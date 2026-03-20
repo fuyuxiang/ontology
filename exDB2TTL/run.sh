@@ -52,10 +52,12 @@ with open(path, "r", encoding="utf-8") as handle:
 database = payload.get("database") or {}
 llm = payload.get("llm") or {}
 output = payload.get("output") or {}
+backend_sync = payload.get("backend_sync") or {}
 
 print(f"DIALECT={database.get('dialect', '')}")
 print(f"API_KEY_ENV={llm.get('api_key_env', '')}")
 print(f"OUTPUT_DIR={output.get('directory', '')}")
+print(f"BACKEND_SYNC_ENABLED={backend_sync.get('enabled', True)}")
 PY
 )"
 
@@ -64,6 +66,7 @@ while IFS='=' read -r key value; do
     DIALECT) DIALECT="${value}" ;;
     API_KEY_ENV) API_KEY_ENV="${value}" ;;
     OUTPUT_DIR) OUTPUT_DIR="${value}" ;;
+    BACKEND_SYNC_ENABLED) BACKEND_SYNC_ENABLED="${value}" ;;
   esac
 done <<EOF
 ${CONFIG_INFO}
@@ -116,3 +119,6 @@ print_line "Step 1/1: run full exDB2TTL pipeline"
 
 print_line ""
 print_line "Done. Output directory: ${OUTPUT_DIR:-<see config>}"
+if [ "${BACKEND_SYNC_ENABLED:-true}" = "True" ] || [ "${BACKEND_SYNC_ENABLED:-true}" = "true" ]; then
+  print_line "Backend generated profile: ${ROOT_DIR}/backend/runtime/generated-profile"
+fi

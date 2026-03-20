@@ -4,6 +4,11 @@ from pathlib import Path
 
 from rdflib import Graph
 
+try:
+    import yaml
+except ImportError:  # pragma: no cover
+    yaml = None
+
 from .config import ProjectConfig
 from .materialize import materialize_sample_graph
 from .models import DatabaseMetadata, DraftBundle, ValidationArtifacts
@@ -24,8 +29,9 @@ def validate_bundle(
     ontology_graph = Graph()
     shacl_graph = Graph()
 
-    ontology_parse_ok = _safe_parse_graph(ontology_graph, bundle.ontology_ttl, errors, "ontology_ttl")
-    shacl_parse_ok = _safe_parse_graph(shacl_graph, bundle.shacl_ttl, errors, "shacl_ttl")
+    ontology_parse_ok = _safe_parse_graph(ontology_graph, bundle.telecom_ontology_ttl, errors, "telecom_ontology_ttl")
+    shacl_parse_ok = _safe_parse_graph(shacl_graph, bundle.telecom_shacl_ttl, errors, "telecom_shacl_ttl")
+    rules_parse_ok, rules_validation_error = _validate_rules_yaml(bundle.rules_yaml, output_dir, errors)
 
     sample_graph = materialize_sample_graph(metadata, bundle.mapping_csv, config.ontology)
     sample_data_path = output_dir / "sample-data.ttl"
@@ -53,10 +59,12 @@ def validate_bundle(
     return ValidationArtifacts(
         ontology_parse_ok=ontology_parse_ok,
         shacl_parse_ok=shacl_parse_ok,
+        rules_parse_ok=rules_parse_ok,
         sample_triples=len(sample_graph),
         shacl_conforms=shacl_conforms,
         shacl_report_text=shacl_report_text,
         shacl_report_path=shacl_report_path,
+        rules_validation_error=rules_validation_error,
         errors=errors,
     )
 
@@ -68,3 +76,39 @@ def _safe_parse_graph(graph: Graph, turtle_text: str, errors: list[str], label: 
         errors.append(f"{label} parse failed: {exc}")
         return False
     return True
+
+
+def _validate_rules_yaml(rules_yaml: str, output_dir: Path, errors: list[str]) -> tuple[bool, str | None]:
+    rules_path = output_dir / "porting-risk.yaml"
+    rules_path.write_text(rules_yaml + "\n", encoding="utf-8")
+
+    loader = _load_backend_ruleset_loader()
+    try:
+        if loader is not None:
+            loader(rules_path)
+        else:
+            if yaml is None:
+                raise RuntimeError("PyYAML is required to validate rules_yaml")
+            payload = yaml.safe_load(rules_path.read_text(encoding="utf-8"))
+            _validate_rules_shape(payload)
+    except Exception as exc:
+        message = f"rules_yaml validation failed: {exc}"
+        errors.append(message)
+        return False, str(exc)
+    return True, None
+
+
+def _load_backend_ruleset_loader():
+    try:
+        from backend.app.rules.decision_table import load_decision_table
+    except ImportError:  # pragma: no cover
+        return None
+    return load_decision_table
+
+
+def _validate_rules_shape(payload: object) -> None:
+    if not isinstance(payload, dict):
+        raise ValueError("rules_yaml must parse to a mapping")
+    for key in ("risk_actions", "factor_rules", "decision_rules"):
+        if key not in payload:
+            raise ValueError(f"rules_yaml missing top-level key: {key}")

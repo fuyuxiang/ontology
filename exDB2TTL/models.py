@@ -56,20 +56,23 @@ class DatabaseMetadata:
 
 @dataclass
 class DraftBundle:
-    ontology_ttl: str
-    shacl_ttl: str
+    telecom_ontology_ttl: str
+    telecom_shacl_ttl: str
     mapping_csv: str
-    business_rules_markdown: str
+    rules_yaml: str
+    business_rules_markdown: str = ""
 
 
 @dataclass
 class ValidationArtifacts:
     ontology_parse_ok: bool
     shacl_parse_ok: bool
+    rules_parse_ok: bool
     sample_triples: int
     shacl_conforms: bool | None
     shacl_report_text: str | None
     shacl_report_path: str | None
+    rules_validation_error: str | None = None
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
