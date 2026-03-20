@@ -1,0 +1,14 @@
+INFO:     Started server process [39938]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8088 (Press CTRL+C to quit)
+INFO:     127.0.0.1:64385 - "GET /api/alerts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64384 - "GET /api/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64386 - "GET /api/alerts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64387 - "GET /api/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64394 - "POST /api/sparql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64397 - "POST /api/sparql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64410 - "POST /api/sparql HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64417 - "POST /api/inference/trigger HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64423 - "GET /api/alerts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64422 - "GET /api/summary HTTP/1.1" 200 OK

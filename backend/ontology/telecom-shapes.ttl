@@ -1,0 +1,45 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix doim: <http://purl.org/doim/1.0#> .
+@prefix telecom: <http://example.com/telecom#> .
+
+telecom:SubscriberShape a sh:NodeShape ;
+    sh:targetClass telecom:Subscriber ;
+    sh:property [
+        sh:path telecom:subscriberId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:maxCount 1 ;
+    ] ;
+    sh:property [
+        sh:path rdfs:label ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:city ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .
+
+telecom:MobileNumberShape a sh:NodeShape ;
+    sh:targetClass telecom:MobileNumber ;
+    sh:property [
+        sh:path doim:identifierValue ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .
+
+telecom:InteractionShape a sh:NodeShape ;
+    sh:targetClass telecom:ChannelInteraction ;
+    sh:property [
+        sh:path telecom:eventId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:eventType ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .

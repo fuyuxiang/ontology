@@ -1,0 +1,129 @@
+{
+  "database_name": "sample_db",
+  "dialect": "sqlite",
+  "schema": null,
+  "tables": [
+    {
+      "name": "customers",
+      "columns": [
+        {
+          "name": "customer_id",
+          "data_type": "TEXT",
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "comment": null,
+          "enum_values": []
+        },
+        {
+          "name": "name",
+          "data_type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "comment": null,
+          "enum_values": []
+        },
+        {
+          "name": "city",
+          "data_type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "comment": null,
+          "enum_values": []
+        }
+      ],
+      "primary_keys": [
+        "customer_id"
+      ],
+      "foreign_keys": [],
+      "comment": null,
+      "sample_rows": [
+        {
+          "customer_id": "C001",
+          "name": "Alice",
+          "city": "Shanghai"
+        },
+        {
+          "customer_id": "C002",
+          "name": "Bob",
+          "city": "Shenzhen"
+        }
+      ]
+    },
+    {
+      "name": "orders",
+      "columns": [
+        {
+          "name": "order_id",
+          "data_type": "TEXT",
+          "nullable": false,
+          "primary_key": true,
+          "default": null,
+          "comment": null,
+          "enum_values": []
+        },
+        {
+          "name": "customer_id",
+          "data_type": "TEXT",
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "comment": null,
+          "enum_values": []
+        },
+        {
+          "name": "amount",
+          "data_type": "REAL",
+          "nullable": false,
+          "primary_key": false,
+          "default": null,
+          "comment": null,
+          "enum_values": []
+        },
+        {
+          "name": "status",
+          "data_type": "TEXT",
+          "nullable": true,
+          "primary_key": false,
+          "default": null,
+          "comment": null,
+          "enum_values": []
+        }
+      ],
+      "primary_keys": [
+        "order_id"
+      ],
+      "foreign_keys": [
+        {
+          "column_name": "customer_id",
+          "target_table": "customers",
+          "target_column": "customer_id",
+          "constraint_name": "orders_fk_0_0"
+        }
+      ],
+      "comment": null,
+      "sample_rows": [
+        {
+          "order_id": "O100",
+          "customer_id": "C001",
+          "amount": 120.5,
+          "status": "paid"
+        },
+        {
+          "order_id": "O101",
+          "customer_id": "C001",
+          "amount": 99.0,
+          "status": "pending"
+        },
+        {
+          "order_id": "O102",
+          "customer_id": "C002",
+          "amount": 210.0,
+          "status": "paid"
+        }
+      ]
+    }
+  ]
+}
