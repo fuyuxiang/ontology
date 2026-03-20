@@ -1,0 +1,155 @@
+risk_actions:
+  HIGH: 48小时内外呼挽留+定向权益补贴
+  MEDIUM: 短信/APP 定向优惠+人工复核
+  LOW: 常规关怀与权益提醒
+
+factor_rules:
+  - id: complaint_spike
+    rule_label: 投诉激增规则
+    factor:
+      code: complaint_spike
+      label: 投诉激增
+    when:
+      all:
+        - field: complaintCount30d
+          op: ">"
+          value: 2
+
+  - id: data_drop
+    rule_label: 流量下滑规则
+    factor:
+      code: data_drop
+      label: 流量下滑
+    when:
+      all:
+        - field: dataUsageDropPct
+          op: ">"
+          value: 30
+
+  - id: competitor_contact
+    rule_label: 竞对接触规则
+    factor:
+      code: competitor_contact
+      label: 竞对接触
+    when:
+      all:
+        - field: competitorContactCount30d
+          op: ">"
+          value: 0
+
+  - id: contract_expiring
+    rule_label: 合约到期规则
+    factor:
+      code: contract_expiring
+      label: 合约即将到期
+    when:
+      all:
+        - field: contractRemainingDays
+          op: "<"
+          value: 45
+
+  - id: porting_intent
+    rule_label: 携转意图规则
+    factor:
+      code: porting_intent
+      label: 携转意图明确
+    when:
+      all:
+        - field: portingCodeRequestCount30d
+          op: ">"
+          value: 0
+
+  - id: payment_pressure
+    rule_label: 支付压力规则
+    factor:
+      code: payment_pressure
+      label: 支付压力
+    when:
+      all:
+        - field: overdueDays
+          op: ">"
+          value: 7
+
+  - id: retention_reject
+    rule_label: 挽留拒绝规则
+    factor:
+      code: retention_reject
+      label: 挽留拒绝
+    when:
+      all:
+        - field: retentionOfferRejected
+          op: ">"
+          value: 0
+
+decision_rules:
+  - id: high_risk_combo
+    priority: 100
+    rule_label: 高风险组合规则
+    when:
+      all:
+        - field: portingCodeRequestCount30d
+          op: ">"
+          value: 0
+        - any:
+            - field: competitorContactCount30d
+              op: ">"
+              value: 0
+            - field: complaintCount30d
+              op: ">"
+              value: 2
+            - field: contractRemainingDays
+              op: "<"
+              value: 45
+    then:
+      risk_level: HIGH
+
+  - id: medium_risk_combo
+    priority: 50
+    rule_label: 中风险组合规则
+    when:
+      any:
+        - all:
+            - field: complaintCount30d
+              op: ">"
+              value: 2
+            - field: dataUsageDropPct
+              op: ">"
+              value: 30
+        - all:
+            - field: dataUsageDropPct
+              op: ">"
+              value: 30
+            - field: contractRemainingDays
+              op: "<"
+              value: 45
+        - all:
+            - field: complaintCount30d
+              op: ">"
+              value: 2
+            - field: competitorContactCount30d
+              op: ">"
+              value: 0
+        - all:
+            - field: competitorContactCount30d
+              op: ">"
+              value: 0
+            - field: retentionOfferRejected
+              op: ">"
+              value: 0
+        - all:
+            - field: overdueDays
+              op: ">"
+              value: 7
+            - field: contractRemainingDays
+              op: "<"
+              value: 45
+    then:
+      risk_level: MEDIUM
+
+  - id: low_risk_default
+    priority: 0
+    rule_label: 低风险默认规则
+    when:
+      all: []
+    then:
+      risk_level: LOW

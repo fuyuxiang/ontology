@@ -16,6 +16,7 @@ def run_shacl_validation(data_graph: Graph, shapes_path: Path, report_path: Path
     if not shapes_path.exists():
         return {"status": "skipped", "reason": "shapes_not_found"}
 
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     conforms, report_graph, report_text = validate(
         data_graph,
         shacl_graph=str(shapes_path),
@@ -29,4 +30,3 @@ def run_shacl_validation(data_graph: Graph, shapes_path: Path, report_path: Path
         "reportPath": str(report_path),
         "reportText": report_text,
     }
-

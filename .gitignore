@@ -1,0 +1,21 @@
+.DS_Store
+
+# Python cache and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.venv/
+
+# Backend runtime artifacts
+backend/runtime/*
+!backend/runtime/.gitkeep
+
+# Frontend install/build artifacts
+frontend/node_modules/
+frontend/dist/
+
+# exDB2TTL local scratch outputs
+exDB2TTL/test-out/
+exDB2TTL/test-project.json
+exDB2TTL/metadata-request.md
