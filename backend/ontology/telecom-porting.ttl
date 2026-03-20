@@ -1,0 +1,155 @@
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix doim: <http://purl.org/doim/1.0#> .
+@prefix telecom: <http://example.com/telecom#> .
+
+telecom: rdf:type owl:Ontology ;
+    rdfs:label "Telecom Porting Ontology"@en ;
+    rdfs:comment "Carrier porting risk ontology for the Python implementation."@en .
+
+telecom:Subscriber rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Subscriber"@en .
+
+telecom:MobileNumber rdf:type owl:Class ;
+    rdfs:subClassOf doim:Identifier ;
+    rdfs:label "Mobile Number"@en .
+
+telecom:UsageSnapshot rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Usage Snapshot"@en .
+
+telecom:CommercialSnapshot rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Commercial Snapshot"@en .
+
+telecom:ChannelInteraction rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Channel Interaction"@en .
+
+telecom:RiskFactor rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Risk Factor"@en .
+
+telecom:Rule rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Rule"@en .
+
+telecom:RiskAlert rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Risk Alert"@en .
+
+telecom:ownsNumber rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:Subscriber ;
+    rdfs:range telecom:MobileNumber .
+
+telecom:hasUsageSnapshot rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:Subscriber ;
+    rdfs:range telecom:UsageSnapshot .
+
+telecom:hasCommercialSnapshot rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:Subscriber ;
+    rdfs:range telecom:CommercialSnapshot .
+
+telecom:hasInteraction rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:Subscriber ;
+    rdfs:range telecom:ChannelInteraction .
+
+telecom:hasRiskFactor rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:Subscriber ;
+    rdfs:range telecom:RiskFactor .
+
+telecom:generatedAlert rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:Subscriber ;
+    rdfs:range telecom:RiskAlert .
+
+telecom:subscriberId rdf:type owl:DatatypeProperty ;
+    rdfs:domain telecom:Subscriber ;
+    rdfs:range xsd:string .
+
+telecom:segmentName rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:city rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:planName rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:tenureMonths rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:monthlyFee rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:decimal .
+
+telecom:vipFlag rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:dataUsageDropPct rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:voiceUsageDropPct rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:complaintCount30d rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:networkIssueCount30d rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:npsScore rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:serviceTicketCount30d rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:contractRemainingDays rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:overdueDays rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:competitorContactCount30d rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:portingCodeRequestCount30d rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:retentionOfferRejected rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:paymentRiskLevel rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:eventId rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:eventType rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:channelName rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:eventDaysAgo rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+
+telecom:eventSeverity rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:eventDetail rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:inferredRiskLevel rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:recommendedAction rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:riskLevel rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:riskScore rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
+

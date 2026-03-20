@@ -1,0 +1,27 @@
+dataset,source_system,target_type,subject_key,mapped_predicate,field_name,value_type,description
+subscribers,CRM,telecom:Subscriber,subscriber_id,telecom:subscriberId,subscriber_id,string,客户唯一标识
+subscribers,CRM,telecom:Subscriber,subscriber_id,rdfs:label,customer_name,string,客户名称
+subscribers,CRM,telecom:Subscriber,subscriber_id,doim:identifierValue,msisdn,string,号码标识值
+subscribers,CRM,telecom:Subscriber,subscriber_id,telecom:segmentName,segment,string,客群
+subscribers,CRM,telecom:Subscriber,subscriber_id,telecom:city,city,string,归属城市
+subscribers,CRM,telecom:Subscriber,subscriber_id,telecom:planName,plan_name,string,套餐名称
+subscribers,CRM,telecom:Subscriber,subscriber_id,telecom:tenureMonths,tenure_months,int,在网时长
+subscribers,CRM,telecom:Subscriber,subscriber_id,telecom:monthlyFee,monthly_fee,decimal,月套餐费
+subscribers,CRM,telecom:Subscriber,subscriber_id,telecom:vipFlag,vip_flag,int,高价值客户标记
+usage_signals,NETWORK,telecom:UsageSnapshot,subscriber_id,telecom:dataUsageDropPct,data_usage_drop_pct,int,近30天流量下降比例
+usage_signals,NETWORK,telecom:UsageSnapshot,subscriber_id,telecom:voiceUsageDropPct,voice_usage_drop_pct,int,近30天语音下降比例
+usage_signals,NETWORK,telecom:UsageSnapshot,subscriber_id,telecom:complaintCount30d,complaint_count_30d,int,近30天投诉次数
+usage_signals,NETWORK,telecom:UsageSnapshot,subscriber_id,telecom:networkIssueCount30d,network_issue_count_30d,int,近30天网络故障次数
+usage_signals,NETWORK,telecom:UsageSnapshot,subscriber_id,telecom:npsScore,nps_score,int,NPS 评分
+usage_signals,NETWORK,telecom:UsageSnapshot,subscriber_id,telecom:serviceTicketCount30d,service_ticket_count_30d,int,近30天服务工单数
+commercial_signals,BILLING,telecom:CommercialSnapshot,subscriber_id,telecom:contractRemainingDays,contract_remaining_days,int,合约剩余天数
+commercial_signals,BILLING,telecom:CommercialSnapshot,subscriber_id,telecom:overdueDays,overdue_days,int,欠费天数
+commercial_signals,BILLING,telecom:CommercialSnapshot,subscriber_id,telecom:competitorContactCount30d,competitor_contact_count_30d,int,竞对接触次数
+commercial_signals,BILLING,telecom:CommercialSnapshot,subscriber_id,telecom:portingCodeRequestCount30d,porting_code_request_count_30d,int,携转授权码申请次数
+commercial_signals,BILLING,telecom:CommercialSnapshot,subscriber_id,telecom:retentionOfferRejected,retention_offer_rejected,int,挽留是否拒绝
+commercial_signals,BILLING,telecom:CommercialSnapshot,subscriber_id,telecom:paymentRiskLevel,payment_risk_level,string,支付风险等级
+interaction_events,OMNI_CHANNEL,telecom:ChannelInteraction,event_id,telecom:eventType,event_type,string,事件类型
+interaction_events,OMNI_CHANNEL,telecom:ChannelInteraction,event_id,telecom:channelName,channel,string,渠道
+interaction_events,OMNI_CHANNEL,telecom:ChannelInteraction,event_id,telecom:eventDaysAgo,days_ago,int,距今天数
+interaction_events,OMNI_CHANNEL,telecom:ChannelInteraction,event_id,telecom:eventSeverity,severity,string,事件级别
+interaction_events,OMNI_CHANNEL,telecom:ChannelInteraction,event_id,telecom:eventDetail,detail,string,事件描述

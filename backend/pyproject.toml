@@ -1,0 +1,34 @@
+[project]
+name = "python-ontology-backend"
+version = "0.1.0"
+description = "Python implementation of the telecom ontology semantic layer POC."
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.116.0",
+  "uvicorn>=0.35.0",
+  "rdflib>=7.2.1",
+  "pyoxigraph>=0.5.1",
+  "pyshacl>=0.31.0",
+  "owlrl>=7.1.4",
+  "pandas>=2.2.3",
+  "pydantic>=2.11.0",
+  "typer>=0.16.0",
+  "python-multipart>=0.0.20",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+

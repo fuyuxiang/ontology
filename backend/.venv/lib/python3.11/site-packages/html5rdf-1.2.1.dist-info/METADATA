@@ -1,0 +1,261 @@
+Metadata-Version: 2.1
+Name: html5rdf
+Version: 1.2.1
+Summary: HTML parser based on the WHATWG HTML specification
+Home-page: https://github.com/RDFLib/html5rdf
+Author-email: Ashley Sommer <ashleysommer@gmail.com>, James Graham <james@hoppipolla.co.uk>
+Maintainer: Ashley Sommer
+Maintainer-email: ashleysommer@gmail.com
+License: Copyright (c) 2006-2013 James Graham and other contributors
+        
+        Permission is hereby granted, free of charge, to any person obtaining
+        a copy of this software and associated documentation files (the
+        "Software"), to deal in the Software without restriction, including
+        without limitation the rights to use, copy, modify, merge, publish,
+        distribute, sublicense, and/or sell copies of the Software, and to
+        permit persons to whom the Software is furnished to do so, subject to
+        the following conditions:
+        
+        The above copyright notice and this permission notice shall be
+        included in all copies or substantial portions of the Software.
+        
+        THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+        EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+        MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+        NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
+        LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+        OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+        WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+        
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Text Processing :: Markup :: HTML
+Requires-Python: >=3.8
+Description-Content-Type: text/x-rst
+License-File: LICENSE
+License-File: AUTHORS.rst
+
+html5rdf
+========
+
+.. image:: https://github.com/html5lib/html5lib-python/actions/workflows/python-tox.yml/badge.svg
+    :target: https://github.com/html5lib/html5lib-python/actions/workflows/python-tox.yml
+
+html5rdf is a pure-python library for parsing HTML to DOMFragment objects for the use in RDFLib.
+html5rdf is a fork of html5lib-python. See below for the html5lib README.
+
+----
+
+It is designed to conform to the WHATWG HTML specification, as is implemented by all major
+web browsers.
+
+htm5lib-modern is designed as a drop-in replacement for ``html5lib`` that exposes a new
+``html5lib`` module without Python 2 support and without the legacy dependencies on
+``six``, and ``webencodings``. Note, you should not have the old deprecated ``html5lib``
+and ``html5lib-modern`` in your dependency tree at the same time, because they alias.
+
+
+Usage
+-----
+
+Simple usage follows this pattern:
+
+.. code-block:: python
+
+  import html5rdf
+  with open("mydocument.html", "rb") as f:
+      document = html5rdf.parse(f)
+
+or:
+
+.. code-block:: python
+
+  import html5rdf
+  document = html5rdf.parse("<p>Hello World!")
+
+By default, the ``document`` will be an ``xml.etree`` element instance.
+Whenever possible, html5lib chooses the accelerated ``ElementTree``
+implementation.
+
+Two other tree types are supported: ``xml.dom.minidom`` and
+``lxml.etree``. To use an alternative format, specify the name of
+a treebuilder:
+
+.. code-block:: python
+
+  import html5rdf
+  with open("mydocument.html", "rb") as f:
+      lxml_etree_document = html5rdf.parse(f, treebuilder="lxml")
+
+When using with ``urllib.request`` (Python 3), the charset from HTTP
+should be pass into html5rdf as follows:
+
+.. code-block:: python
+
+  from urllib.request import urlopen
+  import html5rdf
+
+  with urlopen("http://example.com/") as f:
+      document = html5rdf.parse(f, transport_encoding=f.info().get_content_charset())
+
+To have more control over the parser, create a parser object explicitly.
+For instance, to make the parser raise exceptions on parse errors, use:
+
+.. code-block:: python
+
+  import html5rdf
+  with open("mydocument.html", "rb") as f:
+      parser = html5rdf.HTMLParser(strict=True)
+      document = parser.parse(f)
+
+When you're instantiating parser objects explicitly, pass a treebuilder
+class as the ``tree`` keyword argument to use an alternative document
+format:
+
+.. code-block:: python
+
+  import html5rdf
+  parser = html5rdf.HTMLParser(tree=html5rdf.getTreeBuilder("dom"))
+  minidom_document = parser.parse("<p>Hello World!")
+
+More documentation is available at https://html5lib.readthedocs.io/.
+
+
+Installation
+------------
+
+html5rdf works on CPython 3.8+ and PyPy. To install:
+
+.. code-block:: bash
+
+    $ pip install html5rdf
+
+The goal is to support a (non-strict) superset of the versions that `pip
+supports
+<https://pip.pypa.io/en/stable/installing/#python-and-os-compatibility>`_.
+
+
+Optional Dependencies
+---------------------
+
+The following third-party libraries may be used for additional
+functionality:
+
+- ``lxml`` is supported as a tree format (for both building and
+  walking) under CPython (but *not* PyPy where it is known to cause
+  segfaults);
+
+- ``genshi`` has a treewalker (but not builder); and
+
+- ``chardet`` can be used as a fallback when character encoding cannot
+  be determined.
+
+
+Bugs
+----
+
+Please report any bugs on the `issue tracker
+<https://github.com/html5lib/html5lib-python/issues>`_.
+
+
+Tests
+-----
+
+Unit tests require the ``pytest`` and ``mock`` libraries and can be
+run using the ``pytest`` command in the root directory.
+
+Test data are contained in a separate `html5lib-tests
+<https://github.com/html5lib/html5lib-tests>`_ repository and included
+as a submodule, thus for git checkouts they must be initialized::
+
+  $ git submodule init
+  $ git submodule update
+
+If you have all compatible Python implementations available on your
+system, you can run tests on all of them using the ``tox`` utility,
+which can be found on PyPI.
+
+
+Credits
+=======
+
+``html5lib`` is written and maintained by:
+
+- James Graham
+- Sam Sneddon
+- Łukasz Langa
+- Will Kahn-Greene
+
+
+Patches and suggestions
+-----------------------
+(In chronological order, by first commit:)
+
+- Anne van Kesteren
+- Lachlan Hunt
+- lantis63
+- Sam Ruby
+- Thomas Broyer
+- Tim Fletcher
+- Mark Pilgrim
+- Ryan King
+- Philip Taylor
+- Edward Z. Yang
+- fantasai
+- Philip Jägenstedt
+- Ms2ger
+- Mohammad Taha Jahangir
+- Andy Wingo
+- Andreas Madsack
+- Karim Valiev
+- Juan Carlos Garcia Segovia
+- Mike West
+- Marc DM
+- Simon Sapin
+- Michael[tm] Smith
+- Ritwik Gupta
+- Marc Abramowitz
+- Tony Lopes
+- lilbludevil
+- Kevin
+- Drew Hubl
+- Austin Kumbera
+- Jim Baker
+- Jon Dufresne
+- Donald Stufft
+- Alex Gaynor
+- Nik Nyby
+- Jakub Wilk
+- Sigmund Cherem
+- Gabi Davar
+- Florian Mounier
+- neumond
+- Vitalik Verhovodov
+- Kovid Goyal
+- Adam Chainz
+- John Vandenberg
+- Eric Amorde
+- Benedikt Morbach
+- Jonathan Vanasco
+- Tom Most
+- Ville Skyttä
+- Hugo van Kemenade
+- Mark Vasilkov
+
+
+HTML5Lib-modern
+---------------
+
+- Ashley Sommer
