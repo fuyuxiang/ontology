@@ -1,0 +1,9 @@
+{
+  "ontology_parse_ok": true,
+  "shacl_parse_ok": true,
+  "sample_triples": 23,
+  "shacl_conforms": true,
+  "shacl_report_text": "Validation Report\nConforms: True\n",
+  "shacl_report_path": "exDB2TTL/test-out/shacl-report.ttl",
+  "errors": []
+}

@@ -1,0 +1,660 @@
+Metadata-Version: 2.4
+Name: pyshacl
+Version: 0.31.0
+Summary: Python SHACL Validator
+License: Apache License
+                                    Version 2.0, January 2004
+                                 http://www.apache.org/licenses/
+         
+            TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+         
+            1. Definitions.
+         
+               "License" shall mean the terms and conditions for use, reproduction,
+               and distribution as defined by Sections 1 through 9 of this document.
+         
+               "Licensor" shall mean the copyright owner or entity authorized by
+               the copyright owner that is granting the License.
+         
+               "Legal Entity" shall mean the union of the acting entity and all
+               other entities that control, are controlled by, or are under common
+               control with that entity. For the purposes of this definition,
+               "control" means (i) the power, direct or indirect, to cause the
+               direction or management of such entity, whether by contract or
+               otherwise, or (ii) ownership of fifty percent (50%) or more of the
+               outstanding shares, or (iii) beneficial ownership of such entity.
+         
+               "You" (or "Your") shall mean an individual or Legal Entity
+               exercising permissions granted by this License.
+         
+               "Source" form shall mean the preferred form for making modifications,
+               including but not limited to software source code, documentation
+               source, and configuration files.
+         
+               "Object" form shall mean any form resulting from mechanical
+               transformation or translation of a Source form, including but
+               not limited to compiled object code, generated documentation,
+               and conversions to other media types.
+         
+               "Work" shall mean the work of authorship, whether in Source or
+               Object form, made available under the License, as indicated by a
+               copyright notice that is included in or attached to the work
+               (an example is provided in the Appendix below).
+         
+               "Derivative Works" shall mean any work, whether in Source or Object
+               form, that is based on (or derived from) the Work and for which the
+               editorial revisions, annotations, elaborations, or other modifications
+               represent, as a whole, an original work of authorship. For the purposes
+               of this License, Derivative Works shall not include works that remain
+               separable from, or merely link (or bind by name) to the interfaces of,
+               the Work and Derivative Works thereof.
+         
+               "Contribution" shall mean any work of authorship, including
+               the original version of the Work and any modifications or additions
+               to that Work or Derivative Works thereof, that is intentionally
+               submitted to Licensor for inclusion in the Work by the copyright owner
+               or by an individual or Legal Entity authorized to submit on behalf of
+               the copyright owner. For the purposes of this definition, "submitted"
+               means any form of electronic, verbal, or written communication sent
+               to the Licensor or its representatives, including but not limited to
+               communication on electronic mailing lists, source code control systems,
+               and issue tracking systems that are managed by, or on behalf of, the
+               Licensor for the purpose of discussing and improving the Work, but
+               excluding communication that is conspicuously marked or otherwise
+               designated in writing by the copyright owner as "Not a Contribution."
+         
+               "Contributor" shall mean Licensor and any individual or Legal Entity
+               on behalf of whom a Contribution has been received by Licensor and
+               subsequently incorporated within the Work.
+         
+            2. Grant of Copyright License. Subject to the terms and conditions of
+               this License, each Contributor hereby grants to You a perpetual,
+               worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+               copyright license to reproduce, prepare Derivative Works of,
+               publicly display, publicly perform, sublicense, and distribute the
+               Work and such Derivative Works in Source or Object form.
+         
+            3. Grant of Patent License. Subject to the terms and conditions of
+               this License, each Contributor hereby grants to You a perpetual,
+               worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+               (except as stated in this section) patent license to make, have made,
+               use, offer to sell, sell, import, and otherwise transfer the Work,
+               where such license applies only to those patent claims licensable
+               by such Contributor that are necessarily infringed by their
+               Contribution(s) alone or by combination of their Contribution(s)
+               with the Work to which such Contribution(s) was submitted. If You
+               institute patent litigation against any entity (including a
+               cross-claim or counterclaim in a lawsuit) alleging that the Work
+               or a Contribution incorporated within the Work constitutes direct
+               or contributory patent infringement, then any patent licenses
+               granted to You under this License for that Work shall terminate
+               as of the date such litigation is filed.
+         
+            4. Redistribution. You may reproduce and distribute copies of the
+               Work or Derivative Works thereof in any medium, with or without
+               modifications, and in Source or Object form, provided that You
+               meet the following conditions:
+         
+               (a) You must give any other recipients of the Work or
+                   Derivative Works a copy of this License; and
+         
+               (b) You must cause any modified files to carry prominent notices
+                   stating that You changed the files; and
+         
+               (c) You must retain, in the Source form of any Derivative Works
+                   that You distribute, all copyright, patent, trademark, and
+                   attribution notices from the Source form of the Work,
+                   excluding those notices that do not pertain to any part of
+                   the Derivative Works; and
+         
+               (d) If the Work includes a "NOTICE" text file as part of its
+                   distribution, then any Derivative Works that You distribute must
+                   include a readable copy of the attribution notices contained
+                   within such NOTICE file, excluding those notices that do not
+                   pertain to any part of the Derivative Works, in at least one
+                   of the following places: within a NOTICE text file distributed
+                   as part of the Derivative Works; within the Source form or
+                   documentation, if provided along with the Derivative Works; or,
+                   within a display generated by the Derivative Works, if and
+                   wherever such third-party notices normally appear. The contents
+                   of the NOTICE file are for informational purposes only and
+                   do not modify the License. You may add Your own attribution
+                   notices within Derivative Works that You distribute, alongside
+                   or as an addendum to the NOTICE text from the Work, provided
+                   that such additional attribution notices cannot be construed
+                   as modifying the License.
+         
+               You may add Your own copyright statement to Your modifications and
+               may provide additional or different license terms and conditions
+               for use, reproduction, or distribution of Your modifications, or
+               for any such Derivative Works as a whole, provided Your use,
+               reproduction, and distribution of the Work otherwise complies with
+               the conditions stated in this License.
+         
+            5. Submission of Contributions. Unless You explicitly state otherwise,
+               any Contribution intentionally submitted for inclusion in the Work
+               by You to the Licensor shall be under the terms and conditions of
+               this License, without any additional terms or conditions.
+               Notwithstanding the above, nothing herein shall supersede or modify
+               the terms of any separate license agreement you may have executed
+               with Licensor regarding such Contributions.
+         
+            6. Trademarks. This License does not grant permission to use the trade
+               names, trademarks, service marks, or product names of the Licensor,
+               except as required for reasonable and customary use in describing the
+               origin of the Work and reproducing the content of the NOTICE file.
+         
+            7. Disclaimer of Warranty. Unless required by applicable law or
+               agreed to in writing, Licensor provides the Work (and each
+               Contributor provides its Contributions) on an "AS IS" BASIS,
+               WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+               implied, including, without limitation, any warranties or conditions
+               of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+               PARTICULAR PURPOSE. You are solely responsible for determining the
+               appropriateness of using or redistributing the Work and assume any
+               risks associated with Your exercise of permissions under this License.
+         
+            8. Limitation of Liability. In no event and under no legal theory,
+               whether in tort (including negligence), contract, or otherwise,
+               unless required by applicable law (such as deliberate and grossly
+               negligent acts) or agreed to in writing, shall any Contributor be
+               liable to You for damages, including any direct, indirect, special,
+               incidental, or consequential damages of any character arising as a
+               result of this License or out of the use or inability to use the
+               Work (including but not limited to damages for loss of goodwill,
+               work stoppage, computer failure or malfunction, or any and all
+               other commercial damages or losses), even if such Contributor
+               has been advised of the possibility of such damages.
+         
+            9. Accepting Warranty or Additional Liability. While redistributing
+               the Work or Derivative Works thereof, You may choose to offer,
+               and charge a fee for, acceptance of support, warranty, indemnity,
+               or other liability obligations and/or rights consistent with this
+               License. However, in accepting such obligations, You may act only
+               on Your own behalf and on Your sole responsibility, not on behalf
+               of any other Contributor, and only if You agree to indemnify,
+               defend, and hold each Contributor harmless for any liability
+               incurred by, or claims asserted against, such Contributor by reason
+               of your accepting any such warranty or additional liability.
+         
+            END OF TERMS AND CONDITIONS
+         
+            APPENDIX: How to apply the Apache License to your work.
+         
+               To apply the Apache License to your work, attach the following
+               boilerplate notice, with the fields enclosed by brackets "[]"
+               replaced with your own identifying information. (Don't include
+               the brackets!)  The text should be enclosed in the appropriate
+               comment syntax for the file format. We also recommend that a
+               file or class name and description of purpose be included on the
+               same "printed page" as the copyright notice for easier
+               identification within third-party archives.
+         
+            Copyright [yyyy] [name of copyright owner]
+         
+            Licensed under the Apache License, Version 2.0 (the "License");
+            you may not use this file except in compliance with the License.
+            You may obtain a copy of the License at
+         
+                http://www.apache.org/licenses/LICENSE-2.0
+         
+            Unless required by applicable law or agreed to in writing, software
+            distributed under the License is distributed on an "AS IS" BASIS,
+            WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+            See the License for the specific language governing permissions and
+            limitations under the License.
+License-File: LICENSE.txt
+Keywords: Linked Data,Semantic Web,RDF,Graph,Python,SHACL,Shapes,Schema,Validate,Validator
+Author: Ashley Sommer
+Author-email: Ashley.Sommer@csiro.au
+Requires-Python: >=3.9,<4
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Topic :: Utilities
+Classifier: Intended Audience :: Developers
+Classifier: Natural Language :: English
+Classifier: Programming Language :: Python :: Implementation :: CPython
+Classifier: Programming Language :: Python :: Implementation :: PyPy
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Programming Language :: Python :: 3.13
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Operating System :: OS Independent
+Provides-Extra: dev-coverage
+Provides-Extra: dev-lint
+Provides-Extra: dev-type-checking
+Provides-Extra: http
+Provides-Extra: js
+Requires-Dist: coverage (>6.1,!=6.1.1,<7) ; extra == "dev-coverage"
+Requires-Dist: importlib-metadata (>6) ; python_version < "3.12"
+Requires-Dist: mypy (>=1.13.0) ; extra == "dev-type-checking"
+Requires-Dist: owlrl (>=7.1.2,<8)
+Requires-Dist: packaging (>=21.3)
+Requires-Dist: platformdirs ; extra == "dev-coverage"
+Requires-Dist: platformdirs ; extra == "dev-lint"
+Requires-Dist: platformdirs ; extra == "dev-type-checking"
+Requires-Dist: prettytable (>=3.5.0) ; python_version < "3.12"
+Requires-Dist: prettytable (>=3.7.0) ; python_version >= "3.12"
+Requires-Dist: pyduktape2 (>=0.4.6,<1) ; extra == "js"
+Requires-Dist: pytest-cov (>=2.8.1,<3) ; extra == "dev-coverage"
+Requires-Dist: rdflib[html] (>=7.1.1,!=7.1.2,<8.0)
+Requires-Dist: ruff (>=0.9.3,<0.10) ; extra == "dev-lint"
+Requires-Dist: sanic (>=22.12,<23) ; extra == "http"
+Requires-Dist: sanic-cors (==2.2.0) ; extra == "http"
+Requires-Dist: sanic-ext (>=23.3,<23.6) ; extra == "http"
+Requires-Dist: types-setuptools ; extra == "dev-type-checking"
+Project-URL: Homepage, https://github.com/RDFLib/pySHACL
+Project-URL: changelog, https://github.com/RDFLib/pySHACL/blob/master/CHANGELOG.md
+Project-URL: download, https://github.com/RDFLib/pySHACL/releases
+Project-URL: issues, https://github.com/RDFLib/pySHACL/issues
+Project-URL: source, https://github.com/RDFLib/pySHACL
+Description-Content-Type: text/markdown
+
+![](pySHACL-250.png)
+
+# pySHACL
+A Python validator for SHACL.
+
+[![Build Status](https://drone.rdflib.ashs.dev/api/badges/RDFLib/pySHACL/status.svg)](https://drone.rdflib.ashs.dev/RDFLib/pySHACL)
+
+[![DOI](https://zenodo.org/badge/147505799.svg)](https://zenodo.org/badge/latestdoi/147505799) [![Downloads](https://pepy.tech/badge/pyshacl)](https://pepy.tech/project/pyshacl) [![Downloads](https://pepy.tech/badge/pyshacl/month)](https://pepy.tech/project/pyshacl/month) [![Downloads](https://pepy.tech/badge/pyshacl/week)](https://pepy.tech/project/pyshacl/week)
+
+This is a pure Python module which allows for the validation of [RDF](https://www.w3.org/2001/sw/wiki/RDF) graphs against Shapes Constraint Language ([SHACL](https://www.w3.org/TR/shacl/)) graphs. This module uses the [rdflib](https://github.com/RDFLib/rdflib) Python library for working with RDF and is dependent on the [OWL-RL](https://github.com/RDFLib/OWL-RL) Python module for [OWL2 RL Profile](https://www.w3.org/TR/owl2-overview/#ref-owl-2-profiles) based expansion of data graphs.
+
+This module is developed to adhere to the SHACL Recommendation:
+> Holger Knublauch; Dimitris Kontokostas. *Shapes Constraint Language (SHACL)*. 20 July 2017. W3C Recommendation. URL: <https://www.w3.org/TR/shacl/> ED: <https://w3c.github.io/data-shapes/shacl/>
+
+# Community for Help and Support
+The SHACL community has a discord server for discussion of topics around SHACL and the SHACL specification.
+
+[Use this invitation link: https://discord.gg/RTbGfJqdKB to join the server](https://discord.gg/RTbGfJqdKB)
+
+There is a \#pyshacl channel for discussion of this python library, and you can ask for general SHACL help too.
+
+## Installation
+Install with PIP (Using the Python3 pip installer `pip3`)
+```bash
+$ pip3 install pyshacl
+```
+
+Or in a python virtualenv _(these example commandline instructions are for a Linux/Unix based OS)_
+```bash
+$ python3 -m virtualenv --python=python3 --no-site-packages .venv
+$ source ./.venv/bin/activate
+$ pip3 install pyshacl
+```
+
+To exit the virtual enviornment:
+```bash
+$ deactivate
+```
+
+## Command Line Use
+For command line use:
+_(these example commandline instructions are for a Linux/Unix based OS)_
+```bash
+$ pyshacl -s /path/to/shapesGraph.ttl -m -i rdfs -a -j -f human /path/to/dataGraph.ttl
+```
+To validate multiple data graphs in combine mode (default):
+```bash
+$ pyshacl -s /path/to/shapesGraph.ttl /path/to/dataGraph1.ttl /path/to/dataGraph2.ttl
+```
+To validate multiple data graphs independently:
+```bash
+$ pyshacl --validate-each -s /path/to/shapesGraph.ttl /path/to/dataGraph1.ttl /path/to/dataGraph2.ttl
+```
+Where
+ - `-s` is an (optional) path to the shapes graph to use
+ - `-e` is an (optional) path to an extra ontology graph to import
+ - `-i` is the pre-inferencing option
+ - `-f` is the ValidationReport output format (`human` = human-readable validation report)
+ - `--validate-each` validates each data graph independently when multiple inputs are provided
+ - `-m` enable the meta-shacl feature
+ - `-a` enable SHACL Advanced Features
+ - `-j` enable SHACL-JS Features (if `pyshacl[js]` is installed)
+
+System exit codes are:
+`0` = DataGraph is Conformant
+`1` = DataGraph is Non-Conformant
+`2` = The validator encountered a RuntimeError (check stderr output for details)
+`3` = Not-Implemented; The validator encountered a SHACL feature that is not yet implemented.
+
+Full CLI Usage options:
+```bash
+$ pyshacl -h
+$ python3 -m pyshacl -h
+usage: pyshacl [-h] [-s [SHACL]] [-e [ONT]] [-i {none,rdfs,owlrl,both}] [-m]
+               [-im] [-a] [-j] [-it] [--abort] [--allow-info] [-w]
+               [--max-depth [MAX_DEPTH]] [-d] [--validate-each]
+               [-f {human,table,turtle,xml,json-ld,nt,n3}]
+               [-df {auto,turtle,xml,json-ld,nt,n3}]
+               [-sf {auto,turtle,xml,json-ld,nt,n3}]
+               [-ef {auto,turtle,xml,json-ld,nt,n3}] [-V] [-o [OUTPUT]]
+               [--server]
+               DataGraph [DataGraph ...]
+
+PySHACL 0.27.0 command line tool.
+
+positional arguments:
+  DataGraph             The file(s) containing the Target Data Graph.
+
+optional arguments:
+  --server              Ignore all the rest of the options, start the HTTP Server.
+  -h, --help            show this help message and exit
+  -s [SHACL], --shacl [SHACL]
+                        A file containing the SHACL Shapes Graph.
+  -e [ONT], --ont-graph [ONT]
+                        A file path or URL to a document containing extra
+                        ontological information. RDFS and OWL definitions from this 
+                        are used to inoculate the DataGraph.
+  -i {none,rdfs,owlrl,both}, --inference {none,rdfs,owlrl,both}
+                        Choose a type of inferencing to run against the Data
+                        Graph before validating.
+  -m, --metashacl       Validate the SHACL Shapes graph against the shacl-
+                        shacl Shapes Graph before validating the Data Graph.
+  -im, --imports        Allow import of sub-graphs defined in statements with
+                        owl:imports.
+  -a, --advanced        Enable features from the SHACL Advanced Features
+                        specification.
+  -j, --js              Enable features from the SHACL-JS Specification.
+  -it, --iterate-rules  Run Shape's SHACL Rules iteratively until the
+                        data_graph reaches a steady state.
+  --abort               Abort on first invalid data.
+  --allow-info, --allow-infos
+                        Shapes marked with severity of Info will not cause
+                        result to be invalid.
+  -w, --allow-warning, --allow-warnings
+                        Shapes marked with severity of Warning or Info will
+                        not cause result to be invalid.
+  --max-depth [MAX_DEPTH]
+                        The maximum number of SHACL shapes "deep" that the
+                        validator can go before reaching an "endpoint"
+                        constraint.
+  -d, --debug           Output additional verbose runtime messages.
+  --validate-each       Validate each data graph independently when multiple
+                        inputs are provided.
+  --focus [FOCUS]       Optional IRIs of focus nodes from the DataGraph, the shapes will
+                        validate only these node. Comma-separated list.
+  --shape [SHAPE]       Optional IRIs of a NodeShape or PropertyShape from the SHACL
+                        ShapesGraph, only these shapes will be used to validate the
+                        DataGraph. Comma-separated list.
+  -f {human,table,turtle,xml,json-ld,nt,n3}, --format {human,table,turtle,xml,json-ld,nt,n3}
+                        Choose an output format. Default is "human".
+  -df {auto,turtle,xml,json-ld,nt,n3}, --data-file-format {auto,turtle,xml,json-ld,nt,n3}
+                        Explicitly state the RDF File format of the input
+                        DataGraph file. Default="auto".
+  -sf {auto,turtle,xml,json-ld,nt,n3}, --shacl-file-format {auto,turtle,xml,json-ld,nt,n3}
+                        Explicitly state the RDF File format of the input
+                        SHACL file. Default="auto".
+  -ef {auto,turtle,xml,json-ld,nt,n3}, --ont-file-format {auto,turtle,xml,json-ld,nt,n3}
+                        Explicitly state the RDF File format of the extra
+                        ontology file. Default="auto".
+  -V, --version         Show PySHACL version and exit.
+  -o [OUTPUT], --output [OUTPUT]
+                        Send output to a file (defaults to stdout).
+  --server              Ignore all the rest of the options, start the HTTP
+                        Server. Same as `pyshacl_server`.
+```
+
+## Python Module Use
+For basic use of this module, you can just call the `validate` function of the `pyshacl` module like this:
+
+```python
+from pyshacl import validate
+
+data_graph = "some-data.ttl"
+shacl_graph = "some-shacl.ttl"
+ont_graph = "some-ontology.ttl"
+
+r = validate(data_graph,
+      shacl_graph=shacl_graph,
+      ont_graph=ont_graph,
+      inference='rdfs',
+      abort_on_first=False,
+      allow_infos=False,
+      allow_warnings=False,
+      meta_shacl=False,
+      advanced=False,
+      js=False,
+      debug=False)
+conforms, results_graph, results_text = r
+```
+
+To validate multiple data graphs in combine mode (default):
+```python
+from pyshacl import validate
+
+data_graphs = ["data1.ttl", "data2.ttl", "data3.ttl"]
+conforms, results_graph, results_text = validate(data_graphs, shacl_graph="shapes.ttl")
+```
+
+To validate each data graph independently:
+```python
+from pyshacl import validate_each
+
+data_graphs = ["data1.ttl", "data2.ttl", "data3.ttl"]
+results = validate_each(data_graphs, shacl_graph="shapes.ttl")
+for graph_id, (conforms, results_graph, results_text) in results.items():
+    print(graph_id, conforms)
+```
+
+Where:
+* `data_graph` is an rdflib `Graph` object, file path, or a sequence of those to be validated
+* `shacl_graph` is an rdflib `Graph` object or file path or Web URL of the graph containing the SHACL shapes to validate with, or None if the SHACL shapes are included in the data_graph.
+* `ont_graph` is an rdflib `Graph` object or file path or Web URL a graph containing extra ontological information, or None if not required. RDFS and OWL definitions from this are used to inoculate the DataGraph.
+* `inference` is a Python string value to indicate whether or not to perform OWL inferencing expansion of the `data_graph` before validation.
+Options are 'rdfs', 'owlrl', 'both', or 'none'. The default is 'none'.
+* `abort_on_first` (optional) `bool` value to indicate whether or not the program should abort after encountering the first validation failure or to continue. Default is to continue.
+* `allow_infos` (optional) `bool` value, Shapes marked with severity of Info will not cause result to be invalid.
+* `allow_warnings` (optional) `bool` value, Shapes marked with severity of Warning or Info will not cause result to be invalid.
+* `meta_shacl` (optional) `bool` value to indicate whether or not the program should enable the Meta-SHACL feature. Default is False.
+* `advanced`: (optional) `bool` value to enable SHACL Advanced Features
+* `js`: (optional) `bool` value to enable SHACL-JS Features (if `pyshacl[js]` is installed)
+* `debug` (optional) `bool` value to indicate whether or not the program should emit debugging output text, including violations that didn't lead to non-conformance overall. So when debug is True don't judge conformance by absense of violation messages. Default is False.
+
+Some other optional keyword variables available on the `validate` function:
+* `data_graph_format`: Override the format detection for the given data graph source file.
+* `shacl_graph_format`: Override the format detection for the given shacl graph source file.
+* `ont_graph_format`: Override the format detection for the given extra ontology graph source file.
+* `iterate_rules`: Iterate SHACL Rules until steady state is found (only works with advanced mode).
+* `do_owl_imports`: Enable the feature to allow the import of subgraphs using `owl:imports` for the shapes graph and the ontology graph. Note, you explicitly cannot use this on the target data graph.
+* `serialize_report_graph`: Convert the report results_graph into a serialised representation (for example, 'turtle')
+* `check_dash_result`: Check the validation result against the given expected DASH test suite result.
+* `multi_data_graphs_mode`: When passing a sequence of data graphs, choose `"combine"` or `"validate_each"`.
+
+Return value:
+* a three-component `tuple` containing:
+  * `conforms`: a `bool`, indicating whether the `data_graph` conforms to the `shacl_graph`
+  * `results_graph`: a `Graph` object built according to the SHACL specification's [Validation Report](https://www.w3.org/TR/shacl/#validation-report) scheme
+  * `results_text`: python string representing a verbose textual representation of the [Validation Report](https://www.w3.org/TR/shacl/#validation-report)
+
+## Python Module Call
+
+You can get an equivalent of the Command Line Tool using the Python3 executable by doing:
+
+```bash
+$ python3 -m pyshacl
+```
+
+## Errors
+Under certain circumstances pySHACL can produce a [`Validation Failure`](https://www.w3.org/TR/shacl/#failures). This is a formal error [defined by the SHACL specification](https://www.w3.org/TR/shacl/#failures) and is required to be produced as a result of specific conditions within the SHACL graph that leads to the inability to complete the validation.
+If the validator produces a [`Validation Failure`](https://www.w3.org/TR/shacl/#failures), the `results_graph` variable returned by the `validate()` function will be an instance of `ValidationFailure`.
+See the `message` attribute on that instance to get more information about the validation failure.
+
+Other errors the validator can generate:
+- `ShapeLoadError`: This error is thrown when a SHACL Shape in the SHACL graph is in an invalid state and cannot be loaded into the validation engine.
+- `ConstraintLoadError`: This error is thrown when a SHACL Constraint Component is in an invalid state and cannot be loaded into the validation engine.
+- `ReportableRuntimeError`: An error occurred for a different reason, and the reason should be communicated back to the user of the validator.
+- `RuntimeError`: The validator encountered a situation that caused it to throw an error, but the reason does not concern the user.
+
+Unlike `ValidationFailure`, these errors are not passed back as a result by the `validate()` function, but thrown as exceptions by the validation engine and must be
+caught in a `try ... except` block.
+In the case of `ShapeLoadError` and `ConstraintLoadError`, see the `str()` string representation of the exception instance for the error message along with a link to the relevant section in the SHACL spec document.
+
+## Focus Node Filtering, and Shape Selection
+PySHACL v0.27.0 and above has two powerful new features:
+- Focus Node Filtering
+  - You can pass in a list of focus nodes to the validator, and it will only validate those focus nodes.
+  - _Note_, you still need to use a SHACL ShapesGraph, and the Shapes _still need to target_ the focus nodes.
+  - This feature will filter the Shapes' targeted focus nodes to include only those that are in the list of specified focus nodes.
+- SHACL Shape selection
+  - You can pass in a list of SHACL Shapes to the validator, and it will use only those Shapes for validation.
+  - This is useful for testing new shapes in your shapes graph, or for many other procedure-driven use cases.
+- Combined Shape Selection with Focus Node filtering
+  - The combination of the above two new features is especially powerful.
+  - If you give the validator a list of Shapes to use, and a list of focus nodes, the validator will operate in
+    a highly-targeted mode, it feeds those focus nodes directly into those given Shapes for validation.
+  - In this mode, the selected SHACL Shape does not need to specify any focus-targeting mechanisms of its own.
+
+## SPARQL Remote Graph Mode
+
+_**PySHACL now has a built-in SPARQL Remote Graph Mode, which allows you to validate a data graph that is stored on a remote server.**_
+
+- In this mode, PySHAL operates strictly in read-only mode, and does not modify the remote data graph.
+- Some features are disabled when using the SPARQL Remote Graph Mode:
+    - "rdfs" and "owl" inferencing is not allowed (because the remote graph is read-only, it cannot be expanded)
+    - Extra Ontology file (Inoculation or Mix-In mode) is disabled (because the remote graph is read-only)
+    - SHACL Rules (Advanced mode SPARQL-Rules) are not allowed (because the remote graph is read-only)
+    - All SHACL-JS features are disabled (this is not safe when operating on a remote graph)
+    - "inplace" mode is disabled (actually all operations on the remote data graph are inherently performed in-place)
+
+## Inference and Rules
+PySHACL can perform inference - creation of new data using rules - according to the [SHACL Advanced Features - Rules specification](https://www.w3.org/TR/shacl-af/#rules).
+
+The `shacl_rules` function can be used like this:
+
+```python
+from pyshacl import shacl_rules
+
+data_graph = "some-data.ttl"
+shacl_graph = "some-shacl.ttl"
+
+output_graph = shacl_rules(data_graph, shacl_graph=shacl_graph, advanced=True)
+```
+
+In the code above, the `output_graph` will contain the original RDF triples in the `data_graph` as well as new triples generated by the `shacl_graph`.
+
+See the example file `examples/rules_inference.py` for a working example of PySHACL performing two kinds of SHACL inference.
+
+## Integrated OpenAPI-3.0-compatible HTTP REST Service
+
+PySHACL now has a built-in validation service, exposed via an OpenAPI3.0-compatible REST API.
+
+Due to the additional dependencies required to run, this feature is an optional extra.
+
+You must first install PySHACL with the `http` extra option enabled:
+
+```bash
+$ pip3 install -U pyshacl[http]
+```
+
+When that is installed, you can start the service using the by executing the CLI entrypoint:
+
+```bash
+$ pyshacl --server
+# or
+$ pyshacl_server
+# or
+$ python3 -m pyshacl server
+# or
+$ docker run --rm -e PYSHACL_SERVER=TRUE -i -t docker.io/ashleysommer/pyshacl:latest
+```
+
+By default, this will run the service on localhost address `127.0.0.1` on port `8099`.
+
+To view the SwaggerUI documentation for the service, navigate to `http://127.0.0.1:8099/docs/swagger` and for the ReDoc version, go to `http://127.0.0.1:8099/docs/redoc`.
+
+To view the OpenAPI3 schema see `http://127.0.0.1:8099/docs/openapi.json`
+
+### Configuring the HTTP REST Service
+
+- You can force PySHACL CLI to start up in HTTP Server mode by passing environment variable `PYSHACL_SERVER=TRUE`. This is useful in a containerised service, where you will _only_ be running PySHACL in this mode.
+- `PYSHACL_SERVER_LISTEN=1.2.3.4` listen on a different IP Address or hostname
+- `PYSHACL_SERVER_PORT=8080` listen on given different TCP PORT
+- `PYSHACL_SERVER_HOSTNAME=example.org` when you are hosting the server behind a reverse-proxy or in a containerised environment, use this so PySHACL server knows what your externally facing hostname is
+
+
+## Windows CLI
+
+[Pyinstaller](https://www.pyinstaller.org/) can be
+[used](https://pyinstaller.readthedocs.io/en/stable/usage.html) to create an
+executable for Windows that has the same characteristics as the Linux/Mac
+CLI program.
+The necessary ``.spec`` file is already included in ``pyshacl/pyshacl-cli.spec``.
+The ``pyshacl-cli.spec`` PyInstaller spec file creates a ``.exe`` for the
+pySHACL Command Line utility. See above for the pySHACL command line util usage instructions.
+
+See [the PyInstaller installation guide](https://pyinstaller.readthedocs.io/en/stable/installation.html#installing-in-windows) for info on how to install PyInstaller for Windows.
+
+Once you have pyinstaller, use pyinstaller to generate the ``pyshacl.exe`` CLI file like so:
+```bash powershell
+$ cd src/pyshacl
+$ pyinstaller pyshacl-cli.spec
+```
+This will output ``pyshacl.exe`` in the ``dist`` directory in ``src/pyshacl``.
+
+You can now run the pySHACL Command Line utility via ``pyshacl.exe``.
+See above for the pySHACL command line util usage instructions.
+
+## Docker
+Pull the official docker image from Dockerhub:
+`docker pull docker.io/ashleysommer/pyshacl:latest`
+
+Or build the image yourself, from the PySHACL repository with `docker build . -t pyshacl`.
+
+You can now run PySHACL inside a container; but you need to mount the data you want to validate.
+For example, to validate `graph.ttl` against `shacl.ttl`, run :
+```bash
+docker run --rm -i -t --mount type=bind,src=`pwd`,dst=/data pyshacl -s /data/shacl.ttl /data/graph.ttl
+```
+
+## Compatibility
+PySHACL is a Python3 library. For best compatibility use Python v3.8 or greater. Python3 v3.7 or below is _**not supported**_ and this library _**does not work**_ on Python v2.7.x or below.
+
+PySHACL is a PEP518 & PEP517 project, it uses `pyproject.toml` and `poetry` to manage dependencies, build and install.
+
+For best compatibility when installing from PyPI with `pip`, upgrade to pip v20.0.2 or above.
+  - If you're on Ubuntu 18.04 or older, you will need to run `sudo pip3 install --upgrade pip` to get the newer version.
+
+## Features
+A features matrix is kept in the [FEATURES file](https://github.com/RDFLib/pySHACL/blob/master/FEATURES.md).
+
+## Changelog
+A comprehensive changelog is kept in the [CHANGELOG file](https://github.com/RDFLib/pySHACL/blob/master/CHANGELOG.md).
+
+## Benchmarks
+This project includes a script to measure the difference in performance of validating the same source graph that has been inferenced using each of the four different inferencing options. Run it on your computer to see how fast the validator operates for you.
+
+## License
+This repository is licensed under Apache License, Version 2.0. See the [LICENSE deed](https://github.com/RDFLib/pySHACL/blob/master/LICENSE.txt) for details.
+
+## Contributors
+See the [CONTRIBUTORS file](https://github.com/RDFLib/pySHACL/blob/master/CONTRIBUTORS.md).
+
+## Citation
+DOI: [10.5281/zenodo.4750840](https://doi.org/10.5281/zenodo.4750840) (For all versions/latest version)
+
+## Contacts
+
+### Lead Developer
+
+**Ashley Sommer**  
+*Software Engineer*  
+[Department of Climate Change, Energy, the Environment and Water](https://www.dcceew.gov.au)  
+Brisbane, Qld, Australia  
+<Ashley.Sommer@dcceew.gov.au>  
+<https://orcid.org/0000-0003-0590-0131>
+
+### Support developer
+
+**Nicholas Car**  
+*Data Architect*  
+[KurrawongAI](https://kurrawong.ai)  
+Brisbane, Qld, Australia  
+<nick@kurrawong.ai>  
+<http://orcid.org/0000-0002-8742-7730>
+
