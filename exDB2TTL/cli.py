@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
+from .backend_sync import sync_backend_profile
 from .config import ConfigError, create_bootstrap_config, load_project_config
 from .drafts import parse_draft_bundle, serialize_draft_bundle
 from .llm import call_llm
@@ -51,6 +52,14 @@ def _build_parser() -> argparse.ArgumentParser:
     validate.add_argument("--metadata-path")
     validate.add_argument("--drafts-path")
     validate.set_defaults(func=_cmd_validate)
+
+    sync_backend = subparsers.add_parser(
+        "sync-backend",
+        help="Sync generated ontology, SHACL, and rules artifacts into the current backend profile",
+    )
+    sync_backend.add_argument("--config", required=True)
+    sync_backend.add_argument("--drafts-path")
+    sync_backend.set_defaults(func=_cmd_sync_backend)
 
     run = subparsers.add_parser("run", help="Run extract, draft, validate, and export artifacts")
     run.add_argument("--config", required=True)
@@ -157,6 +166,23 @@ def _cmd_run(args: argparse.Namespace) -> int:
     print(f"Wrote raw LLM response: {raw_response_path}")
     print(f"Wrote drafts: {drafts_json_path}")
     print(f"Wrote validation summary: {validation_path}")
+    if config.backend_sync.enabled:
+        synced = sync_backend_profile(config, output_dir, bundle)
+        print(f"Synced backend profile: {synced['profile_root']}")
+        if config.backend_sync.activate_profile:
+            print(f"Activated backend profile: {synced['active_profile_path']}")
+    return 0
+
+
+def _cmd_sync_backend(args: argparse.Namespace) -> int:
+    config = load_project_config(args.config)
+    output_dir = _ensure_output_dir(config.output_dir)
+    bundle = _load_bundle(output_dir, args.drafts_path)
+
+    synced = sync_backend_profile(config, output_dir, bundle)
+    print(f"Synced backend profile: {synced['profile_root']}")
+    if config.backend_sync.activate_profile:
+        print(f"Activated backend profile: {synced['active_profile_path']}")
     return 0
 
 
@@ -195,9 +221,10 @@ def _load_bundle(output_dir: Path, drafts_path: str | None):
 
 
 def _write_bundle_files(bundle, output_dir: Path) -> None:
-    (output_dir / "ontology.ttl").write_text(bundle.ontology_ttl + "\n", encoding="utf-8")
-    (output_dir / "shacl.ttl").write_text(bundle.shacl_ttl + "\n", encoding="utf-8")
+    (output_dir / "telecom-porting.ttl").write_text(bundle.telecom_ontology_ttl + "\n", encoding="utf-8")
+    (output_dir / "telecom-shapes.ttl").write_text(bundle.telecom_shacl_ttl + "\n", encoding="utf-8")
     (output_dir / "mapping.csv").write_text(bundle.mapping_csv + "\n", encoding="utf-8")
+    (output_dir / "porting-risk.yaml").write_text(bundle.rules_yaml + "\n", encoding="utf-8")
     (output_dir / "business-rules.md").write_text(bundle.business_rules_markdown + "\n", encoding="utf-8")
 
 

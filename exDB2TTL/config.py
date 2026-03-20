@@ -46,6 +46,13 @@ class OntologyConfig:
 
 
 @dataclass(frozen=True)
+class BackendSyncConfig:
+    enabled: bool = True
+    backend_project_dir: str = "backend"
+    activate_profile: bool = True
+
+
+@dataclass(frozen=True)
 class OutputConfig:
     directory: str
 
@@ -55,6 +62,7 @@ class ProjectConfig:
     database: DatabaseConfig
     llm: LLMConfig
     ontology: OntologyConfig
+    backend_sync: BackendSyncConfig
     output: OutputConfig
     business_context: dict[str, Any] = field(default_factory=dict)
 
@@ -74,6 +82,7 @@ def load_project_config(path: str | Path) -> ProjectConfig:
     database_raw = raw.get("database") or {}
     llm_raw = raw.get("llm") or {}
     ontology_raw = raw.get("ontology") or {}
+    backend_sync_raw = raw.get("backend_sync") or {}
     output_raw = raw.get("output") or {}
 
     database = DatabaseConfig(
@@ -124,10 +133,17 @@ def load_project_config(path: str | Path) -> ProjectConfig:
     if not output.directory:
         raise ConfigError("output.directory is required")
 
+    backend_sync = BackendSyncConfig(
+        enabled=bool(backend_sync_raw.get("enabled", True)),
+        backend_project_dir=str(backend_sync_raw.get("backend_project_dir", "backend")).strip() or "backend",
+        activate_profile=bool(backend_sync_raw.get("activate_profile", True)),
+    )
+
     return ProjectConfig(
         database=database,
         llm=llm,
         ontology=ontology,
+        backend_sync=backend_sync,
         output=output,
         business_context=raw.get("business_context") or {},
     )
@@ -161,15 +177,21 @@ def create_bootstrap_config(database_name: str, tables: list[str], dialect: str,
             "extra_headers": {},
         },
         "ontology": {
-            "ontology_namespace": "http://example.com/ontology#",
-            "data_namespace": "http://example.com/data/",
+            "ontology_namespace": "http://example.com/telecom#",
+            "data_namespace": "http://example.com/telecom/data/",
+        },
+        "backend_sync": {
+            "enabled": True,
+            "backend_project_dir": "backend",
+            "activate_profile": True,
         },
         "business_context": {
-            "scenario": "从关系数据库自动生成本体与 SHACL 草案",
-            "goal": "识别核心实体、关系、字段约束和候选业务规则",
+            "scenario": "从关系数据库自动生成可接入当前 telecom backend 的本体、SHACL 和规则 YAML",
+            "goal": "识别核心实体、关系、字段约束和候选业务规则，并产出 backend 可直接加载的文件集",
             "notes": [
                 "如果当前只有数据库名和表名，请先补充连接信息，再运行 extract/run。",
                 "如果暂时无法直连数据库，可让 DBA 导出字段元数据和样例数据，再替换 metadata.json。",
+                "当前 backend 仍然是电信场景实现，优先复用现有 telecom 词表和规则格式。",
             ],
         },
         "output": {

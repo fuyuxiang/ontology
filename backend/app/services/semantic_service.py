@@ -14,7 +14,7 @@ from app.config.settings import Settings
 from app.etl.csv_loader import read_csv_rows
 from app.graph.repository import GraphRepository
 from app.ontology.namespaces import bind_prefixes, make_namespaces
-from app.rules.engine import canonical_action, materialize_business_inference
+from app.rules.engine import materialize_business_inference
 from app.validation.shacl import run_shacl_validation
 
 try:
@@ -54,15 +54,15 @@ class SemanticService:
             self._materialize_base_graph()
             self.validation = run_shacl_validation(
                 self.base_graph,
-                self.settings.ontology_dir / "telecom-shapes.ttl",
+                self.settings.ontology_shapes_path,
                 self.settings.reports_dir / "validation-report.ttl",
             )
             self.run_inference(persist=False)
             self.persistence = self.repository.persist(self.dataset)
 
     def _load_schema(self, graph: Graph) -> None:
-        for name in ("doim-core.ttl", "telecom-porting.ttl"):
-            graph.parse(self.settings.ontology_dir / name, format="turtle")
+        for path in (self.settings.ontology_core_path, self.settings.ontology_domain_path):
+            graph.parse(path, format="turtle")
 
     def _load_records(self) -> dict[str, dict[str, Any]]:
         subscribers = read_csv_rows(self.settings.data_dir / "subscribers.csv")

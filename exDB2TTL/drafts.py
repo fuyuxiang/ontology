@@ -9,16 +9,19 @@ from .models import DraftBundle
 
 def parse_draft_bundle(raw_text: str) -> DraftBundle:
     payload = json.loads(_extract_json_object(raw_text))
-    required = ["ontology_ttl", "shacl_ttl", "mapping_csv", "business_rules_markdown"]
+    required = ["mapping_csv", "rules_yaml"]
     missing = [key for key in required if key not in payload]
     if missing:
         raise ValueError(f"LLM output missing required keys: {', '.join(missing)}")
 
+    telecom_ontology_ttl = _first_present(payload, "telecom_ontology_ttl", "ontology_ttl")
+    telecom_shacl_ttl = _first_present(payload, "telecom_shacl_ttl", "shacl_ttl")
     bundle = DraftBundle(
-        ontology_ttl=str(payload["ontology_ttl"]).strip(),
-        shacl_ttl=str(payload["shacl_ttl"]).strip(),
+        telecom_ontology_ttl=telecom_ontology_ttl,
+        telecom_shacl_ttl=telecom_shacl_ttl,
         mapping_csv=str(payload["mapping_csv"]).strip(),
-        business_rules_markdown=str(payload["business_rules_markdown"]).strip(),
+        rules_yaml=str(payload["rules_yaml"]).strip(),
+        business_rules_markdown=str(payload.get("business_rules_markdown", "")).strip(),
     )
     _validate_mapping_header(bundle.mapping_csv)
     return bundle
@@ -27,9 +30,10 @@ def parse_draft_bundle(raw_text: str) -> DraftBundle:
 def serialize_draft_bundle(bundle: DraftBundle) -> str:
     return json.dumps(
         {
-            "ontology_ttl": bundle.ontology_ttl,
-            "shacl_ttl": bundle.shacl_ttl,
+            "telecom_ontology_ttl": bundle.telecom_ontology_ttl,
+            "telecom_shacl_ttl": bundle.telecom_shacl_ttl,
             "mapping_csv": bundle.mapping_csv,
+            "rules_yaml": bundle.rules_yaml,
             "business_rules_markdown": bundle.business_rules_markdown,
         },
         ensure_ascii=False,
@@ -79,3 +83,10 @@ def _validate_mapping_header(mapping_csv: str) -> None:
     ]
     if header != expected:
         raise ValueError(f"mapping_csv header mismatch. Expected {expected}, got {header}")
+
+
+def _first_present(payload: dict[str, object], *keys: str) -> str:
+    for key in keys:
+        if key in payload:
+            return str(payload[key]).strip()
+    raise ValueError(f"LLM output missing required keys: {', '.join(keys)}")

@@ -11,6 +11,7 @@ dependencies = [
   "pyshacl>=0.31.0",
   "owlrl>=7.1.4",
   "pandas>=2.2.3",
+  "PyYAML>=6.0.2",
   "pydantic>=2.11.0",
   "typer>=0.16.0",
   "python-multipart>=0.0.20",
@@ -31,4 +32,3 @@ packages = ["app"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
-
