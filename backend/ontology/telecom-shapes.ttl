@@ -1,45 +1,68 @@
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
-@prefix doim: <http://purl.org/doim/1.0#> .
 @prefix telecom: <http://example.com/telecom#> .
 
-telecom:SubscriberShape a sh:NodeShape ;
-    sh:targetClass telecom:Subscriber ;
+telecom:UserShape a sh:NodeShape ;
+    sh:targetClass telecom:User ;
     sh:property [
-        sh:path telecom:subscriberId ;
+        sh:path telecom:userId ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
         sh:maxCount 1 ;
     ] ;
     sh:property [
+        sh:path telecom:deviceNumber ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
         sh:path rdfs:label ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
-    ] ;
-    sh:property [
-        sh:path telecom:city ;
-        sh:datatype xsd:string ;
-        sh:minCount 1 ;
     ] .
 
-telecom:MobileNumberShape a sh:NodeShape ;
-    sh:targetClass telecom:MobileNumber ;
+telecom:PortingQueryShape a sh:NodeShape ;
+    sh:targetClass telecom:PortingQuery ;
     sh:property [
-        sh:path doim:identifierValue ;
-        sh:datatype xsd:string ;
-        sh:minCount 1 ;
-    ] .
-
-telecom:InteractionShape a sh:NodeShape ;
-    sh:targetClass telecom:ChannelInteraction ;
-    sh:property [
-        sh:path telecom:eventId ;
+        sh:path telecom:queryTime ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
     ] ;
     sh:property [
-        sh:path telecom:eventType ;
+        sh:path telecom:outTag ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .
+
+telecom:BusinessContractShape a sh:NodeShape ;
+    sh:targetClass telecom:BusinessContract ;
+    sh:property [
+        sh:path telecom:activityType ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .
+
+telecom:BillingRecordShape a sh:NodeShape ;
+    sh:targetClass telecom:BillingRecord ;
+    sh:property [
+        sh:path telecom:userId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .
+
+telecom:CustomerServiceInteractionShape a sh:NodeShape ;
+    sh:targetClass telecom:CustomerServiceInteraction ;
+    sh:property [
+        sh:path telecom:acceptTime ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] .
+
+telecom:RetentionActionShape a sh:NodeShape ;
+    sh:targetClass telecom:RetentionAction ;
+    sh:property [
+        sh:path telecom:callResult ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
     ] .

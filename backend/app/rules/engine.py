@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from collections import Counter
 from typing import Any
+from urllib.parse import quote
 
 from rdflib import Graph, Literal, RDF, RDFS, URIRef, XSD
 
 from app.config.settings import Settings
 from app.ontology.namespaces import make_namespaces
 from app.rules.decision_table import DecisionTable, load_decision_table, matches_condition
+from app.scenario.config import ScenarioConfig
 
 
 def load_ruleset(settings: Settings) -> DecisionTable:
@@ -54,6 +56,7 @@ def materialize_business_inference(
     deductions_graph: Graph,
     records: dict[str, dict[str, Any]],
     settings: Settings,
+    scenario: ScenarioConfig,
 ) -> tuple[dict[str, dict[str, Any]], Counter]:
     decision_table = load_ruleset(settings)
     namespaces = make_namespaces(settings)
@@ -62,40 +65,41 @@ def materialize_business_inference(
 
     inferred: dict[str, dict[str, Any]] = {}
     top_rules: Counter = Counter()
+    primary_segment = scenario.primary_node_type.lower()
 
-    for subscriber_id, record in records.items():
+    for entity_id, record in records.items():
         result = infer_record(record, decision_table)
-        inferred[subscriber_id] = result
+        inferred[entity_id] = result
 
-        subscriber = URIRef(f"{settings.data_ns}subscriber/{subscriber_id}")
-        deductions_graph.add((subscriber, telecom.inferredRiskLevel, Literal(result["riskLevel"])))
-        deductions_graph.add((subscriber, telecom.recommendedAction, Literal(result["recommendedAction"])))
+        entity = URIRef(f"{settings.data_ns}{primary_segment}/{quote(entity_id, safe='')}")
+        deductions_graph.add((entity, telecom.inferredRiskLevel, Literal(result["riskLevel"])))
+        deductions_graph.add((entity, telecom.recommendedAction, Literal(result["recommendedAction"])))
 
-        alert_resource = URIRef(f"{settings.data_ns}alert/{subscriber_id}")
+        alert_resource = URIRef(f"{settings.data_ns}alert/{quote(entity_id, safe='')}")
         deductions_graph.add((alert_resource, RDF.type, telecom.RiskAlert))
-        deductions_graph.add((alert_resource, RDFS.label, Literal(f"{subscriber_id} 风险告警")))
+        deductions_graph.add((alert_resource, RDFS.label, Literal(f"{entity_id} 风险告警")))
         deductions_graph.add((alert_resource, telecom.riskLevel, Literal(result["riskLevel"])))
         deductions_graph.add((alert_resource, telecom.recommendedAction, Literal(result["recommendedAction"])))
-        deductions_graph.add((subscriber, telecom.generatedAlert, alert_resource))
+        deductions_graph.add((entity, telecom.generatedAlert, alert_resource))
 
         for factor in result["factors"]:
             factor_resource = URIRef(f"{settings.data_ns}factor/{factor.code}")
             deductions_graph.add((factor_resource, RDF.type, telecom.RiskFactor))
             deductions_graph.add((factor_resource, RDFS.label, Literal(factor.label)))
-            deductions_graph.add((subscriber, telecom.hasRiskFactor, factor_resource))
-            deductions_graph.add((subscriber, doim.evidenceFrom, factor_resource))
+            deductions_graph.add((entity, telecom.hasRiskFactor, factor_resource))
+            deductions_graph.add((entity, doim.evidenceFrom, factor_resource))
 
         for rule_label in result["rules"]:
             rule_code = rule_label.encode("utf-8").hex()
             rule_resource = URIRef(f"{settings.data_ns}rule/{rule_code}")
             deductions_graph.add((rule_resource, RDF.type, telecom.Rule))
             deductions_graph.add((rule_resource, RDFS.label, Literal(rule_label)))
-            deductions_graph.add((subscriber, doim.taggedByRule, rule_resource))
+            deductions_graph.add((entity, doim.taggedByRule, rule_resource))
             top_rules[rule_label] += 1
 
         deductions_graph.add(
             (
-                subscriber,
+                entity,
                 telecom.riskScore,
                 Literal({"HIGH": 90, "MEDIUM": 65, "LOW": 30}[result["riskLevel"]], datatype=XSD.integer),
             )

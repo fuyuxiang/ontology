@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 import threading
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from rdflib import BNode, Dataset, Graph, Literal, RDF, RDFS, URIRef, XSD
 
@@ -15,6 +16,8 @@ from app.etl.csv_loader import read_csv_rows
 from app.graph.repository import GraphRepository
 from app.ontology.namespaces import bind_prefixes, make_namespaces
 from app.rules.engine import materialize_business_inference
+from app.scenario.config import AlertDisplayField, FactConfig, ScenarioConfig, SortConfig, load_scenario_config
+from app.scenario.mapping import MappingRow, load_mapping_rows
 from app.validation.shacl import run_shacl_validation
 
 try:
@@ -33,11 +36,20 @@ class SemanticService:
         self.dataset: Dataset | None = None
         self.base_graph: Graph | None = None
         self.deductions_graph: Graph | None = None
+        self.scenario: ScenarioConfig = load_scenario_config(settings.scenario_path)
+        self.reference_date = self.scenario.reference_date or datetime.now(tz=UTC).date()
+        self.mapping_rows: list[MappingRow] = load_mapping_rows(settings.mapping_path)
+        self.mapping_by_dataset: dict[str, list[MappingRow]] = defaultdict(list)
+        for row in self.mapping_rows:
+            self.mapping_by_dataset[row.dataset].append(row)
+        self.source_rows: dict[str, list[dict[str, Any]]] = {}
+        self.dataset_indexes: dict[str, dict[str, dict[str, list[dict[str, Any]]]]] = {}
         self.records: dict[str, dict[str, Any]] = {}
         self.inference: dict[str, dict[str, Any]] = {}
         self.top_rules: dict[str, int] = {}
         self.validation: dict[str, object] = {}
         self.persistence: dict[str, object] = {}
+        self.data_warnings: list[str] = []
         self.initialize()
 
     def initialize(self) -> None:
@@ -50,7 +62,9 @@ class SemanticService:
             bind_prefixes(self.deductions_graph, self.settings)
 
             self._load_schema(self.base_graph)
-            self.records = self._load_records()
+            self.source_rows = self._load_source_rows()
+            self.dataset_indexes = self._build_dataset_indexes()
+            self.records = self._build_records()
             self._materialize_base_graph()
             self.validation = run_shacl_validation(
                 self.base_graph,
@@ -64,165 +78,128 @@ class SemanticService:
         for path in (self.settings.ontology_core_path, self.settings.ontology_domain_path):
             graph.parse(path, format="turtle")
 
-    def _load_records(self) -> dict[str, dict[str, Any]]:
-        subscribers = read_csv_rows(self.settings.data_dir / "subscribers.csv")
-        usage_rows = {
-            row["subscriber_id"]: row
-            for row in read_csv_rows(self.settings.data_dir / "usage_signals.csv")
-        }
-        commercial_rows = {
-            row["subscriber_id"]: row
-            for row in read_csv_rows(self.settings.data_dir / "commercial_signals.csv")
-        }
-        event_rows = defaultdict(list)
-        for row in read_csv_rows(self.settings.data_dir / "interaction_events.csv"):
-            event_rows[row["subscriber_id"]].append(
-                {
-                    "eventId": row["event_id"],
-                    "eventType": row["event_type"],
-                    "channel": row["channel"],
-                    "daysAgo": int(row["days_ago"]),
-                    "severity": row["severity"],
-                    "detail": row["detail"],
-                }
-            )
+    def _load_source_rows(self) -> dict[str, list[dict[str, Any]]]:
+        rows_by_dataset: dict[str, list[dict[str, Any]]] = {}
+        self.data_warnings = []
 
+        for dataset_key, dataset_config in self.scenario.datasets.items():
+            path = self.settings.data_dir / dataset_config.file
+            if not path.exists():
+                self.data_warnings.append(f"missing_dataset:{dataset_key}:{dataset_config.file}")
+                rows_by_dataset[dataset_key] = []
+                continue
+
+            raw_rows = read_csv_rows(path)
+            typed_rows: list[dict[str, Any]] = []
+            target_type = self._target_type_for_dataset(dataset_key)
+            for index, raw_row in enumerate(raw_rows):
+                row: dict[str, Any] = dict(raw_row)
+                for mapping in self.mapping_by_dataset.get(dataset_key, []):
+                    if mapping.field_name in row:
+                        row[mapping.field_name] = self._coerce_scalar(row[mapping.field_name], mapping.value_type)
+                row["_dataset_key"] = dataset_key
+                row["_row_index"] = index
+                row["_target_type"] = target_type
+                row["_entity_uri"] = self._entity_uri(dataset_key, row, index)
+                row["_label"] = self._entity_label(dataset_key, row)
+                row["_node_type"] = dataset_config.node_type
+                typed_rows.append(row)
+            rows_by_dataset[dataset_key] = typed_rows
+        return rows_by_dataset
+
+    def _build_dataset_indexes(self) -> dict[str, dict[str, dict[str, list[dict[str, Any]]]]]:
+        indexes: dict[str, dict[str, dict[str, list[dict[str, Any]]]]] = {}
+        for dataset_key, rows in self.source_rows.items():
+            dataset_config = self.scenario.datasets[dataset_key]
+            join_indexes: dict[str, dict[str, list[dict[str, Any]]]] = {
+                canonical_key: defaultdict(list) for canonical_key in dataset_config.join_keys
+            }
+            for row in rows:
+                for canonical_key, field_name in dataset_config.join_keys.items():
+                    value = row.get(field_name)
+                    if value in (None, ""):
+                        continue
+                    join_indexes[canonical_key][str(value)].append(row)
+            indexes[dataset_key] = join_indexes
+        return indexes
+
+    def _build_records(self) -> dict[str, dict[str, Any]]:
+        primary_dataset = self.scenario.datasets[self.scenario.primary_dataset]
         records: dict[str, dict[str, Any]] = {}
-        for row in subscribers:
-            subscriber_id = row["subscriber_id"]
-            usage = usage_rows[subscriber_id]
-            commercial = commercial_rows[subscriber_id]
-            records[subscriber_id] = {
-                "subscriberId": subscriber_id,
-                "name": row["customer_name"],
-                "msisdn": row["msisdn"],
-                "segment": row["segment"],
-                "city": row["city"],
-                "planName": row["plan_name"],
-                "metrics": {
-                    "tenureMonths": int(row["tenure_months"]),
-                    "monthlyFee": Decimal(row["monthly_fee"]),
-                    "vipFlag": int(row["vip_flag"]),
-                    "dataUsageDropPct": int(usage["data_usage_drop_pct"]),
-                    "voiceUsageDropPct": int(usage["voice_usage_drop_pct"]),
-                    "complaintCount30d": int(usage["complaint_count_30d"]),
-                    "networkIssueCount30d": int(usage["network_issue_count_30d"]),
-                    "npsScore": int(usage["nps_score"]),
-                    "serviceTicketCount30d": int(usage["service_ticket_count_30d"]),
-                    "contractRemainingDays": int(commercial["contract_remaining_days"]),
-                    "overdueDays": int(commercial["overdue_days"]),
-                    "competitorContactCount30d": int(commercial["competitor_contact_count_30d"]),
-                    "portingCodeRequestCount30d": int(commercial["porting_code_request_count_30d"]),
-                    "retentionOfferRejected": int(commercial["retention_offer_rejected"]),
-                    "paymentRiskLevel": commercial["payment_risk_level"],
-                },
-                "events": sorted(event_rows.get(subscriber_id, []), key=lambda item: item["daysAgo"]),
+
+        for primary_row in self.source_rows.get(self.scenario.primary_dataset, []):
+            entity_id = str(primary_row.get(self.scenario.primary_id_field) or "").strip()
+            if not entity_id:
+                continue
+
+            related: dict[str, list[dict[str, Any]]] = {}
+            for dataset_key, dataset_config in self.scenario.datasets.items():
+                if dataset_key == self.scenario.primary_dataset:
+                    continue
+                matched: dict[tuple[str, int], dict[str, Any]] = {}
+                for canonical_key, primary_field in primary_dataset.join_keys.items():
+                    if canonical_key not in dataset_config.join_keys:
+                        continue
+                    value = primary_row.get(primary_field)
+                    if value in (None, ""):
+                        continue
+                    for row in self.dataset_indexes[dataset_key][canonical_key].get(str(value), []):
+                        matched[(dataset_key, int(row["_row_index"]))] = row
+                related[dataset_key] = list(matched.values())
+
+            facts = {fact.key: self._evaluate_fact(fact, primary_row, related) for fact in self.scenario.facts}
+            records[entity_id] = {
+                "entityId": entity_id,
+                "displayName": str(primary_row.get(self.scenario.primary_label_field) or entity_id),
+                "nodeId": self._node_id(self.scenario.primary_dataset, primary_row),
+                "primary": primary_row,
+                "related": related,
+                "metrics": facts,
             }
         return records
 
     def _materialize_base_graph(self) -> None:
         graph = self.base_graph
         assert graph is not None
-        namespaces = make_namespaces(self.settings)
-        doim = namespaces["doim"]
-        telecom = namespaces["telecom"]
 
-        for record in self.records.values():
-            subscriber = URIRef(f"{self.settings.data_ns}subscriber/{record['subscriberId']}")
-            number = URIRef(f"{self.settings.data_ns}number/{record['msisdn']}")
+        for dataset_key, rows in self.source_rows.items():
+            target_type = self._target_type_for_dataset(dataset_key)
+            target_class = self._resolve_curie(target_type)
+            for row in rows:
+                resource = row["_entity_uri"]
+                self._tag_entity(graph, resource, self.scenario.datasets[dataset_key].source_system)
+                graph.add((resource, RDF.type, target_class))
 
-            self._tag_entity(graph, subscriber, "CRM")
-            graph.add((subscriber, RDF.type, telecom.Subscriber))
-            graph.add((subscriber, telecom.subscriberId, Literal(record["subscriberId"])))
-            graph.add((subscriber, RDFS.label, Literal(record["name"])))
-            graph.add((subscriber, telecom.city, Literal(record["city"])))
-            graph.add((subscriber, telecom.segmentName, Literal(record["segment"])))
-            graph.add((subscriber, telecom.planName, Literal(record["planName"])))
+                label = row.get("_label")
+                if label:
+                    graph.add((resource, RDFS.label, Literal(str(label))))
 
-            metrics = record["metrics"]
-            self._add_int(graph, subscriber, telecom.tenureMonths, metrics["tenureMonths"])
-            graph.add((subscriber, telecom.monthlyFee, Literal(metrics["monthlyFee"], datatype=XSD.decimal)))
-            self._add_int(graph, subscriber, telecom.vipFlag, metrics["vipFlag"])
-            self._add_int(graph, subscriber, telecom.dataUsageDropPct, metrics["dataUsageDropPct"])
-            self._add_int(graph, subscriber, telecom.voiceUsageDropPct, metrics["voiceUsageDropPct"])
-            self._add_int(graph, subscriber, telecom.complaintCount30d, metrics["complaintCount30d"])
-            self._add_int(graph, subscriber, telecom.networkIssueCount30d, metrics["networkIssueCount30d"])
-            self._add_int(graph, subscriber, telecom.npsScore, metrics["npsScore"])
-            self._add_int(graph, subscriber, telecom.serviceTicketCount30d, metrics["serviceTicketCount30d"])
-            self._add_int(graph, subscriber, telecom.contractRemainingDays, metrics["contractRemainingDays"])
-            self._add_int(graph, subscriber, telecom.overdueDays, metrics["overdueDays"])
-            self._add_int(graph, subscriber, telecom.competitorContactCount30d, metrics["competitorContactCount30d"])
-            self._add_int(graph, subscriber, telecom.portingCodeRequestCount30d, metrics["portingCodeRequestCount30d"])
-            self._add_int(graph, subscriber, telecom.retentionOfferRejected, metrics["retentionOfferRejected"])
-            graph.add((subscriber, telecom.paymentRiskLevel, Literal(metrics["paymentRiskLevel"])))
+                for mapping in self.mapping_by_dataset.get(dataset_key, []):
+                    value = row.get(mapping.field_name)
+                    if value in (None, ""):
+                        continue
+                    predicate = self._resolve_curie(mapping.mapped_predicate)
+                    graph.add((resource, predicate, self._literal_for_value(value, mapping.value_type)))
 
-            self._tag_entity(graph, number, "CRM")
-            graph.add((number, RDF.type, telecom.MobileNumber))
-            graph.add((number, RDFS.label, Literal(record["msisdn"])))
-            graph.add((number, doim.identifierValue, Literal(record["msisdn"])))
+        for relation in self.scenario.relations:
+            source_rows = self.source_rows.get(relation.source_dataset, [])
+            target_index = self.dataset_indexes.get(relation.target_dataset, {}).get(relation.target_join_key, {})
+            source_dataset_config = self.scenario.datasets[relation.source_dataset]
+            source_field = source_dataset_config.join_keys[relation.source_join_key]
 
-            self._add_relation(subscriber, doim.hasIdentifier, number, f"{record['subscriberId']}-identifier", "关联标识符", "CRM")
-            self._add_relation(subscriber, telecom.ownsNumber, number, f"{record['subscriberId']}-number", "拥有号码", "CRM")
-
-            usage_snapshot = URIRef(f"{self.settings.data_ns}usage/{record['subscriberId']}")
-            self._tag_entity(graph, usage_snapshot, "NETWORK")
-            graph.add((usage_snapshot, RDF.type, telecom.UsageSnapshot))
-            graph.add((usage_snapshot, RDFS.label, Literal(f"{record['subscriberId']} 使用快照")))
-            self._add_int(graph, usage_snapshot, telecom.dataUsageDropPct, metrics["dataUsageDropPct"])
-            self._add_int(graph, usage_snapshot, telecom.voiceUsageDropPct, metrics["voiceUsageDropPct"])
-            self._add_int(graph, usage_snapshot, telecom.complaintCount30d, metrics["complaintCount30d"])
-            self._add_int(graph, usage_snapshot, telecom.networkIssueCount30d, metrics["networkIssueCount30d"])
-            self._add_int(graph, usage_snapshot, telecom.npsScore, metrics["npsScore"])
-            self._add_int(graph, usage_snapshot, telecom.serviceTicketCount30d, metrics["serviceTicketCount30d"])
-            self._add_relation(subscriber, telecom.hasUsageSnapshot, usage_snapshot, f"{record['subscriberId']}-usage", "关联使用快照", "NETWORK")
-
-            commercial_snapshot = URIRef(f"{self.settings.data_ns}commercial/{record['subscriberId']}")
-            self._tag_entity(graph, commercial_snapshot, "BILLING")
-            graph.add((commercial_snapshot, RDF.type, telecom.CommercialSnapshot))
-            graph.add((commercial_snapshot, RDFS.label, Literal(f"{record['subscriberId']} 商业快照")))
-            self._add_int(graph, commercial_snapshot, telecom.contractRemainingDays, metrics["contractRemainingDays"])
-            self._add_int(graph, commercial_snapshot, telecom.overdueDays, metrics["overdueDays"])
-            self._add_int(graph, commercial_snapshot, telecom.competitorContactCount30d, metrics["competitorContactCount30d"])
-            self._add_int(graph, commercial_snapshot, telecom.portingCodeRequestCount30d, metrics["portingCodeRequestCount30d"])
-            self._add_int(graph, commercial_snapshot, telecom.retentionOfferRejected, metrics["retentionOfferRejected"])
-            graph.add((commercial_snapshot, telecom.paymentRiskLevel, Literal(metrics["paymentRiskLevel"])))
-            self._add_relation(
-                subscriber,
-                telecom.hasCommercialSnapshot,
-                commercial_snapshot,
-                f"{record['subscriberId']}-commercial",
-                "关联商业快照",
-                "BILLING",
-            )
-
-            for event in record["events"]:
-                event_resource = URIRef(f"{self.settings.data_ns}event/{event['eventId']}")
-                self._tag_entity(graph, event_resource, "OMNI_CHANNEL")
-                graph.add((event_resource, RDF.type, telecom.ChannelInteraction))
-                graph.add((event_resource, RDFS.label, Literal(event["eventType"])))
-                graph.add((event_resource, telecom.eventId, Literal(event["eventId"])))
-                graph.add((event_resource, telecom.eventType, Literal(event["eventType"])))
-                graph.add((event_resource, telecom.channelName, Literal(event["channel"])))
-                self._add_int(graph, event_resource, telecom.eventDaysAgo, event["daysAgo"])
-                graph.add((event_resource, telecom.eventSeverity, Literal(event["severity"])))
-                graph.add((event_resource, telecom.eventDetail, Literal(event["detail"])))
-                self._add_relation(
-                    subscriber,
-                    telecom.hasInteraction,
-                    event_resource,
-                    f"{record['subscriberId']}-event-{event['eventId']}",
-                    "发生交互事件",
-                    "OMNI_CHANNEL",
-                )
-
-    def _add_int(self, graph: Graph, subject: URIRef, predicate: URIRef, value: int) -> None:
-        graph.add((subject, predicate, Literal(value, datatype=XSD.integer)))
-
-    def _tag_entity(self, graph: Graph, resource: URIRef, source_system: str) -> None:
-        namespaces = make_namespaces(self.settings)
-        doim = namespaces["doim"]
-        graph.add((resource, doim.sourceSystem, Literal(source_system)))
-        graph.add((resource, doim.loadBatch, Literal(self.batch_id)))
+            for source_row in source_rows:
+                join_value = source_row.get(source_field)
+                if join_value in (None, ""):
+                    continue
+                for target_row in target_index.get(str(join_value), []):
+                    self._add_relation(
+                        source_row["_entity_uri"],
+                        self._resolve_curie(relation.predicate),
+                        target_row["_entity_uri"],
+                        self._relation_id(relation.source_dataset, source_row, relation.target_dataset, target_row),
+                        relation.label,
+                        relation.source_system,
+                    )
 
     def _add_relation(
         self,
@@ -246,6 +223,12 @@ class SemanticService:
         graph.add((relation, doim.fromEntity, source))
         graph.add((relation, doim.toEntity, target))
         graph.add((relation, doim.predicateUri, Literal(str(predicate))))
+
+    def _tag_entity(self, graph: Graph, resource: URIRef, source_system: str) -> None:
+        namespaces = make_namespaces(self.settings)
+        doim = namespaces["doim"]
+        graph.add((resource, doim.sourceSystem, Literal(source_system)))
+        graph.add((resource, doim.loadBatch, Literal(self.batch_id)))
 
     def _apply_owlrl(self) -> int:
         if DeductiveClosure is None or OWLRL_Semantics is None:
@@ -283,7 +266,12 @@ class SemanticService:
             assert self.deductions_graph is not None
             self.deductions_graph.remove((None, None, None))
             owlrl_triples = self._apply_owlrl()
-            inferred, top_rules = materialize_business_inference(self.deductions_graph, self.records, self.settings)
+            inferred, top_rules = materialize_business_inference(
+                self.deductions_graph,
+                self.records,
+                self.settings,
+                self.scenario,
+            )
             self.inference = inferred
             self.top_rules = dict(top_rules)
             if persist and self.dataset is not None:
@@ -298,146 +286,107 @@ class SemanticService:
         with self.lock:
             union = self._union_graph()
             return {
-                "scenario": "运营商携号转网预警",
+                "scenario": self.scenario.name,
+                "appTitle": self.scenario.app_title,
+                "headerTitle": self.scenario.header_title,
+                "dashboardSubtitle": self.scenario.dashboard_subtitle,
                 "tripleCount": len(union),
-                "subscriberCount": len(self.records),
-                "interactionCount": sum(len(record["events"]) for record in self.records.values()),
+                "primaryEntityLabel": self.scenario.primary_entity_label,
+                "primaryEntityPluralLabel": self.scenario.primary_entity_plural_label,
+                "primaryEntityCount": len(self.records),
+                "interactionLabel": "交互记录",
+                "interactionCount": sum(len(self.source_rows.get(key, [])) for key in self.scenario.interaction_datasets),
                 "relationCount": sum(
-                    1
-                    for _ in self.base_graph.subjects(RDF.type, URIRef(f"{self.settings.doim_ns}Relation"))
+                    1 for _ in self.base_graph.subjects(RDF.type, URIRef(f"{self.settings.doim_ns}Relation"))
                 ),
                 "riskDistribution": self._risk_distribution(),
                 "topRules": [
                     {"rule": label, "count": count}
                     for label, count in sorted(self.top_rules.items(), key=lambda item: (-item[1], item[0]))
                 ],
-                "sampleQuery": self.settings.default_query,
+                "sampleQuery": self.scenario.sample_query or self.settings.default_query,
+                "questionSuggestions": list(self.scenario.question_suggestions),
                 "ontologyGraph": self._build_overview_graph(),
-                "architecture": [
-                    {
-                        "title": "数据接入层",
-                        "subtitle": "CSV/多源信号",
-                        "items": ["CRM 客户主数据", "NETWORK 使用信号", "BILLING 商业信号", "OMNI_CHANNEL 交互事件"],
-                    },
-                    {
-                        "title": "语义层",
-                        "subtitle": "DOIM + 领域本体",
-                        "items": ["Entity / Identifier / Relation", "Subscriber / Snapshot / Event", "RiskFactor / Rule / Alert"],
-                    },
-                    {
-                        "title": "存储与推理",
-                        "subtitle": "RDFLib + pyoxigraph + pySHACL",
-                        "items": ["三元组构建", "命名图持久化", "OWL-RL + 业务规则推理"],
-                    },
-                    {
-                        "title": "应用层",
-                        "subtitle": "FastAPI + React",
-                        "items": ["告警列表", "客户画像", "知识关系图", "规则命中解释"],
-                    },
-                ],
+                "architecture": list(self.scenario.architecture),
                 "validation": self.validation,
                 "persistence": self.persistence,
+                "sourceCards": self._build_source_cards(),
+                "ontologyFiles": [item.__dict__ for item in self.scenario.ontology_files],
+                "ruleCards": [item.__dict__ for item in self.scenario.rule_cards],
+                "mappingExamples": list(self.scenario.mapping_examples),
+                "warnings": list(self.data_warnings),
             }
 
     def get_alerts(self) -> list[dict[str, Any]]:
         alerts: list[dict[str, Any]] = []
         for record in self.records.values():
-            subscriber_id = record["subscriberId"]
-            inference = self.inference[subscriber_id]
-            metrics = record["metrics"]
+            inference = self.inference[record["entityId"]]
             alerts.append(
                 {
-                    "subscriberId": subscriber_id,
-                    "name": record["name"],
-                    "city": record["city"],
-                    "segment": record["segment"],
-                    "planName": record["planName"],
-                    "msisdn": record["msisdn"],
+                    "entityId": record["entityId"],
+                    "nodeId": record["nodeId"],
+                    "displayName": record["displayName"],
                     "riskLevel": inference["riskLevel"],
                     "recommendedAction": inference["recommendedAction"],
                     "factors": [factor.label for factor in inference["factors"]],
-                    "metrics": {
-                        "dataUsageDropPct": metrics["dataUsageDropPct"],
-                        "complaintCount30d": metrics["complaintCount30d"],
-                        "competitorContactCount30d": metrics["competitorContactCount30d"],
-                        "portingCodeRequestCount30d": metrics["portingCodeRequestCount30d"],
-                        "contractRemainingDays": metrics["contractRemainingDays"],
-                        "vipFlag": metrics["vipFlag"],
-                    },
-                    "complaint": metrics["complaintCount30d"],
-                    "competitor": metrics["competitorContactCount30d"],
-                    "porting": metrics["portingCodeRequestCount30d"],
-                    "plan": record["planName"],
+                    "summaryFields": self._render_display_fields(record, self.scenario.summary_fields),
+                    "detailFields": self._render_display_fields(record, self.scenario.detail_fields),
+                    "highlightFields": self._render_display_fields(record, self.scenario.highlight_fields),
+                    "metrics": self._serialize_metrics(record["metrics"]),
                 }
             )
-        alerts.sort(
-            key=lambda item: (
-                -self._risk_weight(item["riskLevel"]),
-                -item["metrics"]["portingCodeRequestCount30d"],
-                -item["metrics"]["competitorContactCount30d"],
-                -item["metrics"]["complaintCount30d"],
-                item["subscriberId"],
-            )
-        )
+
+        alerts.sort(key=self._alert_sort_key)
         return alerts
 
     def search_subscribers(self, query: str) -> list[dict[str, Any]]:
         keyword = (query or "").strip().lower()
         alerts = self.get_alerts()
-        risk_terms = {"风险", "risk", "携转", "携号转网", "转网", "流失", "告警"}
-        if any(term in keyword for term in risk_terms):
-            matches = alerts
-        else:
-            matches = []
-            for item in alerts:
-                haystacks = [item["subscriberId"], item["name"], item["msisdn"]]
-                if not keyword or any(keyword in str(value).lower() for value in haystacks):
-                    matches.append(item)
-        return [
-            {
-                "subscriberId": item["subscriberId"],
-                "name": item["name"],
-                "msisdn": item["msisdn"],
-                "city": item["city"],
-                "segment": item["segment"],
-                "planName": item["planName"],
-                "riskLevel": item["riskLevel"],
-                "recommendedAction": item["recommendedAction"],
-                "factors": item["factors"],
-            }
-            for item in matches
-        ]
+        if any(term in keyword for term in self.scenario.risk_terms):
+            return alerts
+
+        matches = []
+        for record in self.records.values():
+            haystacks = [record["entityId"], record["displayName"]]
+            primary_row = record["primary"]
+            haystacks.extend(str(primary_row.get(field) or "") for field in self.scenario.search_fields)
+            if not keyword or any(keyword in value.lower() for value in haystacks if value):
+                matches.append(record["entityId"])
+
+        by_id = {item["entityId"]: item for item in alerts}
+        return [by_id[entity_id] for entity_id in matches if entity_id in by_id]
 
     def get_subscriber(self, subscriber_id: str) -> dict[str, Any]:
-        subscriber_id = subscriber_id.strip()
-        if subscriber_id not in self.records:
-            return {"error": "subscriber_not_found", "subscriberId": subscriber_id}
-        record = self.records[subscriber_id]
-        inference = self.inference[subscriber_id]
-        metrics = record["metrics"]
+        entity_id = subscriber_id.strip()
+        if entity_id not in self.records:
+            return {"error": "entity_not_found", "entityId": entity_id}
+
+        record = self.records[entity_id]
+        inference = self.inference[entity_id]
+        related_payload = {
+            dataset_key: [self._serialize_row(row) for row in rows]
+            for dataset_key, rows in record["related"].items()
+            if rows
+        }
+        interaction_count = sum(len(record["related"].get(key, [])) for key in self.scenario.interaction_datasets)
         return {
-            "subscriberId": subscriber_id,
-            "name": record["name"],
-            "city": record["city"],
-            "segment": record["segment"],
-            "planName": record["planName"],
-            "msisdn": record["msisdn"],
+            "entityId": entity_id,
+            "displayName": record["displayName"],
             "riskLevel": inference["riskLevel"],
             "recommendedAction": inference["recommendedAction"],
-            "metrics": {
-                key: (float(value) if isinstance(value, Decimal) else value)
-                for key, value in metrics.items()
-            },
+            "metrics": self._serialize_metrics(record["metrics"]),
             "factors": [factor.label for factor in inference["factors"]],
             "rules": inference["rules"],
-            "events": record["events"],
-            "inference": self._build_inference_summary(record["name"], inference, len(record["events"])),
+            "summaryFields": self._render_display_fields(record, self.scenario.summary_fields),
+            "detailFields": self._render_display_fields(record, self.scenario.detail_fields),
+            "relatedData": related_payload,
+            "inference": self._build_inference_summary(record["displayName"], inference, interaction_count),
             "evidence": self._build_evidence(record, inference),
-            "graph": self._build_subscriber_graph(record, inference),
+            "graph": self._build_entity_graph(record, inference),
         }
 
     def run_sparql(self, query_string: str | None) -> dict[str, Any]:
-        query = self._extract_query(query_string) or self.settings.default_query
+        query = self._extract_query(query_string) or self.scenario.sample_query or self.settings.default_query
         graph = self._union_graph()
         results = graph.query(query)
         variables = [str(variable) for variable in results.vars]
@@ -457,6 +406,14 @@ class SemanticService:
 
     def load_data_file(self, file_path: Path) -> dict[str, Any]:
         with self.lock:
+            if file_path.suffix.lower() == ".csv":
+                self.initialize()
+                return {
+                    "success": True,
+                    "file": file_path.name,
+                    "rows": len(read_csv_rows(file_path)),
+                }
+
             assert self.base_graph is not None
             self.base_graph.parse(file_path)
             if self.dataset is not None:
@@ -473,9 +430,6 @@ class SemanticService:
             distribution[item["riskLevel"]] += 1
         return distribution
 
-    def _risk_weight(self, level: str) -> int:
-        return {"HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(level, 0)
-
     def _extract_query(self, payload: str | None) -> str:
         if payload is None:
             return ""
@@ -490,7 +444,7 @@ class SemanticService:
             return str(body.get("query", "")).strip()
         return text
 
-    def _build_inference_summary(self, name: str, inference: dict[str, Any], event_count: int) -> dict[str, Any]:
+    def _build_inference_summary(self, name: str, inference: dict[str, Any], interaction_count: int) -> dict[str, Any]:
         risk_level = inference["riskLevel"]
         summary = {
             "headline": f"{name} 被推理为 {risk_level} 风险",
@@ -498,182 +452,454 @@ class SemanticService:
             "recommendedAction": inference["recommendedAction"],
             "factorCount": len(inference["factors"]),
             "ruleCount": len(inference["rules"]),
-            "eventCount": event_count,
+            "eventCount": interaction_count,
         }
         if risk_level == "HIGH":
-            summary["summary"] = "命中高风险组合规则，建议立即进入人工挽留流程。"
+            summary["summary"] = "命中高风险携转预警规则，建议立即触发紧急维系流程。"
         elif risk_level == "MEDIUM":
-            summary["summary"] = "命中中风险组合规则，建议触发优惠触达并人工复核。"
+            summary["summary"] = "命中中风险携转预警规则，建议常规维系并持续复核。"
         else:
-            summary["summary"] = "未命中中高风险组合规则，维持常规关怀策略。"
+            summary["summary"] = "未命中中高风险组合规则，维持低风险持续监控。"
         return summary
 
     def _build_evidence(self, record: dict[str, Any], inference: dict[str, Any]) -> list[dict[str, Any]]:
-        metrics = record["metrics"]
-        events = record["events"]
         evidence: list[dict[str, Any]] = []
-        if metrics["complaintCount30d"] > 2:
+        for field in self.scenario.highlight_fields:
+            rendered = self._render_display_field(record, field)
+            if rendered["value"] in ("", None):
+                continue
             evidence.append(
-                self._evidence_item(
-                    "signal",
-                    "投诉激增规则",
-                    "投诉次数超过阈值，命中“投诉激增”风险因子。",
-                    [
-                        f"近30天投诉次数 = {metrics['complaintCount30d']}，阈值 > 2",
-                        *self._related_event_facts(events, {"complaint"}),
-                    ],
-                    "投诉激增",
-                )
-            )
-        if metrics["dataUsageDropPct"] > 30:
-            evidence.append(
-                self._evidence_item(
-                    "signal",
-                    "流量下滑规则",
-                    "使用量明显下滑，命中“流量下滑”风险因子。",
-                    [
-                        f"近30天流量下降比例 = {metrics['dataUsageDropPct']}%，阈值 > 30%",
-                        f"语音下降比例 = {metrics['voiceUsageDropPct']}%",
-                    ],
-                    "流量下滑",
-                )
-            )
-        if metrics["competitorContactCount30d"] > 0:
-            evidence.append(
-                self._evidence_item(
-                    "signal",
-                    "竞对接触规则",
-                    "出现竞对接触行为，命中“竞对接触”风险因子。",
-                    [
-                        f"近30天竞对接触次数 = {metrics['competitorContactCount30d']}，阈值 > 0",
-                        *self._related_event_facts(events, {"competitor_visit"}),
-                    ],
-                    "竞对接触",
-                )
-            )
-        if metrics["portingCodeRequestCount30d"] > 0:
-            evidence.append(
-                self._evidence_item(
-                    "signal",
-                    "携转意图规则",
-                    "出现携转码申请行为，命中“携转意图明确”风险因子。",
-                    [
-                        f"近30天携转授权码申请次数 = {metrics['portingCodeRequestCount30d']}，阈值 > 0",
-                        *self._related_event_facts(events, {"porting_code_request"}),
-                    ],
-                    "携转意图明确",
-                )
+                {
+                    "category": "signal",
+                    "title": rendered["label"],
+                    "summary": f"{rendered['label']} = {rendered['value']}",
+                    "facts": [f"{rendered['label']} = {rendered['value']}"],
+                }
             )
         evidence.append(
             {
                 "category": "decision",
                 "title": f"{inference['riskLevel']} 风险判定",
-                "summary": f"根据命中规则数 {len(inference['rules'])} 与风险因子数 {len(inference['factors'])} 生成最终风险等级。",
+                "summary": f"命中 {len(inference['rules'])} 条规则，形成最终风险等级。",
                 "riskLevel": inference["riskLevel"],
                 "facts": [f"命中规则：{label}" for label in inference["rules"]],
             }
         )
         return evidence
 
-    def _evidence_item(
-        self,
-        category: str,
-        title: str,
-        summary: str,
-        facts: list[str],
-        factor: str,
-    ) -> dict[str, Any]:
-        return {
-            "category": category,
-            "title": title,
-            "summary": summary,
-            "factor": factor,
-            "facts": facts,
-        }
-
-    def _related_event_facts(self, events: list[dict[str, Any]], event_types: set[str]) -> list[str]:
-        facts: list[str] = []
-        for event in events:
-            if event["eventType"] in event_types:
-                facts.append(f"{event['daysAgo']} 天前 · {event['channel']} · {event['detail']}")
-        return facts[:2]
+    def _build_source_cards(self) -> list[dict[str, Any]]:
+        cards: list[dict[str, Any]] = []
+        for card in self.scenario.source_cards:
+            if card.count_mode == "primary":
+                count = len(self.records)
+            else:
+                count = len(self.source_rows.get(card.dataset, []))
+            cards.append(
+                {
+                    "key": card.key,
+                    "label": card.label,
+                    "file": card.file,
+                    "count": count,
+                    "icon": card.icon,
+                    "tone": card.tone,
+                }
+            )
+        return cards
 
     def _build_overview_graph(self) -> dict[str, Any]:
         nodes: list[dict[str, Any]] = []
         edges: list[dict[str, Any]] = []
-        subscriber_items = list(self.records.values())[:20]
-        event_count = 0
-        cols = 5
-        for index, record in enumerate(subscriber_items):
+        primary_items = list(self.records.values())[:20]
+        cols = 4
+        for index, record in enumerate(primary_items):
             row = index // cols
             col = index % cols
-            x = 0.12 + col * 0.16
-            y = 0.16 + row * 0.18
-            subscriber_node_id = f"subscriber:{record['subscriberId']}"
-            nodes.append({"id": subscriber_node_id, "label": record["name"], "type": "Subscriber", "x": x, "y": y})
-            for event in record["events"][:2]:
-                event_count += 1
-                event_node_id = f"event:{event['eventId']}"
+            x = 0.14 + col * 0.2
+            y = 0.18 + row * 0.22
+            primary_node_id = record["nodeId"]
+            nodes.append(
+                {
+                    "id": primary_node_id,
+                    "label": record["displayName"],
+                    "type": self.scenario.primary_node_type,
+                    "x": x,
+                    "y": y,
+                }
+            )
+
+            node_offset = 0
+            for dataset_key in self.scenario.graph_datasets:
+                related_rows = record["related"].get(dataset_key, [])
+                if not related_rows:
+                    continue
+                node_offset += 1
+                related = related_rows[0]
+                related_id = self._node_id(dataset_key, related)
                 nodes.append(
                     {
-                        "id": event_node_id,
-                        "label": event["eventType"],
-                        "type": "Interaction",
-                        "x": min(x + 0.06, 0.95),
-                        "y": min(y + 0.08 + event_count * 0.002, 0.92),
+                        "id": related_id,
+                        "label": str(related.get("_label") or self.scenario.datasets[dataset_key].entity_label),
+                        "type": self.scenario.datasets[dataset_key].node_type,
+                        "x": min(x + 0.08 + node_offset * 0.04, 0.94),
+                        "y": min(y + 0.08, 0.92),
                     }
                 )
-                edges.append({"source": subscriber_node_id, "target": event_node_id, "label": "发生交互"})
-            result_node_id = f"result:{record['subscriberId']}"
+                relation_label = self._relation_label(self.scenario.primary_dataset, dataset_key)
+                edges.append({"source": primary_node_id, "target": related_id, "label": relation_label})
+
+            result_node_id = f"risk:{record['entityId']}"
             nodes.append(
                 {
                     "id": result_node_id,
-                    "label": self.inference[record["subscriberId"]]["riskLevel"],
-                    "type": "Result",
-                    "x": min(x + 0.1, 0.96),
-                    "y": max(y - 0.06, 0.08),
+                    "label": self.inference[record["entityId"]]["riskLevel"],
+                    "type": "RiskResult",
+                    "x": min(x + 0.08, 0.94),
+                    "y": max(y - 0.08, 0.08),
                 }
             )
-            edges.append({"source": subscriber_node_id, "target": result_node_id, "label": "推理输出"})
+            edges.append({"source": primary_node_id, "target": result_node_id, "label": "推理输出"})
+
         return {
             "nodes": nodes,
             "edges": edges,
-            "totalSubscribers": len(self.records),
-            "totalInteractions": sum(len(item["events"]) for item in self.records.values()),
+            "totalPrimaryEntities": len(self.records),
+            "totalInteractions": sum(len(self.source_rows.get(key, [])) for key in self.scenario.interaction_datasets),
         }
 
-    def _build_subscriber_graph(self, record: dict[str, Any], inference: dict[str, Any]) -> dict[str, Any]:
-        subscriber_id = record["subscriberId"]
-        subscriber_node = {"id": f"subscriber:{subscriber_id}", "label": record["name"], "type": "Subscriber"}
-        nodes = [subscriber_node]
+    def _build_entity_graph(self, record: dict[str, Any], inference: dict[str, Any]) -> dict[str, Any]:
+        primary_node = {
+            "id": record["nodeId"],
+            "label": record["displayName"],
+            "type": self.scenario.primary_node_type,
+        }
+        nodes = [primary_node]
         edges = []
 
-        result_node = {"id": f"result:{subscriber_id}", "label": f"{inference['riskLevel']} 风险", "type": "Result"}
-        action_node = {"id": f"action:{subscriber_id}", "label": inference["recommendedAction"], "type": "Action"}
+        result_node = {
+            "id": f"risk:{record['entityId']}",
+            "label": f"{inference['riskLevel']} 风险",
+            "type": "RiskResult",
+        }
+        action_node = {
+            "id": f"action:{record['entityId']}",
+            "label": inference["recommendedAction"],
+            "type": "Action",
+        }
         nodes.extend([result_node, action_node])
-        edges.append({"source": subscriber_node["id"], "target": result_node["id"], "label": "推理输出"})
+        edges.append({"source": primary_node["id"], "target": result_node["id"], "label": "推理输出"})
         edges.append({"source": result_node["id"], "target": action_node["id"], "label": "推荐动作"})
 
-        number_node = {"id": f"number:{record['msisdn']}", "label": record["msisdn"], "type": "Entity"}
-        nodes.append(number_node)
-        edges.append({"source": subscriber_node["id"], "target": number_node["id"], "label": "拥有号码"})
+        for dataset_key in self.scenario.graph_datasets:
+            for row in record["related"].get(dataset_key, [])[:2]:
+                node_id = self._node_id(dataset_key, row)
+                nodes.append(
+                    {
+                        "id": node_id,
+                        "label": str(row.get("_label") or self.scenario.datasets[dataset_key].entity_label),
+                        "type": self.scenario.datasets[dataset_key].node_type,
+                    }
+                )
+                edges.append({"source": primary_node["id"], "target": node_id, "label": self._relation_label(self.scenario.primary_dataset, dataset_key)})
 
         for factor in inference["factors"]:
-            node = {"id": f"factor:{factor.code}", "label": factor.label, "type": "Inference"}
-            nodes.append(node)
-            edges.append({"source": subscriber_node["id"], "target": node["id"], "label": "命中风险因子"})
-            edges.append({"source": node["id"], "target": result_node["id"], "label": "支撑结论"})
+            node_id = f"factor:{factor.code}"
+            nodes.append({"id": node_id, "label": factor.label, "type": "Inference"})
+            edges.append({"source": primary_node["id"], "target": node_id, "label": "命中风险因子"})
+            edges.append({"source": node_id, "target": result_node["id"], "label": "支撑结论"})
 
         for rule_label in inference["rules"]:
-            node_id = rule_label.encode("utf-8").hex()
-            node = {"id": f"rule:{node_id}", "label": rule_label, "type": "Inference"}
-            nodes.append(node)
-            edges.append({"source": subscriber_node["id"], "target": node["id"], "label": "命中规则"})
-            edges.append({"source": node["id"], "target": result_node["id"], "label": "触发推理"})
-
-        for event in record["events"][:5]:
-            node = {"id": f"event:{event['eventId']}", "label": event["eventType"], "type": "Interaction"}
-            nodes.append(node)
-            edges.append({"source": subscriber_node["id"], "target": node["id"], "label": "发生交互"})
+            node_id = f"rule:{rule_label.encode('utf-8').hex()}"
+            nodes.append({"id": node_id, "label": rule_label, "type": "Inference"})
+            edges.append({"source": primary_node["id"], "target": node_id, "label": "命中规则"})
+            edges.append({"source": node_id, "target": result_node["id"], "label": "触发推理"})
 
         return {"nodes": nodes, "edges": edges}
+
+    def _render_display_fields(
+        self,
+        record: dict[str, Any],
+        fields: tuple[AlertDisplayField, ...],
+    ) -> list[dict[str, Any]]:
+        return [self._render_display_field(record, field) for field in fields]
+
+    def _render_display_field(self, record: dict[str, Any], field: AlertDisplayField) -> dict[str, Any]:
+        value: Any = ""
+        if field.fact:
+            value = record["metrics"].get(field.fact)
+        elif field.source == self.scenario.primary_dataset:
+            value = record["primary"].get(field.field or "")
+        elif field.source:
+            related_rows = record["related"].get(field.source, [])
+            if related_rows and field.field:
+                value = related_rows[0].get(field.field)
+        return {
+            "label": field.label,
+            "value": self._json_ready_value(value),
+        }
+
+    def _alert_sort_key(self, item: dict[str, Any]) -> tuple[Any, ...]:
+        key_parts: list[Any] = [-self._risk_weight(item["riskLevel"])]
+        metrics = item["metrics"]
+        for sort_field in self.scenario.alert_sort:
+            raw = metrics.get(sort_field.fact)
+            normalized = self._sortable_value(raw)
+            key_parts.append(-normalized if sort_field.order == "desc" else normalized)
+        key_parts.append(item["entityId"])
+        return tuple(key_parts)
+
+    def _risk_weight(self, level: str) -> int:
+        return {"HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(level, 0)
+
+    def _sortable_value(self, value: Any) -> float:
+        if isinstance(value, bool):
+            return 1.0 if value else 0.0
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, (int, float)):
+            return float(value)
+        if value in ("", None):
+            return 0.0
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    def _evaluate_fact(
+        self,
+        fact: FactConfig,
+        primary_row: dict[str, Any],
+        related_rows: dict[str, list[dict[str, Any]]],
+    ) -> Any:
+        rows = [primary_row] if fact.source_dataset == self.scenario.primary_dataset else related_rows.get(fact.source_dataset, [])
+        candidates = [row for row in rows if not fact.where or self._row_matches(fact.where, row)]
+
+        if fact.aggregate == "first":
+            value = candidates[0].get(fact.field or "") if candidates else fact.default
+            return self._apply_cast(value, fact.cast, fact.default)
+        if fact.aggregate == "latest":
+            if not candidates or not fact.field or not fact.order_by:
+                return self._apply_cast(fact.default, fact.cast, fact.default)
+            ordered = sorted(candidates, key=lambda row: self._order_key(row.get(fact.order_by)))
+            return self._apply_cast(ordered[-1].get(fact.field), fact.cast, fact.default)
+        if fact.aggregate == "exists":
+            return bool(candidates)
+        if fact.aggregate == "count":
+            return len(candidates)
+        if fact.aggregate == "sum":
+            total = sum((self._coerce_scalar(row.get(fact.field or ""), fact.cast or "decimal") or Decimal("0")) for row in candidates)
+            return total
+        if fact.aggregate == "min_days_since":
+            if not candidates or not fact.field:
+                return fact.default
+            days = [
+                self._days_since(row.get(fact.field))
+                for row in candidates
+            ]
+            values = [value for value in days if value is not None]
+            return min(values) if values else fact.default
+        raise ValueError(f"Unsupported fact aggregate: {fact.aggregate}")
+
+    def _row_matches(self, condition: dict[str, Any], row: dict[str, Any]) -> bool:
+        if "all" in condition:
+            return all(self._row_matches(item, row) for item in condition["all"])
+        if "any" in condition:
+            return any(self._row_matches(item, row) for item in condition["any"])
+        if "not" in condition:
+            return not self._row_matches(condition["not"], row)
+
+        field = str(condition["field"])
+        operator = str(condition["op"])
+        expected = condition.get("value")
+        actual = row.get(field)
+
+        if operator == "within_days":
+            days = self._days_since(actual)
+            return days is not None and 0 <= days <= int(expected)
+        if operator == "date_on_or_after":
+            actual_date = self._parse_date_value(actual)
+            if actual_date is None:
+                return False
+            expected_date = self.reference_date if expected == "today" else date.fromisoformat(str(expected))
+            return actual_date >= expected_date
+        if operator == "not_empty":
+            return actual not in (None, "")
+
+        return self._compare(actual, operator, expected)
+
+    def _compare(self, actual: Any, operator: str, expected: Any) -> bool:
+        if isinstance(actual, bool):
+            actual_value = actual
+            expected_value = self._coerce_scalar(expected, "bool")
+        elif isinstance(actual, Decimal):
+            actual_value = actual
+            expected_value = self._coerce_scalar(expected, "decimal")
+        elif isinstance(actual, int):
+            actual_value = actual
+            expected_value = self._coerce_scalar(expected, "int")
+        else:
+            actual_value = "" if actual is None else actual
+            expected_value = expected
+
+        if operator == ">":
+            return actual_value > expected_value
+        if operator == ">=":
+            return actual_value >= expected_value
+        if operator == "<":
+            return actual_value < expected_value
+        if operator == "<=":
+            return actual_value <= expected_value
+        if operator == "==":
+            return actual_value == expected_value
+        if operator == "!=":
+            return actual_value != expected_value
+        if operator == "in":
+            return actual_value in expected_value
+        if operator == "not in":
+            return actual_value not in expected_value
+        raise ValueError(f"Unsupported row operator: {operator}")
+
+    def _days_since(self, value: Any) -> int | None:
+        parsed = self._parse_date_value(value)
+        if parsed is None:
+            return None
+        return (self.reference_date - parsed).days
+
+    def _parse_date_value(self, value: Any) -> date | None:
+        if value in (None, ""):
+            return None
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
+        except ValueError:
+            pass
+        try:
+            return date.fromisoformat(text)
+        except ValueError:
+            return None
+
+    def _apply_cast(self, value: Any, cast: str | None, default: Any) -> Any:
+        if value in (None, ""):
+            return default
+        if not cast:
+            return value
+        converted = self._coerce_scalar(value, cast)
+        return default if converted is None else converted
+
+    def _coerce_scalar(self, value: Any, value_type: str) -> Any:
+        if value in (None, ""):
+            return None
+        if isinstance(value, (int, float, Decimal, bool)) and value_type.lower() not in {"string", "str"}:
+            if value_type.lower() in {"bool", "boolean"}:
+                return bool(value)
+            return value
+
+        text = str(value).strip()
+        lowered = value_type.lower()
+        if lowered in {"int", "integer"}:
+            return int(text)
+        if lowered == "decimal":
+            return Decimal(text)
+        if lowered in {"float", "double"}:
+            return float(text)
+        if lowered in {"bool", "boolean"}:
+            return text.lower() in {"1", "true", "yes", "y"}
+        return text
+
+    def _json_ready_value(self, value: Any) -> Any:
+        if isinstance(value, Decimal):
+            return float(value)
+        return value
+
+    def _serialize_metrics(self, metrics: dict[str, Any]) -> dict[str, Any]:
+        return {key: self._json_ready_value(value) for key, value in metrics.items()}
+
+    def _serialize_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+        for key, value in row.items():
+            if key.startswith("_"):
+                continue
+            payload[key] = self._json_ready_value(value)
+        return payload
+
+    def _order_key(self, value: Any) -> Any:
+        parsed_date = self._parse_date_value(value)
+        if parsed_date is not None:
+            return parsed_date.toordinal()
+        if isinstance(value, Decimal):
+            return float(value)
+        if isinstance(value, (int, float)):
+            return value
+        return "" if value is None else str(value)
+
+    def _target_type_for_dataset(self, dataset_key: str) -> str:
+        rows = self.mapping_by_dataset.get(dataset_key, [])
+        if not rows:
+            raise ValueError(f"No mapping rows configured for dataset: {dataset_key}")
+        return rows[0].target_type
+
+    def _entity_uri(self, dataset_key: str, row: dict[str, Any], index: int) -> URIRef:
+        dataset_config = self.scenario.datasets[dataset_key]
+        parts = []
+        for field_name in dataset_config.id_fields:
+            value = row.get(field_name)
+            if value not in (None, ""):
+                parts.append(quote(str(value), safe=""))
+        if not parts:
+            parts.append(f"row-{index + 1}")
+        dataset_segment = dataset_key.replace("_", "-")
+        return URIRef(f"{self.settings.data_ns}{dataset_segment}/{'/'.join(parts)}")
+
+    def _entity_label(self, dataset_key: str, row: dict[str, Any]) -> str:
+        dataset_config = self.scenario.datasets[dataset_key]
+        if dataset_config.label_template:
+            values = {key: "" if value is None else str(value) for key, value in row.items()}
+            return dataset_config.label_template.format(**values)
+        if dataset_config.label_field:
+            value = row.get(dataset_config.label_field)
+            if value not in (None, ""):
+                return str(value)
+        return f"{dataset_config.entity_label}-{int(row['_row_index']) + 1}"
+
+    def _resolve_curie(self, curie: str) -> URIRef:
+        namespace, local = curie.split(":", 1)
+        if namespace == "rdf":
+            return URIRef(str(RDF[local]))
+        if namespace == "rdfs":
+            return URIRef(str(RDFS[local]))
+        return URIRef(str(make_namespaces(self.settings)[namespace][local]))
+
+    def _literal_for_value(self, value: Any, value_type: str) -> Literal:
+        lowered = value_type.lower()
+        if lowered in {"int", "integer"}:
+            return Literal(int(value), datatype=XSD.integer)
+        if lowered == "decimal":
+            return Literal(Decimal(str(value)), datatype=XSD.decimal)
+        if lowered in {"bool", "boolean"}:
+            return Literal(bool(value), datatype=XSD.boolean)
+        return Literal(value)
+
+    def _relation_id(
+        self,
+        source_dataset: str,
+        source_row: dict[str, Any],
+        target_dataset: str,
+        target_row: dict[str, Any],
+    ) -> str:
+        source_bits = [source_dataset, str(source_row["_row_index"])]
+        target_bits = [target_dataset, str(target_row["_row_index"])]
+        return "-".join(source_bits + target_bits)
+
+    def _node_id(self, dataset_key: str, row: dict[str, Any]) -> str:
+        dataset_config = self.scenario.datasets[dataset_key]
+        identifiers = [str(row.get(field)) for field in dataset_config.id_fields if row.get(field) not in (None, "")]
+        if not identifiers:
+            identifiers = [str(row.get("_row_index"))]
+        return f"{dataset_config.node_type.lower()}:{'|'.join(identifiers)}"
+
+    def _relation_label(self, source_dataset: str, target_dataset: str) -> str:
+        for relation in self.scenario.relations:
+            if relation.source_dataset == source_dataset and relation.target_dataset == target_dataset:
+                return relation.label
+        return "关联"

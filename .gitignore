@@ -1,4 +1,5 @@
 .DS_Store
+.idea/
 
 # Python cache and local environments
 __pycache__/
@@ -8,6 +9,7 @@ __pycache__/
 .venv/
 
 # Backend runtime artifacts
+.run/
 backend/runtime/*
 !backend/runtime/.gitkeep
 

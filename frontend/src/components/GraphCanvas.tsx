@@ -14,8 +14,15 @@ export const NODE_TYPE_COLORS: Record<string, string> = {
   Class: "#52c41a",
   Inference: "#722ed1",
   Result: "#fa8c16",
+  RiskResult: "#fa8c16",
   Entity: "#13c2c2",
-  Subscriber: "#1890ff",
+  User: "#1890ff",
+  PortingQuery: "#36cfc9",
+  Contract: "#73d13d",
+  Billing: "#faad14",
+  NetworkUsage: "#597ef7",
+  CustomerService: "#ff7a45",
+  RetentionAction: "#eb2f96",
   Interaction: "#52c41a",
   Action: "#13c2c2",
 };
@@ -25,8 +32,15 @@ export const NODE_TYPE_LABELS: Record<string, string> = {
   Class: "本体类",
   Inference: "推理结果",
   Result: "查询结果",
+  RiskResult: "风险结果",
   Entity: "实体",
-  Subscriber: "用户",
+  User: "用户",
+  PortingQuery: "携转资格",
+  Contract: "业务合约",
+  Billing: "账务信息",
+  NetworkUsage: "网络使用",
+  CustomerService: "客服交互",
+  RetentionAction: "维系动作",
   Interaction: "交互记录",
   Action: "动作",
 };
@@ -44,9 +58,16 @@ function buildFallbackPositions(nodes: GraphNode[]) {
   }
 
   const anchors: Record<string, { x: number; y: number; radiusX: number; radiusY: number }> = {
-    Subscriber: { x: 0.24, y: 0.38, radiusX: 0.2, radiusY: 0.18 },
+    User: { x: 0.24, y: 0.38, radiusX: 0.2, radiusY: 0.18 },
+    PortingQuery: { x: 0.74, y: 0.22, radiusX: 0.12, radiusY: 0.08 },
+    Contract: { x: 0.78, y: 0.38, radiusX: 0.12, radiusY: 0.08 },
+    Billing: { x: 0.74, y: 0.58, radiusX: 0.12, radiusY: 0.08 },
+    CustomerService: { x: 0.58, y: 0.76, radiusX: 0.12, radiusY: 0.08 },
+    RetentionAction: { x: 0.88, y: 0.7, radiusX: 0.08, radiusY: 0.08 },
+    NetworkUsage: { x: 0.56, y: 0.2, radiusX: 0.12, radiusY: 0.08 },
     Interaction: { x: 0.72, y: 0.32, radiusX: 0.16, radiusY: 0.12 },
     Result: { x: 0.52, y: 0.18, radiusX: 0.14, radiusY: 0.06 },
+    RiskResult: { x: 0.52, y: 0.18, radiusX: 0.14, radiusY: 0.06 },
     Entity: { x: 0.28, y: 0.78, radiusX: 0.12, radiusY: 0.08 },
     Inference: { x: 0.7, y: 0.74, radiusX: 0.16, radiusY: 0.1 },
     Action: { x: 0.9, y: 0.58, radiusX: 0.06, radiusY: 0.08 },
@@ -117,7 +138,7 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
         }
 
         const fill = NODE_TYPE_COLORS[node.type] || "#999999";
-        const radius = node.type === "Subscriber" ? 20 : 16;
+        const radius = node.type === "User" ? 20 : 16;
         const isSelected = selectedNodeId === node.id;
 
         return (
