@@ -12,10 +12,10 @@ def test_ruleset_is_loaded_from_rules_directory():
     assert settings.rules_dir.name == "rules"
     assert settings.rules_path.name == "porting-risk.yaml"
     assert settings.ontology_domain_path.name == "telecom-porting.ttl"
-    assert len(ruleset.factor_rules) == 7
+    assert len(ruleset.factor_rules) == 10
     assert [rule.rule_label for rule in ruleset.decision_rules] == [
-        "高风险组合规则",
-        "中风险组合规则",
+        "高风险携转预警",
+        "中风险携转预警",
         "低风险默认规则",
     ]
 
@@ -25,25 +25,31 @@ def test_infer_record_uses_external_decision_table():
     ruleset = load_ruleset(get_settings())
     record = {
         "metrics": {
-            "complaintCount30d": 4,
-            "dataUsageDropPct": 35,
-            "competitorContactCount30d": 1,
-            "contractRemainingDays": 30,
-            "portingCodeRequestCount30d": 1,
-            "overdueDays": 0,
-            "retentionOfferRejected": 0,
+            "hasActiveContract": False,
+            "hasArrears": False,
+            "hasRecentQuery7d": True,
+            "hasRecentQuery30d": True,
+            "queryAllowed": "1",
+            "competitorCallCount7d": 2,
+            "competitorCallCount30d": 2,
+            "complaintCount30d": 2,
+            "complaintCount60d": 2,
+            "latestMaintainSuccess": "0",
+            "innetMonths": 8,
         }
     }
 
     result = infer_record(record, ruleset)
 
     assert result["riskLevel"] == "HIGH"
-    assert result["recommendedAction"] == "48小时内外呼挽留+定向权益补贴"
-    assert "高风险组合规则" in result["rules"]
+    assert result["recommendedAction"] == "携转风险等级=高，触发紧急维系流程（例如：专属客服对接）"
+    assert "高风险携转预警" in result["rules"]
     assert {factor.code for factor in result["factors"]} >= {
-        "complaint_spike",
-        "data_drop",
-        "competitor_contact",
-        "contract_expiring",
-        "porting_intent",
+        "no_active_contract",
+        "no_arrears",
+        "recent_query_7d",
+        "competitor_call",
+        "complaint_30d",
+        "retention_failed",
+        "short_tenure",
     }

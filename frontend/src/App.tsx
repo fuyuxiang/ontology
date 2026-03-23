@@ -2,7 +2,7 @@ import { type KeyboardEvent, startTransition, useEffect, useState } from "react"
 
 import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS } from "./components/GraphCanvas";
 import { getAlerts, getSummary, runSparql, triggerInference } from "./services/api";
-import type { Alert, GraphNode, RiskLevel, SparqlResult, Summary } from "./types";
+import type { Alert, RiskLevel, SparqlResult, Summary } from "./types";
 
 type PageKey = "dashboard" | "ontology" | "graph" | "qa" | "settings";
 
@@ -29,16 +29,10 @@ const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: IconName }> = [
   { key: "settings", label: "设置", icon: "settings" },
 ];
 
-const ONTOLOGY_FILES: Array<{ name: string; desc: string; tone: "ttl" | "rules" }> = [
-  { name: "doim-core.ttl", desc: "DOIM 核心本体，定义 Entity / Identifier / Relation 等基础语义。", tone: "ttl" },
-  { name: "telecom-porting.ttl", desc: "电信携号转网领域本体，定义 Subscriber / Snapshot / Alert 等类。", tone: "ttl" },
-  { name: "porting-risk.rules", desc: "业务规则定义，驱动高风险、中风险与默认规则推理。", tone: "rules" },
-];
-
 const RECOMMENDED_QUESTIONS = [
-  "哪些用户有携号转网高风险？",
-  "系统里定义了哪些风险因子？",
-  "最近有哪些交互事件值得关注？",
+  "哪些用户属于高风险携转预警？",
+  "哪些规则被命中最多？",
+  "最近有哪些携转资格查询或投诉记录？",
 ];
 
 const ICON_PATHS = {
@@ -79,6 +73,13 @@ function formatCompactNumber(value: number) {
   return `${value}`;
 }
 
+function formatFieldLine(fields: Array<{ label: string; value: string | number | boolean | null }>, separator = " | ") {
+  return fields
+    .filter((field) => field.value !== "" && field.value !== null && field.value !== undefined)
+    .map((field) => `${field.label}: ${field.value}`)
+    .join(separator);
+}
+
 function riskLabel(level: RiskLevel) {
   if (level === "HIGH") {
     return "高风险";
@@ -107,16 +108,15 @@ function buildDefaultQuestionQuery(defaultQuery?: string) {
     `PREFIX rdf: <${RDF_NS}>`,
     `PREFIX rdfs: <${RDFS_NS}>`,
     `PREFIX telecom: <${TELECOM_NS}>`,
-    "SELECT ?subscriberId ?name ?riskLevel ?city ?plan",
+    "SELECT ?userId ?deviceNumber ?riskLevel ?areaId",
     "WHERE {",
-    "  ?s a telecom:Subscriber ;",
-    "     telecom:subscriberId ?subscriberId ;",
-    "     rdfs:label ?name ;",
-    "     telecom:city ?city ;",
-    "     telecom:planName ?plan ;",
-    "     telecom:inferredRiskLevel ?riskLevel .",
+    "  ?user a telecom:User ;",
+    "        telecom:userId ?userId ;",
+    "        telecom:deviceNumber ?deviceNumber ;",
+    "        telecom:inferredRiskLevel ?riskLevel .",
+    "  OPTIONAL { ?user telecom:areaId ?areaId }",
     "}",
-    "ORDER BY DESC(?riskLevel) ?subscriberId",
+    "ORDER BY DESC(?riskLevel) ?userId",
     "LIMIT 10",
   ].join("\n");
 }
@@ -142,56 +142,63 @@ LIMIT 20`;
 
   if (q.includes("高风险") || (q.includes("风险") && q.includes("用户"))) {
     return `${prefixes}
-SELECT ?subscriberId ?name ?city ?riskLevel
+SELECT ?userId ?deviceNumber ?areaId ?riskLevel
 WHERE {
-  ?s a telecom:Subscriber ;
-     telecom:subscriberId ?subscriberId ;
-     rdfs:label ?name ;
-     telecom:city ?city ;
-     telecom:inferredRiskLevel ?riskLevel .
+  ?user a telecom:User ;
+        telecom:userId ?userId ;
+        telecom:deviceNumber ?deviceNumber ;
+        telecom:inferredRiskLevel ?riskLevel .
+  OPTIONAL { ?user telecom:areaId ?areaId }
   FILTER(?riskLevel = "HIGH")
 }
-ORDER BY ?subscriberId
+ORDER BY ?userId
 LIMIT 10`;
   }
 
   if (q.includes("交互") || q.includes("事件") || q.includes("interaction")) {
     return `${prefixes}
-SELECT ?eventId ?type ?detail
+SELECT ?deviceNumber ?queryTime ?servContent
 WHERE {
-  ?event a telecom:ChannelInteraction ;
-         telecom:eventId ?eventId ;
-         telecom:eventType ?type ;
-         telecom:eventDetail ?detail .
+  {
+    ?query a telecom:PortingQuery ;
+           telecom:deviceNumber ?deviceNumber ;
+           telecom:queryTime ?queryTime .
+  }
+  UNION
+  {
+    ?service a telecom:CustomerServiceInteraction ;
+             telecom:deviceNumber ?deviceNumber ;
+             telecom:servContent ?servContent .
+  }
 }
-ORDER BY ?eventId
+ORDER BY ?deviceNumber
 LIMIT 10`;
   }
 
   if (q.includes("规则") || q.includes("rule")) {
     return `${prefixes}
-SELECT ?subscriberId ?ruleLabel
+SELECT ?userId ?ruleLabel
 WHERE {
-  ?s a telecom:Subscriber ;
-     telecom:subscriberId ?subscriberId ;
+  ?user a telecom:User ;
+     telecom:userId ?userId ;
      <http://purl.org/doim/1.0#taggedByRule> ?rule .
   ?rule rdfs:label ?ruleLabel .
 }
-ORDER BY ?subscriberId ?ruleLabel
+ORDER BY ?userId ?ruleLabel
 LIMIT 15`;
   }
 
   if (q.includes("用户") || q.includes("subscriber")) {
     return `${prefixes}
-SELECT ?subscriberId ?name ?city ?plan
+SELECT ?userId ?deviceNumber ?areaId ?userType
 WHERE {
-  ?s a telecom:Subscriber ;
-     telecom:subscriberId ?subscriberId ;
-     rdfs:label ?name .
-  OPTIONAL { ?s telecom:city ?city }
-  OPTIONAL { ?s telecom:planName ?plan }
+  ?user a telecom:User ;
+        telecom:userId ?userId ;
+        telecom:deviceNumber ?deviceNumber .
+  OPTIONAL { ?user telecom:areaId ?areaId }
+  OPTIONAL { ?user telecom:userType ?userType }
 }
-ORDER BY ?subscriberId
+ORDER BY ?userId
 LIMIT 10`;
   }
 
@@ -213,25 +220,25 @@ function formatAnswer(result: SparqlResult, question: string) {
 
   if (q.includes("高风险") || (q.includes("风险") && q.includes("用户"))) {
     return `找到 ${rows.length} 个高风险用户：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.name || row.subscriberId || "-"} · ${row.city || "-"} · ${row.riskLevel || "HIGH"}`)
+      .map((row, index) => `${index + 1}. ${row.deviceNumber || row.userId || "-"} · ${row.areaId || "-"} · ${row.riskLevel || "HIGH"}`)
       .join("\n")}`;
   }
 
   if (q.includes("交互") || q.includes("事件")) {
     return `最近的关键交互事件如下：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.eventId || "-"} · ${row.type || "-"} · ${row.detail || "-"}`)
+      .map((row, index) => `${index + 1}. ${row.deviceNumber || "-"} · ${row.queryTime || row.servContent || "-"}`)
       .join("\n")}`;
   }
 
   if (q.includes("规则")) {
     return `规则命中样例如下：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.subscriberId || "-"} · ${row.ruleLabel || "-"}`)
+      .map((row, index) => `${index + 1}. ${row.userId || "-"} · ${row.ruleLabel || "-"}`)
       .join("\n")}`;
   }
 
   if (q.includes("用户") || q.includes("subscriber")) {
     return `找到 ${rows.length} 个用户：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.name || row.subscriberId || "-"} · ${row.city || "-"} · ${row.plan || "-"}`)
+      .map((row, index) => `${index + 1}. ${row.deviceNumber || row.userId || "-"} · ${row.areaId || "-"} · ${row.userType || "-"}`)
       .join("\n")}`;
   }
 
@@ -409,7 +416,7 @@ export default function App() {
   function openAlertInGraph(alert: Alert) {
     startTransition(() => {
       setPage("graph");
-      setSelectedNodeId(`subscriber:${alert.subscriberId}`);
+      setSelectedNodeId(alert.nodeId);
     });
   }
 
@@ -420,28 +427,24 @@ export default function App() {
   const selectedNodeEdges = selectedNode
     ? graphEdges.filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
     : [];
-  const selectedSubscriberAlert =
-    selectedNode && selectedNode.id.startsWith("subscriber:")
-      ? alerts.find((item) => `subscriber:${item.subscriberId}` === selectedNode.id)
-      : undefined;
+  const selectedEntityAlert = selectedNode ? alerts.find((item) => item.nodeId === selectedNode.id) : undefined;
 
   const legendTypes = Array.from(new Set(graphNodes.map((node) => node.type)));
   const highRiskUsers = alerts.filter((item) => item.riskLevel !== "LOW").slice(0, 5);
   const topRules = summary?.topRules ?? [];
   const ruleCounts = Object.fromEntries(topRules.map((item) => [item.rule, item.count]));
-  const dataSourceCards = [
-    { key: "subscribers", label: "用户主数据", file: "subscribers.csv", count: `${summary?.subscriberCount ?? 0} 条`, icon: "user" as IconName, tone: "crm" },
-    { key: "usage", label: "使用信号", file: "usage_signals.csv", count: `${summary?.subscriberCount ?? 0} 条`, icon: "data" as IconName, tone: "usage" },
-    { key: "commercial", label: "商业信号", file: "commercial_signals.csv", count: `${summary?.subscriberCount ?? 0} 条`, icon: "money" as IconName, tone: "commercial" },
-    { key: "interactions", label: "交互事件", file: "interaction_events.csv", count: `${summary?.interactionCount ?? 0} 条`, icon: "event" as IconName, tone: "interaction" },
-  ];
+  const dataSourceCards = summary?.sourceCards ?? [];
+  const ontologyFiles = summary?.ontologyFiles ?? [];
+  const ruleCards = summary?.ruleCards ?? [];
+  const mappingExamples = summary?.mappingExamples ?? [];
+  const suggestedQuestions = summary?.questionSuggestions?.length ? summary.questionSuggestions : RECOMMENDED_QUESTIONS;
 
   return (
     <div className="app-container">
       <header className="top-header">
         <div className="header-title">
           <SvgIcon name="globe" size={24} />
-          <span>电信携号转网预警系统</span>
+          <span>{summary?.headerTitle || "携号转网场景语义预警系统"}</span>
         </div>
         <div className="header-actions">
           <button className="action-btn" type="button" onClick={() => void handleRefresh()}>
@@ -477,18 +480,18 @@ export default function App() {
 
           {page === "dashboard" ? (
             <div className="page active">
-              <PageHeader title="仪表盘" subtitle="实时监控携号转网风险态势" />
+              <PageHeader title="仪表盘" subtitle={summary?.dashboardSubtitle || "实时监控携号转网风险态势"} />
 
               <div className="stats-grid">
                 <StatCard
-                  label="用户总数"
-                  value={summary ? formatCompactNumber(summary.subscriberCount) : "-"}
+                  label={`${summary?.primaryEntityPluralLabel || "用户"}总数`}
+                  value={summary ? formatCompactNumber(summary.primaryEntityCount) : "-"}
                   icon="user"
                   iconBg="#e6f7ff"
                   iconColor="#1890ff"
                 />
                 <StatCard
-                  label="交互记录"
+                  label={summary?.interactionLabel || "交互记录"}
                   value={summary ? formatCompactNumber(summary.interactionCount) : "-"}
                   icon="interaction"
                   iconBg="#fff7e6"
@@ -520,15 +523,13 @@ export default function App() {
                     {!loading && alerts.length === 0 ? <EmptyState message="暂无告警数据" /> : null}
                     {!loading &&
                       alerts.slice(0, 6).map((alert) => (
-                        <button key={alert.subscriberId} type="button" className="alert-item" onClick={() => openAlertInGraph(alert)}>
+                        <button key={alert.entityId} type="button" className="alert-item" onClick={() => openAlertInGraph(alert)}>
                           <div className="alert-icon">
                             <SvgIcon name="alert" size={20} color="#ff4d4f" />
                           </div>
                           <div className="alert-info">
-                            <div className="alert-name">{alert.name || alert.subscriberId}</div>
-                            <div className="alert-meta">
-                              城市: {alert.city || "-"} | 套餐: {alert.planName || alert.plan || "-"} | 动作: {alert.recommendedAction}
-                            </div>
+                            <div className="alert-name">{alert.displayName || alert.entityId}</div>
+                            <div className="alert-meta">{formatFieldLine(alert.summaryFields) || `动作: ${alert.recommendedAction}`}</div>
                           </div>
                           <RiskStatus level={alert.riskLevel} />
                         </button>
@@ -545,18 +546,16 @@ export default function App() {
                     {!loading && highRiskUsers.length === 0 ? <EmptyState message="暂无高风险用户" /> : null}
                     {!loading &&
                       highRiskUsers.map((alert) => (
-                        <button key={alert.subscriberId} type="button" className="risk-user-item" onClick={() => openAlertInGraph(alert)}>
+                        <button key={alert.entityId} type="button" className="risk-user-item" onClick={() => openAlertInGraph(alert)}>
                           <div className="risk-user-icon">
                             <SvgIcon name="user" size={20} color="#1890ff" />
                           </div>
                           <div className="risk-user-info">
-                            <div className="risk-user-name">{alert.name}</div>
-                            <div className="risk-user-meta">
-                              城市: {alert.city} | 套餐: {alert.planName}
-                            </div>
+                            <div className="risk-user-name">{alert.displayName}</div>
+                            <div className="risk-user-meta">{formatFieldLine(alert.summaryFields) || alert.recommendedAction}</div>
                           </div>
                           <div className="risk-user-right">
-                            <div className="risk-user-amount">{alert.segment}</div>
+                            <div className="risk-user-amount">{alert.factors[0] || "-"}</div>
                             <RiskStatus level={alert.riskLevel} />
                           </div>
                         </button>
@@ -578,16 +577,16 @@ export default function App() {
                     <h3 className="step-title">数据源接入</h3>
                   </div>
                   <div className="step-content">
-                    <div className="step-desc">从多个 CSV 数据源加载客户、使用、商业与交互事件信号。</div>
+                    <div className="step-desc">从多个业务模型 CSV 数据源加载当前场景的核心实体与行为信号。</div>
                     <div className="data-sources-grid">
                       {dataSourceCards.map((item) => (
                         <div key={item.key} className="data-source-card">
                           <div className={`source-icon ${item.tone}`}>
-                            <SvgIcon name={item.icon} size={24} />
+                            <SvgIcon name={item.icon as IconName} size={24} />
                           </div>
                           <div className="source-name">{item.label}</div>
                           <div className="source-file">{item.file}</div>
-                          <div className="source-count">{item.count}</div>
+                          <div className="source-count">{item.count} 条</div>
                         </div>
                       ))}
                     </div>
@@ -600,9 +599,9 @@ export default function App() {
                     <h3 className="step-title">本体定义</h3>
                   </div>
                   <div className="step-content">
-                    <div className="step-desc">加载 DOIM 核心本体、电信领域本体和风险规则文件。</div>
+                    <div className="step-desc">加载 DOIM 核心本体、当前场景领域本体与风险规则文件。</div>
                     <div className="ontology-files">
-                      {ONTOLOGY_FILES.map((file) => (
+                      {ontologyFiles.map((file) => (
                         <div key={file.name} className="ontology-file">
                           <div className={`file-icon ${file.tone}`}>
                             <SvgIcon name="file" size={20} />
@@ -630,24 +629,18 @@ export default function App() {
                         <div className="stat-label">三元组总数</div>
                       </div>
                       <div className="stat-item">
-                        <div className="stat-value">{summary ? summary.subscriberCount + summary.interactionCount : "-"}</div>
+                        <div className="stat-value">{summary ? summary.primaryEntityCount + summary.interactionCount : "-"}</div>
                         <div className="stat-label">实体数量</div>
                       </div>
                     </div>
                     <div className="mapping-example">
                       <div className="example-title">映射示例：</div>
-                      <div className="example-item">
-                        <span className="example-label">用户:</span>
-                        <code>:S1001 a :Subscriber ; :subscriberId "S1001" ; rdfs:label "张敏" .</code>
-                      </div>
-                      <div className="example-item">
-                        <span className="example-label">号码:</span>
-                        <code>:number/13900000001 a :MobileNumber ; :identifierValue "13900000001" .</code>
-                      </div>
-                      <div className="example-item">
-                        <span className="example-label">关系:</span>
-                        <code>:S1001 :ownsNumber :number/13900000001 .</code>
-                      </div>
+                      {mappingExamples.map((item) => (
+                        <div key={item.label} className="example-item">
+                          <span className="example-label">{item.label}:</span>
+                          <code>{item.code}</code>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -658,38 +651,15 @@ export default function App() {
                     <h3 className="step-title">推理引擎</h3>
                   </div>
                   <div className="step-content">
-                    <div className="step-desc">结合 OWL-RL 推导与业务规则命中，形成风险判断。</div>
+                    <div className="step-desc">结合 OWL-RL 推导与配置化业务规则命中，形成当前场景风险判断。</div>
                     <div className="inference-rules">
-                      <div className="rule-item high">
-                        <div className="rule-name">高风险组合规则</div>
-                        <div className="rule-desc">携转申请 + 竞对接触/投诉/合约临近 等强信号组合</div>
-                        <div className="rule-count">{ruleCounts["高风险组合规则"] || 0} 次命中</div>
-                      </div>
-                      <div className="rule-item medium">
-                        <div className="rule-name">中风险组合规则</div>
-                        <div className="rule-desc">使用下滑、投诉、竞对接触、合约到期等中等强度组合</div>
-                        <div className="rule-count">{ruleCounts["中风险组合规则"] || 0} 次命中</div>
-                      </div>
-                      <div className="rule-item low">
-                        <div className="rule-name">低风险默认规则</div>
-                        <div className="rule-desc">未触发中高风险条件的常规客户</div>
-                        <div className="rule-count">{ruleCounts["低风险默认规则"] || 0} 次命中</div>
-                      </div>
-                      <div className="rule-item retention">
-                        <div className="rule-name">挽留拒绝规则</div>
-                        <div className="rule-desc">客户拒绝优惠挽留时提升风险等级</div>
-                        <div className="rule-count">{ruleCounts["挽留拒绝规则"] || 0} 次命中</div>
-                      </div>
-                      <div className="rule-item complaint">
-                        <div className="rule-name">投诉激增规则</div>
-                        <div className="rule-desc">30 天内投诉次数超过阈值</div>
-                        <div className="rule-count">{ruleCounts["投诉激增规则"] || 0} 次命中</div>
-                      </div>
-                      <div className="rule-item porting">
-                        <div className="rule-name">携转意图规则</div>
-                        <div className="rule-desc">发生携转授权码查询或申请事件</div>
-                        <div className="rule-count">{ruleCounts["携转意图规则"] || 0} 次命中</div>
-                      </div>
+                      {ruleCards.map((card) => (
+                        <div key={card.label} className={`rule-item ${card.tone}`}>
+                          <div className="rule-name">{card.label}</div>
+                          <div className="rule-desc">{card.desc}</div>
+                          <div className="rule-count">{ruleCounts[card.label] || 0} 次命中</div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -704,15 +674,15 @@ export default function App() {
                     <div className="result-summary">
                       <div className="result-card high">
                         <div className="result-count">{summary?.riskDistribution.HIGH ?? "-"}</div>
-                        <div className="result-label">高风险用户</div>
+                        <div className="result-label">高风险{summary?.primaryEntityLabel || "用户"}</div>
                       </div>
                       <div className="result-card medium">
                         <div className="result-count">{summary?.riskDistribution.MEDIUM ?? "-"}</div>
-                        <div className="result-label">中风险用户</div>
+                        <div className="result-label">中风险{summary?.primaryEntityLabel || "用户"}</div>
                       </div>
                       <div className="result-card low">
                         <div className="result-count">{summary?.riskDistribution.LOW ?? "-"}</div>
-                        <div className="result-label">低风险用户</div>
+                        <div className="result-label">低风险{summary?.primaryEntityLabel || "用户"}</div>
                       </div>
                     </div>
                     <div className="top-rules">
@@ -761,8 +731,8 @@ export default function App() {
                   {graph ? (
                     <>
                       <div className="graph-stats">
-                        <span>用户: {graph.totalSubscribers ?? summary?.subscriberCount ?? 0}</span> |
-                        <span> 交互: {graph.totalInteractions ?? summary?.interactionCount ?? 0}</span> |
+                        <span>{summary?.primaryEntityPluralLabel || "用户"}: {graph.totalPrimaryEntities ?? summary?.primaryEntityCount ?? 0}</span> |
+                        <span> {summary?.interactionLabel || "交互"}: {graph.totalInteractions ?? summary?.interactionCount ?? 0}</span> |
                         <span> 节点: {graphNodes.length}</span> |
                         <span> 边: {graphEdges.length}</span>
                       </div>
@@ -821,25 +791,23 @@ export default function App() {
                           <span className="detail-property-key">标签</span>
                           <span className="detail-property-value">{selectedNode.label || "-"}</span>
                         </div>
-                        {selectedSubscriberAlert ? (
+                        {selectedEntityAlert ? (
                           <>
                             <div className="detail-property">
                               <span className="detail-property-key">风险</span>
                               <span className="detail-property-value">
-                                <RiskStatus level={selectedSubscriberAlert.riskLevel} />
+                                <RiskStatus level={selectedEntityAlert.riskLevel} />
                               </span>
                             </div>
-                            <div className="detail-property">
-                              <span className="detail-property-key">号码</span>
-                              <span className="detail-property-value">{selectedSubscriberAlert.msisdn}</span>
-                            </div>
-                            <div className="detail-property">
-                              <span className="detail-property-key">套餐</span>
-                              <span className="detail-property-value">{selectedSubscriberAlert.planName}</span>
-                            </div>
+                            {selectedEntityAlert.detailFields.map((field) => (
+                              <div key={field.label} className="detail-property">
+                                <span className="detail-property-key">{field.label}</span>
+                                <span className="detail-property-value">{String(field.value ?? "-")}</span>
+                              </div>
+                            ))}
                             <div className="detail-property">
                               <span className="detail-property-key">动作</span>
-                              <span className="detail-property-value">{selectedSubscriberAlert.recommendedAction}</span>
+                              <span className="detail-property-value">{selectedEntityAlert.recommendedAction}</span>
                             </div>
                           </>
                         ) : null}
@@ -903,7 +871,7 @@ export default function App() {
 
                 <div className="suggested-questions">
                   <span className="suggest-label">推荐问题：</span>
-                  {RECOMMENDED_QUESTIONS.map((question) => (
+                  {suggestedQuestions.map((question) => (
                     <button
                       key={question}
                       className="suggest-btn"
