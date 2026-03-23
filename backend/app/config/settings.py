@@ -18,8 +18,10 @@ class Settings:
     project_dir: Path
     data_dir: Path
     mappings_dir: Path
+    mapping_path: Path
     ontology_dir: Path
     rules_dir: Path
+    scenarios_dir: Path
     runtime_dir: Path
     store_dir: Path
     reports_dir: Path
@@ -27,6 +29,7 @@ class Settings:
     ontology_domain_path: Path
     ontology_shapes_path: Path
     rules_path: Path
+    scenario_path: Path
     host: str
     port: int
     doim_ns: str
@@ -51,8 +54,15 @@ def get_settings() -> Settings:
         project_dir=project_dir,
         data_dir=project_dir / "data" / "raw",
         mappings_dir=project_dir / "mappings",
+        mapping_path=_resolve_path(
+            project_dir,
+            os.getenv("ONTOLOGY_MAPPING_PATH"),
+            profile.get("mapping_path"),
+            project_dir / "mappings" / "doim_mapping.csv",
+        ),
         ontology_dir=ontology_dir,
         rules_dir=rules_dir,
+        scenarios_dir=project_dir / "scenarios",
         runtime_dir=project_dir / "runtime",
         store_dir=project_dir / "runtime" / "store",
         reports_dir=project_dir / "runtime" / "reports",
@@ -79,6 +89,12 @@ def get_settings() -> Settings:
             os.getenv("ONTOLOGY_RULES_PATH"),
             profile.get("rules_path"),
             rules_dir / "porting-risk.yaml",
+        ),
+        scenario_path=_resolve_path(
+            project_dir,
+            os.getenv("ONTOLOGY_SCENARIO_PATH"),
+            profile.get("scenario_path"),
+            project_dir / "scenarios" / "telecom-porting.yaml",
         ),
         host=os.getenv("ONTOLOGY_HOST", "127.0.0.1"),
         port=int(os.getenv("ONTOLOGY_PORT", "8088")),
@@ -121,14 +137,13 @@ def _build_default_query(doim_ns: str, telecom_ns: str) -> str:
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX doim: <{doim_ns}>
 PREFIX telecom: <{telecom_ns}>
-SELECT ?subscriberId ?name ?riskLevel ?city ?plan
+SELECT ?userId ?deviceNumber ?riskLevel ?areaId
 WHERE {{
-  ?s a telecom:Subscriber ;
-     telecom:subscriberId ?subscriberId ;
-     rdfs:label ?name ;
-     telecom:city ?city ;
-     telecom:planName ?plan ;
+  ?s a telecom:User ;
+     telecom:userId ?userId ;
+     telecom:deviceNumber ?deviceNumber ;
      telecom:inferredRiskLevel ?riskLevel .
+  OPTIONAL {{ ?s telecom:areaId ?areaId }}
 }}
-ORDER BY DESC(?riskLevel) ?subscriberId
+ORDER BY DESC(?riskLevel) ?userId
 """

@@ -1,148 +1,190 @@
 risk_actions:
-  HIGH: 48小时内外呼挽留+定向权益补贴
-  MEDIUM: 短信/APP 定向优惠+人工复核
-  LOW: 常规关怀与权益提醒
+  HIGH: 携转风险等级=高，触发紧急维系流程（例如：专属客服对接）
+  MEDIUM: 携转风险等级=中，触发常规维系流程（例如：72小时内外呼+优惠推荐）
+  LOW: 携转风险等级=低，无需主动维系，持续监控即可
 
 factor_rules:
-  - id: complaint_spike
-    rule_label: 投诉激增规则
+  - id: no_active_contract
+    rule_label: 无有效合约
     factor:
-      code: complaint_spike
-      label: 投诉激增
+      code: no_active_contract
+      label: 无有效合约
+    when:
+      all:
+        - field: hasActiveContract
+          op: "=="
+          value: false
+
+  - id: no_arrears
+    rule_label: 无欠费
+    factor:
+      code: no_arrears
+      label: 无欠费
+    when:
+      all:
+        - field: hasArrears
+          op: "=="
+          value: false
+
+  - id: recent_query_7d
+    rule_label: 近7天携转资格查询
+    factor:
+      code: recent_query_7d
+      label: 近7天携转资格查询
+    when:
+      all:
+        - field: hasRecentQuery7d
+          op: "=="
+          value: true
+        - field: queryAllowed
+          op: "=="
+          value: "1"
+
+  - id: recent_query_30d
+    rule_label: 近30天携转资格查询
+    factor:
+      code: recent_query_30d
+      label: 近30天携转资格查询
+    when:
+      all:
+        - field: hasRecentQuery30d
+          op: "=="
+          value: true
+        - field: queryAllowed
+          op: "=="
+          value: "1"
+
+  - id: competitor_call
+    rule_label: 存在竞对通话
+    factor:
+      code: competitor_call
+      label: 存在竞对通话
+    when:
+      any:
+        - field: competitorCallCount7d
+          op: ">"
+          value: 0
+        - field: competitorCallCount30d
+          op: ">"
+          value: 0
+
+  - id: complaint_30d
+    rule_label: 近30天投诉偏高
+    factor:
+      code: complaint_30d
+      label: 近30天投诉偏高
     when:
       all:
         - field: complaintCount30d
-          op: ">"
+          op: ">="
           value: 2
 
-  - id: data_drop
-    rule_label: 流量下滑规则
+  - id: complaint_60d
+    rule_label: 近60天存在投诉
     factor:
-      code: data_drop
-      label: 流量下滑
+      code: complaint_60d
+      label: 近60天存在投诉
     when:
       all:
-        - field: dataUsageDropPct
-          op: ">"
-          value: 30
+        - field: complaintCount60d
+          op: ">="
+          value: 1
 
-  - id: competitor_contact
-    rule_label: 竞对接触规则
+  - id: retention_failed
+    rule_label: 维系失败
     factor:
-      code: competitor_contact
-      label: 竞对接触
+      code: retention_failed
+      label: 维系失败
     when:
       all:
-        - field: competitorContactCount30d
-          op: ">"
-          value: 0
+        - field: latestMaintainSuccess
+          op: "=="
+          value: "0"
 
-  - id: contract_expiring
-    rule_label: 合约到期规则
+  - id: retention_success
+    rule_label: 维系成功
     factor:
-      code: contract_expiring
-      label: 合约即将到期
+      code: retention_success
+      label: 维系成功
     when:
       all:
-        - field: contractRemainingDays
+        - field: latestMaintainSuccess
+          op: "=="
+          value: "1"
+
+  - id: short_tenure
+    rule_label: 短网龄
+    factor:
+      code: short_tenure
+      label: 在网时长不足1年
+    when:
+      all:
+        - field: innetMonths
           op: "<"
-          value: 45
-
-  - id: porting_intent
-    rule_label: 携转意图规则
-    factor:
-      code: porting_intent
-      label: 携转意图明确
-    when:
-      all:
-        - field: portingCodeRequestCount30d
-          op: ">"
-          value: 0
-
-  - id: payment_pressure
-    rule_label: 支付压力规则
-    factor:
-      code: payment_pressure
-      label: 支付压力
-    when:
-      all:
-        - field: overdueDays
-          op: ">"
-          value: 7
-
-  - id: retention_reject
-    rule_label: 挽留拒绝规则
-    factor:
-      code: retention_reject
-      label: 挽留拒绝
-    when:
-      all:
-        - field: retentionOfferRejected
-          op: ">"
-          value: 0
+          value: 12
 
 decision_rules:
-  - id: high_risk_combo
+  - id: high_porting_risk
     priority: 100
-    rule_label: 高风险组合规则
+    rule_label: 高风险携转预警
     when:
       all:
-        - field: portingCodeRequestCount30d
+        - field: hasActiveContract
+          op: "=="
+          value: false
+        - field: hasArrears
+          op: "=="
+          value: false
+        - field: hasRecentQuery7d
+          op: "=="
+          value: true
+        - field: queryAllowed
+          op: "=="
+          value: "1"
+        - field: competitorCallCount7d
           op: ">"
           value: 0
-        - any:
-            - field: competitorContactCount30d
-              op: ">"
-              value: 0
-            - field: complaintCount30d
-              op: ">"
-              value: 2
-            - field: contractRemainingDays
-              op: "<"
-              value: 45
+        - field: complaintCount30d
+          op: ">="
+          value: 2
+        - field: latestMaintainSuccess
+          op: "=="
+          value: "0"
+        - field: innetMonths
+          op: "<"
+          value: 12
     then:
       risk_level: HIGH
 
-  - id: medium_risk_combo
+  - id: medium_porting_risk
     priority: 50
-    rule_label: 中风险组合规则
+    rule_label: 中风险携转预警
     when:
-      any:
-        - all:
-            - field: complaintCount30d
-              op: ">"
-              value: 2
-            - field: dataUsageDropPct
-              op: ">"
-              value: 30
-        - all:
-            - field: dataUsageDropPct
-              op: ">"
-              value: 30
-            - field: contractRemainingDays
-              op: "<"
-              value: 45
-        - all:
-            - field: complaintCount30d
-              op: ">"
-              value: 2
-            - field: competitorContactCount30d
-              op: ">"
-              value: 0
-        - all:
-            - field: competitorContactCount30d
-              op: ">"
-              value: 0
-            - field: retentionOfferRejected
-              op: ">"
-              value: 0
-        - all:
-            - field: overdueDays
-              op: ">"
-              value: 7
-            - field: contractRemainingDays
-              op: "<"
-              value: 45
+      all:
+        - field: hasActiveContract
+          op: "=="
+          value: false
+        - field: hasArrears
+          op: "=="
+          value: false
+        - field: hasRecentQuery30d
+          op: "=="
+          value: true
+        - field: queryAllowed
+          op: "=="
+          value: "1"
+        - field: competitorCallCount30d
+          op: ">"
+          value: 0
+        - field: complaintCount60d
+          op: ">="
+          value: 1
+        - field: latestMaintainSuccess
+          op: "=="
+          value: "1"
+        - field: innetMonths
+          op: "<"
+          value: 12
     then:
       risk_level: MEDIUM
 
