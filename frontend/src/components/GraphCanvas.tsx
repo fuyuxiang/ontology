@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 
-import type { GraphData, GraphNode } from "../types";
+import type { GraphData, GraphNode, RiskLevel } from "../types";
 
 interface GraphCanvasProps {
   graph: GraphData;
   selectedNodeId?: string | null;
   onSelectNode?: (node: GraphNode) => void;
+  riskByNodeId?: Partial<Record<string, RiskLevel>>;
+  showEdgeLabels?: boolean;
+  showControls?: boolean;
 }
 
 interface Point {
@@ -59,6 +62,12 @@ export const NODE_TYPE_LABELS: Record<string, string> = {
   RetentionAction: "维系动作",
   Interaction: "交互记录",
   Action: "动作",
+};
+
+export const RISK_COLORS: Record<RiskLevel, string> = {
+  HIGH: "#ff4d4f",
+  MEDIUM: "#fa8c16",
+  LOW: "#52c41a",
 };
 
 function clamp(value: number, min: number, max: number) {
@@ -172,7 +181,14 @@ function shortLabel(label: string) {
   return value.length > 8 ? `${value.slice(0, 8)}..` : value;
 }
 
-export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvasProps) {
+export function GraphCanvas({
+  graph,
+  selectedNodeId,
+  onSelectNode,
+  riskByNodeId,
+  showEdgeLabels = false,
+  showControls = true,
+}: GraphCanvasProps) {
   const positions = resolvePositions(graph);
   const initialViewBox = buildGraphBounds(graph, positions);
   const svgRef = useRef<SVGSVGElement | null>(null);
@@ -298,18 +314,22 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
 
   return (
     <>
-      <div className="graph-toolbar">
-        <button type="button" className="graph-tool-btn" onClick={() => applyZoom(0.82)}>
-          +
-        </button>
-        <button type="button" className="graph-tool-btn" onClick={() => applyZoom(1.22)}>
-          -
-        </button>
-        <button type="button" className="graph-tool-btn reset" onClick={resetViewBox}>
-          重置
-        </button>
-      </div>
-      <div className="graph-tip">滚轮缩放，拖动画布平移</div>
+      {showControls ? (
+        <>
+          <div className="graph-toolbar">
+            <button type="button" className="graph-tool-btn" onClick={() => applyZoom(0.82)}>
+              +
+            </button>
+            <button type="button" className="graph-tool-btn" onClick={() => applyZoom(1.22)}>
+              -
+            </button>
+            <button type="button" className="graph-tool-btn reset" onClick={resetViewBox}>
+              重置
+            </button>
+          </div>
+          <div className="graph-tip">滚轮缩放，拖动画布平移</div>
+        </>
+      ) : null}
 
       <svg
         ref={svgRef}
@@ -330,15 +350,28 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
           if (!source || !target) {
             return null;
           }
+          const midX = (source.x + target.x) / 2;
+          const midY = (source.y + target.y) / 2;
           return (
-            <line
-              key={`${edge.source}-${edge.target}-${edge.label}`}
-              className="graph-link"
-              x1={source.x}
-              y1={source.y}
-              x2={target.x}
-              y2={target.y}
-            />
+            <g key={`${edge.source}-${edge.target}-${edge.label}`}>
+              <line className="graph-link" x1={source.x} y1={source.y} x2={target.x} y2={target.y} />
+              {showEdgeLabels ? (
+                <>
+                  <rect
+                    className="graph-edge-label-bg"
+                    x={midX - Math.max(edge.label.length * 3.6, 20)}
+                    y={midY - 10}
+                    rx={8}
+                    ry={8}
+                    width={Math.max(edge.label.length * 7.2, 40)}
+                    height={20}
+                  />
+                  <text className="graph-edge-label" x={midX} y={midY + 4} textAnchor="middle">
+                    {edge.label}
+                  </text>
+                </>
+              ) : null}
+            </g>
           );
         })}
 
@@ -351,6 +384,8 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
           const fill = NODE_TYPE_COLORS[node.type] || "#999999";
           const radius = node.type === "User" ? 20 : 16;
           const isSelected = selectedNodeId === node.id;
+          const riskLevel = riskByNodeId?.[node.id];
+          const riskStroke = riskLevel ? RISK_COLORS[riskLevel] : null;
 
           return (
             <g
@@ -360,7 +395,10 @@ export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvas
               onClick={() => handleNodeClick(node)}
             >
               <title>{node.label || node.id}</title>
-              <circle r={radius} fill={fill} stroke="#ffffff" strokeWidth={isSelected ? 4 : 2} />
+              {riskStroke ? (
+                <circle className="graph-risk-ring" r={radius + 8} fill="none" stroke={riskStroke} strokeWidth={4} strokeOpacity={0.82} />
+              ) : null}
+              <circle className="graph-node-core" r={radius} fill={fill} stroke="#ffffff" strokeWidth={isSelected ? 4 : 2} />
               <text textAnchor="middle" dy="0.35em" fill="#ffffff" fontSize="9px" fontWeight="500">
                 {shortLabel(node.label || node.id)}
               </text>
