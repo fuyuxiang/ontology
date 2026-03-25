@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import threading
 from collections import defaultdict
 from datetime import UTC, date, datetime
@@ -16,7 +17,14 @@ from app.etl.csv_loader import read_csv_rows
 from app.graph.repository import GraphRepository
 from app.ontology.namespaces import bind_prefixes, make_namespaces
 from app.rules.engine import materialize_business_inference
-from app.scenario.config import AlertDisplayField, FactConfig, ScenarioConfig, SortConfig, load_scenario_config
+from app.scenario.config import (
+    AlertDisplayField,
+    FactConfig,
+    RelationConfig,
+    ScenarioConfig,
+    SortConfig,
+    load_scenario_config,
+)
 from app.scenario.mapping import MappingRow, load_mapping_rows
 from app.validation.shacl import run_shacl_validation
 
@@ -506,64 +514,154 @@ class SemanticService:
             )
         return cards
 
+    def _overview_cluster_offsets(self) -> dict[str, tuple[float, float]]:
+        return {
+            "porting_query": (0.0, -78.0),
+            "contract_info": (80.0, -34.0),
+            "charge_info": (88.0, 42.0),
+            "arrear_info": (0.0, 94.0),
+            "customer_service": (-88.0, 42.0),
+            "retention_action": (-80.0, -34.0),
+            "voice_usage": (-96.0, 0.0),
+        }
+
+    def _add_overview_node(
+        self,
+        nodes_by_id: dict[str, dict[str, Any]],
+        position_accumulators: dict[str, dict[str, float]],
+        node_id: str,
+        label: str,
+        node_type: str,
+        x: float,
+        y: float,
+    ) -> None:
+        nodes_by_id.setdefault(
+            node_id,
+            {
+                "id": node_id,
+                "label": label,
+                "type": node_type,
+            },
+        )
+        accumulator = position_accumulators.setdefault(node_id, {"x": 0.0, "y": 0.0, "count": 0.0})
+        accumulator["x"] += x
+        accumulator["y"] += y
+        accumulator["count"] += 1.0
+
+    def _overview_related_node_id(self, dataset_key: str, row: dict[str, Any]) -> str:
+        label = str(row.get("_label") or self.scenario.datasets[dataset_key].entity_label)
+        return f"overview:{self.scenario.datasets[dataset_key].node_type.lower()}:{quote(label, safe='')}"
+
+    def _rows_match_relation(
+        self,
+        relation: RelationConfig,
+        source_row: dict[str, Any],
+        target_row: dict[str, Any],
+    ) -> bool:
+        source_field = self.scenario.datasets[relation.source_dataset].join_keys[relation.source_join_key]
+        target_field = self.scenario.datasets[relation.target_dataset].join_keys[relation.target_join_key]
+        source_value = source_row.get(source_field)
+        target_value = target_row.get(target_field)
+        if source_value in (None, "") or target_value in (None, ""):
+            return False
+        return str(source_value) == str(target_value)
+
     def _build_overview_graph(self) -> dict[str, Any]:
-        nodes: list[dict[str, Any]] = []
-        edges: list[dict[str, Any]] = []
-        primary_items = list(self.records.values())[:20]
-        cols = 4
+        nodes_by_id: dict[str, dict[str, Any]] = {}
+        position_accumulators: dict[str, dict[str, float]] = {}
+        edges_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+        primary_items = list(self.records.values())
+        if not primary_items:
+            return {
+                "nodes": [],
+                "edges": [],
+                "totalPrimaryEntities": 0,
+                "totalInteractions": 0,
+                "displayedPrimaryEntities": 0,
+            }
+
+        cols = max(4, math.ceil(math.sqrt(len(primary_items))))
+        cluster_width = 260.0
+        cluster_height = 220.0
+        margin_x = 160.0
+        margin_y = 150.0
+        cluster_offsets = self._overview_cluster_offsets()
+
         for index, record in enumerate(primary_items):
             row = index // cols
             col = index % cols
-            x = 0.14 + col * 0.2
-            y = 0.18 + row * 0.22
+            center_x = margin_x + col * cluster_width
+            center_y = margin_y + row * cluster_height
+            sampled_rows: dict[str, dict[str, Any]] = {
+                self.scenario.primary_dataset: record["primary"],
+            }
+            sampled_node_ids: dict[str, str] = {}
             primary_node_id = record["nodeId"]
-            nodes.append(
-                {
-                    "id": primary_node_id,
-                    "label": record["displayName"],
-                    "type": self.scenario.primary_node_type,
-                    "x": x,
-                    "y": y,
-                }
+            sampled_node_ids[self.scenario.primary_dataset] = primary_node_id
+            self._add_overview_node(
+                nodes_by_id,
+                position_accumulators,
+                primary_node_id,
+                record["displayName"],
+                self.scenario.primary_node_type,
+                center_x,
+                center_y,
             )
 
-            node_offset = 0
             for dataset_key in self.scenario.graph_datasets:
                 related_rows = record["related"].get(dataset_key, [])
                 if not related_rows:
                     continue
-                node_offset += 1
                 related = related_rows[0]
-                related_id = self._node_id(dataset_key, related)
-                nodes.append(
-                    {
-                        "id": related_id,
-                        "label": str(related.get("_label") or self.scenario.datasets[dataset_key].entity_label),
-                        "type": self.scenario.datasets[dataset_key].node_type,
-                        "x": min(x + 0.08 + node_offset * 0.04, 0.94),
-                        "y": min(y + 0.08, 0.92),
-                    }
+                sampled_rows[dataset_key] = related
+                related_node_id = self._overview_related_node_id(dataset_key, related)
+                sampled_node_ids[dataset_key] = related_node_id
+                offset_x, offset_y = cluster_offsets.get(dataset_key, (0.0, 0.0))
+                self._add_overview_node(
+                    nodes_by_id,
+                    position_accumulators,
+                    related_node_id,
+                    str(related.get("_label") or self.scenario.datasets[dataset_key].entity_label),
+                    self.scenario.datasets[dataset_key].node_type,
+                    center_x + offset_x,
+                    center_y + offset_y,
                 )
-                relation_label = self._relation_label(self.scenario.primary_dataset, dataset_key)
-                edges.append({"source": primary_node_id, "target": related_id, "label": relation_label})
 
-            result_node_id = f"risk:{record['entityId']}"
+            for relation in self.scenario.relations:
+                source_row = sampled_rows.get(relation.source_dataset)
+                target_row = sampled_rows.get(relation.target_dataset)
+                if source_row is None or target_row is None:
+                    continue
+                if not self._rows_match_relation(relation, source_row, target_row):
+                    continue
+                source_id = sampled_node_ids.get(relation.source_dataset)
+                target_id = sampled_node_ids.get(relation.target_dataset)
+                if source_id is None or target_id is None:
+                    continue
+                edges_by_key[(source_id, target_id, relation.label)] = {
+                    "source": source_id,
+                    "target": target_id,
+                    "label": relation.label,
+                }
+
+        nodes = []
+        for node_id, node in nodes_by_id.items():
+            accumulator = position_accumulators[node_id]
+            count = max(accumulator["count"], 1.0)
             nodes.append(
                 {
-                    "id": result_node_id,
-                    "label": self.inference[record["entityId"]]["riskLevel"],
-                    "type": "RiskResult",
-                    "x": min(x + 0.08, 0.94),
-                    "y": max(y - 0.08, 0.08),
+                    **node,
+                    "x": accumulator["x"] / count,
+                    "y": accumulator["y"] / count,
                 }
             )
-            edges.append({"source": primary_node_id, "target": result_node_id, "label": "推理输出"})
 
         return {
             "nodes": nodes,
-            "edges": edges,
+            "edges": list(edges_by_key.values()),
             "totalPrimaryEntities": len(self.records),
             "totalInteractions": sum(len(self.source_rows.get(key, [])) for key in self.scenario.interaction_datasets),
+            "displayedPrimaryEntities": len(primary_items),
         }
 
     def _build_entity_graph(self, record: dict[str, Any], inference: dict[str, Any]) -> dict[str, Any]:

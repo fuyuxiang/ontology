@@ -19,6 +19,7 @@ export interface GraphData {
   edges: GraphEdge[];
   totalPrimaryEntities?: number;
   totalInteractions?: number;
+  displayedPrimaryEntities?: number;
 }
 
 export interface FieldDisplay {

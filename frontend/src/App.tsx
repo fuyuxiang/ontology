@@ -348,8 +348,15 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!selectedNodeId && summary?.ontologyGraph.nodes.length) {
-      setSelectedNodeId(summary.ontologyGraph.nodes[0].id);
+    const nodes = summary?.ontologyGraph.nodes ?? [];
+    if (!nodes.length) {
+      if (selectedNodeId) {
+        setSelectedNodeId(null);
+      }
+      return;
+    }
+    if (!selectedNodeId || !nodes.some((node) => node.id === selectedNodeId)) {
+      setSelectedNodeId(nodes[0].id);
     }
   }, [selectedNodeId, summary]);
 
@@ -724,21 +731,21 @@ export default function App() {
 
           {page === "graph" ? (
             <div className="page active">
-              <PageHeader title="图谱探索" subtitle="探索本体知识图谱结构与实体关系" />
+              <PageHeader title="图谱探索" subtitle="仅展示实体节点及实体之间的关系" />
 
               <div className="graph-container">
                 <div className="graph-canvas">
                   {graph ? (
                     <>
                       <div className="graph-stats">
-                        <span>{summary?.primaryEntityPluralLabel || "用户"}: {graph.totalPrimaryEntities ?? summary?.primaryEntityCount ?? 0}</span> |
-                        <span> {summary?.interactionLabel || "交互"}: {graph.totalInteractions ?? summary?.interactionCount ?? 0}</span> |
-                        <span> 节点: {graphNodes.length}</span> |
-                        <span> 边: {graphEdges.length}</span>
+                        <span>总{summary?.primaryEntityPluralLabel || "用户"}: {graph.totalPrimaryEntities ?? summary?.primaryEntityCount ?? 0}</span> |
+                        <span> 展示{summary?.primaryEntityLabel || "用户"}: {graph.displayedPrimaryEntities ?? 0}</span> |
+                        <span> 实体: {graphNodes.length}</span> |
+                        <span> 关系: {graphEdges.length}</span>
                       </div>
 
                       <div className="graph-legend">
-                        <h4>图例</h4>
+                        <h4>实体类型</h4>
                         <div className="legend-items">
                           {legendTypes.map((type) => (
                             <div key={type} className="legend-item">
@@ -767,7 +774,7 @@ export default function App() {
 
                 <div className="node-detail-panel">
                   {!selectedNode ? (
-                    <EmptyState message="在图谱中选择一个节点以查看其详情" />
+                    <EmptyState message="在图谱中选择一个实体节点以查看详情" />
                   ) : (
                     <div className="node-detail-content">
                       <div className="detail-header">
@@ -812,7 +819,7 @@ export default function App() {
                           </>
                         ) : null}
                         <div className="detail-property">
-                          <span className="detail-property-key">关联边</span>
+                          <span className="detail-property-key">关联关系</span>
                           <span className="detail-property-value">{selectedNodeEdges.length} 条</span>
                         </div>
                         {selectedNodeEdges.slice(0, 6).map((edge) => {

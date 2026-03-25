@@ -15,7 +15,7 @@ telecom:User rdf:type owl:Class ;
 
 telecom:PortingQuery rdf:type owl:Class ;
     rdfs:subClassOf doim:Entity ;
-    rdfs:label "Porting Query"@en .
+    rdfs:label "Porting Eligibility"@en .
 
 telecom:BusinessContract rdf:type owl:Class ;
     rdfs:subClassOf doim:Entity ;
@@ -112,9 +112,6 @@ telecom:userStatus rdf:type owl:DatatypeProperty ;
 telecom:innetDate rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:string .
 
-telecom:is5G rdf:type owl:DatatypeProperty ;
-    rdfs:range xsd:string .
-
 telecom:userType rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:string .
 
@@ -157,6 +154,9 @@ telecom:presentFee rdf:type owl:DatatypeProperty ;
 telecom:protocalMonth rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:integer .
 
+telecom:compType rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
 telecom:totalFee rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:decimal .
 
@@ -175,13 +175,13 @@ telecom:callDuration rdf:type owl:DatatypeProperty ;
 telecom:opposeDealerType rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:string .
 
+telecom:sourceType rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
 telecom:netType rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:string .
 
 telecom:callType rdf:type owl:DatatypeProperty ;
-    rdfs:range xsd:string .
-
-telecom:sheetId rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:string .
 
 telecom:isTurn rdf:type owl:DatatypeProperty ;
@@ -198,6 +198,9 @@ telecom:solvedResult rdf:type owl:DatatypeProperty ;
 
 telecom:custSatisfaction rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:string .
+
+telecom:complaintCount rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:integer .
 
 telecom:callConnTime rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:string .

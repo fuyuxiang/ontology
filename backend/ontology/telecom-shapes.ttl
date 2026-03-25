@@ -1,6 +1,5 @@
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
-@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix telecom: <http://example.com/telecom#> .
 
 telecom:UserShape a sh:NodeShape ;
@@ -15,11 +14,27 @@ telecom:UserShape a sh:NodeShape ;
         sh:path telecom:deviceNumber ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
+        sh:maxCount 1 ;
     ] ;
     sh:property [
-        sh:path rdfs:label ;
+        sh:path telecom:areaId ;
         sh:datatype xsd:string ;
-        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:userStatus ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:innetDate ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:userType ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:innetMonths ;
+        sh:datatype xsd:integer ;
     ] .
 
 telecom:PortingQueryShape a sh:NodeShape ;
@@ -33,22 +48,128 @@ telecom:PortingQueryShape a sh:NodeShape ;
         sh:path telecom:outTag ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:limitRemark ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:queryChannel ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:queryStaff ;
+        sh:datatype xsd:string ;
     ] .
 
 telecom:BusinessContractShape a sh:NodeShape ;
     sh:targetClass telecom:BusinessContract ;
+    sh:or (
+        [
+            sh:property [
+                sh:path telecom:activityType ;
+                sh:datatype xsd:string ;
+                sh:minCount 1 ;
+            ]
+        ]
+        [
+            sh:property [
+                sh:path telecom:compType ;
+                sh:datatype xsd:string ;
+                sh:minCount 1 ;
+            ]
+        ]
+    ) ;
     sh:property [
         sh:path telecom:activityType ;
         sh:datatype xsd:string ;
-        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:startDate ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:endDate ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:preFee ;
+        sh:datatype xsd:decimal ;
+    ] ;
+    sh:property [
+        sh:path telecom:presentFee ;
+        sh:datatype xsd:decimal ;
+    ] ;
+    sh:property [
+        sh:path telecom:protocalMonth ;
+        sh:datatype xsd:integer ;
+    ] ;
+    sh:property [
+        sh:path telecom:compType ;
+        sh:datatype xsd:string ;
     ] .
 
 telecom:BillingRecordShape a sh:NodeShape ;
     sh:targetClass telecom:BillingRecord ;
+    sh:or (
+        [
+            sh:property [
+                sh:path telecom:totalFee ;
+                sh:datatype xsd:decimal ;
+                sh:minCount 1 ;
+            ]
+        ]
+        [
+            sh:property [
+                sh:path telecom:arrearFee ;
+                sh:datatype xsd:decimal ;
+                sh:minCount 1 ;
+            ]
+        ]
+    ) ;
     sh:property [
-        sh:path telecom:userId ;
+        sh:path telecom:payMode ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:baseRentFee ;
+        sh:datatype xsd:decimal ;
+    ] ;
+    sh:property [
+        sh:path telecom:totalFee ;
+        sh:datatype xsd:decimal ;
+    ] ;
+    sh:property [
+        sh:path telecom:arrearFee ;
+        sh:datatype xsd:decimal ;
+    ] ;
+    sh:property [
+        sh:path telecom:latestDate ;
+        sh:datatype xsd:string ;
+    ] .
+
+telecom:NetworkUsageShape a sh:NodeShape ;
+    sh:targetClass telecom:NetworkUsage ;
+    sh:property [
+        sh:path telecom:opposeDealerType ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:callDuration ;
+        sh:datatype xsd:decimal ;
+    ] ;
+    sh:property [
+        sh:path telecom:sourceType ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:netType ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:callType ;
+        sh:datatype xsd:string ;
     ] .
 
 telecom:CustomerServiceInteractionShape a sh:NodeShape ;
@@ -57,12 +178,52 @@ telecom:CustomerServiceInteractionShape a sh:NodeShape ;
         sh:path telecom:acceptTime ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:isTurn ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:servContent ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:solvedResult ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:custSatisfaction ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:complaintCount ;
+        sh:datatype xsd:integer ;
     ] .
 
 telecom:RetentionActionShape a sh:NodeShape ;
     sh:targetClass telecom:RetentionAction ;
     sh:property [
-        sh:path telecom:callResult ;
+        sh:path telecom:isSuccessMaintain ;
         sh:datatype xsd:string ;
         sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:callResult ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:turnReason ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:productName ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:callConnTime ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:isMaintainExec ;
+        sh:datatype xsd:string ;
     ] .
