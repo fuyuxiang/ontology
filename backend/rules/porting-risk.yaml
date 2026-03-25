@@ -15,6 +15,17 @@ factor_rules:
           op: "=="
           value: false
 
+  - id: no_fusion_binding
+    rule_label: 无融合绑定
+    factor:
+      code: no_fusion_binding
+      label: 无融合绑定
+    when:
+      all:
+        - field: hasFusionBinding
+          op: "=="
+          value: false
+
   - id: no_arrears
     rule_label: 无欠费
     factor:
@@ -132,6 +143,9 @@ decision_rules:
         - field: hasActiveContract
           op: "=="
           value: false
+        - field: hasFusionBinding
+          op: "=="
+          value: false
         - field: hasArrears
           op: "=="
           value: false
@@ -164,6 +178,9 @@ decision_rules:
         - field: hasActiveContract
           op: "=="
           value: false
+        - field: hasFusionBinding
+          op: "=="
+          value: false
         - field: hasArrears
           op: "=="
           value: false
@@ -187,6 +204,32 @@ decision_rules:
           value: 12
     then:
       risk_level: MEDIUM
+
+  - id: low_porting_risk
+    priority: 10
+    rule_label: 低风险携转预警
+    when:
+      all:
+        - field: hasActiveContract
+          op: "=="
+          value: false
+        - field: hasFusionBinding
+          op: "=="
+          value: false
+        - field: hasArrears
+          op: "=="
+          value: false
+        - field: hasRecentQuery30d
+          op: "=="
+          value: false
+        - field: competitorCallCount30d
+          op: "=="
+          value: 0
+        - field: complaintCount60d
+          op: "=="
+          value: 0
+    then:
+      risk_level: LOW
 
   - id: low_risk_default
     priority: 0

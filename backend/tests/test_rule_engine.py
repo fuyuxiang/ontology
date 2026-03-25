@@ -12,10 +12,11 @@ def test_ruleset_is_loaded_from_rules_directory():
     assert settings.rules_dir.name == "rules"
     assert settings.rules_path.name == "porting-risk.yaml"
     assert settings.ontology_domain_path.name == "telecom-porting.ttl"
-    assert len(ruleset.factor_rules) == 10
+    assert len(ruleset.factor_rules) == 11
     assert [rule.rule_label for rule in ruleset.decision_rules] == [
         "高风险携转预警",
         "中风险携转预警",
+        "低风险携转预警",
         "低风险默认规则",
     ]
 
@@ -26,6 +27,7 @@ def test_infer_record_uses_external_decision_table():
     record = {
         "metrics": {
             "hasActiveContract": False,
+            "hasFusionBinding": False,
             "hasArrears": False,
             "hasRecentQuery7d": True,
             "hasRecentQuery30d": True,
@@ -46,6 +48,7 @@ def test_infer_record_uses_external_decision_table():
     assert "高风险携转预警" in result["rules"]
     assert {factor.code for factor in result["factors"]} >= {
         "no_active_contract",
+        "no_fusion_binding",
         "no_arrears",
         "recent_query_7d",
         "competitor_call",

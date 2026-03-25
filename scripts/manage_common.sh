@@ -16,6 +16,8 @@ BACKEND_PORT="${BACKEND_PORT:-8088}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
 BACKEND_HOST="${BACKEND_HOST:-127.0.0.1}"
 FRONTEND_HOST="${FRONTEND_HOST:-0.0.0.0}"
+BACKEND_STARTUP_TIMEOUT="${BACKEND_STARTUP_TIMEOUT:-90}"
+FRONTEND_STARTUP_TIMEOUT="${FRONTEND_STARTUP_TIMEOUT:-20}"
 
 BACKEND_PID_FILE="${PID_DIR}/backend.pid"
 FRONTEND_PID_FILE="${PID_DIR}/frontend.pid"
@@ -116,15 +118,34 @@ port_in_use() {
 
 pid_command() {
   local pid="$1"
-  ps -p "${pid}" -o command= 2>/dev/null | sed 's/^[[:space:]]*//'
+  local command_text
+  command_text="$(ps -p "${pid}" -o command= 2>/dev/null | sed 's/^[[:space:]]*//')"
+  if [ -n "${command_text}" ]; then
+    print_line "${command_text}"
+    return 0
+  fi
+  lsof -a -p "${pid}" -d txt -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
+}
+
+pid_cwd() {
+  local pid="$1"
+  lsof -a -p "${pid}" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1
 }
 
 is_backend_process() {
   local pid="$1"
   local command_text
+  local cwd_path
   command_text="$(pid_command "${pid}")"
   case "${command_text}" in
-    *"python3 -m app.cli serve"*|*"uvicorn"*"app.main:app"*|*"app.main:app"*)
+    *"-m app.cli serve"*|*"uvicorn"*"app.main:app"*|*"app.main:app"*)
+      return 0
+      ;;
+  esac
+
+  cwd_path="$(pid_cwd "${pid}")"
+  case "${cwd_path}" in
+    "${BACKEND_DIR}"|"${BACKEND_DIR}"/*)
       return 0
       ;;
   esac
@@ -134,9 +155,17 @@ is_backend_process() {
 is_frontend_process() {
   local pid="$1"
   local command_text
+  local cwd_path
   command_text="$(pid_command "${pid}")"
   case "${command_text}" in
     *"vite"*"--port ${FRONTEND_PORT}"*|*"vite"*"--strictPort"*|*"npm run dev"*)
+      return 0
+      ;;
+  esac
+
+  cwd_path="$(pid_cwd "${pid}")"
+  case "${cwd_path}" in
+    "${FRONTEND_DIR}"|"${FRONTEND_DIR}"/*)
       return 0
       ;;
   esac
@@ -292,7 +321,7 @@ start_backend() {
     echo "$!" > "${BACKEND_PID_FILE}"
   )
 
-  if ! wait_for_port "${BACKEND_PORT}" 20; then
+  if ! wait_for_port "${BACKEND_PORT}" "${BACKEND_STARTUP_TIMEOUT}"; then
     print_line "Backend failed to listen on port ${BACKEND_PORT}. Recent log output:"
     tail -n 40 "${BACKEND_LOG_FILE}" 2>/dev/null || true
     fail "Backend start failed."
@@ -327,7 +356,7 @@ start_frontend() {
     echo "$!" > "${FRONTEND_PID_FILE}"
   )
 
-  if ! wait_for_port "${FRONTEND_PORT}" 20; then
+  if ! wait_for_port "${FRONTEND_PORT}" "${FRONTEND_STARTUP_TIMEOUT}"; then
     print_line "Frontend failed to listen on port ${FRONTEND_PORT}. Recent log output:"
     tail -n 40 "${FRONTEND_LOG_FILE}" 2>/dev/null || true
     fail "Frontend start failed."
