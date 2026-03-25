@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
+
 import type { GraphData, GraphNode } from "../types";
 
 interface GraphCanvasProps {
@@ -6,8 +8,22 @@ interface GraphCanvasProps {
   onSelectNode?: (node: GraphNode) => void;
 }
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface ViewBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 const WIDTH = 920;
 const HEIGHT = 560;
+const PADDING = 120;
+const MIN_ZOOM_FACTOR = 0.18;
 
 export const NODE_TYPE_COLORS: Record<string, string> = {
   Source: "#1890ff",
@@ -58,29 +74,29 @@ function buildFallbackPositions(nodes: GraphNode[]) {
   }
 
   const anchors: Record<string, { x: number; y: number; radiusX: number; radiusY: number }> = {
-    User: { x: 0.24, y: 0.38, radiusX: 0.2, radiusY: 0.18 },
-    PortingQuery: { x: 0.74, y: 0.22, radiusX: 0.12, radiusY: 0.08 },
-    Contract: { x: 0.78, y: 0.38, radiusX: 0.12, radiusY: 0.08 },
-    Billing: { x: 0.74, y: 0.58, radiusX: 0.12, radiusY: 0.08 },
-    CustomerService: { x: 0.58, y: 0.76, radiusX: 0.12, radiusY: 0.08 },
-    RetentionAction: { x: 0.88, y: 0.7, radiusX: 0.08, radiusY: 0.08 },
-    NetworkUsage: { x: 0.56, y: 0.2, radiusX: 0.12, radiusY: 0.08 },
-    Interaction: { x: 0.72, y: 0.32, radiusX: 0.16, radiusY: 0.12 },
-    Result: { x: 0.52, y: 0.18, radiusX: 0.14, radiusY: 0.06 },
-    RiskResult: { x: 0.52, y: 0.18, radiusX: 0.14, radiusY: 0.06 },
-    Entity: { x: 0.28, y: 0.78, radiusX: 0.12, radiusY: 0.08 },
-    Inference: { x: 0.7, y: 0.74, radiusX: 0.16, radiusY: 0.1 },
-    Action: { x: 0.9, y: 0.58, radiusX: 0.06, radiusY: 0.08 },
+    User: { x: 220, y: 220, radiusX: 140, radiusY: 100 },
+    PortingQuery: { x: 640, y: 120, radiusX: 90, radiusY: 56 },
+    Contract: { x: 710, y: 210, radiusX: 90, radiusY: 56 },
+    Billing: { x: 710, y: 350, radiusX: 90, radiusY: 56 },
+    CustomerService: { x: 530, y: 470, radiusX: 90, radiusY: 56 },
+    RetentionAction: { x: 820, y: 410, radiusX: 60, radiusY: 60 },
+    NetworkUsage: { x: 500, y: 120, radiusX: 90, radiusY: 56 },
+    Interaction: { x: 650, y: 180, radiusX: 110, radiusY: 70 },
+    Result: { x: 450, y: 90, radiusX: 80, radiusY: 40 },
+    RiskResult: { x: 450, y: 90, radiusX: 80, radiusY: 40 },
+    Entity: { x: 260, y: 440, radiusX: 90, radiusY: 56 },
+    Inference: { x: 640, y: 430, radiusX: 110, radiusY: 70 },
+    Action: { x: 840, y: 320, radiusX: 50, radiusY: 64 },
   };
 
   return new Map(
     Array.from(groups.entries()).flatMap(([type, items]) => {
-      const anchor = anchors[type] ?? { x: 0.5, y: 0.5, radiusX: 0.2, radiusY: 0.16 };
+      const anchor = anchors[type] ?? { x: WIDTH / 2, y: HEIGHT / 2, radiusX: 120, radiusY: 90 };
       return items.map((node, index) => {
         const spread = Math.max(items.length - 1, 1);
         const angle = -Math.PI * 0.8 + (index / spread) * Math.PI * 0.8;
-        const x = clamp(anchor.x + Math.cos(angle) * anchor.radiusX, 0.06, 0.94);
-        const y = clamp(anchor.y + Math.sin(angle) * anchor.radiusY, 0.08, 0.92);
+        const x = clamp(anchor.x + Math.cos(angle) * anchor.radiusX, 60, WIDTH - 60);
+        const y = clamp(anchor.y + Math.sin(angle) * anchor.radiusY, 60, HEIGHT - 60);
         return [node.id, { x, y }] as const;
       });
     }),
@@ -103,6 +119,54 @@ function resolvePositions(graph: GraphData) {
   return buildFallbackPositions(graph.nodes);
 }
 
+function buildGraphBounds(graph: GraphData, positions: Map<string, Point>): ViewBox {
+  if (!graph.nodes.length) {
+    return { x: 0, y: 0, width: WIDTH, height: HEIGHT };
+  }
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const node of graph.nodes) {
+    const position = positions.get(node.id);
+    if (!position) {
+      continue;
+    }
+    const radius = node.type === "User" ? 28 : 22;
+    minX = Math.min(minX, position.x - radius);
+    minY = Math.min(minY, position.y - radius);
+    maxX = Math.max(maxX, position.x + radius);
+    maxY = Math.max(maxY, position.y + radius);
+  }
+
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return { x: 0, y: 0, width: WIDTH, height: HEIGHT };
+  }
+
+  return {
+    x: minX - PADDING,
+    y: minY - PADDING,
+    width: Math.max(maxX - minX + PADDING * 2, WIDTH),
+    height: Math.max(maxY - minY + PADDING * 2, HEIGHT),
+  };
+}
+
+function clampViewBox(viewBox: ViewBox, initialViewBox: ViewBox): ViewBox {
+  const width = clamp(viewBox.width, initialViewBox.width * MIN_ZOOM_FACTOR, initialViewBox.width);
+  const height = clamp(viewBox.height, initialViewBox.height * MIN_ZOOM_FACTOR, initialViewBox.height);
+  const maxX = initialViewBox.x + initialViewBox.width - width;
+  const maxY = initialViewBox.y + initialViewBox.height - height;
+
+  return {
+    x: clamp(viewBox.x, initialViewBox.x, maxX),
+    y: clamp(viewBox.y, initialViewBox.y, maxY),
+    width,
+    height,
+  };
+}
+
 function shortLabel(label: string) {
   const value = label.includes("/") ? label.split("/").pop() || label : label;
   return value.length > 8 ? `${value.slice(0, 8)}..` : value;
@@ -110,52 +174,200 @@ function shortLabel(label: string) {
 
 export function GraphCanvas({ graph, selectedNodeId, onSelectNode }: GraphCanvasProps) {
   const positions = resolvePositions(graph);
+  const initialViewBox = buildGraphBounds(graph, positions);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const dragRef = useRef<{ pointerId: number; clientX: number; clientY: number; moved: boolean } | null>(null);
+  const dragMovedRef = useRef(false);
+  const [viewBox, setViewBox] = useState<ViewBox>(initialViewBox);
+  const viewBoxRef = useRef(viewBox);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    setViewBox(initialViewBox);
+    dragRef.current = null;
+    dragMovedRef.current = false;
+    setIsDragging(false);
+  }, [initialViewBox.x, initialViewBox.y, initialViewBox.width, initialViewBox.height]);
+
+  useEffect(() => {
+    viewBoxRef.current = viewBox;
+  }, [viewBox]);
+
+  function applyZoom(factor: number, clientX?: number, clientY?: number) {
+    const svg = svgRef.current;
+    const rect = svg?.getBoundingClientRect();
+    const current = viewBoxRef.current;
+    const relativeX = rect && clientX !== undefined ? clamp((clientX - rect.left) / rect.width, 0, 1) : 0.5;
+    const relativeY = rect && clientY !== undefined ? clamp((clientY - rect.top) / rect.height, 0, 1) : 0.5;
+    const nextWidth = current.width * factor;
+    const nextHeight = current.height * factor;
+    const focusX = current.x + current.width * relativeX;
+    const focusY = current.y + current.height * relativeY;
+
+    setViewBox(
+      clampViewBox(
+        {
+          x: focusX - nextWidth * relativeX,
+          y: focusY - nextHeight * relativeY,
+          width: nextWidth,
+          height: nextHeight,
+        },
+        initialViewBox,
+      ),
+    );
+  }
+
+  function resetViewBox() {
+    setViewBox(initialViewBox);
+    dragMovedRef.current = false;
+  }
+
+  function handleWheel(event: WheelEvent<SVGSVGElement>) {
+    event.preventDefault();
+    applyZoom(event.deltaY < 0 ? 0.88 : 1.14, event.clientX, event.clientY);
+  }
+
+  function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
+    if (event.button !== 0) {
+      return;
+    }
+    dragRef.current = {
+      pointerId: event.pointerId,
+      clientX: event.clientX,
+      clientY: event.clientY,
+      moved: false,
+    };
+    dragMovedRef.current = false;
+    setIsDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function handlePointerMove(event: PointerEvent<SVGSVGElement>) {
+    const dragState = dragRef.current;
+    const svg = svgRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId || !svg) {
+      return;
+    }
+
+    const rect = svg.getBoundingClientRect();
+    const current = viewBoxRef.current;
+    const moveX = event.clientX - dragState.clientX;
+    const moveY = event.clientY - dragState.clientY;
+    const dx = (moveX / rect.width) * current.width;
+    const dy = (moveY / rect.height) * current.height;
+
+    if (Math.abs(moveX) > 2 || Math.abs(moveY) > 2) {
+      dragState.moved = true;
+    }
+
+    setViewBox(
+      clampViewBox(
+        {
+          ...current,
+          x: current.x - dx,
+          y: current.y - dy,
+        },
+        initialViewBox,
+      ),
+    );
+
+    dragState.clientX = event.clientX;
+    dragState.clientY = event.clientY;
+  }
+
+  function finishDrag(event: PointerEvent<SVGSVGElement>) {
+    const dragState = dragRef.current;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+    dragMovedRef.current = dragState.moved;
+    dragRef.current = null;
+    setIsDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function handleNodeClick(node: GraphNode) {
+    if (dragMovedRef.current) {
+      dragMovedRef.current = false;
+      return;
+    }
+    onSelectNode?.(node);
+  }
 
   return (
-    <svg className="graph-svg" viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="知识图谱">
-      {graph.edges.map((edge) => {
-        const source = positions.get(edge.source);
-        const target = positions.get(edge.target);
-        if (!source || !target) {
-          return null;
-        }
-        return (
-          <line
-            key={`${edge.source}-${edge.target}-${edge.label}`}
-            className="graph-link"
-            x1={source.x * WIDTH}
-            y1={source.y * HEIGHT}
-            x2={target.x * WIDTH}
-            y2={target.y * HEIGHT}
-          />
-        );
-      })}
+    <>
+      <div className="graph-toolbar">
+        <button type="button" className="graph-tool-btn" onClick={() => applyZoom(0.82)}>
+          +
+        </button>
+        <button type="button" className="graph-tool-btn" onClick={() => applyZoom(1.22)}>
+          -
+        </button>
+        <button type="button" className="graph-tool-btn reset" onClick={resetViewBox}>
+          重置
+        </button>
+      </div>
+      <div className="graph-tip">滚轮缩放，拖动画布平移</div>
 
-      {graph.nodes.map((node) => {
-        const position = positions.get(node.id);
-        if (!position) {
-          return null;
-        }
+      <svg
+        ref={svgRef}
+        className={`graph-svg ${isDragging ? "is-dragging" : ""}`}
+        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="知识图谱"
+        onWheel={handleWheel}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+      >
+        {graph.edges.map((edge) => {
+          const source = positions.get(edge.source);
+          const target = positions.get(edge.target);
+          if (!source || !target) {
+            return null;
+          }
+          return (
+            <line
+              key={`${edge.source}-${edge.target}-${edge.label}`}
+              className="graph-link"
+              x1={source.x}
+              y1={source.y}
+              x2={target.x}
+              y2={target.y}
+            />
+          );
+        })}
 
-        const fill = NODE_TYPE_COLORS[node.type] || "#999999";
-        const radius = node.type === "User" ? 20 : 16;
-        const isSelected = selectedNodeId === node.id;
+        {graph.nodes.map((node) => {
+          const position = positions.get(node.id);
+          if (!position) {
+            return null;
+          }
 
-        return (
-          <g
-            key={node.id}
-            className={`graph-node ${isSelected ? "is-selected" : ""}`}
-            transform={`translate(${position.x * WIDTH}, ${position.y * HEIGHT})`}
-            onClick={() => onSelectNode?.(node)}
-          >
-            <title>{node.label || node.id}</title>
-            <circle r={radius} fill={fill} stroke="#ffffff" strokeWidth={isSelected ? 4 : 2} />
-            <text textAnchor="middle" dy="0.35em" fill="#ffffff" fontSize="9px" fontWeight="500">
-              {shortLabel(node.label || node.id)}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+          const fill = NODE_TYPE_COLORS[node.type] || "#999999";
+          const radius = node.type === "User" ? 20 : 16;
+          const isSelected = selectedNodeId === node.id;
+
+          return (
+            <g
+              key={node.id}
+              className={`graph-node ${isSelected ? "is-selected" : ""}`}
+              transform={`translate(${position.x}, ${position.y})`}
+              onClick={() => handleNodeClick(node)}
+            >
+              <title>{node.label || node.id}</title>
+              <circle r={radius} fill={fill} stroke="#ffffff" strokeWidth={isSelected ? 4 : 2} />
+              <text textAnchor="middle" dy="0.35em" fill="#ffffff" fontSize="9px" fontWeight="500">
+                {shortLabel(node.label || node.id)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </>
   );
 }

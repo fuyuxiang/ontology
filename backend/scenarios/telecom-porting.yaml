@@ -47,6 +47,7 @@ scenario:
   graph_datasets:
     - porting_query
     - contract_info
+    - om_datum
     - charge_info
     - arrear_info
     - customer_service
@@ -70,6 +71,13 @@ scenario:
       dataset: contract_info
       label: 业务合约
       file: dwa_v_d_cus_cb_act_info.csv
+      icon: file
+      tone: commercial
+      count_mode: records
+    - key: om_datum
+      dataset: om_datum
+      label: 融合绑定
+      file: DWA_V_D_CUS_CB_OM_DATUM.csv
       icon: file
       tone: commercial
       count_mode: records
@@ -113,13 +121,13 @@ scenario:
       tone: rules
   rule_cards:
     - label: 高风险携转预警
-      desc: 近7天查询携转资格、无合约无欠费、存在竞对通话、投诉频发且维系失败。
+      desc: 近7天查询携转资格、无合约无融合绑定无欠费、存在竞对通话、投诉频发且维系失败。
       tone: high
     - label: 中风险携转预警
-      desc: 近30天出现携转查询，具备竞对通话和投诉信号，维系成功但仍需持续关注。
+      desc: 近30天出现携转查询、无合约无融合绑定无欠费，具备竞对通话和投诉信号，维系成功但仍需持续关注。
       tone: medium
-    - label: 低风险默认规则
-      desc: 未触发中高风险组合规则，保留持续监控结果。
+    - label: 低风险携转预警
+      desc: 近30天无查询、无竞对通话、近60天无投诉，且维持无合约无融合绑定无欠费状态。
       tone: low
   architecture:
     - title: 数据接入层
@@ -127,7 +135,7 @@ scenario:
       items:
         - 用户信息
         - 携转资格查询
-        - 业务合约 / 账务
+        - 业务合约 / 融合绑定 / 账务
         - 网络使用 / 客服交互 / 维系动作
     - title: 语义层
       subtitle: DOIM + 携转场景本体
@@ -193,6 +201,19 @@ datasets:
     label_template: "{activity_type} 合约"
     node_type: Contract
     entity_label: 业务合约
+  om_datum:
+    file: DWA_V_D_CUS_CB_OM_DATUM.csv
+    source_system: OM
+    id_fields:
+      - user_id
+      - device_number
+      - start_date
+    join_keys:
+      user_id: user_id
+      device_number: device_number
+    label_template: "{device_number} 融合绑定"
+    node_type: Contract
+    entity_label: 融合绑定
   charge_info:
     file: dwa_v_m_cus_cb_sing_charge.csv
     source_system: BILLING
@@ -265,6 +286,13 @@ relations:
     predicate: telecom:hasBusinessContract
     label: 签订合约
     source_system: CONTRACT
+  - source_dataset: user_info
+    target_dataset: om_datum
+    source_join_key: user_id
+    target_join_key: user_id
+    predicate: telecom:hasBusinessContract
+    label: 融合绑定
+    source_system: OM
   - source_dataset: user_info
     target_dataset: charge_info
     source_join_key: user_id
@@ -357,6 +385,15 @@ facts:
         - field: arrear_fee
           op: ">"
           value: 0
+  - key: hasFusionBinding
+    label: 是否存在融合绑定
+    source_dataset: om_datum
+    aggregate: exists
+    default: false
+    where:
+      all:
+        - field: comp_type
+          op: not_empty
   - key: recentQueryDays
     label: 最近查询距今天数
     source_dataset: porting_query
@@ -511,12 +548,16 @@ alert_fields:
       fact: complaintCount30d
     - label: 有效合约
       fact: hasActiveContract
+    - label: 融合绑定
+      fact: hasFusionBinding
 
 alert_sort:
   - fact: hasRecentQuery7d
     order: desc
   - fact: hasRecentQuery30d
     order: desc
+  - fact: hasFusionBinding
+    order: asc
   - fact: competitorCallCount7d
     order: desc
   - fact: complaintCount30d
