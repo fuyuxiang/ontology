@@ -1,10 +1,11 @@
 import { type KeyboardEvent, startTransition, useEffect, useState } from "react";
 
-import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS } from "./components/GraphCanvas";
-import { getAlerts, getSummary, runSparql, triggerInference } from "./services/api";
-import type { Alert, RiskLevel, SparqlResult, Summary } from "./types";
+import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS, RISK_COLORS } from "./components/GraphCanvas";
+import { getAlerts, getSubscriber, getSummary, runSparql, triggerInference } from "./services/api";
+import type { Alert, GraphData, RiskLevel, SparqlResult, SubscriberDetail, Summary } from "./types";
 
 type PageKey = "dashboard" | "ontology" | "graph" | "qa" | "settings";
+type GraphRiskFilter = "ALL" | RiskLevel;
 
 interface ChatMessage {
   id: string;
@@ -33,6 +34,13 @@ const RECOMMENDED_QUESTIONS = [
   "哪些用户属于高风险携转预警？",
   "哪些规则被命中最多？",
   "最近有哪些携转资格查询或投诉记录？",
+];
+
+const GRAPH_RISK_FILTERS: Array<{ key: GraphRiskFilter; label: string }> = [
+  { key: "ALL", label: "全部风险" },
+  { key: "HIGH", label: "高风险" },
+  { key: "MEDIUM", label: "中风险" },
+  { key: "LOW", label: "低风险" },
 ];
 
 const ICON_PATHS = {
@@ -98,6 +106,41 @@ function riskTone(level: RiskLevel) {
     return "medium";
   }
   return "low";
+}
+
+function buildRiskScopedGraph(graph: GraphData | null, alerts: Alert[], riskFilter: GraphRiskFilter): GraphData | null {
+  if (!graph || riskFilter === "ALL") {
+    return graph;
+  }
+
+  const matchedUserNodeIds = new Set(alerts.filter((item) => item.riskLevel === riskFilter).map((item) => item.nodeId));
+  if (!matchedUserNodeIds.size) {
+    return {
+      ...graph,
+      nodes: [],
+      edges: [],
+      displayedPrimaryEntities: 0,
+    };
+  }
+
+  const includedNodeIds = new Set<string>(matchedUserNodeIds);
+  for (const edge of graph.edges) {
+    if (matchedUserNodeIds.has(edge.source) || matchedUserNodeIds.has(edge.target)) {
+      includedNodeIds.add(edge.source);
+      includedNodeIds.add(edge.target);
+    }
+  }
+
+  const nodes = graph.nodes.filter((node) => includedNodeIds.has(node.id));
+  const edges = graph.edges.filter((edge) => includedNodeIds.has(edge.source) && includedNodeIds.has(edge.target));
+  const displayedPrimaryEntities = nodes.filter((node) => matchedUserNodeIds.has(node.id)).length;
+
+  return {
+    ...graph,
+    nodes,
+    edges,
+    displayedPrimaryEntities,
+  };
 }
 
 function buildDefaultQuestionQuery(defaultQuery?: string) {
@@ -311,6 +354,10 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [appError, setAppError] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [graphRiskFilter, setGraphRiskFilter] = useState<GraphRiskFilter>("ALL");
+  const [subscriberDetails, setSubscriberDetails] = useState<Record<string, SubscriberDetail>>({});
+  const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const [detailError, setDetailError] = useState("");
   const [questionInput, setQuestionInput] = useState("");
   const [askingQuestion, setAskingQuestion] = useState(false);
   const [runningInference, setRunningInference] = useState(false);
@@ -326,6 +373,9 @@ export default function App() {
   async function loadAppData() {
     setLoading(true);
     setAppError("");
+    setSubscriberDetails({});
+    setDetailLoadingId(null);
+    setDetailError("");
     const [summaryResult, alertsResult] = await Promise.allSettled([getSummary(), getAlerts()]);
 
     if (summaryResult.status === "fulfilled") {
@@ -348,7 +398,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const nodes = summary?.ontologyGraph.nodes ?? [];
+    const nodes = buildRiskScopedGraph(summary?.ontologyGraph ?? null, alerts, graphRiskFilter)?.nodes ?? [];
     if (!nodes.length) {
       if (selectedNodeId) {
         setSelectedNodeId(null);
@@ -356,9 +406,10 @@ export default function App() {
       return;
     }
     if (!selectedNodeId || !nodes.some((node) => node.id === selectedNodeId)) {
-      setSelectedNodeId(nodes[0].id);
+      const defaultUserNode = nodes.find((node) => alerts.some((item) => item.nodeId === node.id));
+      setSelectedNodeId((defaultUserNode ?? nodes[0]).id);
     }
-  }, [selectedNodeId, summary]);
+  }, [alerts, graphRiskFilter, selectedNodeId, summary]);
 
   async function handleRefresh() {
     setFeedback(null);
@@ -423,11 +474,12 @@ export default function App() {
   function openAlertInGraph(alert: Alert) {
     startTransition(() => {
       setPage("graph");
+      setGraphRiskFilter(alert.riskLevel);
       setSelectedNodeId(alert.nodeId);
     });
   }
 
-  const graph = summary?.ontologyGraph ?? null;
+  const graph = buildRiskScopedGraph(summary?.ontologyGraph ?? null, alerts, graphRiskFilter);
   const graphNodes = graph?.nodes ?? [];
   const graphEdges = graph?.edges ?? [];
   const selectedNode = graphNodes.find((node) => node.id === selectedNodeId) ?? null;
@@ -435,6 +487,23 @@ export default function App() {
     ? graphEdges.filter((edge) => edge.source === selectedNode.id || edge.target === selectedNode.id)
     : [];
   const selectedEntityAlert = selectedNode ? alerts.find((item) => item.nodeId === selectedNode.id) : undefined;
+  const selectedEntityId = selectedEntityAlert?.entityId ?? null;
+  const selectedSubscriber = selectedEntityId ? subscriberDetails[selectedEntityId] ?? null : null;
+  const detailLoading = selectedEntityId !== null && detailLoadingId === selectedEntityId;
+  const riskByNodeId = Object.fromEntries(alerts.map((item) => [item.nodeId, item.riskLevel] as const));
+  const relatedAlerts = selectedNode
+    ? Array.from(
+        new Map(
+          selectedNodeEdges
+            .map((edge) => {
+              const relatedNodeId = edge.source === selectedNode.id ? edge.target : edge.source;
+              const relatedAlert = alerts.find((item) => item.nodeId === relatedNodeId);
+              return relatedAlert ? [relatedAlert.entityId, relatedAlert] : null;
+            })
+            .filter((item): item is [string, Alert] => item !== null),
+        ).values(),
+      )
+    : [];
 
   const legendTypes = Array.from(new Set(graphNodes.map((node) => node.type)));
   const highRiskUsers = alerts.filter((item) => item.riskLevel !== "LOW").slice(0, 5);
@@ -445,6 +514,43 @@ export default function App() {
   const ruleCards = summary?.ruleCards ?? [];
   const mappingExamples = summary?.mappingExamples ?? [];
   const suggestedQuestions = summary?.questionSuggestions?.length ? summary.questionSuggestions : RECOMMENDED_QUESTIONS;
+  const visibleAlerts =
+    graphRiskFilter === "ALL" ? alerts : alerts.filter((item) => item.riskLevel === graphRiskFilter);
+
+  useEffect(() => {
+    if (!selectedEntityId || subscriberDetails[selectedEntityId]) {
+      setDetailError("");
+      return;
+    }
+
+    let cancelled = false;
+    setDetailLoadingId(selectedEntityId);
+    setDetailError("");
+
+    void getSubscriber(selectedEntityId)
+      .then((detail) => {
+        if (cancelled) {
+          return;
+        }
+        setSubscriberDetails((current) => ({ ...current, [selectedEntityId]: detail }));
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setDetailError(error instanceof Error ? error.message : "加载用户详情失败");
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+        setDetailLoadingId((current) => (current === selectedEntityId ? null : current));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEntityId, subscriberDetails]);
 
   return (
     <div className="app-container">
@@ -731,11 +837,28 @@ export default function App() {
 
           {page === "graph" ? (
             <div className="page active">
-              <PageHeader title="图谱探索" subtitle="仅展示实体节点及实体之间的关系" />
+              <PageHeader title="图谱探索" subtitle="先看高、中、低风险分布，再下钻查看命中因子、规则与动作链路" />
 
               <div className="graph-container">
                 <div className="graph-canvas">
-                  {graph ? (
+                  <div className="graph-filters">
+                    {GRAPH_RISK_FILTERS.map((item) => {
+                      const count = item.key === "ALL" ? alerts.length : summary?.riskDistribution[item.key] ?? 0;
+                      return (
+                        <button
+                          key={item.key}
+                          type="button"
+                          className={`graph-filter-chip ${graphRiskFilter === item.key ? "active" : ""} ${item.key.toLowerCase()}`}
+                          onClick={() => setGraphRiskFilter(item.key)}
+                        >
+                          <span>{item.label}</span>
+                          <strong>{count}</strong>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {graph && graphNodes.length ? (
                     <>
                       <div className="graph-stats">
                         <span>总{summary?.primaryEntityPluralLabel || "用户"}: {graph.totalPrimaryEntities ?? summary?.primaryEntityCount ?? 0}</span> |
@@ -754,10 +877,20 @@ export default function App() {
                             </div>
                           ))}
                         </div>
+                        <h4 className="graph-legend-title">风险等级</h4>
+                        <div className="legend-items">
+                          {(["HIGH", "MEDIUM", "LOW"] as RiskLevel[]).map((level) => (
+                            <div key={level} className="legend-item">
+                              <span className="legend-ring" style={{ borderColor: RISK_COLORS[level] }} />
+                              <span>{riskLabel(level)}用户外环</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
 
                       <GraphCanvas
                         graph={graph}
+                        riskByNodeId={riskByNodeId}
                         selectedNodeId={selectedNodeId}
                         onSelectNode={(node) => {
                           setSelectedNodeId(node.id);
@@ -767,7 +900,7 @@ export default function App() {
                   ) : (
                     <div className="graph-empty">
                       <SvgIcon name="graph" size={48} />
-                      <p>{loading ? "加载图谱数据..." : "暂无图谱数据"}</p>
+                      <p>{loading ? "加载图谱数据..." : graphRiskFilter === "ALL" ? "暂无图谱数据" : `当前没有${riskLabel(graphRiskFilter)}用户`}</p>
                     </div>
                   )}
                 </div>
@@ -783,9 +916,20 @@ export default function App() {
                         </div>
                         <h3>{selectedNode.label || selectedNode.id}</h3>
                         <span className="node-type-tag">{NODE_TYPE_LABELS[selectedNode.type] || selectedNode.type}</span>
+                        {selectedEntityAlert ? <RiskStatus level={selectedEntityAlert.riskLevel} /> : null}
                       </div>
 
                       <div className="detail-body">
+                        {selectedEntityAlert ? (
+                          <div className={`risk-hero ${riskTone(selectedEntityAlert.riskLevel)}`}>
+                            <div className="risk-hero-label">{riskLabel(selectedEntityAlert.riskLevel)}</div>
+                            <div className="risk-hero-title">{selectedSubscriber?.inference.headline || `${selectedNode.label} 风险判定`}</div>
+                            <div className="risk-hero-summary">
+                              {selectedSubscriber?.inference.summary || selectedEntityAlert.recommendedAction}
+                            </div>
+                          </div>
+                        ) : null}
+
                         <div className="detail-property">
                           <span className="detail-property-key">ID</span>
                           <span className="detail-property-value">{selectedNode.id}</span>
@@ -800,12 +944,6 @@ export default function App() {
                         </div>
                         {selectedEntityAlert ? (
                           <>
-                            <div className="detail-property">
-                              <span className="detail-property-key">风险</span>
-                              <span className="detail-property-value">
-                                <RiskStatus level={selectedEntityAlert.riskLevel} />
-                              </span>
-                            </div>
                             {selectedEntityAlert.detailFields.map((field) => (
                               <div key={field.label} className="detail-property">
                                 <span className="detail-property-key">{field.label}</span>
@@ -835,6 +973,112 @@ export default function App() {
                             </div>
                           );
                         })}
+
+                        {selectedEntityAlert ? (
+                          <div className="detail-section">
+                            <div className="detail-section-title">风险信号</div>
+                            <div className="signal-grid">
+                              {selectedEntityAlert.highlightFields.map((field) => (
+                                <div key={field.label} className="signal-card">
+                                  <span className="signal-label">{field.label}</span>
+                                  <strong>{String(field.value ?? "-")}</strong>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {selectedSubscriber?.factors.length ? (
+                          <div className="detail-section">
+                            <div className="detail-section-title">命中因子</div>
+                            <div className="token-list">
+                              {selectedSubscriber.factors.map((factor) => (
+                                <span key={factor} className="token-chip factor">
+                                  {factor}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {selectedSubscriber?.rules.length ? (
+                          <div className="detail-section">
+                            <div className="detail-section-title">命中规则</div>
+                            <div className="token-list">
+                              {selectedSubscriber.rules.map((rule) => (
+                                <span key={rule} className="token-chip rule">
+                                  {rule}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {detailLoading ? <div className="loading-state">正在加载规则解释图...</div> : null}
+                        {detailError ? <div className="inline-error">{detailError}</div> : null}
+
+                        {selectedSubscriber?.graph ? (
+                          <div className="detail-section">
+                            <div className="detail-section-title">规则解释图</div>
+                            <div className="detail-graph-shell">
+                              <GraphCanvas
+                                graph={selectedSubscriber.graph}
+                                riskByNodeId={selectedEntityAlert ? { [selectedEntityAlert.nodeId]: selectedEntityAlert.riskLevel } : undefined}
+                                selectedNodeId={selectedSubscriber.graph.nodes[0]?.id}
+                                showEdgeLabels
+                                showControls={false}
+                              />
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {selectedSubscriber?.evidence.length ? (
+                          <div className="detail-section">
+                            <div className="detail-section-title">证据链</div>
+                            <div className="evidence-list">
+                              {selectedSubscriber.evidence.map((item) => (
+                                <div key={`${item.category}-${item.title}`} className="evidence-card">
+                                  <div className="evidence-title-row">
+                                    <span className="evidence-title">{item.title}</span>
+                                    {item.riskLevel ? <RiskStatus level={item.riskLevel} /> : null}
+                                  </div>
+                                  <div className="evidence-summary">{item.summary}</div>
+                                  {item.facts.map((fact) => (
+                                    <div key={fact} className="evidence-fact">
+                                      {fact}
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        {!selectedEntityAlert && relatedAlerts.length ? (
+                          <div className="detail-section">
+                            <div className="detail-section-title">关联风险用户</div>
+                            <div className="related-alert-list">
+                              {relatedAlerts.map((alert) => (
+                                <button
+                                  key={alert.entityId}
+                                  type="button"
+                                  className="related-alert-item"
+                                  onClick={() => setSelectedNodeId(alert.nodeId)}
+                                >
+                                  <span>{alert.displayName}</span>
+                                  <RiskStatus level={alert.riskLevel} />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="detail-section">
+                          <div className="detail-section-title">当前筛选结果</div>
+                          <div className="detail-muted">
+                            当前展示 {visibleAlerts.length} 个{graphRiskFilter === "ALL" ? "" : riskLabel(graphRiskFilter)}用户，可在左侧图中继续下钻。
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}

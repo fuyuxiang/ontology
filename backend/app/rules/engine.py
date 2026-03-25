@@ -71,7 +71,12 @@ def materialize_business_inference(
         result = infer_record(record, decision_table)
         inferred[entity_id] = result
 
-        entity = URIRef(f"{settings.data_ns}{primary_segment}/{quote(entity_id, safe='')}")
+        primary_row = record.get("primary") or {}
+        entity_resource = primary_row.get("_entity_uri")
+        if isinstance(entity_resource, URIRef):
+            entity = entity_resource
+        else:
+            entity = URIRef(f"{settings.data_ns}{primary_segment}/{quote(entity_id, safe='')}")
         deductions_graph.add((entity, telecom.inferredRiskLevel, Literal(result["riskLevel"])))
         deductions_graph.add((entity, telecom.recommendedAction, Literal(result["recommendedAction"])))
 
