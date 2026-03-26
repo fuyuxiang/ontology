@@ -1,3 +1,5 @@
+"""项目运行时配置加载器，统一解析环境变量、默认值和生成配置。"""
+
 from __future__ import annotations
 
 import json
@@ -15,6 +17,8 @@ DEFAULT_DATA_NS = "http://example.com/telecom/data/"
 
 @dataclass(frozen=True)
 class Settings:
+    """集中保存后端运行所需的路径、命名空间和服务参数。"""
+
     project_dir: Path
     data_dir: Path
     mappings_dir: Path
@@ -41,6 +45,7 @@ class Settings:
 
 
 def get_settings() -> Settings:
+    """构建当前后端使用的完整配置对象。"""
     project_dir = Path(__file__).resolve().parents[2]
     ontology_dir = project_dir / "ontology"
     rules_dir = project_dir / "rules"
@@ -108,6 +113,7 @@ def get_settings() -> Settings:
 
 
 def _load_active_profile(project_dir: Path) -> dict[str, Any]:
+    """读取当前激活的生成档案，用于覆盖默认本体与规则路径。"""
     if os.getenv("ONTOLOGY_IGNORE_ACTIVE_PROFILE", "").strip().lower() in {"1", "true", "yes"}:
         return {}
     path = project_dir / ACTIVE_PROFILE_PATH
@@ -123,6 +129,7 @@ def _load_active_profile(project_dir: Path) -> dict[str, Any]:
 
 
 def _resolve_path(project_dir: Path, env_value: str | None, profile_value: Any, default: Path) -> Path:
+    """按 环境变量 > 激活档案 > 默认值 的优先级解析路径。"""
     raw = env_value or (str(profile_value).strip() if profile_value else "")
     if not raw:
         return default
@@ -133,6 +140,7 @@ def _resolve_path(project_dir: Path, env_value: str | None, profile_value: Any, 
 
 
 def _build_default_query(doim_ns: str, telecom_ns: str) -> str:
+    """生成前端默认展示的 SPARQL 示例查询。"""
     return f"""PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 PREFIX doim: <{doim_ns}>

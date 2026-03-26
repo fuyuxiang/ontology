@@ -1,8 +1,11 @@
+"""语义服务测试。"""
+
 from app.config.settings import get_settings
 from app.services.semantic_service import SemanticService
 
 
 def test_summary_contains_core_fields():
+    """验证概览接口包含前端依赖的核心字段。"""
     service = SemanticService(get_settings())
     summary = service.get_summary()
     assert summary["primaryEntityCount"] > 0
@@ -12,6 +15,7 @@ def test_summary_contains_core_fields():
 
 
 def test_summary_graph_only_contains_entity_nodes_and_relations():
+    """验证概览图只保留实体节点和实体间关系。"""
     service = SemanticService(get_settings())
     summary = service.get_summary()
     graph = summary["ontologyGraph"]

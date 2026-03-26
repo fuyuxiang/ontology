@@ -1,4 +1,4 @@
-"""exDB2TTL: extract database metadata, ask an LLM for ontology drafts, and validate the result."""
+"""exDB2TTL 包入口，负责元数据抽取、草稿生成与结果校验。"""
 
 from .cli import main
 

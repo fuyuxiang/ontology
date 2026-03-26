@@ -1,3 +1,5 @@
+/** 图谱画布组件，负责节点绘制、视口控制和交互反馈。 */
+
 import { useEffect, useRef, useState, type PointerEvent, type WheelEvent } from "react";
 
 import type { GraphData, GraphNode, RiskLevel } from "../types";
@@ -74,6 +76,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+/** 在缺少后端坐标时生成默认布局。 */
 function buildFallbackPositions(nodes: GraphNode[]) {
   const groups = new Map<string, GraphNode[]>();
   for (const node of nodes) {
@@ -112,6 +115,7 @@ function buildFallbackPositions(nodes: GraphNode[]) {
   );
 }
 
+/** 优先使用后端坐标，缺失时回退到前端布局。 */
 function resolvePositions(graph: GraphData) {
   const hasCoordinates = graph.nodes.every((node) => typeof node.x === "number" && typeof node.y === "number");
   if (hasCoordinates) {
@@ -128,6 +132,7 @@ function resolvePositions(graph: GraphData) {
   return buildFallbackPositions(graph.nodes);
 }
 
+/** 计算图谱内容对应的初始视口。 */
 function buildGraphBounds(graph: GraphData, positions: Map<string, Point>): ViewBox {
   if (!graph.nodes.length) {
     return { x: 0, y: 0, width: WIDTH, height: HEIGHT };
@@ -162,6 +167,7 @@ function buildGraphBounds(graph: GraphData, positions: Map<string, Point>): View
   };
 }
 
+/** 约束视口的缩放比例和移动范围。 */
 function clampViewBox(viewBox: ViewBox, initialViewBox: ViewBox): ViewBox {
   const width = clamp(viewBox.width, initialViewBox.width * MIN_ZOOM_FACTOR, initialViewBox.width);
   const height = clamp(viewBox.height, initialViewBox.height * MIN_ZOOM_FACTOR, initialViewBox.height);
@@ -181,6 +187,7 @@ function shortLabel(label: string) {
   return value.length > 8 ? `${value.slice(0, 8)}..` : value;
 }
 
+/** 图谱画布组件，负责缩放、拖拽和节点选中。 */
 export function GraphCanvas({
   graph,
   selectedNodeId,

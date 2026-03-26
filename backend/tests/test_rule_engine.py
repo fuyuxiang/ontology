@@ -1,3 +1,5 @@
+"""规则引擎测试。"""
+
 import os
 
 from app.config.settings import get_settings
@@ -5,6 +7,7 @@ from app.rules.engine import infer_record, load_ruleset
 
 
 def test_ruleset_is_loaded_from_rules_directory():
+    """验证默认规则集会从项目 rules 目录加载。"""
     os.environ["ONTOLOGY_IGNORE_ACTIVE_PROFILE"] = "1"
     settings = get_settings()
     ruleset = load_ruleset(settings)
@@ -22,6 +25,7 @@ def test_ruleset_is_loaded_from_rules_directory():
 
 
 def test_infer_record_uses_external_decision_table():
+    """验证推理逻辑会按外部决策表产出高风险结果。"""
     os.environ["ONTOLOGY_IGNORE_ACTIVE_PROFILE"] = "1"
     ruleset = load_ruleset(get_settings())
     record = {

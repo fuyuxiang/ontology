@@ -1,3 +1,5 @@
+"""语义服务核心实现，负责数据装载、图谱构建、推理与查询。"""
+
 from __future__ import annotations
 
 import json
@@ -36,6 +38,8 @@ except ImportError:  # pragma: no cover
 
 
 class SemanticService:
+    """聚合语义层的主要能力，供 API 与 CLI 复用。"""
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.repository = GraphRepository(settings)
@@ -61,6 +65,7 @@ class SemanticService:
         self.initialize()
 
     def initialize(self) -> None:
+        """重新装载配置、原始数据、本体和推理结果。"""
         with self.lock:
             self.batch_id = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
             self.dataset = Dataset()
@@ -69,6 +74,7 @@ class SemanticService:
             bind_prefixes(self.base_graph, self.settings)
             bind_prefixes(self.deductions_graph, self.settings)
 
+            # 初始化顺序固定：先装入 schema，再读源数据、构图、校验、推理、持久化。
             self._load_schema(self.base_graph)
             self.source_rows = self._load_source_rows()
             self.dataset_indexes = self._build_dataset_indexes()
@@ -83,10 +89,12 @@ class SemanticService:
             self.persistence = self.repository.persist(self.dataset)
 
     def _load_schema(self, graph: Graph) -> None:
+        """把核心本体和领域本体加载到基础图。"""
         for path in (self.settings.ontology_core_path, self.settings.ontology_domain_path):
             graph.parse(path, format="turtle")
 
     def _load_source_rows(self) -> dict[str, list[dict[str, Any]]]:
+        """读取各数据集 CSV，并补充实体构图所需的运行时元字段。"""
         rows_by_dataset: dict[str, list[dict[str, Any]]] = {}
         self.data_warnings = []
 
@@ -108,6 +116,7 @@ class SemanticService:
                 row["_dataset_key"] = dataset_key
                 row["_row_index"] = index
                 row["_target_type"] = target_type
+                # 以下下划线字段仅在服务内部使用，不直接暴露给前端。
                 row["_entity_uri"] = self._entity_uri(dataset_key, row, index)
                 row["_label"] = self._entity_label(dataset_key, row)
                 row["_node_type"] = dataset_config.node_type
@@ -116,6 +125,7 @@ class SemanticService:
         return rows_by_dataset
 
     def _build_dataset_indexes(self) -> dict[str, dict[str, dict[str, list[dict[str, Any]]]]]:
+        """按场景配置的 join key 构建多级索引，加速跨表关联。"""
         indexes: dict[str, dict[str, dict[str, list[dict[str, Any]]]]] = {}
         for dataset_key, rows in self.source_rows.items():
             dataset_config = self.scenario.datasets[dataset_key]
@@ -132,6 +142,7 @@ class SemanticService:
         return indexes
 
     def _build_records(self) -> dict[str, dict[str, Any]]:
+        """以主数据集为中心拼装实体记录，供告警与详情视图使用。"""
         primary_dataset = self.scenario.datasets[self.scenario.primary_dataset]
         records: dict[str, dict[str, Any]] = {}
 
@@ -144,6 +155,7 @@ class SemanticService:
             for dataset_key, dataset_config in self.scenario.datasets.items():
                 if dataset_key == self.scenario.primary_dataset:
                     continue
+                # 使用数据集键 + 行号去重，避免同一关联记录因多个 join key 重复命中。
                 matched: dict[tuple[str, int], dict[str, Any]] = {}
                 for canonical_key, primary_field in primary_dataset.join_keys.items():
                     if canonical_key not in dataset_config.join_keys:
@@ -167,6 +179,7 @@ class SemanticService:
         return records
 
     def _materialize_base_graph(self) -> None:
+        """把原始行数据和场景关系映射为基础 RDF 图。"""
         graph = self.base_graph
         assert graph is not None
 
@@ -218,6 +231,7 @@ class SemanticService:
         label: str,
         source_system: str,
     ) -> None:
+        """同时写入实体间关系边和关系对象节点，便于查询与溯源。"""
         graph = self.base_graph
         assert graph is not None
         namespaces = make_namespaces(self.settings)
@@ -233,12 +247,14 @@ class SemanticService:
         graph.add((relation, doim.predicateUri, Literal(str(predicate))))
 
     def _tag_entity(self, graph: Graph, resource: URIRef, source_system: str) -> None:
+        """为实体补充来源系统和导入批次标记。"""
         namespaces = make_namespaces(self.settings)
         doim = namespaces["doim"]
         graph.add((resource, doim.sourceSystem, Literal(source_system)))
         graph.add((resource, doim.loadBatch, Literal(self.batch_id)))
 
     def _apply_owlrl(self) -> int:
+        """执行 OWL RL 推理，并把新增三元组写入推理图。"""
         if DeductiveClosure is None or OWLRL_Semantics is None:
             return 0
         assert self.base_graph is not None
@@ -259,6 +275,7 @@ class SemanticService:
         return added
 
     def _union_graph(self) -> Graph:
+        """合并基础图与推理图，形成统一查询视图。"""
         union = Graph()
         bind_prefixes(union, self.settings)
         assert self.base_graph is not None
@@ -270,8 +287,10 @@ class SemanticService:
         return union
 
     def run_inference(self, persist: bool = True) -> dict[str, Any]:
+        """重新执行推理流程，并按需持久化结果。"""
         with self.lock:
             assert self.deductions_graph is not None
+            # 每次推理前先清空旧推理结果，避免重复叠加。
             self.deductions_graph.remove((None, None, None))
             owlrl_triples = self._apply_owlrl()
             inferred, top_rules = materialize_business_inference(
@@ -291,6 +310,7 @@ class SemanticService:
             }
 
     def get_summary(self) -> dict[str, Any]:
+        """返回首页概览所需的汇总数据。"""
         with self.lock:
             union = self._union_graph()
             return {
@@ -326,6 +346,7 @@ class SemanticService:
             }
 
     def get_alerts(self) -> list[dict[str, Any]]:
+        """构建告警列表，并按场景配置的排序规则输出。"""
         alerts: list[dict[str, Any]] = []
         for record in self.records.values():
             inference = self.inference[record["entityId"]]
@@ -348,6 +369,7 @@ class SemanticService:
         return alerts
 
     def search_subscribers(self, query: str) -> list[dict[str, Any]]:
+        """按实体标识、名称和搜索字段检索实体。"""
         keyword = (query or "").strip().lower()
         alerts = self.get_alerts()
         if any(term in keyword for term in self.scenario.risk_terms):
@@ -365,6 +387,7 @@ class SemanticService:
         return [by_id[entity_id] for entity_id in matches if entity_id in by_id]
 
     def get_subscriber(self, subscriber_id: str) -> dict[str, Any]:
+        """返回单个实体的详细信息、证据和局部图谱。"""
         entity_id = subscriber_id.strip()
         if entity_id not in self.records:
             return {"error": "entity_not_found", "entityId": entity_id}
@@ -394,6 +417,7 @@ class SemanticService:
         }
 
     def run_sparql(self, query_string: str | None) -> dict[str, Any]:
+        """执行 SPARQL 查询，兼容纯文本和 JSON body 两种输入格式。"""
         query = self._extract_query(query_string) or self.scenario.sample_query or self.settings.default_query
         graph = self._union_graph()
         results = graph.query(query)
@@ -413,6 +437,7 @@ class SemanticService:
         }
 
     def load_data_file(self, file_path: Path) -> dict[str, Any]:
+        """加载上传文件；CSV 触发全量重建，RDF 文件则直接解析入图。"""
         with self.lock:
             if file_path.suffix.lower() == ".csv":
                 self.initialize()
@@ -433,12 +458,14 @@ class SemanticService:
             }
 
     def _risk_distribution(self) -> dict[str, int]:
+        """统计当前推理结果中的风险等级分布。"""
         distribution = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
         for item in self.inference.values():
             distribution[item["riskLevel"]] += 1
         return distribution
 
     def _extract_query(self, payload: str | None) -> str:
+        """从请求体中提取查询语句。"""
         if payload is None:
             return ""
         text = payload.strip()
@@ -453,6 +480,7 @@ class SemanticService:
         return text
 
     def _build_inference_summary(self, name: str, inference: dict[str, Any], interaction_count: int) -> dict[str, Any]:
+        """生成详情页顶部的推理摘要卡片。"""
         risk_level = inference["riskLevel"]
         summary = {
             "headline": f"{name} 被推理为 {risk_level} 风险",
@@ -471,6 +499,7 @@ class SemanticService:
         return summary
 
     def _build_evidence(self, record: dict[str, Any], inference: dict[str, Any]) -> list[dict[str, Any]]:
+        """把高亮字段和命中规则整理成前端可直接展示的证据列表。"""
         evidence: list[dict[str, Any]] = []
         for field in self.scenario.highlight_fields:
             rendered = self._render_display_field(record, field)
@@ -496,6 +525,7 @@ class SemanticService:
         return evidence
 
     def _build_source_cards(self) -> list[dict[str, Any]]:
+        """根据场景配置生成首页数据源卡片。"""
         cards: list[dict[str, Any]] = []
         for card in self.scenario.source_cards:
             if card.count_mode == "primary":
@@ -515,6 +545,7 @@ class SemanticService:
         return cards
 
     def _overview_cluster_offsets(self) -> dict[str, tuple[float, float]]:
+        """定义概览图中各关联节点相对主实体的布局偏移。"""
         return {
             "porting_query": (0.0, -78.0),
             "contract_info": (80.0, -34.0),
@@ -535,6 +566,7 @@ class SemanticService:
         x: float,
         y: float,
     ) -> None:
+        """向概览图累加节点及其平均坐标。"""
         nodes_by_id.setdefault(
             node_id,
             {
@@ -549,6 +581,7 @@ class SemanticService:
         accumulator["count"] += 1.0
 
     def _overview_related_node_id(self, dataset_key: str, row: dict[str, Any]) -> str:
+        """为概览图中的关联节点生成稳定 ID。"""
         label = str(row.get("_label") or self.scenario.datasets[dataset_key].entity_label)
         return f"overview:{self.scenario.datasets[dataset_key].node_type.lower()}:{quote(label, safe='')}"
 
@@ -558,6 +591,7 @@ class SemanticService:
         source_row: dict[str, Any],
         target_row: dict[str, Any],
     ) -> bool:
+        """判断两条原始记录是否满足某条场景关系配置。"""
         source_field = self.scenario.datasets[relation.source_dataset].join_keys[relation.source_join_key]
         target_field = self.scenario.datasets[relation.target_dataset].join_keys[relation.target_join_key]
         source_value = source_row.get(source_field)
@@ -567,6 +601,7 @@ class SemanticService:
         return str(source_value) == str(target_value)
 
     def _build_overview_graph(self) -> dict[str, Any]:
+        """构建首页概览图，只抽样展示每个主实体的一组代表性关联节点。"""
         nodes_by_id: dict[str, dict[str, Any]] = {}
         position_accumulators: dict[str, dict[str, float]] = {}
         edges_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
@@ -665,6 +700,7 @@ class SemanticService:
         }
 
     def _build_entity_graph(self, record: dict[str, Any], inference: dict[str, Any]) -> dict[str, Any]:
+        """构建单个实体的详情图谱。"""
         primary_node = {
             "id": record["nodeId"],
             "label": record["displayName"],
@@ -718,9 +754,11 @@ class SemanticService:
         record: dict[str, Any],
         fields: tuple[AlertDisplayField, ...],
     ) -> list[dict[str, Any]]:
+        """批量渲染展示字段。"""
         return [self._render_display_field(record, field) for field in fields]
 
     def _render_display_field(self, record: dict[str, Any], field: AlertDisplayField) -> dict[str, Any]:
+        """根据字段来源规则提取展示值。"""
         value: Any = ""
         if field.fact:
             value = record["metrics"].get(field.fact)
@@ -736,6 +774,7 @@ class SemanticService:
         }
 
     def _alert_sort_key(self, item: dict[str, Any]) -> tuple[Any, ...]:
+        """生成告警排序键，先按风险等级，再按场景配置事实值排序。"""
         key_parts: list[Any] = [-self._risk_weight(item["riskLevel"])]
         metrics = item["metrics"]
         for sort_field in self.scenario.alert_sort:
@@ -746,9 +785,11 @@ class SemanticService:
         return tuple(key_parts)
 
     def _risk_weight(self, level: str) -> int:
+        """把文本风险等级转换成可排序权重。"""
         return {"HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(level, 0)
 
     def _sortable_value(self, value: Any) -> float:
+        """把多种事实值归一为可排序的数字。"""
         if isinstance(value, bool):
             return 1.0 if value else 0.0
         if isinstance(value, Decimal):
@@ -768,6 +809,7 @@ class SemanticService:
         primary_row: dict[str, Any],
         related_rows: dict[str, list[dict[str, Any]]],
     ) -> Any:
+        """根据聚合类型计算单个事实指标。"""
         rows = [primary_row] if fact.source_dataset == self.scenario.primary_dataset else related_rows.get(fact.source_dataset, [])
         candidates = [row for row in rows if not fact.where or self._row_matches(fact.where, row)]
 
@@ -798,6 +840,7 @@ class SemanticService:
         raise ValueError(f"Unsupported fact aggregate: {fact.aggregate}")
 
     def _row_matches(self, condition: dict[str, Any], row: dict[str, Any]) -> bool:
+        """评估单行数据是否满足 where 条件。"""
         if "all" in condition:
             return all(self._row_matches(item, row) for item in condition["all"])
         if "any" in condition:
@@ -825,6 +868,7 @@ class SemanticService:
         return self._compare(actual, operator, expected)
 
     def _compare(self, actual: Any, operator: str, expected: Any) -> bool:
+        """在基础 Python 类型上执行统一比较。"""
         if isinstance(actual, bool):
             actual_value = actual
             expected_value = self._coerce_scalar(expected, "bool")
@@ -857,12 +901,14 @@ class SemanticService:
         raise ValueError(f"Unsupported row operator: {operator}")
 
     def _days_since(self, value: Any) -> int | None:
+        """计算给定日期距参考日的天数差。"""
         parsed = self._parse_date_value(value)
         if parsed is None:
             return None
         return (self.reference_date - parsed).days
 
     def _parse_date_value(self, value: Any) -> date | None:
+        """尽量把输入解析为日期对象，兼容 ISO 日期和时间戳字符串。"""
         if value in (None, ""):
             return None
         text = str(value).strip()
@@ -878,6 +924,7 @@ class SemanticService:
             return None
 
     def _apply_cast(self, value: Any, cast: str | None, default: Any) -> Any:
+        """按事实定义的 cast 规则转换值，并处理空值默认值。"""
         if value in (None, ""):
             return default
         if not cast:
@@ -886,6 +933,7 @@ class SemanticService:
         return default if converted is None else converted
 
     def _coerce_scalar(self, value: Any, value_type: str) -> Any:
+        """把字符串或原始值转换为规则/映射要求的标量类型。"""
         if value in (None, ""):
             return None
         if isinstance(value, (int, float, Decimal, bool)) and value_type.lower() not in {"string", "str"}:
@@ -906,14 +954,17 @@ class SemanticService:
         return text
 
     def _json_ready_value(self, value: Any) -> Any:
+        """把不能直接 JSON 序列化的值转换为前端友好格式。"""
         if isinstance(value, Decimal):
             return float(value)
         return value
 
     def _serialize_metrics(self, metrics: dict[str, Any]) -> dict[str, Any]:
+        """序列化事实指标字典。"""
         return {key: self._json_ready_value(value) for key, value in metrics.items()}
 
     def _serialize_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        """剔除内部辅助字段后输出原始行数据。"""
         payload: dict[str, Any] = {}
         for key, value in row.items():
             if key.startswith("_"):
@@ -922,6 +973,7 @@ class SemanticService:
         return payload
 
     def _order_key(self, value: Any) -> Any:
+        """为 latest 聚合生成统一排序键。"""
         parsed_date = self._parse_date_value(value)
         if parsed_date is not None:
             return parsed_date.toordinal()
@@ -932,12 +984,14 @@ class SemanticService:
         return "" if value is None else str(value)
 
     def _target_type_for_dataset(self, dataset_key: str) -> str:
+        """从映射表中推断某个数据集对应的目标类型。"""
         rows = self.mapping_by_dataset.get(dataset_key, [])
         if not rows:
             raise ValueError(f"No mapping rows configured for dataset: {dataset_key}")
         return rows[0].target_type
 
     def _entity_uri(self, dataset_key: str, row: dict[str, Any], index: int) -> URIRef:
+        """为原始行构造稳定的实体 URI。"""
         dataset_config = self.scenario.datasets[dataset_key]
         parts = []
         for field_name in dataset_config.id_fields:
@@ -950,6 +1004,7 @@ class SemanticService:
         return URIRef(f"{self.settings.data_ns}{dataset_segment}/{'/'.join(parts)}")
 
     def _entity_label(self, dataset_key: str, row: dict[str, Any]) -> str:
+        """为实体生成展示标签，优先模板，再退回单字段或序号。"""
         dataset_config = self.scenario.datasets[dataset_key]
         if dataset_config.label_template:
             values = {key: "" if value is None else str(value) for key, value in row.items()}
@@ -961,6 +1016,7 @@ class SemanticService:
         return f"{dataset_config.entity_label}-{int(row['_row_index']) + 1}"
 
     def _resolve_curie(self, curie: str) -> URIRef:
+        """把 CURIE 形式的谓词或类型解析为完整 URI。"""
         namespace, local = curie.split(":", 1)
         if namespace == "rdf":
             return URIRef(str(RDF[local]))
@@ -969,6 +1025,7 @@ class SemanticService:
         return URIRef(str(make_namespaces(self.settings)[namespace][local]))
 
     def _literal_for_value(self, value: Any, value_type: str) -> Literal:
+        """按映射值类型构造 RDF Literal。"""
         lowered = value_type.lower()
         if lowered in {"int", "integer"}:
             return Literal(int(value), datatype=XSD.integer)
@@ -985,11 +1042,13 @@ class SemanticService:
         target_dataset: str,
         target_row: dict[str, Any],
     ) -> str:
+        """为关系节点构造稳定 ID。"""
         source_bits = [source_dataset, str(source_row["_row_index"])]
         target_bits = [target_dataset, str(target_row["_row_index"])]
         return "-".join(source_bits + target_bits)
 
     def _node_id(self, dataset_key: str, row: dict[str, Any]) -> str:
+        """为前端图谱节点生成稳定标识。"""
         dataset_config = self.scenario.datasets[dataset_key]
         identifiers = [str(row.get(field)) for field in dataset_config.id_fields if row.get(field) not in (None, "")]
         if not identifiers:
@@ -997,6 +1056,7 @@ class SemanticService:
         return f"{dataset_config.node_type.lower()}:{'|'.join(identifiers)}"
 
     def _relation_label(self, source_dataset: str, target_dataset: str) -> str:
+        """根据场景配置查找两个数据集之间的默认关系文案。"""
         for relation in self.scenario.relations:
             if relation.source_dataset == source_dataset and relation.target_dataset == target_dataset:
                 return relation.label

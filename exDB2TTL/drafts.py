@@ -1,3 +1,5 @@
+"""LLM 草稿包解析与序列化工具。"""
+
 from __future__ import annotations
 
 import csv
@@ -8,6 +10,7 @@ from .models import DraftBundle
 
 
 def parse_draft_bundle(raw_text: str) -> DraftBundle:
+    """从模型响应中提取并校验草稿包。"""
     payload = json.loads(_extract_json_object(raw_text))
     required = ["mapping_csv", "rules_yaml"]
     missing = [key for key in required if key not in payload]
@@ -28,6 +31,7 @@ def parse_draft_bundle(raw_text: str) -> DraftBundle:
 
 
 def serialize_draft_bundle(bundle: DraftBundle) -> str:
+    """将草稿包序列化为稳定的 JSON 文本。"""
     return json.dumps(
         {
             "telecom_ontology_ttl": bundle.telecom_ontology_ttl,
@@ -42,6 +46,7 @@ def serialize_draft_bundle(bundle: DraftBundle) -> str:
 
 
 def _extract_json_object(text: str) -> str:
+    """从混合文本中截取首个完整 JSON 对象。"""
     stripped = text.strip()
     if stripped.startswith("{") and stripped.endswith("}"):
         return stripped
@@ -62,6 +67,7 @@ def _extract_json_object(text: str) -> str:
 
 
 def _validate_mapping_header(mapping_csv: str) -> None:
+    """校验生成映射表的列头是否符合约定。"""
     reader = csv.reader(io.StringIO(mapping_csv))
     try:
         header = next(reader)
@@ -86,6 +92,7 @@ def _validate_mapping_header(mapping_csv: str) -> None:
 
 
 def _first_present(payload: dict[str, object], *keys: str) -> str:
+    """按优先级读取第一个存在的键。"""
     for key in keys:
         if key in payload:
             return str(payload[key]).strip()

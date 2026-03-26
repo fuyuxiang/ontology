@@ -1,2 +1,1 @@
-"""Graph persistence helpers."""
-
+"""图数据持久化工具。"""

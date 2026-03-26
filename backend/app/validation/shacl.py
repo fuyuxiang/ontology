@@ -1,3 +1,5 @@
+"""SHACL 校验封装，负责执行约束校验并输出报告文件。"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -11,6 +13,7 @@ except ImportError:  # pragma: no cover
 
 
 def run_shacl_validation(data_graph: Graph, shapes_path: Path, report_path: Path) -> dict[str, object]:
+    """对数据图执行 SHACL 校验，并返回可供前端展示的结果摘要。"""
     if validate is None:
         return {"status": "skipped", "reason": "pyshacl_not_installed"}
     if not shapes_path.exists():
