@@ -3,10 +3,31 @@
 import { type KeyboardEvent, startTransition, useEffect, useState } from "react";
 
 import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS, RISK_COLORS } from "./components/GraphCanvas";
-import { getAlerts, getSubscriber, getSummary, runSparql, triggerInference } from "./services/api";
-import type { Alert, GraphData, RiskLevel, SparqlResult, SubscriberDetail, Summary } from "./types";
+import { OperationsWorkbench } from "./components/OperationsWorkbench";
+import {
+  executeAction,
+  getAlerts,
+  getCase,
+  getCases,
+  getSubscriber,
+  getSummary,
+  getTasks,
+  runSparql,
+  triggerInference,
+} from "./services/api";
+import type {
+  Alert,
+  GraphData,
+  OperationalCase,
+  OperationalCaseSummary,
+  RiskLevel,
+  SparqlResult,
+  SubscriberDetail,
+  Summary,
+  TaskItem,
+} from "./types";
 
-type PageKey = "dashboard" | "ontology" | "graph" | "qa" | "settings";
+type PageKey = "dashboard" | "operations" | "ontology" | "graph" | "qa" | "settings";
 type GraphRiskFilter = "ALL" | RiskLevel;
 
 interface ChatMessage {
@@ -26,6 +47,7 @@ const RDFS_NS = "http://www.w3.org/2000/01/rdf-schema#";
 
 const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: IconName }> = [
   { key: "dashboard", label: "仪表盘", icon: "dashboard" },
+  { key: "operations", label: "运营工作台", icon: "data" },
   { key: "ontology", label: "本体构建", icon: "globe" },
   { key: "graph", label: "图谱探索", icon: "graph" },
   { key: "qa", label: "智能问答", icon: "chat" },
@@ -363,16 +385,22 @@ export default function App() {
   const [page, setPage] = useState<PageKey>("dashboard");
   const [summary, setSummary] = useState<Summary | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [cases, setCases] = useState<OperationalCaseSummary[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [appError, setAppError] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [graphRiskFilter, setGraphRiskFilter] = useState<GraphRiskFilter>("ALL");
   const [subscriberDetails, setSubscriberDetails] = useState<Record<string, SubscriberDetail>>({});
+  const [caseDetails, setCaseDetails] = useState<Record<string, OperationalCase>>({});
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
+  const [caseLoadingId, setCaseLoadingId] = useState<string | null>(null);
   const [detailError, setDetailError] = useState("");
   const [questionInput, setQuestionInput] = useState("");
   const [askingQuestion, setAskingQuestion] = useState(false);
   const [runningInference, setRunningInference] = useState(false);
+  const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -386,9 +414,16 @@ export default function App() {
     setLoading(true);
     setAppError("");
     setSubscriberDetails({});
+    setCaseDetails({});
     setDetailLoadingId(null);
+    setCaseLoadingId(null);
     setDetailError("");
-    const [summaryResult, alertsResult] = await Promise.allSettled([getSummary(), getAlerts()]);
+    const [summaryResult, alertsResult, casesResult, tasksResult] = await Promise.allSettled([
+      getSummary(),
+      getAlerts(),
+      getCases(),
+      getTasks(),
+    ]);
 
     if (summaryResult.status === "fulfilled") {
       setSummary(summaryResult.value);
@@ -400,6 +435,18 @@ export default function App() {
       setAlerts(alertsResult.value);
     } else {
       setAppError((current) => current || (alertsResult.reason instanceof Error ? alertsResult.reason.message : "加载 alerts 失败"));
+    }
+
+    if (casesResult.status === "fulfilled") {
+      setCases(casesResult.value);
+    } else {
+      setAppError((current) => current || (casesResult.reason instanceof Error ? casesResult.reason.message : "加载 cases 失败"));
+    }
+
+    if (tasksResult.status === "fulfilled") {
+      setTasks(tasksResult.value);
+    } else {
+      setAppError((current) => current || (tasksResult.reason instanceof Error ? tasksResult.reason.message : "加载 tasks 失败"));
     }
 
     setLoading(false);
@@ -423,9 +470,28 @@ export default function App() {
     }
   }, [alerts, graphRiskFilter, selectedNodeId, summary]);
 
+  useEffect(() => {
+    if (!cases.length) {
+      if (selectedCaseId) {
+        setSelectedCaseId(null);
+      }
+      return;
+    }
+    if (!selectedCaseId || !cases.some((item) => item.caseId === selectedCaseId)) {
+      const actionable = cases.find((item) => item.availableActions?.length);
+      setSelectedCaseId((actionable ?? cases[0]).caseId);
+    }
+  }, [cases, selectedCaseId]);
+
   async function handleRefresh() {
     setFeedback(null);
     await loadAppData();
+    if (selectedCaseId) {
+      await refreshCaseDetail(selectedCaseId);
+    }
+    if (selectedEntityId) {
+      await refreshSubscriberDetail(selectedEntityId);
+    }
   }
 
   async function handleRunInference() {
@@ -434,6 +500,12 @@ export default function App() {
     try {
       const result = await triggerInference();
       await loadAppData();
+      if (selectedCaseId) {
+        await refreshCaseDetail(selectedCaseId);
+      }
+      if (selectedEntityId) {
+        await refreshSubscriberDetail(selectedEntityId);
+      }
       setFeedback({
         tone: "success",
         text: `推理完成，当前共有 ${result.deductionTriples} 条推理三元组，OWL-RL 新增 ${result.owlrlTriples} 条。`,
@@ -445,6 +517,46 @@ export default function App() {
       });
     } finally {
       setRunningInference(false);
+    }
+  }
+
+  async function refreshCaseDetail(caseId: string) {
+    const detail = await getCase(caseId);
+    setCaseDetails((current) => ({ ...current, [caseId]: detail }));
+    return detail;
+  }
+
+  async function refreshSubscriberDetail(entityId: string) {
+    const detail = await getSubscriber(entityId);
+    setSubscriberDetails((current) => ({ ...current, [entityId]: detail }));
+    return detail;
+  }
+
+  async function handleExecuteRuntimeAction(actionId: string, caseId: string, entityId: string) {
+    const busyKey = `${caseId}:${actionId}`;
+    setActionBusyKey(busyKey);
+    setFeedback(null);
+
+    try {
+      await executeAction({
+        actionId,
+        caseId,
+        entityId,
+      });
+      await loadAppData();
+      await Promise.all([refreshCaseDetail(caseId), refreshSubscriberDetail(entityId)]);
+      setSelectedCaseId(caseId);
+      setFeedback({
+        tone: "success",
+        text: `动作 ${actionId} 已执行，运营状态已刷新。`,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "动作执行失败",
+      });
+    } finally {
+      setActionBusyKey(null);
     }
   }
 
@@ -491,6 +603,21 @@ export default function App() {
     });
   }
 
+  function openEntityInGraph(entityId: string) {
+    const target = alerts.find((item) => item.entityId === entityId);
+    if (!target) {
+      return;
+    }
+    openAlertInGraph(target);
+  }
+
+  function openCaseInWorkbench(caseId: string) {
+    startTransition(() => {
+      setPage("operations");
+      setSelectedCaseId(caseId);
+    });
+  }
+
   const graph = buildRiskScopedGraph(summary?.ontologyGraph ?? null, alerts, graphRiskFilter);
   const graphNodes = graph?.nodes ?? [];
   const graphEdges = graph?.edges ?? [];
@@ -502,6 +629,7 @@ export default function App() {
   const selectedEntityId = selectedEntityAlert?.entityId ?? null;
   const selectedSubscriber = selectedEntityId ? subscriberDetails[selectedEntityId] ?? null : null;
   const detailLoading = selectedEntityId !== null && detailLoadingId === selectedEntityId;
+  const caseLoading = selectedCaseId !== null && caseLoadingId === selectedCaseId;
   const riskByNodeId = Object.fromEntries(alerts.map((item) => [item.nodeId, item.riskLevel] as const));
   const relatedAlerts = selectedNode
     ? Array.from(
@@ -528,6 +656,12 @@ export default function App() {
   const suggestedQuestions = summary?.questionSuggestions?.length ? summary.questionSuggestions : RECOMMENDED_QUESTIONS;
   const visibleAlerts =
     graphRiskFilter === "ALL" ? alerts : alerts.filter((item) => item.riskLevel === graphRiskFilter);
+  const selectedCaseSummary = selectedCaseId ? cases.find((item) => item.caseId === selectedCaseId) ?? null : null;
+  const selectedCase = selectedCaseId ? caseDetails[selectedCaseId] ?? null : null;
+  const selectedOperationsTasks = selectedCase ? selectedCase.tasks : tasks.filter((item) => item.status === "TODO");
+  const selectedRuntimeCase =
+    selectedSubscriber?.case ??
+    (selectedEntityAlert?.caseId ? caseDetails[selectedEntityAlert.caseId] ?? cases.find((item) => item.caseId === selectedEntityAlert.caseId) ?? null : null);
 
   useEffect(() => {
     if (!selectedEntityId || subscriberDetails[selectedEntityId]) {
@@ -563,6 +697,33 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedEntityId, subscriberDetails]);
+
+  useEffect(() => {
+    if (!selectedCaseId || caseDetails[selectedCaseId]) {
+      return;
+    }
+
+    let cancelled = false;
+    setCaseLoadingId(selectedCaseId);
+
+    void getCase(selectedCaseId)
+      .then((detail) => {
+        if (cancelled) {
+          return;
+        }
+        setCaseDetails((current) => ({ ...current, [selectedCaseId]: detail }));
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+        setCaseLoadingId((current) => (current === selectedCaseId ? null : current));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [caseDetails, selectedCaseId]);
 
   return (
     <div className="app-container">
@@ -602,6 +763,7 @@ export default function App() {
 
         <main className="content-area">
           {appError ? <div className="global-notice error">{appError}</div> : null}
+          {feedback ? <div className={`global-notice ${feedback.tone}`}>{feedback.text}</div> : null}
 
           {page === "dashboard" ? (
             <div className="page active">
@@ -687,7 +849,66 @@ export default function App() {
                       ))}
                   </div>
                 </div>
+
+                <div className="dashboard-card">
+                  <div className="card-header">
+                    <h3 className="card-title">运营控制面</h3>
+                  </div>
+                  <div className="card-body">
+                    <div className="ops-dashboard-strip">
+                      {(summary?.operationsWorkbench.priorityBands || []).map((item) => (
+                        <div key={item.priority} className={`ops-priority-band compact ${item.priority.toLowerCase()}`}>
+                          <strong>{item.priority}</strong>
+                          <span>{item.caseCount} 个 Case</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="ops-dashboard-list">
+                      {(summary?.operationsWorkbench.focusCases || []).slice(0, 4).map((item) => (
+                        <button
+                          key={item.caseId}
+                          type="button"
+                          className="ops-dashboard-item"
+                          onClick={() => openCaseInWorkbench(item.caseId)}
+                        >
+                          <div>
+                            <div className="alert-name">{item.displayName || item.entityId}</div>
+                            <div className="alert-meta">{item.recommendedAction || item.nextAction?.label || "等待动作"}</div>
+                          </div>
+                          <div className="ops-dashboard-item-right">
+                            <span className={`risk-status ${riskTone((item.risk_level as RiskLevel) || "LOW")}`}>
+                              {riskLabel((item.risk_level as RiskLevel) || "LOW")}
+                            </span>
+                            <span className="ops-dashboard-count">{item.openTaskCount} 待办</span>
+                          </div>
+                        </button>
+                      ))}
+                      {!summary?.operationsWorkbench.focusCases.length ? <EmptyState message="暂无运营对象" /> : null}
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
+          ) : null}
+
+          {page === "operations" ? (
+            <div className="page active ops-page-shell">
+              <OperationsWorkbench
+                summary={summary}
+                cases={cases}
+                tasks={selectedOperationsTasks}
+                selectedCaseId={selectedCaseId}
+                selectedCaseSummary={selectedCaseSummary}
+                selectedCase={selectedCase}
+                loading={loading}
+                caseLoading={caseLoading}
+                actionBusyKey={actionBusyKey}
+                onSelectCase={setSelectedCaseId}
+                onOpenGraph={openEntityInGraph}
+                onExecuteAction={(actionId, caseId, entityId) => {
+                  void handleExecuteRuntimeAction(actionId, caseId, entityId);
+                }}
+              />
             </div>
           ) : null}
 
@@ -1000,6 +1221,51 @@ export default function App() {
                           </div>
                         ) : null}
 
+                        {selectedRuntimeCase ? (
+                          <div className="detail-section">
+                            <div className="detail-section-title">运营处置</div>
+                            <div className="ops-inline-card">
+                              <div className="ops-inline-top">
+                                <div>
+                                  <div className="ops-inline-title">{selectedRuntimeCase.displayName || selectedRuntimeCase.entityId}</div>
+                                  <div className="ops-inline-meta">
+                                    {selectedRuntimeCase.caseId} · {selectedRuntimeCase.state} · {selectedRuntimeCase.queue_name}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="ops-jump-button"
+                                  onClick={() => openCaseInWorkbench(selectedRuntimeCase.caseId)}
+                                >
+                                  打开工作台
+                                </button>
+                              </div>
+                              <div className="token-list">
+                                {(selectedRuntimeCase.availableActions || []).map((action) => {
+                                  const busy = actionBusyKey === `${selectedRuntimeCase.caseId}:${action.id}`;
+                                  return (
+                                    <button
+                                      key={action.id}
+                                      type="button"
+                                      className="token-chip rule action-token"
+                                      disabled={busy}
+                                      onClick={() => {
+                                        void handleExecuteRuntimeAction(
+                                          action.id,
+                                          selectedRuntimeCase.caseId,
+                                          selectedRuntimeCase.entityId,
+                                        );
+                                      }}
+                                    >
+                                      {busy ? "执行中..." : action.label}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+
                         {selectedSubscriber?.factors.length ? (
                           <div className="detail-section">
                             <div className="detail-section-title">命中因子</div>
@@ -1202,8 +1468,6 @@ export default function App() {
                     <SvgIcon name="refresh" size={16} color="#ffffff" />
                     {runningInference ? "推理中..." : "触发推理"}
                   </button>
-
-                  {feedback ? <div className={`inference-result show ${feedback.tone === "success" ? "success" : "error"}`}>{feedback.text}</div> : null}
                 </div>
               </div>
             </div>

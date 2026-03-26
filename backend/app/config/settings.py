@@ -27,6 +27,7 @@ class Settings:
     rules_dir: Path
     scenarios_dir: Path
     runtime_dir: Path
+    runtime_state_path: Path
     store_dir: Path
     reports_dir: Path
     ontology_core_path: Path
@@ -42,6 +43,7 @@ class Settings:
     base_graph_uri: str
     deductions_graph_uri: str
     default_query: str
+    runtime_persistence_enabled: bool
 
 
 def get_settings() -> Settings:
@@ -69,6 +71,7 @@ def get_settings() -> Settings:
         rules_dir=rules_dir,
         scenarios_dir=project_dir / "scenarios",
         runtime_dir=project_dir / "runtime",
+        runtime_state_path=project_dir / "runtime" / "operations-state.json",
         store_dir=project_dir / "runtime" / "store",
         reports_dir=project_dir / "runtime" / "reports",
         ontology_core_path=_resolve_path(
@@ -109,6 +112,10 @@ def get_settings() -> Settings:
         base_graph_uri="urn:doim:poc:base",
         deductions_graph_uri="urn:doim:poc:deductions",
         default_query=_build_default_query(doim_ns, telecom_ns),
+        runtime_persistence_enabled=_env_flag(
+            "ONTOLOGY_RUNTIME_PERSIST",
+            "PYTEST_CURRENT_TEST" not in os.environ,
+        ),
     )
 
 
@@ -155,3 +162,16 @@ WHERE {{
 }}
 ORDER BY DESC(?riskLevel) ?userId
 """
+
+
+def _env_flag(name: str, default: bool) -> bool:
+    """解析布尔环境变量，兼容常见真值和假值文本。"""
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    normalized = raw.strip().lower()
+    if normalized in {"1", "true", "yes", "y", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "n", "off"}:
+        return False
+    return default

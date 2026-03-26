@@ -1,12 +1,16 @@
 /** 前端 API 访问层，统一封装后端请求与错误处理。 */
 
 import type {
+  ActionExecutionResult,
   Alert,
   InferenceTriggerResult,
+  OperationalCase,
+  OperationalCaseSummary,
   SparqlResult,
   SubscriberDetail,
   SubscriberListItem,
   Summary,
+  TaskItem,
 } from "../types";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "/api";
@@ -73,5 +77,44 @@ export function runSparql(query: string): Promise<SparqlResult> {
 export function triggerInference(): Promise<InferenceTriggerResult> {
   return requestJson<InferenceTriggerResult>("/inference/trigger", {
     method: "POST",
+  });
+}
+
+/** 获取运营 case 列表。 */
+export function getCases(signal?: AbortSignal): Promise<OperationalCaseSummary[]> {
+  return requestJson<OperationalCaseSummary[]>("/cases", { signal });
+}
+
+/** 获取单个运营 case。 */
+export function getCase(caseId: string, signal?: AbortSignal): Promise<OperationalCase> {
+  return requestJson<OperationalCase>(`/cases/${caseId}`, { signal });
+}
+
+/** 获取任务列表。 */
+export function getTasks(params?: { status?: string; assignee_role?: string }, signal?: AbortSignal): Promise<TaskItem[]> {
+  const search = new URLSearchParams();
+  if (params?.status) {
+    search.set("status", params.status);
+  }
+  if (params?.assignee_role) {
+    search.set("assignee_role", params.assignee_role);
+  }
+  const suffix = search.size ? `?${search.toString()}` : "";
+  return requestJson<TaskItem[]>(`/tasks${suffix}`, { signal });
+}
+
+/** 执行运营动作。 */
+export function executeAction(payload: {
+  actionId: string;
+  caseId?: string;
+  entityId?: string;
+  actorRole?: string;
+  actorId?: string;
+  actorAreaId?: string;
+  parameters?: Record<string, string | number | boolean | null>;
+}): Promise<ActionExecutionResult> {
+  return requestJson<ActionExecutionResult>("/actions/execute", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }

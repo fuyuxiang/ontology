@@ -3,12 +3,26 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from pydantic import BaseModel, Field
 
 from app.services.semantic_service import SemanticService
 
 router = APIRouter(prefix="/api")
+
+
+class ActionExecutionRequest(BaseModel):
+    """动作执行请求。"""
+
+    actionId: str
+    caseId: str | None = None
+    entityId: str | None = None
+    actorRole: str = "ops_manager"
+    actorId: str = "api-user"
+    actorAreaId: str | None = None
+    parameters: dict[str, Any] = Field(default_factory=dict)
 
 
 def get_service(request: Request) -> SemanticService:
@@ -51,6 +65,45 @@ async def sparql(request: Request, service: SemanticService = Depends(get_servic
 def trigger_inference(service: SemanticService = Depends(get_service)) -> dict:
     """手动触发一次推理并返回统计结果。"""
     return service.run_inference()
+
+
+@router.get("/cases")
+def cases(service: SemanticService = Depends(get_service)) -> list[dict]:
+    """返回运营 case 列表。"""
+    return service.list_cases()
+
+
+@router.get("/cases/{case_id}")
+def case_detail(case_id: str, service: SemanticService = Depends(get_service)) -> dict:
+    """返回单个运营 case 详情。"""
+    return service.get_case(case_id)
+
+
+@router.get("/tasks")
+def tasks(
+    status: str | None = None,
+    assignee_role: str | None = None,
+    service: SemanticService = Depends(get_service),
+) -> list[dict]:
+    """按状态或角色筛选任务列表。"""
+    return service.list_tasks(status=status, assignee_role=assignee_role)
+
+
+@router.post("/actions/execute")
+def execute_action(payload: ActionExecutionRequest, service: SemanticService = Depends(get_service)) -> dict:
+    """执行运营动作。"""
+    try:
+        return service.execute_action(
+            action_id=payload.actionId,
+            actor_role=payload.actorRole,
+            actor_id=payload.actorId,
+            actor_area_id=payload.actorAreaId,
+            entity_id=payload.entityId,
+            case_id=payload.caseId,
+            parameters=payload.parameters,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @router.post("/upload")

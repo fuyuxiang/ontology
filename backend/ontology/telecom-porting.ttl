@@ -49,6 +49,30 @@ telecom:RiskAlert rdf:type owl:Class ;
     rdfs:subClassOf doim:Entity ;
     rdfs:label "Risk Alert"@en .
 
+telecom:RetentionCase rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Retention Case"@en .
+
+telecom:Task rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Task"@en .
+
+telecom:ActionDefinition rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Action Definition"@en .
+
+telecom:ActionRun rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Action Run"@en .
+
+telecom:DomainEvent rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "Domain Event"@en .
+
+telecom:StateTransition rdf:type owl:Class ;
+    rdfs:subClassOf doim:Entity ;
+    rdfs:label "State Transition"@en .
+
 telecom:hasPortingQuery rdf:type owl:ObjectProperty ;
     rdfs:domain telecom:User ;
     rdfs:range telecom:PortingQuery .
@@ -95,6 +119,40 @@ telecom:hasRiskFactor rdf:type owl:ObjectProperty ;
 
 telecom:generatedAlert rdf:type owl:ObjectProperty ;
     rdfs:domain telecom:User ;
+    rdfs:range telecom:RiskAlert .
+
+telecom:hasRetentionCase rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:User ;
+    rdfs:range telecom:RetentionCase .
+
+telecom:hasTask rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:RetentionCase ;
+    rdfs:range telecom:Task .
+
+telecom:availableAction rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:RetentionCase ;
+    rdfs:range telecom:ActionDefinition .
+
+telecom:hasActionRun rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:RetentionCase ;
+    rdfs:range telecom:ActionRun .
+
+telecom:usesActionDefinition rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:ActionRun ;
+    rdfs:range telecom:ActionDefinition .
+
+telecom:hasEvent rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:RetentionCase ;
+    rdfs:range telecom:DomainEvent .
+
+telecom:hasTransition rdf:type owl:ObjectProperty ;
+    rdfs:domain telecom:RetentionCase ;
+    rdfs:range telecom:StateTransition .
+
+telecom:forCase rdf:type owl:ObjectProperty ;
+    rdfs:range telecom:RetentionCase .
+
+telecom:forAlert rdf:type owl:ObjectProperty ;
     rdfs:range telecom:RiskAlert .
 
 telecom:userId rdf:type owl:DatatypeProperty ;
@@ -231,3 +289,63 @@ telecom:riskLevel rdf:type owl:DatatypeProperty ;
 
 telecom:riskScore rdf:type owl:DatatypeProperty ;
     rdfs:range xsd:integer .
+
+telecom:alertState rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:caseId rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:caseState rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:taskState rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:actionId rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:actionStatus rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:eventType rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:eventTime rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:dateTime .
+
+telecom:transitionFrom rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:transitionTo rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:queueName rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:priority rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:ownerRole rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:assigneeRole rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:actorRole rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:allowedRole rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:sideEffect rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:description rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:string .
+
+telecom:createdAt rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:dateTime .
+
+telecom:updatedAt rdf:type owl:DatatypeProperty ;
+    rdfs:range xsd:dateTime .
