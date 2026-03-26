@@ -95,6 +95,23 @@ export interface Summary {
     label: string;
     code: string;
   }>;
+  operationalMetrics: {
+    caseCount: number;
+    openCaseCount: number;
+    taskCount: number;
+    todoTaskCount: number;
+    actionRunCount: number;
+    eventCount: number;
+    caseDistribution: Record<string, number>;
+    taskDistribution: Record<string, number>;
+    alertDistribution: Record<string, number>;
+    actionCatalog: ActionDefinition[];
+  };
+  operationsWorkbench: OperationsWorkbench;
+  caseDistribution: Record<string, number>;
+  taskDistribution: Record<string, number>;
+  alertDistribution: Record<string, number>;
+  actionCatalog: ActionDefinition[];
   warnings: string[];
 }
 
@@ -110,6 +127,11 @@ export interface Alert {
   detailFields: FieldDisplay[];
   highlightFields: FieldDisplay[];
   metrics: Record<string, string | number | boolean | null>;
+  alertState?: string;
+  caseId?: string;
+  caseState?: string;
+  taskCount?: number;
+  availableActions?: ActionDefinition[];
 }
 
 export interface EvidenceItem {
@@ -147,6 +169,12 @@ export interface EntityDetail {
   inference: InferenceSummary;
   evidence: EvidenceItem[];
   graph: GraphData;
+  alertState?: string;
+  case?: OperationalCase;
+  tasks?: TaskItem[];
+  timeline?: TimelineItem[];
+  actionRuns?: ActionRun[];
+  availableActions?: ActionDefinition[];
   error?: string;
 }
 
@@ -166,4 +194,136 @@ export interface InferenceTriggerResult {
   deductionTriples: number;
   owlrlTriples: number;
   riskDistribution: Record<RiskLevel, number>;
+  operationalMetrics?: Summary["operationalMetrics"];
+}
+
+export interface ActionDefinition {
+  id: string;
+  label: string;
+  description: string;
+  allowed_roles: string[];
+  allowed_states: string[];
+  allowed_risk_levels: string[];
+  side_effect: string;
+  queue_hint: string;
+}
+
+export interface TaskItem {
+  id: string;
+  case_id: string;
+  entity_id: string;
+  action_id: string;
+  title: string;
+  status: string;
+  assignee_role: string;
+  queue_name: string;
+  due_sla_hours: number;
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+  output: Record<string, string | number | boolean | null>;
+  displayName?: string;
+  riskLevel?: RiskLevel | "";
+  caseState?: string;
+  priority?: string;
+  recommendedAction?: string;
+  summaryFields?: FieldDisplay[];
+}
+
+export interface ActionRun {
+  id: string;
+  action_id: string;
+  case_id: string;
+  entity_id: string;
+  actor_role: string;
+  actor_id: string;
+  status: string;
+  policy_reason: string;
+  created_at: string;
+  updated_at: string;
+  parameters: Record<string, string | number | boolean | null>;
+  output: Record<string, string | number | boolean | null>;
+}
+
+export interface TimelineItem {
+  kind: string;
+  time: string;
+  title: string;
+  eventType?: string;
+  subjectType?: string;
+  subjectId?: string;
+  payload?: Record<string, string | number | boolean | null>;
+  fromState?: string;
+  toState?: string;
+  reason?: string;
+}
+
+export interface OperationalCaseSummary {
+  id: string;
+  entityId: string;
+  caseId: string;
+  state: string;
+  risk_level: string;
+  priority: string;
+  queue_name: string;
+  owner_role: string;
+  area_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  alertState: string;
+  availableActions: ActionDefinition[];
+  openTaskCount: number;
+  displayName?: string;
+  summaryFields?: FieldDisplay[];
+  detailFields?: FieldDisplay[];
+  recommendedAction?: string;
+  nextAction?: ActionDefinition | null;
+  lastActivityTitle?: string;
+  lastActivityTime?: string;
+}
+
+export interface OperationalCase extends OperationalCaseSummary {
+  timeline: TimelineItem[];
+  tasks: TaskItem[];
+  actionRuns: ActionRun[];
+}
+
+export interface OperationsWorkbench {
+  focusCases: OperationalCaseSummary[];
+  queueLanes: Array<{
+    queueName: string;
+    label: string;
+    caseCount: number;
+    taskCount: number;
+    highRiskCount: number;
+    owners: string[];
+  }>;
+  priorityBands: Array<{
+    priority: string;
+    label: string;
+    caseCount: number;
+    openTaskCount: number;
+    actionableCount: number;
+  }>;
+  recentActions: Array<{
+    id: string;
+    caseId: string;
+    entityId: string;
+    displayName: string;
+    actionId: string;
+    label: string;
+    actorRole: string;
+    status: string;
+    time: string;
+  }>;
+}
+
+export interface ActionExecutionResult {
+  actionRun: ActionRun;
+  case: OperationalCase;
+  alert: Record<string, string | number | boolean | null>;
+  availableActions: ActionDefinition[];
+  owlrlTriples: number;
+  operationalMetrics: Summary["operationalMetrics"];
+  workbench: OperationsWorkbench;
 }

@@ -227,3 +227,106 @@ telecom:RetentionActionShape a sh:NodeShape ;
         sh:path telecom:isMaintainExec ;
         sh:datatype xsd:string ;
     ] .
+
+telecom:RetentionCaseShape a sh:NodeShape ;
+    sh:targetClass telecom:RetentionCase ;
+    sh:property [
+        sh:path telecom:caseId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:caseState ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:riskLevel ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:priority ;
+        sh:datatype xsd:string ;
+    ] ;
+    sh:property [
+        sh:path telecom:queueName ;
+        sh:datatype xsd:string ;
+    ] .
+
+telecom:TaskShape a sh:NodeShape ;
+    sh:targetClass telecom:Task ;
+    sh:property [
+        sh:path telecom:taskState ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:actionId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:assigneeRole ;
+        sh:datatype xsd:string ;
+    ] .
+
+telecom:ActionDefinitionShape a sh:NodeShape ;
+    sh:targetClass telecom:ActionDefinition ;
+    sh:property [
+        sh:path telecom:actionId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:sideEffect ;
+        sh:datatype xsd:string ;
+    ] .
+
+telecom:ActionRunShape a sh:NodeShape ;
+    sh:targetClass telecom:ActionRun ;
+    sh:property [
+        sh:path telecom:actionId ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:actionStatus ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:actorRole ;
+        sh:datatype xsd:string ;
+    ] .
+
+telecom:DomainEventShape a sh:NodeShape ;
+    sh:targetClass telecom:DomainEvent ;
+    sh:property [
+        sh:path telecom:eventType ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:eventTime ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+    ] .
+
+telecom:StateTransitionShape a sh:NodeShape ;
+    sh:targetClass telecom:StateTransition ;
+    sh:property [
+        sh:path telecom:transitionFrom ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:transitionTo ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+    ] ;
+    sh:property [
+        sh:path telecom:eventTime ;
+        sh:datatype xsd:dateTime ;
+        sh:minCount 1 ;
+    ] .
