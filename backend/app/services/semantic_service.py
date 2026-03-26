@@ -19,6 +19,7 @@ from app.etl.csv_loader import read_csv_rows
 from app.graph.repository import GraphRepository
 from app.ontology.namespaces import bind_prefixes, make_namespaces
 from app.rules.engine import materialize_business_inference
+from app.runtime import ActorContext, RuntimeEngine
 from app.scenario.config import (
     AlertDisplayField,
     FactConfig,
@@ -43,6 +44,7 @@ class SemanticService:
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.repository = GraphRepository(settings)
+        self.runtime = RuntimeEngine(settings)
         self.lock = threading.RLock()
         self.batch_id = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
         self.dataset: Dataset | None = None
@@ -59,6 +61,7 @@ class SemanticService:
         self.records: dict[str, dict[str, Any]] = {}
         self.inference: dict[str, dict[str, Any]] = {}
         self.top_rules: dict[str, int] = {}
+        self.operational_metrics: dict[str, Any] = {}
         self.validation: dict[str, object] = {}
         self.persistence: dict[str, object] = {}
         self.data_warnings: list[str] = []
@@ -259,6 +262,8 @@ class SemanticService:
             return 0
         assert self.base_graph is not None
         assert self.deductions_graph is not None
+        if len(self.base_graph) > 20000:
+            return 0
         closure_graph = Graph()
         bind_prefixes(closure_graph, self.settings)
         for triple in self.base_graph:
@@ -301,12 +306,16 @@ class SemanticService:
             )
             self.inference = inferred
             self.top_rules = dict(top_rules)
+            self.runtime.bootstrap(self.records, self.inference)
+            self.runtime.materialize(self.deductions_graph, self.settings, self.records)
+            self.operational_metrics = self.runtime.operational_summary()
             if persist and self.dataset is not None:
                 self.persistence = self.repository.persist(self.dataset)
             return {
                 "deductionTriples": len(self.deductions_graph),
                 "owlrlTriples": owlrl_triples,
                 "riskDistribution": self._risk_distribution(),
+                "operationalMetrics": self.operational_metrics,
             }
 
     def get_summary(self) -> dict[str, Any]:
@@ -342,6 +351,12 @@ class SemanticService:
                 "ontologyFiles": [item.__dict__ for item in self.scenario.ontology_files],
                 "ruleCards": [item.__dict__ for item in self.scenario.rule_cards],
                 "mappingExamples": list(self.scenario.mapping_examples),
+                "operationalMetrics": self.operational_metrics,
+                "caseDistribution": self.operational_metrics.get("caseDistribution", {}),
+                "taskDistribution": self.operational_metrics.get("taskDistribution", {}),
+                "alertDistribution": self.operational_metrics.get("alertDistribution", {}),
+                "actionCatalog": self.operational_metrics.get("actionCatalog", []),
+                "operationsWorkbench": self._build_operations_workbench(),
                 "warnings": list(self.data_warnings),
             }
 
@@ -350,6 +365,8 @@ class SemanticService:
         alerts: list[dict[str, Any]] = []
         for record in self.records.values():
             inference = self.inference[record["entityId"]]
+            runtime_case = self.runtime.get_case_for_entity(record["entityId"])
+            runtime_alert = self.runtime.get_alert_for_entity(record["entityId"])
             alerts.append(
                 {
                     "entityId": record["entityId"],
@@ -362,6 +379,11 @@ class SemanticService:
                     "detailFields": self._render_display_fields(record, self.scenario.detail_fields),
                     "highlightFields": self._render_display_fields(record, self.scenario.highlight_fields),
                     "metrics": self._serialize_metrics(record["metrics"]),
+                    "alertState": (runtime_alert or {}).get("state") or "",
+                    "caseId": (runtime_case or {}).get("caseId") or "",
+                    "caseState": (runtime_case or {}).get("state") or "",
+                    "taskCount": len((runtime_case or {}).get("tasks", [])),
+                    "availableActions": (runtime_case or {}).get("availableActions", []),
                 }
             )
 
@@ -394,6 +416,8 @@ class SemanticService:
 
         record = self.records[entity_id]
         inference = self.inference[entity_id]
+        runtime_case = self.runtime.get_case_for_entity(entity_id)
+        runtime_alert = self.runtime.get_alert_for_entity(entity_id)
         related_payload = {
             dataset_key: [self._serialize_row(row) for row in rows]
             for dataset_key, rows in record["related"].items()
@@ -413,7 +437,13 @@ class SemanticService:
             "relatedData": related_payload,
             "inference": self._build_inference_summary(record["displayName"], inference, interaction_count),
             "evidence": self._build_evidence(record, inference),
-            "graph": self._build_entity_graph(record, inference),
+            "graph": self._build_entity_graph(record, inference, runtime_case),
+            "alertState": (runtime_alert or {}).get("state") or "",
+            "case": runtime_case,
+            "tasks": (runtime_case or {}).get("tasks", []),
+            "timeline": (runtime_case or {}).get("timeline", []),
+            "actionRuns": (runtime_case or {}).get("actionRuns", []),
+            "availableActions": (runtime_case or {}).get("availableActions", []),
         }
 
     def run_sparql(self, query_string: str | None) -> dict[str, Any]:
@@ -456,6 +486,178 @@ class SemanticService:
                 "file": file_path.name,
                 "triples": len(self.base_graph),
             }
+
+    def list_cases(self) -> list[dict[str, Any]]:
+        """返回当前所有运营 case。"""
+        with self.lock:
+            return [self._enrich_case_payload(item) for item in self.runtime.list_cases()]
+
+    def get_case(self, case_id: str) -> dict[str, Any]:
+        """返回单个运营 case。"""
+        with self.lock:
+            payload = self.runtime.get_case(case_id)
+            if payload is None:
+                return {"error": "case_not_found", "caseId": case_id}
+            return self._enrich_case_payload(payload, include_detail=True)
+
+    def list_tasks(self, status: str | None = None, assignee_role: str | None = None) -> list[dict[str, Any]]:
+        """返回任务列表。"""
+        with self.lock:
+            return [
+                self._enrich_task_payload(item)
+                for item in self.runtime.list_tasks(status=status, assignee_role=assignee_role)
+            ]
+
+    def execute_action(
+        self,
+        *,
+        action_id: str,
+        actor_role: str,
+        actor_id: str,
+        actor_area_id: str | None,
+        entity_id: str | None,
+        case_id: str | None,
+        parameters: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """执行运营动作。"""
+        with self.lock:
+            result = self.runtime.execute_action(
+                action_id=action_id,
+                actor=ActorContext(role=actor_role, actor_id=actor_id, area_id=actor_area_id),
+                entity_id=entity_id,
+                case_id=case_id,
+                parameters=parameters,
+            )
+            assert self.deductions_graph is not None
+            self.deductions_graph.remove((None, None, None))
+            owlrl_triples = self._apply_owlrl()
+            materialize_business_inference(
+                self.deductions_graph,
+                self.records,
+                self.settings,
+                self.scenario,
+            )
+            self.runtime.materialize(self.deductions_graph, self.settings, self.records)
+            self.operational_metrics = self.runtime.operational_summary()
+            if self.dataset is not None:
+                self.persistence = self.repository.persist(self.dataset)
+            result["owlrlTriples"] = owlrl_triples
+            result["operationalMetrics"] = self.operational_metrics
+            result["case"] = self._enrich_case_payload(result["case"], include_detail=True)
+            result["workbench"] = self._build_operations_workbench()
+            return result
+
+    def _build_operations_workbench(self) -> dict[str, Any]:
+        """构建前端运营工作台所需的聚合视图。"""
+        cases = [self._enrich_case_payload(item) for item in self.runtime.list_cases()]
+        tasks = [self._enrich_task_payload(item) for item in self.runtime.list_tasks()]
+        open_cases = [item for item in cases if item.get("state") != "CLOSED"]
+        todo_tasks = [item for item in tasks if item.get("status") == "TODO"]
+
+        priority_meta = {
+            "P1": "立即处置",
+            "P2": "当班跟进",
+            "P3": "持续监控",
+        }
+        priority_bands = []
+        for priority in ("P1", "P2", "P3"):
+            band_cases = [item for item in open_cases if item.get("priority") == priority]
+            priority_bands.append(
+                {
+                    "priority": priority,
+                    "label": priority_meta[priority],
+                    "caseCount": len(band_cases),
+                    "openTaskCount": sum(int(item.get("openTaskCount") or 0) for item in band_cases),
+                    "actionableCount": sum(1 for item in band_cases if item.get("availableActions")),
+                }
+            )
+
+        queue_names = sorted({item.get("queue_name", "") for item in open_cases if item.get("queue_name")})
+        queue_lanes = []
+        for queue_name in queue_names:
+            lane_cases = [item for item in open_cases if item.get("queue_name") == queue_name]
+            lane_tasks = [item for item in todo_tasks if item.get("queue_name") == queue_name]
+            queue_lanes.append(
+                {
+                    "queueName": queue_name,
+                    "label": queue_name.replace("-", " ").title(),
+                    "caseCount": len(lane_cases),
+                    "taskCount": len(lane_tasks),
+                    "highRiskCount": sum(1 for item in lane_cases if item.get("risk_level") == "HIGH"),
+                    "owners": sorted({str(item.get("owner_role") or "") for item in lane_cases if item.get("owner_role")}),
+                }
+            )
+
+        recent_actions = []
+        for run in sorted(self.runtime.action_runs.values(), key=lambda item: item.updated_at, reverse=True)[:6]:
+            display_name = self.records.get(run.entity_id, {}).get("displayName", run.entity_id)
+            recent_actions.append(
+                {
+                    "id": run.id,
+                    "caseId": run.case_id,
+                    "entityId": run.entity_id,
+                    "displayName": display_name,
+                    "actionId": run.action_id,
+                    "label": self.runtime.action_definitions.get(run.action_id).label
+                    if run.action_id in self.runtime.action_definitions
+                    else run.action_id,
+                    "actorRole": run.actor_role,
+                    "status": run.status,
+                    "time": run.updated_at,
+                }
+            )
+
+        return {
+            "focusCases": open_cases[:6],
+            "queueLanes": queue_lanes,
+            "priorityBands": priority_bands,
+            "recentActions": recent_actions,
+        }
+
+    def _enrich_case_payload(self, payload: dict[str, Any], include_detail: bool = False) -> dict[str, Any]:
+        """补齐前端工作台所需的 case 展示字段。"""
+        enriched = dict(payload)
+        entity_id = str(enriched.get("entityId") or "")
+        record = self.records.get(entity_id)
+        inference = self.inference.get(entity_id, {})
+        if record is not None:
+            enriched["displayName"] = record["displayName"]
+            enriched["summaryFields"] = self._render_display_fields(record, self.scenario.summary_fields)
+            enriched["detailFields"] = self._render_display_fields(record, self.scenario.detail_fields)
+        else:
+            enriched.setdefault("displayName", entity_id)
+            enriched.setdefault("summaryFields", [])
+            enriched.setdefault("detailFields", [])
+
+        enriched["recommendedAction"] = inference.get("recommendedAction", "")
+        available_actions = enriched.get("availableActions") or []
+        enriched["nextAction"] = available_actions[0] if available_actions else None
+        timeline = list(enriched.get("timeline") or [])
+        last_item = timeline[-1] if timeline else None
+        enriched["lastActivityTitle"] = (last_item or {}).get("title") or "维系 Case 已创建"
+        enriched["lastActivityTime"] = (last_item or {}).get("time") or enriched.get("updated_at") or enriched.get("created_at")
+
+        if include_detail:
+            enriched["tasks"] = [self._enrich_task_payload(item) for item in enriched.get("tasks", [])]
+        return enriched
+
+    def _enrich_task_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """补齐任务列表展示字段。"""
+        enriched = dict(payload)
+        entity_id = str(enriched.get("entity_id") or "")
+        record = self.records.get(entity_id)
+        inference = self.inference.get(entity_id, {})
+        runtime_case = self.runtime.cases.get(str(enriched.get("case_id") or ""))
+        enriched["displayName"] = record["displayName"] if record is not None else entity_id
+        enriched["riskLevel"] = inference.get("riskLevel", "")
+        enriched["caseState"] = runtime_case.state if runtime_case is not None else ""
+        enriched["priority"] = runtime_case.priority if runtime_case is not None else ""
+        enriched["recommendedAction"] = inference.get("recommendedAction", "")
+        if record is not None:
+            enriched["summaryFields"] = self._render_display_fields(record, self.scenario.summary_fields)
+        else:
+            enriched["summaryFields"] = []
+        return enriched
 
     def _risk_distribution(self) -> dict[str, int]:
         """统计当前推理结果中的风险等级分布。"""
@@ -699,7 +901,12 @@ class SemanticService:
             "displayedPrimaryEntities": len(primary_items),
         }
 
-    def _build_entity_graph(self, record: dict[str, Any], inference: dict[str, Any]) -> dict[str, Any]:
+    def _build_entity_graph(
+        self,
+        record: dict[str, Any],
+        inference: dict[str, Any],
+        runtime_case: dict[str, Any] | None,
+    ) -> dict[str, Any]:
         """构建单个实体的详情图谱。"""
         primary_node = {
             "id": record["nodeId"],
@@ -746,6 +953,50 @@ class SemanticService:
             nodes.append({"id": node_id, "label": rule_label, "type": "Inference"})
             edges.append({"source": primary_node["id"], "target": node_id, "label": "命中规则"})
             edges.append({"source": node_id, "target": result_node["id"], "label": "触发推理"})
+
+        if runtime_case:
+            case_node_id = f"case:{record['entityId']}"
+            nodes.append(
+                {
+                    "id": case_node_id,
+                    "label": f"{runtime_case['state']} Case",
+                    "type": "Case",
+                }
+            )
+            edges.append({"source": primary_node["id"], "target": case_node_id, "label": "运营处置"})
+
+            for task in runtime_case.get("tasks", [])[:3]:
+                task_node_id = f"task:{task['id']}"
+                nodes.append(
+                    {
+                        "id": task_node_id,
+                        "label": f"{task['title']} [{task['status']}]",
+                        "type": "Task",
+                    }
+                )
+                edges.append({"source": case_node_id, "target": task_node_id, "label": "任务"})
+
+            for action in runtime_case.get("availableActions", [])[:3]:
+                action_def_node_id = f"action-definition:{action['id']}"
+                nodes.append(
+                    {
+                        "id": action_def_node_id,
+                        "label": action["label"],
+                        "type": "ActionDefinition",
+                    }
+                )
+                edges.append({"source": case_node_id, "target": action_def_node_id, "label": "可执行动作"})
+
+            for timeline_item in runtime_case.get("timeline", [])[:4]:
+                event_node_id = f"timeline:{record['entityId']}:{quote(str(timeline_item['time']), safe='')}"
+                nodes.append(
+                    {
+                        "id": event_node_id,
+                        "label": timeline_item["title"],
+                        "type": "Event",
+                    }
+                )
+                edges.append({"source": case_node_id, "target": event_node_id, "label": "时间线"})
 
         return {"nodes": nodes, "edges": edges}
 
