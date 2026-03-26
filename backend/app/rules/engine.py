@@ -1,3 +1,5 @@
+"""规则推理引擎，负责将业务规则转换为推理结果与告警三元组。"""
+
 from __future__ import annotations
 
 from collections import Counter
@@ -13,10 +15,12 @@ from app.scenario.config import ScenarioConfig
 
 
 def load_ruleset(settings: Settings) -> DecisionTable:
+    """根据当前配置加载风险决策表。"""
     return load_decision_table(settings.rules_path)
 
 
 def canonical_action(risk_level: str, decision_table: DecisionTable) -> str:
+    """将风险等级映射为标准推荐动作。"""
     try:
         return decision_table.risk_actions[risk_level]
     except KeyError as exc:  # pragma: no cover
@@ -24,6 +28,7 @@ def canonical_action(risk_level: str, decision_table: DecisionTable) -> str:
 
 
 def infer_record(record: dict[str, Any], decision_table: DecisionTable) -> dict[str, Any]:
+    """对单个实体记录执行因子识别与最终风险判定。"""
     metrics = record["metrics"]
     factors = []
     rule_labels: list[str] = []
@@ -58,6 +63,7 @@ def materialize_business_inference(
     settings: Settings,
     scenario: ScenarioConfig,
 ) -> tuple[dict[str, dict[str, Any]], Counter]:
+    """把规则推理结果写入推理图，并汇总规则命中次数。"""
     decision_table = load_ruleset(settings)
     namespaces = make_namespaces(settings)
     doim = namespaces["doim"]
@@ -76,6 +82,7 @@ def materialize_business_inference(
         if isinstance(entity_resource, URIRef):
             entity = entity_resource
         else:
+            # 回退到稳定 URI，避免主实体缺少预计算资源标识时推理链中断。
             entity = URIRef(f"{settings.data_ns}{primary_segment}/{quote(entity_id, safe='')}")
         deductions_graph.add((entity, telecom.inferredRiskLevel, Literal(result["riskLevel"])))
         deductions_graph.add((entity, telecom.recommendedAction, Literal(result["recommendedAction"])))

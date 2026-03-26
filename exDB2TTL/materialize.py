@@ -1,3 +1,5 @@
+"""样例 RDF 物化工具，用于把元数据和映射表转换为示例图。"""
+
 from __future__ import annotations
 
 import csv
@@ -15,6 +17,8 @@ from .models import DatabaseMetadata
 
 @dataclass(frozen=True)
 class MappingRow:
+    """映射 CSV 中的一行定义。"""
+
     table_name: str
     subject_class_uri: str
     subject_key_column: str
@@ -29,6 +33,7 @@ class MappingRow:
 
 
 def materialize_sample_graph(metadata: DatabaseMetadata, mapping_csv: str, ontology: OntologyConfig) -> Graph:
+    """根据样例数据和字段映射生成一份 RDF 样例图。"""
     graph = Graph()
     graph.bind("rdf", RDF)
     graph.bind("xsd", XSD)
@@ -75,6 +80,7 @@ def materialize_sample_graph(metadata: DatabaseMetadata, mapping_csv: str, ontol
                 target_table = mapping.reference_table
                 target_column = mapping.reference_column
                 if not target_table or not target_column:
+                    # 若映射未显式给出引用目标，则尝试复用数据库外键元数据补全。
                     target = fk_lookup.get((table.name, mapping.column_name))
                     if target:
                         target_table, target_column = target
@@ -94,6 +100,7 @@ def materialize_sample_graph(metadata: DatabaseMetadata, mapping_csv: str, ontol
 
 
 def _parse_mapping(mapping_csv: str) -> list[MappingRow]:
+    """解析映射 CSV 文本。"""
     reader = csv.DictReader(io.StringIO(mapping_csv))
     return [
         MappingRow(
@@ -120,6 +127,7 @@ def _make_subject_uri(
     subject_key_column: str,
     row_index: int,
 ) -> URIRef:
+    """为样例行生成主体 URI。"""
     key_value = row.get(subject_key_column)
     if key_value in (None, ""):
         key_value = f"row-{row_index + 1}"
@@ -127,12 +135,14 @@ def _make_subject_uri(
 
 
 def _make_reference_uri(data_namespace: str, table_name: str, key_value: str) -> URIRef:
+    """根据表名与键值生成资源 URI。"""
     safe_table = quote(table_name, safe="")
     safe_value = quote(key_value, safe="")
     return URIRef(f"{data_namespace.rstrip('/')}/{safe_table}/{safe_value}")
 
 
 def _literal_from_value(value: Any, datatype_uri: str) -> Literal:
+    """按目标数据类型构造字面量节点。"""
     if not datatype_uri:
         return Literal(value)
     datatype = URIRef(datatype_uri)

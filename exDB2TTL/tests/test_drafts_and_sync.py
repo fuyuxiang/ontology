@@ -1,3 +1,5 @@
+"""草稿解析与后端同步流程测试。"""
+
 from __future__ import annotations
 
 import json
@@ -10,6 +12,7 @@ from exDB2TTL.models import DraftBundle
 
 
 def test_parse_draft_bundle_accepts_backend_contract():
+    """验证草稿解析器可以接受当前后端约定的字段集合。"""
     raw = json.dumps(
         {
             "telecom_ontology_ttl": "@prefix telecom: <http://example.com/telecom#> .\n",
@@ -32,6 +35,7 @@ def test_parse_draft_bundle_accepts_backend_contract():
 
 
 def test_sync_backend_profile_writes_generated_contract(tmp_path: Path):
+    """验证同步流程会写出后端可加载的 profile 文件集。"""
     backend_dir = tmp_path / "backend"
     (backend_dir / "ontology").mkdir(parents=True)
     (backend_dir / "rules").mkdir(parents=True)

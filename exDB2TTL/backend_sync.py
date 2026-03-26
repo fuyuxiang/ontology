@@ -1,3 +1,5 @@
+"""把 exDB2TTL 生成结果同步到后端可加载 profile 的工具。"""
+
 from __future__ import annotations
 
 import json
@@ -16,6 +18,7 @@ def sync_backend_profile(
     output_dir: Path,
     bundle: DraftBundle,
 ) -> dict[str, str]:
+    """把生成产物写入后端 profile 目录，并按需激活该 profile。"""
     backend_dir = _resolve_backend_dir(config.backend_sync.backend_project_dir)
     if not backend_dir.exists():
         raise FileNotFoundError(f"Backend project directory not found: {backend_dir}")
@@ -47,6 +50,7 @@ def sync_backend_profile(
     if bundle.business_rules_markdown:
         notes_path.write_text(bundle.business_rules_markdown + "\n", encoding="utf-8")
 
+    # 这些附属文件不是运行时强依赖，但保留它们便于排查生成质量。
     for artifact_name in ("metadata.json", "drafts.json", "validation-summary.json", "sample-data.ttl", "shacl-report.ttl"):
         source = output_dir / artifact_name
         if source.exists():
@@ -86,6 +90,7 @@ def sync_backend_profile(
 
 
 def _resolve_backend_dir(raw_path: str) -> Path:
+    """把配置中的后端目录解析为绝对路径。"""
     path = Path(raw_path)
     if path.is_absolute():
         return path

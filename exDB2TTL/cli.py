@@ -1,3 +1,5 @@
+"""exDB2TTL 命令行入口，串联抽取、生成、校验与同步流程。"""
+
 from __future__ import annotations
 
 import argparse
@@ -14,6 +16,7 @@ from .validate import validate_bundle
 
 
 def main(argv: list[str] | None = None) -> int:
+    """解析命令行参数并分发到具体子命令。"""
     parser = _build_parser()
     args = parser.parse_args(argv)
     try:
@@ -27,6 +30,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    """构建 CLI 子命令结构。"""
     parser = argparse.ArgumentParser(prog="exDB2TTL", description="Database metadata to ontology draft pipeline")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -69,6 +73,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _cmd_bootstrap(args: argparse.Namespace) -> int:
+    """生成最小可用项目配置与元数据补充清单。"""
     config_path = Path(args.config_path)
     config_path.parent.mkdir(parents=True, exist_ok=True)
     payload = create_bootstrap_config(
@@ -90,6 +95,7 @@ def _cmd_bootstrap(args: argparse.Namespace) -> int:
 
 
 def _cmd_extract(args: argparse.Namespace) -> int:
+    """抽取数据库元数据并写出 `metadata.json`。"""
     config = load_project_config(args.config)
     output_dir = _ensure_output_dir(config.output_dir)
     metadata = extract_metadata(config.database)
@@ -100,6 +106,7 @@ def _cmd_extract(args: argparse.Namespace) -> int:
 
 
 def _cmd_draft(args: argparse.Namespace) -> int:
+    """构建提示词、调用模型并保存草稿产物。"""
     config = load_project_config(args.config)
     output_dir = _ensure_output_dir(config.output_dir)
     metadata = _load_or_extract_metadata(config, args.metadata_path)
@@ -124,6 +131,7 @@ def _cmd_draft(args: argparse.Namespace) -> int:
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
+    """校验生成的本体、SHACL 与规则文件。"""
     config = load_project_config(args.config)
     output_dir = _ensure_output_dir(config.output_dir)
     metadata = _load_or_extract_metadata(config, args.metadata_path)
@@ -137,6 +145,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
+    """执行完整流水线：抽取、生成、校验，并按需同步后端。"""
     config = load_project_config(args.config)
     output_dir = _ensure_output_dir(config.output_dir)
 
@@ -175,6 +184,7 @@ def _cmd_run(args: argparse.Namespace) -> int:
 
 
 def _cmd_sync_backend(args: argparse.Namespace) -> int:
+    """把已生成产物同步到后端 profile 目录。"""
     config = load_project_config(args.config)
     output_dir = _ensure_output_dir(config.output_dir)
     bundle = _load_bundle(output_dir, args.drafts_path)
@@ -187,11 +197,13 @@ def _cmd_sync_backend(args: argparse.Namespace) -> int:
 
 
 def _ensure_output_dir(path: Path) -> Path:
+    """确保输出目录存在。"""
     path.mkdir(parents=True, exist_ok=True)
     return path
 
 
 def _load_or_extract_metadata(config, metadata_path: str | None):
+    """优先复用已有 metadata.json，缺失时再走实时抽取。"""
     if metadata_path:
         payload = json.loads(Path(metadata_path).read_text(encoding="utf-8"))
         from .models import ColumnMeta, DatabaseMetadata, ForeignKeyMeta, TableMeta
@@ -216,11 +228,13 @@ def _load_or_extract_metadata(config, metadata_path: str | None):
 
 
 def _load_bundle(output_dir: Path, drafts_path: str | None):
+    """读取草稿包，默认从输出目录中的 `drafts.json` 加载。"""
     source_path = Path(drafts_path) if drafts_path else output_dir / "drafts.json"
     return parse_draft_bundle(source_path.read_text(encoding="utf-8"))
 
 
 def _write_bundle_files(bundle, output_dir: Path) -> None:
+    """把草稿包拆分写成后续流程需要的独立文件。"""
     (output_dir / "telecom-porting.ttl").write_text(bundle.telecom_ontology_ttl + "\n", encoding="utf-8")
     (output_dir / "telecom-shapes.ttl").write_text(bundle.telecom_shacl_ttl + "\n", encoding="utf-8")
     (output_dir / "mapping.csv").write_text(bundle.mapping_csv + "\n", encoding="utf-8")
@@ -229,6 +243,7 @@ def _write_bundle_files(bundle, output_dir: Path) -> None:
 
 
 def _metadata_request_text(database_name: str, tables: list[str], dialect: str) -> str:
+    """生成补充元数据所需的信息清单。"""
     table_lines = "\n".join(f"- {table}" for table in tables)
     return f"""# Metadata Checklist
 

@@ -1,3 +1,5 @@
+"""提示词构建工具，负责把项目上下文与元数据组织成模型输入。"""
+
 from __future__ import annotations
 
 import json
@@ -62,6 +64,7 @@ BACKEND_PROPERTIES = [
 
 
 def build_messages(config: ProjectConfig, metadata: DatabaseMetadata) -> list[dict[str, str]]:
+    """构建提交给模型的 system/user 消息。"""
     metadata_json = json.dumps(metadata.to_dict(), ensure_ascii=False, indent=2)
     business_context_json = json.dumps(config.business_context, ensure_ascii=False, indent=2)
     backend_classes_json = json.dumps(BACKEND_CLASSES, ensure_ascii=False)
@@ -150,6 +153,7 @@ If metadata does not support some current telecom concept, omit that concept rat
 
 
 def render_prompt_text(messages: list[dict[str, str]]) -> str:
+    """把消息列表渲染为便于人工检查的纯文本提示词。"""
     chunks: list[str] = []
     for message in messages:
         chunks.append(f"[{message['role'].upper()}]\n{message['content']}")

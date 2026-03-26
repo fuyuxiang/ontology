@@ -1,3 +1,5 @@
+"""exDB2TTL 配置模型与项目配置加载逻辑。"""
+
 from __future__ import annotations
 
 import json
@@ -7,11 +9,15 @@ from typing import Any
 
 
 class ConfigError(ValueError):
+    """配置解析或校验失败时抛出的异常。"""
+
     pass
 
 
 @dataclass(frozen=True)
 class DatabaseConfig:
+    """数据库或样例 CSV 的连接/抽取配置。"""
+
     dialect: str
     database_name: str
     tables: list[str]
@@ -30,6 +36,8 @@ class DatabaseConfig:
 
 @dataclass(frozen=True)
 class LLMConfig:
+    """模型调用配置。"""
+
     base_url: str
     model: str
     api_key_env: str
@@ -41,12 +49,16 @@ class LLMConfig:
 
 @dataclass(frozen=True)
 class OntologyConfig:
+    """目标本体命名空间配置。"""
+
     ontology_namespace: str
     data_namespace: str
 
 
 @dataclass(frozen=True)
 class BackendSyncConfig:
+    """生成结果同步到后端工程的配置。"""
+
     enabled: bool = True
     backend_project_dir: str = "backend"
     activate_profile: bool = True
@@ -54,11 +66,15 @@ class BackendSyncConfig:
 
 @dataclass(frozen=True)
 class OutputConfig:
+    """输出目录配置。"""
+
     directory: str
 
 
 @dataclass(frozen=True)
 class ProjectConfig:
+    """exDB2TTL 项目的完整配置集合。"""
+
     database: DatabaseConfig
     llm: LLMConfig
     ontology: OntologyConfig
@@ -68,16 +84,19 @@ class ProjectConfig:
 
     @property
     def output_dir(self) -> Path:
+        """把输出目录字符串转换为 `Path` 对象。"""
         return Path(self.output.directory)
 
 
 def _expect_string_list(payload: Any, key: str) -> list[str]:
+    """校验非空字符串列表配置。"""
     if not isinstance(payload, list) or not all(isinstance(item, str) and item.strip() for item in payload):
         raise ConfigError(f"{key} must be a non-empty list of strings")
     return [item.strip() for item in payload]
 
 
 def load_project_config(path: str | Path) -> ProjectConfig:
+    """从 JSON 文件加载并校验项目配置。"""
     raw = json.loads(Path(path).read_text(encoding="utf-8"))
     database_raw = raw.get("database") or {}
     llm_raw = raw.get("llm") or {}
@@ -150,6 +169,7 @@ def load_project_config(path: str | Path) -> ProjectConfig:
 
 
 def create_bootstrap_config(database_name: str, tables: list[str], dialect: str, output_dir: str) -> dict[str, Any]:
+    """生成一个可直接手工补全的初始化配置模板。"""
     return {
         "database": {
             "dialect": dialect,
@@ -201,6 +221,7 @@ def create_bootstrap_config(database_name: str, tables: list[str], dialect: str,
 
 
 def _nullable_string(value: Any) -> str | None:
+    """把空字符串归一为 `None`。"""
     if value is None:
         return None
     text = str(value).strip()
@@ -208,6 +229,7 @@ def _nullable_string(value: Any) -> str | None:
 
 
 def _nullable_int(value: Any) -> int | None:
+    """把可空整数字段转换为 `int | None`。"""
     if value in (None, "", "null"):
         return None
     return int(value)

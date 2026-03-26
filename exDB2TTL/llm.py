@@ -1,3 +1,5 @@
+"""轻量 LLM 调用封装。"""
+
 from __future__ import annotations
 
 import json
@@ -9,6 +11,7 @@ from .config import ConfigError, LLMConfig
 
 
 def call_llm(config: LLMConfig, messages: list[dict[str, str]]) -> str:
+    """调用兼容 Chat Completions 的接口并返回纯文本结果。"""
     api_key = os.getenv(config.api_key_env)
     if not api_key:
         raise ConfigError(f"Environment variable {config.api_key_env} is required for LLM access")
@@ -40,6 +43,7 @@ def call_llm(config: LLMConfig, messages: list[dict[str, str]]) -> str:
     except urllib.error.URLError as exc:
         raise RuntimeError(f"LLM request failed: {exc}") from exc
 
+    # 同时兼容字符串 content 和分块 content 两种返回结构。
     choices = body.get("choices") or []
     if not choices:
         raise RuntimeError(f"LLM response missing choices: {body}")

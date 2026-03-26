@@ -1,3 +1,5 @@
+"""生成产物校验流程，包括 Turtle 解析、规则校验和 SHACL 验证。"""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -25,6 +27,7 @@ def validate_bundle(
     bundle: DraftBundle,
     output_dir: Path,
 ) -> ValidationArtifacts:
+    """对草稿包执行结构、语法和样例数据验证。"""
     errors: list[str] = []
     ontology_graph = Graph()
     shacl_graph = Graph()
@@ -70,6 +73,7 @@ def validate_bundle(
 
 
 def _safe_parse_graph(graph: Graph, turtle_text: str, errors: list[str], label: str) -> bool:
+    """安全解析 Turtle 文本，并把异常写入错误列表。"""
     try:
         graph.parse(data=turtle_text, format="turtle")
     except Exception as exc:
@@ -79,6 +83,7 @@ def _safe_parse_graph(graph: Graph, turtle_text: str, errors: list[str], label: 
 
 
 def _validate_rules_yaml(rules_yaml: str, output_dir: Path, errors: list[str]) -> tuple[bool, str | None]:
+    """校验规则 YAML，并优先复用后端已有规则加载器。"""
     rules_path = output_dir / "porting-risk.yaml"
     rules_path.write_text(rules_yaml + "\n", encoding="utf-8")
 
@@ -99,6 +104,7 @@ def _validate_rules_yaml(rules_yaml: str, output_dir: Path, errors: list[str]) -
 
 
 def _load_backend_ruleset_loader():
+    """尝试加载后端的规则加载器，确保生成格式与后端实现一致。"""
     try:
         from backend.app.rules.decision_table import load_decision_table
     except ImportError:  # pragma: no cover
@@ -107,6 +113,7 @@ def _load_backend_ruleset_loader():
 
 
 def _validate_rules_shape(payload: object) -> None:
+    """在缺少后端加载器时做最小结构校验。"""
     if not isinstance(payload, dict):
         raise ValueError("rules_yaml must parse to a mapping")
     for key in ("risk_actions", "factor_rules", "decision_rules"):
