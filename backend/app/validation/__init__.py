@@ -1,2 +1,1 @@
-"""Validation helpers."""
-
+"""校验工具模块。"""

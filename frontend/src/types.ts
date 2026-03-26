@@ -1,6 +1,9 @@
+/** 前后端共享的数据结构类型定义。 */
+
 export type RiskLevel = "HIGH" | "MEDIUM" | "LOW";
 
 export interface GraphNode {
+  /** 图谱节点。 */
   id: string;
   label: string;
   type: string;
@@ -9,12 +12,14 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
+  /** 图谱边。 */
   source: string;
   target: string;
   label: string;
 }
 
 export interface GraphData {
+  /** 图谱数据载荷。 */
   nodes: GraphNode[];
   edges: GraphEdge[];
   totalPrimaryEntities?: number;
@@ -23,11 +28,13 @@ export interface GraphData {
 }
 
 export interface FieldDisplay {
+  /** 前端展示字段。 */
   label: string;
   value: string | number | boolean | null;
 }
 
 export interface Summary {
+  /** 首页概览接口返回值。 */
   scenario: string;
   appTitle: string;
   headerTitle: string;
@@ -92,6 +99,7 @@ export interface Summary {
 }
 
 export interface Alert {
+  /** 告警列表项。 */
   entityId: string;
   nodeId: string;
   displayName: string;
@@ -105,6 +113,7 @@ export interface Alert {
 }
 
 export interface EvidenceItem {
+  /** 详情页中的证据项。 */
   category: string;
   title: string;
   summary: string;
@@ -113,6 +122,7 @@ export interface EvidenceItem {
 }
 
 export interface InferenceSummary {
+  /** 推理摘要信息。 */
   headline: string;
   riskLevel: RiskLevel;
   recommendedAction: string;
@@ -123,6 +133,7 @@ export interface InferenceSummary {
 }
 
 export interface EntityDetail {
+  /** 实体详情接口返回值。 */
   entityId: string;
   displayName: string;
   riskLevel: RiskLevel;
@@ -143,6 +154,7 @@ export type SubscriberListItem = Alert;
 export type SubscriberDetail = EntityDetail;
 
 export interface SparqlResult {
+  /** SPARQL 查询结果。 */
   query: string;
   variables: string[];
   rowCount: number;
@@ -150,6 +162,7 @@ export interface SparqlResult {
 }
 
 export interface InferenceTriggerResult {
+  /** 手动触发推理后的统计结果。 */
   deductionTriples: number;
   owlrlTriples: number;
   riskDistribution: Record<RiskLevel, number>;

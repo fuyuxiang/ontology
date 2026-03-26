@@ -1,3 +1,5 @@
+/** 前端主页面，统一编排概览、图谱、问答和设置视图。 */
+
 import { type KeyboardEvent, startTransition, useEffect, useState } from "react";
 
 import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS, RISK_COLORS } from "./components/GraphCanvas";
@@ -108,6 +110,7 @@ function riskTone(level: RiskLevel) {
   return "low";
 }
 
+/** 按风险等级裁剪概览图谱。 */
 function buildRiskScopedGraph(graph: GraphData | null, alerts: Alert[], riskFilter: GraphRiskFilter): GraphData | null {
   if (!graph || riskFilter === "ALL") {
     return graph;
@@ -143,6 +146,7 @@ function buildRiskScopedGraph(graph: GraphData | null, alerts: Alert[], riskFilt
   };
 }
 
+/** 生成问答页默认查询。 */
 function buildDefaultQuestionQuery(defaultQuery?: string) {
   if (defaultQuery?.trim()) {
     return defaultQuery;
@@ -164,6 +168,7 @@ function buildDefaultQuestionQuery(defaultQuery?: string) {
   ].join("\n");
 }
 
+/** 使用规则模板把自然语言问题转换为 SPARQL。 */
 function convertQuestionToSparql(question: string, defaultQuery?: string) {
   const q = question.toLowerCase();
   const prefixes = [
@@ -248,6 +253,7 @@ LIMIT 10`;
   return buildDefaultQuestionQuery(defaultQuery);
 }
 
+/** 将查询结果整理为聊天面板文案。 */
 function formatAnswer(result: SparqlResult, question: string) {
   const rows = result.rows ?? [];
   if (rows.length === 0) {
@@ -291,6 +297,7 @@ function formatAnswer(result: SparqlResult, question: string) {
     .join("\n")}`;
 }
 
+/** 渲染内置 SVG 图标。 */
 function SvgIcon({ name, size = 20, color = "currentColor" }: { name: IconName; size?: number; color?: string }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill={color} aria-hidden="true">
@@ -299,6 +306,7 @@ function SvgIcon({ name, size = 20, color = "currentColor" }: { name: IconName; 
   );
 }
 
+/** 页面区块头部。 */
 function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div className="page-header">
@@ -308,10 +316,12 @@ function PageHeader({ title, subtitle }: { title: string; subtitle: string }) {
   );
 }
 
+/** 风险状态标签。 */
 function RiskStatus({ level }: { level: RiskLevel }) {
   return <span className={`risk-status ${riskTone(level)}`}>{riskLabel(level)}</span>;
 }
 
+/** 首页统计卡片。 */
 function StatCard({
   label,
   value,
@@ -338,6 +348,7 @@ function StatCard({
   );
 }
 
+/** 空状态占位。 */
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="empty-state">
@@ -347,6 +358,7 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+/** 应用主组件，负责页面状态、数据获取和主要交互。 */
 export default function App() {
   const [page, setPage] = useState<PageKey>("dashboard");
   const [summary, setSummary] = useState<Summary | null>(null);

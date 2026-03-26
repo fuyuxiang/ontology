@@ -1,3 +1,5 @@
+"""字段映射配置加载器，负责把 CSV 映射表转成结构化对象。"""
+
 from __future__ import annotations
 
 import csv
@@ -7,6 +9,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class MappingRow:
+    """一行字段映射定义。"""
+
     dataset: str
     target_type: str
     field_name: str
@@ -24,6 +28,7 @@ REQUIRED_MAPPING_COLUMNS = [
 
 
 def load_mapping_rows(path: Path) -> list[MappingRow]:
+    """读取映射 CSV，并校验列头是否符合约定。"""
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
         header = list(reader.fieldnames or [])

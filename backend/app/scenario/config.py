@@ -1,3 +1,5 @@
+"""场景配置模型与 YAML 解析器。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,6 +12,8 @@ import yaml
 
 @dataclass(frozen=True)
 class DatasetConfig:
+    """描述一个原始数据集的文件、标识字段和图谱节点映射方式。"""
+
     key: str
     file: str
     source_system: str
@@ -23,6 +27,8 @@ class DatasetConfig:
 
 @dataclass(frozen=True)
 class RelationConfig:
+    """描述两个数据集之间的关联关系生成规则。"""
+
     source_dataset: str
     target_dataset: str
     source_join_key: str
@@ -34,6 +40,8 @@ class RelationConfig:
 
 @dataclass(frozen=True)
 class FactConfig:
+    """描述事实指标的聚合来源与计算方式。"""
+
     key: str
     label: str
     source_dataset: str
@@ -47,6 +55,8 @@ class FactConfig:
 
 @dataclass(frozen=True)
 class AlertDisplayField:
+    """描述告警卡片中的一个展示字段。"""
+
     label: str
     source: str | None
     field: str | None
@@ -55,12 +65,16 @@ class AlertDisplayField:
 
 @dataclass(frozen=True)
 class SortConfig:
+    """描述告警列表的排序规则。"""
+
     fact: str
     order: str
 
 
 @dataclass(frozen=True)
 class SourceCardConfig:
+    """描述首页数据源卡片。"""
+
     key: str
     dataset: str
     label: str
@@ -72,6 +86,8 @@ class SourceCardConfig:
 
 @dataclass(frozen=True)
 class OntologyFileConfig:
+    """描述前端展示的本体文件说明项。"""
+
     name: str
     desc: str
     tone: str
@@ -79,6 +95,8 @@ class OntologyFileConfig:
 
 @dataclass(frozen=True)
 class RuleCardConfig:
+    """描述前端展示的规则卡片说明项。"""
+
     label: str
     desc: str
     tone: str
@@ -86,6 +104,8 @@ class RuleCardConfig:
 
 @dataclass(frozen=True)
 class ScenarioConfig:
+    """聚合整个场景运行所需的 UI、数据和规则配置。"""
+
     key: str
     name: str
     app_title: str
@@ -119,6 +139,7 @@ class ScenarioConfig:
 
 
 def load_scenario_config(path: Path) -> ScenarioConfig:
+    """从 YAML 文件加载完整场景配置。"""
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     config = _as_mapping(raw, "scenario config")
     scenario_raw = _as_mapping(config.get("scenario"), "scenario")
@@ -178,6 +199,7 @@ def load_scenario_config(path: Path) -> ScenarioConfig:
 
 
 def _load_dataset_config(key: str, raw: Any) -> DatasetConfig:
+    """解析单个数据集配置。"""
     item = _as_mapping(raw, f"datasets.{key}")
     return DatasetConfig(
         key=key,
@@ -193,6 +215,7 @@ def _load_dataset_config(key: str, raw: Any) -> DatasetConfig:
 
 
 def _load_relation(raw: Any) -> RelationConfig:
+    """解析关系配置。"""
     item = _as_mapping(raw, "relation")
     return RelationConfig(
         source_dataset=str(item["source_dataset"]),
@@ -206,6 +229,7 @@ def _load_relation(raw: Any) -> RelationConfig:
 
 
 def _load_fact(raw: Any) -> FactConfig:
+    """解析事实指标配置。"""
     item = _as_mapping(raw, "fact")
     return FactConfig(
         key=str(item["key"]),
@@ -221,6 +245,7 @@ def _load_fact(raw: Any) -> FactConfig:
 
 
 def _load_display_field(raw: Any) -> AlertDisplayField:
+    """解析告警展示字段配置。"""
     item = _as_mapping(raw, "display field")
     return AlertDisplayField(
         label=str(item["label"]),
@@ -231,6 +256,7 @@ def _load_display_field(raw: Any) -> AlertDisplayField:
 
 
 def _load_sort(raw: Any) -> SortConfig:
+    """解析排序配置。"""
     item = _as_mapping(raw, "sort field")
     return SortConfig(
         fact=str(item["fact"]),
@@ -239,6 +265,7 @@ def _load_sort(raw: Any) -> SortConfig:
 
 
 def _load_source_card(raw: Any) -> SourceCardConfig:
+    """解析首页数据源卡片配置。"""
     item = _as_mapping(raw, "source card")
     return SourceCardConfig(
         key=str(item["key"]),
@@ -252,6 +279,7 @@ def _load_source_card(raw: Any) -> SourceCardConfig:
 
 
 def _load_ontology_file(raw: Any) -> OntologyFileConfig:
+    """解析本体文件展示配置。"""
     item = _as_mapping(raw, "ontology file")
     return OntologyFileConfig(
         name=str(item["name"]),
@@ -261,6 +289,7 @@ def _load_ontology_file(raw: Any) -> OntologyFileConfig:
 
 
 def _load_rule_card(raw: Any) -> RuleCardConfig:
+    """解析规则卡片配置。"""
     item = _as_mapping(raw, "rule card")
     return RuleCardConfig(
         label=str(item["label"]),
@@ -270,22 +299,26 @@ def _load_rule_card(raw: Any) -> RuleCardConfig:
 
 
 def _parse_date_optional(value: Any) -> date | None:
+    """把可选日期字段解析为 `date` 对象。"""
     if value in (None, ""):
         return None
     return date.fromisoformat(str(value))
 
 
 def _as_mapping(value: Any, context: str) -> dict[str, Any]:
+    """确保 YAML 节点是映射结构。"""
     if not isinstance(value, dict):
         raise ValueError(f"{context} must be a mapping")
     return value
 
 
 def _as_sequence(value: Any, context: str) -> list[Any]:
+    """确保 YAML 节点是列表结构。"""
     if not isinstance(value, list):
         raise ValueError(f"{context} must be a list")
     return value
 
 
 def _as_string_list(value: Any, context: str) -> list[str]:
+    """把 YAML 列表节点规范化为字符串列表。"""
     return [str(item) for item in _as_sequence(value, context)]
