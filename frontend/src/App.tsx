@@ -3,15 +3,21 @@
 import { type KeyboardEvent, startTransition, useEffect, useRef, useState } from "react";
 
 import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS, RISK_COLORS } from "./components/GraphCanvas";
+import { OntologyWorkbench } from "./components/OntologyWorkbench";
 import { OperationsWorkbench } from "./components/OperationsWorkbench";
 import {
   activateScenario,
   askAgent,
+  discardOntologyDraft,
   executeAction,
   getAlerts,
   getCase,
   getCases,
+  getOntologyWorkspace,
   getPlatformSummary,
+  publishOntologyDraft,
+  revertOntologyDraftChange,
+  saveOntologyDraftChange,
   getSubscriber,
   getSummary,
   getTasks,
@@ -20,6 +26,8 @@ import {
 import type {
   Alert,
   GraphData,
+  GraphNode,
+  OntologyWorkspace,
   OperationalCase,
   OperationalCaseSummary,
   PendingAction,
@@ -30,8 +38,9 @@ import type {
   TaskItem,
 } from "./types";
 
-type PageKey = "dashboard" | "operations" | "ontology" | "graph" | "qa" | "settings";
+type PageKey = "dashboard" | "ontologyStudio" | "operations" | "ontology" | "ontologyMap" | "graph" | "qa" | "settings";
 type GraphRiskFilter = "ALL" | RiskLevel;
+type OntologyKind = "entity" | "property" | "relation" | "rule" | "action";
 
 interface ChatMessage {
   id: string;
@@ -47,10 +56,36 @@ interface FeedbackState {
   text: string;
 }
 
+interface OntologyDetailItem {
+  label: string;
+  value: string;
+}
+
+interface OntologyCollection {
+  title: string;
+  items: string[];
+  tone?: "neutral" | "rule" | "action";
+}
+
+interface OntologyGraphNode extends GraphNode {
+  kind: OntologyKind;
+  description: string;
+  details: OntologyDetailItem[];
+  collections?: OntologyCollection[];
+}
+
+interface OntologyGraphPayload {
+  graph: GraphData;
+  nodes: OntologyGraphNode[];
+  counts: Record<OntologyKind, number>;
+}
+
 const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: IconName }> = [
   { key: "dashboard", label: "仪表盘", icon: "dashboard" },
+  { key: "ontologyStudio", label: "本体工作台", icon: "relation" },
   { key: "operations", label: "运营工作台", icon: "data" },
-  { key: "ontology", label: "本体构建", icon: "globe" },
+  { key: "ontology", label: "构建流水线", icon: "globe" },
+  { key: "ontologyMap", label: "本体图谱", icon: "graph" },
   { key: "graph", label: "图谱探索", icon: "graph" },
   { key: "qa", label: "智能问答", icon: "chat" },
   { key: "settings", label: "设置", icon: "settings" },
@@ -68,6 +103,82 @@ const GRAPH_RISK_FILTERS: Array<{ key: GraphRiskFilter; label: string }> = [
   { key: "MEDIUM", label: "中风险" },
   { key: "LOW", label: "低风险" },
 ];
+
+const ONTOLOGY_KIND_LABELS: Record<OntologyKind, string> = {
+  entity: "实体",
+  property: "属性",
+  relation: "关系",
+  rule: "规则",
+  action: "动作",
+};
+
+const ONTOLOGY_KIND_ORDER: Record<OntologyKind, number> = {
+  entity: 0,
+  property: 1,
+  relation: 2,
+  rule: 3,
+  action: 4,
+};
+
+const ONTOLOGY_KIND_NOTES: Record<OntologyKind, string> = {
+  entity: "对象模型骨架",
+  property: "围绕实体的关键字段",
+  relation: "实体之间的语义连接",
+  rule: "风险判断规则",
+  action: "后续处置动作",
+};
+
+const ONTOLOGY_RELATION_SPECS = [
+  {
+    key: "user-interaction",
+    sourceKey: "User",
+    targetKey: "InteractionEvent",
+    label: "沉淀交互信号",
+    description: "用户对象通过交互事件沉淀行为证据，作为后续风险识别的输入。",
+  },
+  {
+    key: "user-rulehit",
+    sourceKey: "User",
+    targetKey: "RuleHit",
+    label: "进入规则评估",
+    description: "用户会被规则对象评估，产生命中结果与解释语义。",
+  },
+  {
+    key: "rulehit-alert",
+    sourceKey: "RuleHit",
+    targetKey: "RiskAlert",
+    label: "支撑风险告警",
+    description: "规则命中结果被汇聚为风险告警，形成面向运营的统一风险视图。",
+  },
+  {
+    key: "alert-case",
+    sourceKey: "RiskAlert",
+    targetKey: "RetentionCase",
+    label: "转为运营处置",
+    description: "风险告警进入运营流程后会生成 Case，承载状态、优先级和责任队列。",
+  },
+  {
+    key: "case-task",
+    sourceKey: "RetentionCase",
+    targetKey: "Task",
+    label: "拆解执行任务",
+    description: "Case 会继续拆解为多个任务，供不同角色串联处理。",
+  },
+  {
+    key: "case-action-def",
+    sourceKey: "RetentionCase",
+    targetKey: "ActionDefinition",
+    label: "编排可执行动作",
+    description: "Case 会根据状态和风险等级匹配可执行动作定义。",
+  },
+  {
+    key: "task-action-def",
+    sourceKey: "Task",
+    targetKey: "ActionDefinition",
+    label: "调用动作定义",
+    description: "任务会引用动作定义，决定执行方式、角色约束和状态迁移。",
+  },
+] as const;
 
 const ICON_PATHS = {
   dashboard: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
@@ -170,6 +281,263 @@ function buildRiskScopedGraph(graph: GraphData | null, alerts: Alert[], riskFilt
   };
 }
 
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.filter((item) => item.trim().length > 0)));
+}
+
+function detailValue(value: string | number | boolean | null | undefined) {
+  if (value === null || value === undefined || value === "") {
+    return "-";
+  }
+  return String(value);
+}
+
+function riskScopeLabel(value: string) {
+  if (value === "HIGH") {
+    return "高风险";
+  }
+  if (value === "MEDIUM") {
+    return "中风险";
+  }
+  if (value === "LOW") {
+    return "低风险";
+  }
+  return value;
+}
+
+function buildOntologyGraph(summary: Summary | null): OntologyGraphPayload {
+  const counts: Record<OntologyKind, number> = {
+    entity: 0,
+    property: 0,
+    relation: 0,
+    rule: 0,
+    action: 0,
+  };
+
+  if (!summary) {
+    return {
+      graph: { nodes: [], edges: [] },
+      nodes: [],
+      counts,
+    };
+  }
+
+  const nodes: OntologyGraphNode[] = [];
+  const edges: GraphData["edges"] = [];
+  const nodeById = new Map<string, OntologyGraphNode>();
+  const entityNodeIdByKey = new Map<string, string>();
+  const entityYByKey = new Map<string, number>();
+  const edgeKeySet = new Set<string>();
+
+  function addNode(node: OntologyGraphNode) {
+    if (nodeById.has(node.id)) {
+      return;
+    }
+    nodeById.set(node.id, node);
+    nodes.push(node);
+    counts[node.kind] += 1;
+  }
+
+  function addEdge(source: string, target: string, label: string) {
+    const edgeKey = `${source}-${target}-${label}`;
+    if (edgeKeySet.has(edgeKey)) {
+      return;
+    }
+    edgeKeySet.add(edgeKey);
+    edges.push({ source, target, label });
+  }
+
+  const entityX = 360;
+  const entityStartY = 140;
+  const entityGapY = 170;
+
+  summary.ontologyObjects.forEach((item, index) => {
+    const entityId = `ontology-entity:${item.key}`;
+    const entityY = entityStartY + index * entityGapY;
+    entityNodeIdByKey.set(item.key, entityId);
+    entityYByKey.set(item.key, entityY);
+
+    addNode({
+      id: entityId,
+      label: item.label,
+      type: "OntologyEntity",
+      x: entityX,
+      y: entityY,
+      kind: "entity",
+      description: item.description,
+      details: [
+        { label: "对象键", value: item.key },
+        { label: "本体类型", value: item.ontologyType },
+        { label: "标识字段", value: item.identityField },
+      ],
+      collections: [
+        {
+          title: "属性清单",
+          items: uniqueStrings([item.identityField, ...item.attributes]),
+        },
+      ],
+    });
+
+    const attributes = uniqueStrings([item.identityField, ...item.attributes]);
+    const rows = Math.max(Math.ceil(attributes.length / 2), 1);
+    attributes.forEach((attribute, attributeIndex) => {
+      const column = Math.floor(attributeIndex / rows);
+      const row = attributeIndex % rows;
+      const propertyId = `ontology-property:${item.key}:${attribute}`;
+      const propertyX = entityX - 220 - column * 128;
+      const propertyY = entityY - ((rows - 1) * 18) + row * 36;
+
+      addNode({
+        id: propertyId,
+        label: attribute,
+        type: "OntologyProperty",
+        x: propertyX,
+        y: propertyY,
+        kind: "property",
+        description: `${item.label} 的${attribute === item.identityField ? "标识属性" : "业务属性"}，用于定义对象字段边界和展示语义。`,
+        details: [
+          { label: "归属实体", value: item.label },
+          { label: "字段名", value: attribute },
+          { label: "属性角色", value: attribute === item.identityField ? "身份标识" : "业务属性" },
+        ],
+      });
+      addEdge(entityId, propertyId, "拥有属性");
+    });
+  });
+
+  ONTOLOGY_RELATION_SPECS.forEach((relation, index) => {
+    const sourceId = entityNodeIdByKey.get(relation.sourceKey);
+    const targetId = entityNodeIdByKey.get(relation.targetKey);
+    if (!sourceId || !targetId) {
+      return;
+    }
+
+    const sourceLabel = summary.ontologyObjects.find((item) => item.key === relation.sourceKey)?.label ?? relation.sourceKey;
+    const targetLabel = summary.ontologyObjects.find((item) => item.key === relation.targetKey)?.label ?? relation.targetKey;
+    const sourceY = entityYByKey.get(relation.sourceKey) ?? entityStartY;
+    const targetY = entityYByKey.get(relation.targetKey) ?? entityStartY;
+    const relationId = `ontology-relation:${relation.key}`;
+
+    addNode({
+      id: relationId,
+      label: relation.label,
+      type: "OntologyRelation",
+      x: 680,
+      y: (sourceY + targetY) / 2 + (index % 2 === 0 ? -18 : 18),
+      kind: "relation",
+      description: relation.description,
+      details: [
+        { label: "源实体", value: sourceLabel },
+        { label: "目标实体", value: targetLabel },
+        { label: "关系语义", value: relation.label },
+      ],
+    });
+
+    addEdge(sourceId, relationId, "关系起点");
+    addEdge(relationId, targetId, "关系终点");
+  });
+
+  const userEntityId = entityNodeIdByKey.get("User") ?? nodes.find((item) => item.kind === "entity")?.id;
+  const alertEntityId = entityNodeIdByKey.get("RiskAlert") ?? userEntityId;
+
+  summary.ruleCards.forEach((rule, index) => {
+    const ruleId = `ontology-rule:${rule.label}`;
+    addNode({
+      id: ruleId,
+      label: rule.label,
+      type: "OntologyRule",
+      x: 980,
+      y: 150 + index * 190,
+      kind: "rule",
+      description: rule.desc,
+      details: [
+        { label: "规则等级", value: toneLabel(rule.tone) },
+        { label: "命中次数", value: detailValue(summary.topRules.find((item) => item.rule === rule.label)?.count ?? 0) },
+      ],
+      collections: [
+        {
+          title: "规则定位",
+          items: [toneLabel(rule.tone), "面向运营风险判断"],
+          tone: "rule",
+        },
+      ],
+    });
+
+    if (userEntityId) {
+      addEdge(userEntityId, ruleId, "评估对象");
+    }
+    if (alertEntityId && alertEntityId !== ruleId) {
+      addEdge(ruleId, alertEntityId, "产生告警");
+    }
+  });
+
+  const actionAnchorId =
+    entityNodeIdByKey.get("RetentionCase") ?? entityNodeIdByKey.get("RiskAlert") ?? entityNodeIdByKey.get("ActionDefinition");
+
+  summary.actionCatalog.forEach((action, index) => {
+    const column = Math.floor(index / 4);
+    const row = index % 4;
+    const actionId = `ontology-action:${action.id}`;
+    addNode({
+      id: actionId,
+      label: action.label,
+      type: "OntologyAction",
+      x: 1220 + column * 180,
+      y: 170 + row * 150,
+      kind: "action",
+      description: action.description || "动作定义用于驱动运营闭环中的状态迁移与执行审计。",
+      details: [
+        { label: "动作 ID", value: action.id },
+        { label: "队列提示", value: detailValue(action.queue_hint) },
+        { label: "副作用", value: detailValue(action.side_effect) },
+      ],
+      collections: [
+        {
+          title: "允许角色",
+          items: action.allowed_roles.length ? action.allowed_roles : ["未限制"],
+          tone: "action",
+        },
+        {
+          title: "允许状态",
+          items: action.allowed_states.length ? action.allowed_states : ["未限制"],
+          tone: "action",
+        },
+        {
+          title: "风险范围",
+          items: action.allowed_risk_levels.length ? action.allowed_risk_levels.map(riskScopeLabel) : ["全部风险"],
+          tone: "action",
+        },
+      ],
+    });
+
+    if (actionAnchorId) {
+      addEdge(actionAnchorId, actionId, "可执行动作");
+    }
+  });
+
+  return {
+    graph: {
+      nodes,
+      edges,
+    },
+    nodes,
+    counts,
+  };
+}
+
+function toneLabel(value: string) {
+  if (value === "high") {
+    return "高优先级规则";
+  }
+  if (value === "medium") {
+    return "中优先级规则";
+  }
+  if (value === "low") {
+    return "低优先级规则";
+  }
+  return value;
+}
+
 /** 渲染内置 SVG 图标。 */
 function SvgIcon({ name, size = 20, color = "currentColor" }: { name: IconName; size?: number; color?: string }) {
   return (
@@ -233,8 +601,9 @@ function EmptyState({ message }: { message: string }) {
 
 /** 应用主组件，负责页面状态、数据获取和主要交互。 */
 export default function App() {
-  const [page, setPage] = useState<PageKey>("dashboard");
+  const [page, setPage] = useState<PageKey>("ontologyStudio");
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [ontologyWorkspace, setOntologyWorkspace] = useState<OntologyWorkspace | null>(null);
   const [platformSummary, setPlatformSummary] = useState<PlatformSummary | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [cases, setCases] = useState<OperationalCaseSummary[]>([]);
@@ -242,6 +611,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [appError, setAppError] = useState("");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [selectedOntologyNodeId, setSelectedOntologyNodeId] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [graphRiskFilter, setGraphRiskFilter] = useState<GraphRiskFilter>("ALL");
   const [subscriberDetails, setSubscriberDetails] = useState<Record<string, SubscriberDetail>>({});
@@ -254,6 +624,7 @@ export default function App() {
   const [runningInference, setRunningInference] = useState(false);
   const [switchingScenario, setSwitchingScenario] = useState(false);
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
+  const [ontologyDraftBusy, setOntologyDraftBusy] = useState(false);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
   const appLoadRequestRef = useRef(0);
   const [messages, setMessages] = useState<ChatMessage[]>([
@@ -274,8 +645,9 @@ export default function App() {
     setDetailLoadingId(null);
     setCaseLoadingId(null);
     setDetailError("");
-    const [summaryResult, platformResult, alertsResult, casesResult, tasksResult] = await Promise.allSettled([
+    const [summaryResult, workspaceResult, platformResult, alertsResult, casesResult, tasksResult] = await Promise.allSettled([
       getSummary(),
+      getOntologyWorkspace(),
       getPlatformSummary(),
       getAlerts(),
       getCases(),
@@ -290,6 +662,12 @@ export default function App() {
       setSummary(summaryResult.value);
     } else {
       setAppError(summaryResult.reason instanceof Error ? summaryResult.reason.message : "加载 summary 失败");
+    }
+
+    if (workspaceResult.status === "fulfilled") {
+      setOntologyWorkspace(workspaceResult.value);
+    } else {
+      setAppError((current) => current || (workspaceResult.reason instanceof Error ? workspaceResult.reason.message : "加载 ontology workspace 失败"));
     }
 
     if (platformResult.status === "fulfilled") {
@@ -358,6 +736,24 @@ export default function App() {
     }
   }, [alerts, graphRiskFilter, selectedNodeId, summary]);
 
+  const ontologyGraphPayload = buildOntologyGraph(summary);
+  const ontologyGraph = ontologyGraphPayload.graph;
+  const ontologyNodes = ontologyGraphPayload.nodes;
+
+  useEffect(() => {
+    if (!ontologyNodes.length) {
+      if (selectedOntologyNodeId) {
+        setSelectedOntologyNodeId(null);
+      }
+      return;
+    }
+
+    if (!selectedOntologyNodeId || !ontologyNodes.some((node) => node.id === selectedOntologyNodeId)) {
+      const defaultEntityNode = ontologyNodes.find((node) => node.kind === "entity");
+      setSelectedOntologyNodeId((defaultEntityNode ?? ontologyNodes[0]).id);
+    }
+  }, [ontologyNodes, selectedOntologyNodeId]);
+
   useEffect(() => {
     if (!cases.length) {
       if (selectedCaseId) {
@@ -405,6 +801,90 @@ export default function App() {
       });
     } finally {
       setRunningInference(false);
+    }
+  }
+
+  async function handleSaveOntologyDraftChange(payload: {
+    resourceType: string;
+    resourceId: string;
+    changes: Record<string, unknown>;
+  }) {
+    setOntologyDraftBusy(true);
+    setFeedback(null);
+    try {
+      await saveOntologyDraftChange(payload);
+      await loadAppData();
+      setFeedback({
+        tone: "success",
+        text: "本体草稿已更新。",
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "保存本体草稿失败",
+      });
+    } finally {
+      setOntologyDraftBusy(false);
+    }
+  }
+
+  async function handlePublishOntologyDraft() {
+    setOntologyDraftBusy(true);
+    setFeedback(null);
+    try {
+      await publishOntologyDraft();
+      await loadAppData();
+      setFeedback({
+        tone: "success",
+        text: "本体草稿已发布。",
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "发布本体草稿失败",
+      });
+    } finally {
+      setOntologyDraftBusy(false);
+    }
+  }
+
+  async function handleRevertOntologyDraftChange(changeId: string) {
+    setOntologyDraftBusy(true);
+    setFeedback(null);
+    try {
+      await revertOntologyDraftChange(changeId);
+      await loadAppData();
+      setFeedback({
+        tone: "success",
+        text: "本体草稿变更已回退。",
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "回退本体草稿失败",
+      });
+    } finally {
+      setOntologyDraftBusy(false);
+    }
+  }
+
+  async function handleDiscardOntologyDraft() {
+    setOntologyDraftBusy(true);
+    setFeedback(null);
+    try {
+      await discardOntologyDraft();
+      await loadAppData();
+      setFeedback({
+        tone: "success",
+        text: "本体草稿已丢弃。",
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "丢弃本体草稿失败",
+      });
+    } finally {
+      setOntologyDraftBusy(false);
     }
   }
 
@@ -571,6 +1051,14 @@ export default function App() {
     });
   }
 
+  function focusOntologyKind(kind: OntologyKind) {
+    const targetNode = ontologyNodes.find((node) => node.kind === kind);
+    if (!targetNode) {
+      return;
+    }
+    setSelectedOntologyNodeId(targetNode.id);
+  }
+
   const graph = buildRiskScopedGraph(summary?.ontologyGraph ?? null, alerts, graphRiskFilter);
   const graphNodes = graph?.nodes ?? [];
   const graphEdges = graph?.edges ?? [];
@@ -607,6 +1095,35 @@ export default function App() {
   const ruleCards = summary?.ruleCards ?? [];
   const mappingExamples = summary?.mappingExamples ?? [];
   const suggestedQuestions = summary?.questionSuggestions?.length ? summary.questionSuggestions : RECOMMENDED_QUESTIONS;
+  const selectedOntologyNode = ontologyNodes.find((node) => node.id === selectedOntologyNodeId) ?? null;
+  const ontologyEdges = ontologyGraph.edges;
+  const ontologyLegendTypes = Array.from(new Set(ontologyNodes.map((node) => node.type)));
+  const ontologyNodeLinks = selectedOntologyNode
+    ? ontologyEdges
+        .flatMap((edge) => {
+          if (edge.source !== selectedOntologyNode.id && edge.target !== selectedOntologyNode.id) {
+            return [];
+          }
+          const relatedNodeId = edge.source === selectedOntologyNode.id ? edge.target : edge.source;
+          const relatedNode = ontologyNodes.find((node) => node.id === relatedNodeId);
+          if (!relatedNode) {
+            return [];
+          }
+          return [
+            {
+              key: `${edge.source}-${edge.target}-${edge.label}`,
+              label: edge.label,
+              node: relatedNode,
+            },
+          ];
+        })
+        .sort((left, right) => {
+          if (left.node.kind === right.node.kind) {
+            return left.node.label.localeCompare(right.node.label, "zh-CN");
+          }
+          return ONTOLOGY_KIND_ORDER[left.node.kind] - ONTOLOGY_KIND_ORDER[right.node.kind];
+        })
+    : [];
   const visibleAlerts =
     graphRiskFilter === "ALL" ? alerts : alerts.filter((item) => item.riskLevel === graphRiskFilter);
   const selectedCaseSummary = selectedCaseId ? cases.find((item) => item.caseId === selectedCaseId) ?? null : null;
@@ -844,6 +1361,28 @@ export default function App() {
             </div>
           ) : null}
 
+          {page === "ontologyStudio" ? (
+            <div className="page active ontology-studio-shell">
+              <OntologyWorkbench
+                workspace={ontologyWorkspace}
+                loading={loading}
+                draftBusy={ontologyDraftBusy}
+                onSaveDraftChange={(payload) => {
+                  void handleSaveOntologyDraftChange(payload);
+                }}
+                onPublishDraft={() => {
+                  void handlePublishOntologyDraft();
+                }}
+                onRevertDraftChange={(changeId) => {
+                  void handleRevertOntologyDraftChange(changeId);
+                }}
+                onDiscardDraft={() => {
+                  void handleDiscardOntologyDraft();
+                }}
+              />
+            </div>
+          ) : null}
+
           {page === "operations" ? (
             <div className="page active ops-page-shell">
               <OperationsWorkbench
@@ -1016,6 +1555,136 @@ export default function App() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {page === "ontologyMap" ? (
+            <div className="page active">
+              <PageHeader title="本体图谱" subtitle="以对象模型为骨架，串联实体、属性、关系、规则和动作，便于从建模视角理解系统语义。" />
+
+              <div className="ontology-map-strip">
+                {(Object.keys(ONTOLOGY_KIND_LABELS) as OntologyKind[]).map((kind) => (
+                  <button
+                    key={kind}
+                    type="button"
+                    className="ontology-map-card"
+                    onClick={() => focusOntologyKind(kind)}
+                    disabled={ontologyGraphPayload.counts[kind] === 0}
+                  >
+                    <span className="ontology-map-card-label">{ONTOLOGY_KIND_LABELS[kind]}</span>
+                    <strong className="ontology-map-card-value">{ontologyGraphPayload.counts[kind]}</strong>
+                    <span className="ontology-map-card-note">{ONTOLOGY_KIND_NOTES[kind]}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="graph-container ontology-map-container">
+                <div className="graph-canvas ontology-map-canvas">
+                  {ontologyNodes.length ? (
+                    <>
+                      <div className="ontology-map-banner">建议先从“实体”节点开始，再沿关系追踪到规则和动作，阅读路径更清晰。</div>
+                      <div className="graph-stats ontology-map-stats">
+                        <span>实体: {ontologyGraphPayload.counts.entity}</span>|
+                        <span> 属性: {ontologyGraphPayload.counts.property}</span>|
+                        <span> 关系: {ontologyGraphPayload.counts.relation}</span>|
+                        <span> 规则: {ontologyGraphPayload.counts.rule}</span>|
+                        <span> 动作: {ontologyGraphPayload.counts.action}</span>
+                      </div>
+                      <div className="graph-legend ontology-map-legend">
+                        <h4>语义类型</h4>
+                        <div className="legend-items">
+                          {ontologyLegendTypes.map((type) => (
+                            <div key={type} className="legend-item">
+                              <span className="legend-color" style={{ background: NODE_TYPE_COLORS[type] || "#999999" }} />
+                              <span>{NODE_TYPE_LABELS[type] || type}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <GraphCanvas
+                        graph={ontologyGraph}
+                        selectedNodeId={selectedOntologyNodeId}
+                        onSelectNode={(node) => {
+                          setSelectedOntologyNodeId(node.id);
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <div className="graph-empty">
+                      <SvgIcon name="relation" size={48} />
+                      <p>{loading ? "正在整理本体图谱..." : "当前没有可展示的本体语义结构"}</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="node-detail-panel ontology-detail-panel">
+                  {!selectedOntologyNode ? (
+                    <EmptyState message="在本体图谱中选择一个节点，查看它的语义说明、关键字段与关联对象。" />
+                  ) : (
+                    <div className="node-detail-content">
+                      <div className="detail-header">
+                        <div className="detail-icon" style={{ background: NODE_TYPE_COLORS[selectedOntologyNode.type] || "#999999" }}>
+                          <SvgIcon name="relation" size={28} color="#ffffff" />
+                        </div>
+                        <h3>{selectedOntologyNode.label}</h3>
+                        <span className="node-type-tag">{ONTOLOGY_KIND_LABELS[selectedOntologyNode.kind]}</span>
+                      </div>
+
+                      <div className="detail-body">
+                        <div className="ontology-hero">
+                          <div className="ontology-hero-label">语义说明</div>
+                          <div className="ontology-hero-summary">{selectedOntologyNode.description}</div>
+                        </div>
+
+                        <div className="detail-section">
+                          <div className="detail-section-title">关键字段</div>
+                          {selectedOntologyNode.details.map((item) => (
+                            <div key={`${selectedOntologyNode.id}-${item.label}`} className="detail-property">
+                              <span className="detail-property-key">{item.label}</span>
+                              <span className="detail-property-value">{item.value}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {(selectedOntologyNode.collections ?? []).map((collection) => (
+                          <div key={`${selectedOntologyNode.id}-${collection.title}`} className="detail-section">
+                            <div className="detail-section-title">{collection.title}</div>
+                            <div className="token-list">
+                              {collection.items.map((item) => (
+                                <span key={`${collection.title}-${item}`} className={`token-chip ${collection.tone || "ontology"}`}>
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+
+                        <div className="detail-section">
+                          <div className="detail-section-title">关联对象</div>
+                          {ontologyNodeLinks.length ? (
+                            <div className="ontology-link-list">
+                              {ontologyNodeLinks.map((item) => (
+                                <button
+                                  key={item.key}
+                                  type="button"
+                                  className="ontology-link-card"
+                                  onClick={() => setSelectedOntologyNodeId(item.node.id)}
+                                >
+                                  <span className="ontology-link-label">{item.label}</span>
+                                  <strong>{item.node.label}</strong>
+                                  <span className="ontology-link-type">{ONTOLOGY_KIND_LABELS[item.node.kind]}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="detail-muted">当前节点没有额外的邻接对象。</div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

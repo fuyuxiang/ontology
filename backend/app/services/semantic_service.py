@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import threading
 from collections import defaultdict
+from copy import deepcopy
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -38,6 +39,7 @@ from app.services.data_pipeline import (
     load_source_rows,
 )
 from app.services.graph_materializer import materialize_base_graph
+from app.services.ontology_workspace import build_ontology_workspace
 from app.services.graph_views import build_entity_graph, build_overview_graph
 from app.validation.shacl import run_shacl_validation
 
@@ -93,6 +95,7 @@ class SemanticService:
         self.validation: dict[str, object] = {}
         self.persistence: dict[str, object] = {}
         self.data_warnings: list[str] = []
+        self.ontology_governance: dict[str, Any] = self._load_ontology_governance_state()
         self.initialize()
 
     def initialize(self) -> None:
@@ -450,6 +453,262 @@ class SemanticService:
         """
         with self.lock:
             return agent_tool_catalog()
+
+    def get_ontology_workspace(self) -> dict[str, Any]:
+        """
+        功能：
+        - 返回面向本体工作台的资源化语义模型。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回字典结构，包含 object types、link types、interfaces、action types 与 rules。
+        """
+        with self.lock:
+            object_model = self.describe_object_model()
+            action_catalog = self.operational_metrics.get("actionCatalog", [])
+            top_rules = [
+                {"rule": label, "count": count}
+                for label, count in sorted(self.top_rules.items(), key=lambda item: (-item[1], item[0]))
+            ]
+            return build_ontology_workspace(
+                scenario=self.scenario,
+                source_rows=self.source_rows,
+                object_model=object_model,
+                action_catalog=action_catalog,
+                top_rules=top_rules,
+                governance_state=self.ontology_governance,
+            )
+
+    def save_ontology_draft_change(
+        self,
+        *,
+        resource_type: str,
+        resource_id: str,
+        changes: dict[str, Any],
+        actor_id: str = "api-user",
+    ) -> dict[str, Any]:
+        """
+        功能：
+        - 将资源字段变更保存到本体草稿。
+        """
+        with self.lock:
+            normalized = self._normalize_governance_changes(resource_type, changes)
+            if not normalized:
+                raise ValueError("no_supported_changes")
+
+            effective_changes: list[tuple[str, Any, Any]] = []
+            for field, value in normalized.items():
+                old_value = self._current_resource_field_value(
+                    resource_type=resource_type,
+                    resource_id=resource_id,
+                    field=field,
+                )
+                if old_value == value:
+                    continue
+                effective_changes.append((field, old_value, value))
+
+            if not effective_changes:
+                return self.get_ontology_workspace()["governance"]
+
+            if self.ontology_governance.get("status") != "draft":
+                self.ontology_governance["status"] = "draft"
+                self.ontology_governance["draftId"] = self.ontology_governance.get("draftId") or f"draft-{self.batch_id}"
+
+            overrides = self.ontology_governance.setdefault("overrides", {}).setdefault(resource_type, {}).setdefault(resource_id, {})
+            for field, old_value, value in effective_changes:
+                overrides[field] = deepcopy(value)
+                self.ontology_governance.setdefault("changes", []).append(
+                    {
+                        "id": f"chg-{datetime.now(tz=UTC).strftime('%Y%m%d%H%M%S%f')}",
+                        "resourceType": resource_type,
+                        "resourceId": resource_id,
+                        "field": field,
+                        "oldValue": deepcopy(old_value),
+                        "newValue": deepcopy(value),
+                        "actorId": actor_id,
+                        "time": datetime.now(tz=UTC).replace(microsecond=0).isoformat(),
+                    }
+                )
+
+            self._save_ontology_governance_state()
+            return self.get_ontology_workspace()["governance"]
+
+    def revert_ontology_draft_change(self, change_id: str) -> dict[str, Any]:
+        """
+        功能：
+        - 回退指定的本体草稿变更，并按剩余 change set 重建当前草稿覆盖。
+        """
+        with self.lock:
+            changes = self.ontology_governance.setdefault("changes", [])
+            if not any(change.get("id") == change_id for change in changes):
+                raise ValueError("change_not_found")
+
+            remaining = [change for change in changes if change.get("id") != change_id]
+            self.ontology_governance["changes"] = remaining
+            self.ontology_governance["overrides"] = self._rebuild_governance_overrides(remaining)
+
+            if remaining:
+                self.ontology_governance["status"] = "draft"
+                self.ontology_governance["draftId"] = self.ontology_governance.get("draftId") or f"draft-{self.batch_id}"
+            else:
+                self.ontology_governance["draftId"] = None
+                self.ontology_governance["status"] = self._governance_resting_status()
+
+            self._save_ontology_governance_state()
+            return self.get_ontology_workspace()["governance"]
+
+    def discard_ontology_draft(self) -> dict[str, Any]:
+        """
+        功能：
+        - 丢弃当前全部草稿变更，恢复到最近一次发布状态。
+        """
+        with self.lock:
+            self.ontology_governance["changes"] = []
+            self.ontology_governance["draftId"] = None
+            self.ontology_governance["overrides"] = deepcopy(self.ontology_governance.get("publishedOverrides", {}))
+            self.ontology_governance["status"] = self._governance_resting_status()
+            self._save_ontology_governance_state()
+            return self.get_ontology_workspace()["governance"]
+
+    def publish_ontology_draft(self, actor_id: str = "api-user") -> dict[str, Any]:
+        """
+        功能：
+        - 发布当前本体草稿，并保留已发布覆盖结果。
+        """
+        with self.lock:
+            self.ontology_governance["status"] = "published"
+            self.ontology_governance["lastPublishedAt"] = datetime.now(tz=UTC).replace(microsecond=0).isoformat()
+            self.ontology_governance["lastPublishedBy"] = actor_id
+            self.ontology_governance["changes"] = []
+            self.ontology_governance["draftId"] = None
+            self.ontology_governance["publishedOverrides"] = deepcopy(self.ontology_governance.get("overrides", {}))
+            self._save_ontology_governance_state()
+            return self.get_ontology_workspace()["governance"]
+
+    def _load_ontology_governance_state(self) -> dict[str, Any]:
+        if not self.settings.runtime_persistence_enabled:
+            return self._empty_governance_state()
+        path = self.settings.ontology_governance_state_path
+        if not path.exists():
+            return self._empty_governance_state()
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return self._empty_governance_state()
+        if not isinstance(payload, dict):
+            return self._empty_governance_state()
+        payload.setdefault("draftId", None)
+        payload.setdefault("status", "clean")
+        payload.setdefault("lastPublishedAt", None)
+        payload["changes"] = self._normalize_saved_governance_changes(payload.get("changes"))
+        payload.setdefault("overrides", {})
+        payload.setdefault("publishedOverrides", deepcopy(payload.get("overrides", {})))
+        return payload
+
+    def _save_ontology_governance_state(self) -> None:
+        if not self.settings.runtime_persistence_enabled:
+            return
+        path = self.settings.ontology_governance_state_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(self.ontology_governance, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    def _empty_governance_state(self) -> dict[str, Any]:
+        return {
+            "draftId": None,
+            "status": "clean",
+            "lastPublishedAt": None,
+            "changes": [],
+            "overrides": {},
+            "publishedOverrides": {},
+        }
+
+    def _normalize_saved_governance_changes(self, changes: Any) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for item in changes if isinstance(changes, list) else []:
+            if not isinstance(item, dict):
+                continue
+            normalized.append(
+                {
+                    "id": str(item.get("id") or f"chg-{datetime.now(tz=UTC).strftime('%Y%m%d%H%M%S%f')}"),
+                    "resourceType": str(item.get("resourceType") or ""),
+                    "resourceId": str(item.get("resourceId") or ""),
+                    "field": str(item.get("field") or ""),
+                    "oldValue": deepcopy(item.get("oldValue")),
+                    "newValue": deepcopy(item.get("newValue")),
+                    "actorId": str(item.get("actorId") or "system"),
+                    "time": str(item.get("time") or datetime.now(tz=UTC).replace(microsecond=0).isoformat()),
+                }
+            )
+        return normalized
+
+    def _current_resource_field_value(self, *, resource_type: str, resource_id: str, field: str) -> Any:
+        workspace = self.get_ontology_workspace()
+        resources = workspace.get(resource_type)
+        if not isinstance(resources, list):
+            raise ValueError("unknown_resource_type")
+        resource = next((item for item in resources if item.get("id") == resource_id), None)
+        if resource is None:
+            raise ValueError("resource_not_found")
+        if field not in resource:
+            raise ValueError("field_not_supported")
+        return deepcopy(resource[field])
+
+    def _rebuild_governance_overrides(self, changes: list[dict[str, Any]]) -> dict[str, Any]:
+        overrides = deepcopy(self.ontology_governance.get("publishedOverrides", {}))
+        for change in changes:
+            resource_type = change.get("resourceType")
+            resource_id = change.get("resourceId")
+            field = change.get("field")
+            if not resource_type or not resource_id or not field:
+                continue
+            overrides.setdefault(resource_type, {}).setdefault(resource_id, {})[field] = deepcopy(change.get("newValue"))
+        return self._prune_governance_overrides(overrides)
+
+    def _prune_governance_overrides(self, overrides: dict[str, Any]) -> dict[str, Any]:
+        cleaned: dict[str, Any] = {}
+        for resource_type, resources in overrides.items():
+            if not isinstance(resources, dict):
+                continue
+            resource_payload: dict[str, Any] = {}
+            for resource_id, fields in resources.items():
+                if not isinstance(fields, dict):
+                    continue
+                normalized_fields = {field: deepcopy(value) for field, value in fields.items()}
+                if normalized_fields:
+                    resource_payload[resource_id] = normalized_fields
+            if resource_payload:
+                cleaned[resource_type] = resource_payload
+        return cleaned
+
+    def _governance_resting_status(self) -> str:
+        published_overrides = self.ontology_governance.get("publishedOverrides", {})
+        if self.ontology_governance.get("lastPublishedAt") or published_overrides:
+            return "published"
+        return "clean"
+
+    def _normalize_governance_changes(self, resource_type: str, changes: dict[str, Any]) -> dict[str, Any]:
+        allowed_fields: dict[str, set[str]] = {
+            "objectTypes": {"description", "capabilityTags"},
+            "sharedProperties": {"description"},
+            "objectTypeGroups": {"description", "capabilities"},
+            "linkTypes": {"description"},
+            "actionTypes": {"description", "queueHint", "allowedRoles"},
+            "interfaces": {"description", "purpose", "capabilities"},
+            "rules": {"description"},
+        }
+        normalized: dict[str, Any] = {}
+        for field, value in changes.items():
+            if field not in allowed_fields.get(resource_type, set()):
+                continue
+            if isinstance(value, list):
+                normalized[field] = [str(item).strip() for item in value if str(item).strip()]
+            elif value is None:
+                normalized[field] = value
+            else:
+                normalized[field] = str(value).strip()
+        return normalized
 
     def query_objects(
         self,
