@@ -1,4 +1,9 @@
-"""规则推理引擎，负责将业务规则转换为推理结果与告警三元组。"""
+"""
+模块功能：
+- 规则推理引擎，负责将业务规则转换为推理结果与告警三元组。
+- 该文件位于 `backend/app/rules/engine.py`，实现当前领域的核心引擎逻辑，负责状态推进、规则处理或运行时协调。
+- 文件中对外暴露或复用的主要函数包括：`load_ruleset`, `canonical_action`, `infer_record`, `materialize_business_inference`。
+"""
 
 from __future__ import annotations
 
@@ -15,12 +20,31 @@ from app.scenario.config import ScenarioConfig
 
 
 def load_ruleset(settings: Settings) -> DecisionTable:
-    """根据当前配置加载风险决策表。"""
+    """
+    功能：
+    - 根据当前配置加载风险决策表。
+
+    输入：
+    - `settings`: 运行时配置对象，提供目录路径、命名空间和环境参数。
+
+    输出：
+    - 返回值: 返回已解析完成的决策表对象。
+    """
     return load_decision_table(settings.rules_path)
 
 
 def canonical_action(risk_level: str, decision_table: DecisionTable) -> str:
-    """将风险等级映射为标准推荐动作。"""
+    """
+    功能：
+    - 将风险等级映射为标准推荐动作。
+
+    输入：
+    - `risk_level`: 待映射或判断的风险等级。
+    - `decision_table`: 已加载的风险决策表对象。
+
+    输出：
+    - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+    """
     try:
         return decision_table.risk_actions[risk_level]
     except KeyError as exc:  # pragma: no cover
@@ -28,7 +52,17 @@ def canonical_action(risk_level: str, decision_table: DecisionTable) -> str:
 
 
 def infer_record(record: dict[str, Any], decision_table: DecisionTable) -> dict[str, Any]:
-    """对单个实体记录执行因子识别与最终风险判定。"""
+    """
+    功能：
+    - 对单个实体记录执行因子识别与最终风险判定。
+
+    输入：
+    - `record`: 单个实体或业务对象的聚合记录。
+    - `decision_table`: 已加载的风险决策表对象。
+
+    输出：
+    - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+    """
     metrics = record["metrics"]
     factors = []
     rule_labels: list[str] = []
@@ -63,7 +97,19 @@ def materialize_business_inference(
     settings: Settings,
     scenario: ScenarioConfig,
 ) -> tuple[dict[str, dict[str, Any]], Counter]:
-    """把规则推理结果写入推理图，并汇总规则命中次数。"""
+    """
+    功能：
+    - 把规则推理结果写入推理图，并汇总规则命中次数。
+
+    输入：
+    - `deductions_graph`: 推理结果图对象，用于承载规则和 OWL 推理三元组。
+    - `records`: 按实体标识组织的聚合记录集合。
+    - `settings`: 运行时配置对象，提供目录路径、命名空间和环境参数。
+    - `scenario`: 当前激活的场景配置对象。
+
+    输出：
+    - 返回值: 返回元组结果，按既定顺序携带多个返回值。
+    """
     decision_table = load_ruleset(settings)
     namespaces = make_namespaces(settings)
     doim = namespaces["doim"]

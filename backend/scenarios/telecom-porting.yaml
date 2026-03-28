@@ -164,6 +164,16 @@ scenario:
     - label: 关系
       code: ':user/U1001 telecom:hasPortingQuery :porting-query/U1001/2026-03-18T09%3A30%3A00 .'
 
+platform:
+  version: 1.0.0
+  description: 面向携号转网风险预警的场景包，包含对象模型、规则、映射与工作台配置。
+  data_dir: data/raw
+  mapping_path: mappings/doim_mapping.csv
+  ontology_core_path: ontology/doim-core.ttl
+  ontology_domain_path: ontology/telecom-porting.ttl
+  ontology_shapes_path: ontology/telecom-shapes.ttl
+  rules_path: rules/porting-risk.yaml
+
 datasets:
   user_info:
     file: dwa_v_d_cus_cb_user_info.csv

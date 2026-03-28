@@ -1,34 +1,44 @@
-"""语义服务核心实现，负责数据装载、图谱构建、推理与查询。"""
+"""
+模块功能：
+- 语义服务核心实现，负责数据装载、图谱构建、推理与查询。
+- 该文件位于 `backend/app/services/semantic_service.py`，负责数据装载、图谱构建、推理、查询和运营工作台聚合，是后端语义层总入口。
+- 文件中定义的核心类包括：`SemanticService`。
+"""
 
 from __future__ import annotations
 
 import json
-import math
 import threading
 from collections import defaultdict
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote
 
-from rdflib import BNode, Dataset, Graph, Literal, RDF, RDFS, URIRef, XSD
+from rdflib import BNode, Dataset, Graph, RDF, URIRef
 
+from app.agent_tools import agent_tool_catalog
 from app.config.settings import Settings
 from app.etl.csv_loader import read_csv_rows
 from app.graph.repository import GraphRepository
+from app.object_catalog import build_object_model
 from app.ontology.namespaces import bind_prefixes, make_namespaces
 from app.rules.engine import materialize_business_inference
 from app.runtime import ActorContext, RuntimeEngine
 from app.scenario.config import (
     AlertDisplayField,
-    FactConfig,
-    RelationConfig,
     ScenarioConfig,
-    SortConfig,
     load_scenario_config,
 )
 from app.scenario.mapping import MappingRow, load_mapping_rows
+from app.services.data_pipeline import (
+    FactEvaluator,
+    build_dataset_indexes,
+    build_records,
+    load_source_rows,
+)
+from app.services.graph_materializer import materialize_base_graph
+from app.services.graph_views import build_entity_graph, build_overview_graph
 from app.validation.shacl import run_shacl_validation
 
 try:
@@ -39,9 +49,23 @@ except ImportError:  # pragma: no cover
 
 
 class SemanticService:
-    """聚合语义层的主要能力，供 API 与 CLI 复用。"""
+    """
+    功能：
+    - 聚合语义层的主要能力，供 API 与 CLI 复用。
+    - 该类定义在 `backend/app/services/semantic_service.py` 中，用于组织与 `SemanticService` 相关的数据或行为。
+    """
 
     def __init__(self, settings: Settings) -> None:
+        """
+        功能：
+        - 初始化当前对象并准备后续调用所需的依赖、状态和缓存。
+
+        输入：
+        - `settings`: 运行时配置对象，提供目录路径、命名空间和环境参数。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         self.settings = settings
         self.repository = GraphRepository(settings)
         self.runtime = RuntimeEngine(settings)
@@ -52,6 +76,10 @@ class SemanticService:
         self.deductions_graph: Graph | None = None
         self.scenario: ScenarioConfig = load_scenario_config(settings.scenario_path)
         self.reference_date = self.scenario.reference_date or datetime.now(tz=UTC).date()
+        self.fact_evaluator = FactEvaluator(
+            reference_date=self.reference_date,
+            primary_dataset=self.scenario.primary_dataset,
+        )
         self.mapping_rows: list[MappingRow] = load_mapping_rows(settings.mapping_path)
         self.mapping_by_dataset: dict[str, list[MappingRow]] = defaultdict(list)
         for row in self.mapping_rows:
@@ -68,7 +96,16 @@ class SemanticService:
         self.initialize()
 
     def initialize(self) -> None:
-        """重新装载配置、原始数据、本体和推理结果。"""
+        """
+        功能：
+        - 重新装载配置、原始数据、本体和推理结果。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         with self.lock:
             self.batch_id = datetime.now(tz=UTC).strftime("%Y%m%d%H%M%S")
             self.dataset = Dataset()
@@ -79,9 +116,20 @@ class SemanticService:
 
             # 初始化顺序固定：先装入 schema，再读源数据、构图、校验、推理、持久化。
             self._load_schema(self.base_graph)
-            self.source_rows = self._load_source_rows()
-            self.dataset_indexes = self._build_dataset_indexes()
-            self.records = self._build_records()
+            self.source_rows, self.data_warnings = load_source_rows(
+                settings=self.settings,
+                scenario=self.scenario,
+                mapping_by_dataset=self.mapping_by_dataset,
+                fact_evaluator=self.fact_evaluator,
+            )
+            self.dataset_indexes = build_dataset_indexes(self.source_rows, self.scenario)
+            self.records = build_records(
+                source_rows=self.source_rows,
+                dataset_indexes=self.dataset_indexes,
+                scenario=self.scenario,
+                fact_evaluator=self.fact_evaluator,
+                node_id_for_row=self._node_id,
+            )
             self._materialize_base_graph()
             self.validation = run_shacl_validation(
                 self.base_graph,
@@ -92,172 +140,53 @@ class SemanticService:
             self.persistence = self.repository.persist(self.dataset)
 
     def _load_schema(self, graph: Graph) -> None:
-        """把核心本体和领域本体加载到基础图。"""
+        """
+        功能：
+        - 把核心本体和领域本体加载到基础图。
+
+        输入：
+        - `graph`: 需要读取或写入的 RDF 图对象。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         for path in (self.settings.ontology_core_path, self.settings.ontology_domain_path):
             graph.parse(path, format="turtle")
 
-    def _load_source_rows(self) -> dict[str, list[dict[str, Any]]]:
-        """读取各数据集 CSV，并补充实体构图所需的运行时元字段。"""
-        rows_by_dataset: dict[str, list[dict[str, Any]]] = {}
-        self.data_warnings = []
-
-        for dataset_key, dataset_config in self.scenario.datasets.items():
-            path = self.settings.data_dir / dataset_config.file
-            if not path.exists():
-                self.data_warnings.append(f"missing_dataset:{dataset_key}:{dataset_config.file}")
-                rows_by_dataset[dataset_key] = []
-                continue
-
-            raw_rows = read_csv_rows(path)
-            typed_rows: list[dict[str, Any]] = []
-            target_type = self._target_type_for_dataset(dataset_key)
-            for index, raw_row in enumerate(raw_rows):
-                row: dict[str, Any] = dict(raw_row)
-                for mapping in self.mapping_by_dataset.get(dataset_key, []):
-                    if mapping.field_name in row:
-                        row[mapping.field_name] = self._coerce_scalar(row[mapping.field_name], mapping.value_type)
-                row["_dataset_key"] = dataset_key
-                row["_row_index"] = index
-                row["_target_type"] = target_type
-                # 以下下划线字段仅在服务内部使用，不直接暴露给前端。
-                row["_entity_uri"] = self._entity_uri(dataset_key, row, index)
-                row["_label"] = self._entity_label(dataset_key, row)
-                row["_node_type"] = dataset_config.node_type
-                typed_rows.append(row)
-            rows_by_dataset[dataset_key] = typed_rows
-        return rows_by_dataset
-
-    def _build_dataset_indexes(self) -> dict[str, dict[str, dict[str, list[dict[str, Any]]]]]:
-        """按场景配置的 join key 构建多级索引，加速跨表关联。"""
-        indexes: dict[str, dict[str, dict[str, list[dict[str, Any]]]]] = {}
-        for dataset_key, rows in self.source_rows.items():
-            dataset_config = self.scenario.datasets[dataset_key]
-            join_indexes: dict[str, dict[str, list[dict[str, Any]]]] = {
-                canonical_key: defaultdict(list) for canonical_key in dataset_config.join_keys
-            }
-            for row in rows:
-                for canonical_key, field_name in dataset_config.join_keys.items():
-                    value = row.get(field_name)
-                    if value in (None, ""):
-                        continue
-                    join_indexes[canonical_key][str(value)].append(row)
-            indexes[dataset_key] = join_indexes
-        return indexes
-
-    def _build_records(self) -> dict[str, dict[str, Any]]:
-        """以主数据集为中心拼装实体记录，供告警与详情视图使用。"""
-        primary_dataset = self.scenario.datasets[self.scenario.primary_dataset]
-        records: dict[str, dict[str, Any]] = {}
-
-        for primary_row in self.source_rows.get(self.scenario.primary_dataset, []):
-            entity_id = str(primary_row.get(self.scenario.primary_id_field) or "").strip()
-            if not entity_id:
-                continue
-
-            related: dict[str, list[dict[str, Any]]] = {}
-            for dataset_key, dataset_config in self.scenario.datasets.items():
-                if dataset_key == self.scenario.primary_dataset:
-                    continue
-                # 使用数据集键 + 行号去重，避免同一关联记录因多个 join key 重复命中。
-                matched: dict[tuple[str, int], dict[str, Any]] = {}
-                for canonical_key, primary_field in primary_dataset.join_keys.items():
-                    if canonical_key not in dataset_config.join_keys:
-                        continue
-                    value = primary_row.get(primary_field)
-                    if value in (None, ""):
-                        continue
-                    for row in self.dataset_indexes[dataset_key][canonical_key].get(str(value), []):
-                        matched[(dataset_key, int(row["_row_index"]))] = row
-                related[dataset_key] = list(matched.values())
-
-            facts = {fact.key: self._evaluate_fact(fact, primary_row, related) for fact in self.scenario.facts}
-            records[entity_id] = {
-                "entityId": entity_id,
-                "displayName": str(primary_row.get(self.scenario.primary_label_field) or entity_id),
-                "nodeId": self._node_id(self.scenario.primary_dataset, primary_row),
-                "primary": primary_row,
-                "related": related,
-                "metrics": facts,
-            }
-        return records
-
     def _materialize_base_graph(self) -> None:
-        """把原始行数据和场景关系映射为基础 RDF 图。"""
+        """
+        功能：
+        - 把原始行数据和场景关系映射为基础 RDF 图。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         graph = self.base_graph
         assert graph is not None
-
-        for dataset_key, rows in self.source_rows.items():
-            target_type = self._target_type_for_dataset(dataset_key)
-            target_class = self._resolve_curie(target_type)
-            for row in rows:
-                resource = row["_entity_uri"]
-                self._tag_entity(graph, resource, self.scenario.datasets[dataset_key].source_system)
-                graph.add((resource, RDF.type, target_class))
-
-                label = row.get("_label")
-                if label:
-                    graph.add((resource, RDFS.label, Literal(str(label))))
-
-                for mapping in self.mapping_by_dataset.get(dataset_key, []):
-                    value = row.get(mapping.field_name)
-                    if value in (None, ""):
-                        continue
-                    predicate = self._resolve_curie(mapping.mapped_predicate)
-                    graph.add((resource, predicate, self._literal_for_value(value, mapping.value_type)))
-
-        for relation in self.scenario.relations:
-            source_rows = self.source_rows.get(relation.source_dataset, [])
-            target_index = self.dataset_indexes.get(relation.target_dataset, {}).get(relation.target_join_key, {})
-            source_dataset_config = self.scenario.datasets[relation.source_dataset]
-            source_field = source_dataset_config.join_keys[relation.source_join_key]
-
-            for source_row in source_rows:
-                join_value = source_row.get(source_field)
-                if join_value in (None, ""):
-                    continue
-                for target_row in target_index.get(str(join_value), []):
-                    self._add_relation(
-                        source_row["_entity_uri"],
-                        self._resolve_curie(relation.predicate),
-                        target_row["_entity_uri"],
-                        self._relation_id(relation.source_dataset, source_row, relation.target_dataset, target_row),
-                        relation.label,
-                        relation.source_system,
-                    )
-
-    def _add_relation(
-        self,
-        source: URIRef,
-        predicate: URIRef,
-        target: URIRef,
-        relation_id: str,
-        label: str,
-        source_system: str,
-    ) -> None:
-        """同时写入实体间关系边和关系对象节点，便于查询与溯源。"""
-        graph = self.base_graph
-        assert graph is not None
-        namespaces = make_namespaces(self.settings)
-        doim = namespaces["doim"]
-        relation = URIRef(f"{self.settings.data_ns}relation/{relation_id}")
-        self._tag_entity(graph, relation, source_system)
-        graph.add((source, predicate, target))
-        graph.add((source, doim.relatedTo, target))
-        graph.add((relation, RDF.type, doim.Relation))
-        graph.add((relation, RDFS.label, Literal(label)))
-        graph.add((relation, doim.fromEntity, source))
-        graph.add((relation, doim.toEntity, target))
-        graph.add((relation, doim.predicateUri, Literal(str(predicate))))
-
-    def _tag_entity(self, graph: Graph, resource: URIRef, source_system: str) -> None:
-        """为实体补充来源系统和导入批次标记。"""
-        namespaces = make_namespaces(self.settings)
-        doim = namespaces["doim"]
-        graph.add((resource, doim.sourceSystem, Literal(source_system)))
-        graph.add((resource, doim.loadBatch, Literal(self.batch_id)))
+        materialize_base_graph(
+            graph=graph,
+            settings=self.settings,
+            scenario=self.scenario,
+            source_rows=self.source_rows,
+            dataset_indexes=self.dataset_indexes,
+            mapping_by_dataset=self.mapping_by_dataset,
+            batch_id=self.batch_id,
+        )
 
     def _apply_owlrl(self) -> int:
-        """执行 OWL RL 推理，并把新增三元组写入推理图。"""
+        """
+        功能：
+        - 执行 OWL RL 推理，并把新增三元组写入推理图。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回整数结果，通常用于计数、排序权重或状态统计。
+        """
         if DeductiveClosure is None or OWLRL_Semantics is None:
             return 0
         assert self.base_graph is not None
@@ -280,7 +209,16 @@ class SemanticService:
         return added
 
     def _union_graph(self) -> Graph:
-        """合并基础图与推理图，形成统一查询视图。"""
+        """
+        功能：
+        - 合并基础图与推理图，形成统一查询视图。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回构建完成的 RDF 图对象。
+        """
         union = Graph()
         bind_prefixes(union, self.settings)
         assert self.base_graph is not None
@@ -292,7 +230,16 @@ class SemanticService:
         return union
 
     def run_inference(self, persist: bool = True) -> dict[str, Any]:
-        """重新执行推理流程，并按需持久化结果。"""
+        """
+        功能：
+        - 重新执行推理流程，并按需持久化结果。
+
+        输入：
+        - `persist`: 布尔参数 `persist`，用于控制当前分支或开关行为。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         with self.lock:
             assert self.deductions_graph is not None
             # 每次推理前先清空旧推理结果，避免重复叠加。
@@ -319,10 +266,22 @@ class SemanticService:
             }
 
     def get_summary(self) -> dict[str, Any]:
-        """返回首页概览所需的汇总数据。"""
+        """
+        功能：
+        - 返回首页概览所需的汇总数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         with self.lock:
             union = self._union_graph()
+            object_model = self.describe_object_model()
+            tool_catalog = self.describe_tool_catalog()
             return {
+                "scenarioKey": self.settings.scenario_key,
                 "scenario": self.scenario.name,
                 "appTitle": self.scenario.app_title,
                 "headerTitle": self.scenario.header_title,
@@ -357,41 +316,48 @@ class SemanticService:
                 "alertDistribution": self.operational_metrics.get("alertDistribution", {}),
                 "actionCatalog": self.operational_metrics.get("actionCatalog", []),
                 "operationsWorkbench": self._build_operations_workbench(),
+                "ontologyObjects": object_model,
+                "toolCatalog": tool_catalog,
+                "agentProfile": {
+                    "name": "运营智能问答",
+                    "mode": "supervised",
+                    "planner": "llm-tool-router",
+                    "objectCount": len(object_model),
+                    "toolCount": len(tool_catalog),
+                },
                 "warnings": list(self.data_warnings),
             }
 
     def get_alerts(self) -> list[dict[str, Any]]:
-        """构建告警列表，并按场景配置的排序规则输出。"""
-        alerts: list[dict[str, Any]] = []
-        for record in self.records.values():
-            inference = self.inference[record["entityId"]]
-            runtime_case = self.runtime.get_case_for_entity(record["entityId"])
-            runtime_alert = self.runtime.get_alert_for_entity(record["entityId"])
-            alerts.append(
-                {
-                    "entityId": record["entityId"],
-                    "nodeId": record["nodeId"],
-                    "displayName": record["displayName"],
-                    "riskLevel": inference["riskLevel"],
-                    "recommendedAction": inference["recommendedAction"],
-                    "factors": [factor.label for factor in inference["factors"]],
-                    "summaryFields": self._render_display_fields(record, self.scenario.summary_fields),
-                    "detailFields": self._render_display_fields(record, self.scenario.detail_fields),
-                    "highlightFields": self._render_display_fields(record, self.scenario.highlight_fields),
-                    "metrics": self._serialize_metrics(record["metrics"]),
-                    "alertState": (runtime_alert or {}).get("state") or "",
-                    "caseId": (runtime_case or {}).get("caseId") or "",
-                    "caseState": (runtime_case or {}).get("state") or "",
-                    "taskCount": len((runtime_case or {}).get("tasks", [])),
-                    "availableActions": (runtime_case or {}).get("availableActions", []),
-                }
-            )
+        """
+        功能：
+        - 构建告警列表，并按场景配置的排序规则输出。
 
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        alerts = [
+            self._build_alert_payload(context)
+            for entity_id in self.records
+            if (context := self._entity_context(entity_id)) is not None
+        ]
         alerts.sort(key=self._alert_sort_key)
         return alerts
 
     def search_subscribers(self, query: str) -> list[dict[str, Any]]:
-        """按实体标识、名称和搜索字段检索实体。"""
+        """
+        功能：
+        - 按实体标识、名称和搜索字段检索实体。
+
+        输入：
+        - `query`: 调用方传入的查询语句或关键字。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         keyword = (query or "").strip().lower()
         alerts = self.get_alerts()
         if any(term in keyword for term in self.scenario.risk_terms):
@@ -409,45 +375,33 @@ class SemanticService:
         return [by_id[entity_id] for entity_id in matches if entity_id in by_id]
 
     def get_subscriber(self, subscriber_id: str) -> dict[str, Any]:
-        """返回单个实体的详细信息、证据和局部图谱。"""
-        entity_id = subscriber_id.strip()
-        if entity_id not in self.records:
-            return {"error": "entity_not_found", "entityId": entity_id}
+        """
+        功能：
+        - 返回单个实体的详细信息、证据和局部图谱。
 
-        record = self.records[entity_id]
-        inference = self.inference[entity_id]
-        runtime_case = self.runtime.get_case_for_entity(entity_id)
-        runtime_alert = self.runtime.get_alert_for_entity(entity_id)
-        related_payload = {
-            dataset_key: [self._serialize_row(row) for row in rows]
-            for dataset_key, rows in record["related"].items()
-            if rows
-        }
-        interaction_count = sum(len(record["related"].get(key, [])) for key in self.scenario.interaction_datasets)
-        return {
-            "entityId": entity_id,
-            "displayName": record["displayName"],
-            "riskLevel": inference["riskLevel"],
-            "recommendedAction": inference["recommendedAction"],
-            "metrics": self._serialize_metrics(record["metrics"]),
-            "factors": [factor.label for factor in inference["factors"]],
-            "rules": inference["rules"],
-            "summaryFields": self._render_display_fields(record, self.scenario.summary_fields),
-            "detailFields": self._render_display_fields(record, self.scenario.detail_fields),
-            "relatedData": related_payload,
-            "inference": self._build_inference_summary(record["displayName"], inference, interaction_count),
-            "evidence": self._build_evidence(record, inference),
-            "graph": self._build_entity_graph(record, inference, runtime_case),
-            "alertState": (runtime_alert or {}).get("state") or "",
-            "case": runtime_case,
-            "tasks": (runtime_case or {}).get("tasks", []),
-            "timeline": (runtime_case or {}).get("timeline", []),
-            "actionRuns": (runtime_case or {}).get("actionRuns", []),
-            "availableActions": (runtime_case or {}).get("availableActions", []),
-        }
+        输入：
+        - `subscriber_id`: 函数执行所需的 `subscriber_id` 参数。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        entity_id = subscriber_id.strip()
+        context = self._entity_context(entity_id)
+        if context is None:
+            return {"error": "entity_not_found", "entityId": entity_id}
+        return self._build_subscriber_payload(context)
 
     def run_sparql(self, query_string: str | None) -> dict[str, Any]:
-        """执行 SPARQL 查询，兼容纯文本和 JSON body 两种输入格式。"""
+        """
+        功能：
+        - 执行 SPARQL 查询，兼容纯文本和 JSON body 两种输入格式。
+
+        输入：
+        - `query_string`: 需要执行的完整查询字符串。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         query = self._extract_query(query_string) or self.scenario.sample_query or self.settings.default_query
         graph = self._union_graph()
         results = graph.query(query)
@@ -466,8 +420,116 @@ class SemanticService:
             "rows": rows,
         }
 
+    def describe_object_model(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 返回监督 agent 可访问的稳定对象模型定义。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        with self.lock:
+            return build_object_model(
+                primary_entity_label=self.scenario.primary_entity_label,
+                primary_node_type=self.scenario.primary_node_type,
+            )
+
+    def describe_tool_catalog(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 返回监督 agent 依赖的工具目录。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        with self.lock:
+            return agent_tool_catalog()
+
+    def query_objects(
+        self,
+        object_type: str,
+        *,
+        limit: int = 10,
+        search: str | None = None,
+        filters: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """
+        功能：
+        - 按对象类型检索实例，作为监督 agent 的统一 object query 工具。
+
+        输入：
+        - `object_type`: 对象类型名称。
+        - `limit`: 函数执行所需的 `limit` 参数。
+        - `search`: 对象查询时使用的搜索关键字。
+        - `filters`: 对象查询时使用的字段过滤条件。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        with self.lock:
+            normalized_limit = max(1, min(int(limit or 10), 50))
+            rows = self._object_rows(object_type)
+            filtered = [
+                row
+                for row in rows
+                if self._matches_object_filters(row, filters or {})
+                and self._matches_object_search(row, search)
+            ]
+            return {
+                "objectType": object_type,
+                "total": len(filtered),
+                "returned": min(len(filtered), normalized_limit),
+                "rows": filtered[:normalized_limit],
+            }
+
+    def get_object(self, object_type: str, object_id: str) -> dict[str, Any]:
+        """
+        功能：
+        - 读取单个对象详情。
+
+        输入：
+        - `object_type`: 对象类型名称。
+        - `object_id`: 对象标识。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        with self.lock:
+            key = object_id.strip()
+            if not key:
+                raise ValueError("object_id_required")
+
+            direct_getters = {
+                "User": lambda: self.get_subscriber(key),
+                "RetentionCase": lambda: self.get_case(key),
+                "Task": lambda: self._get_task_object(key),
+                "ActionDefinition": lambda: self._get_action_definition_object(key),
+            }
+            if object_type in direct_getters:
+                return direct_getters[object_type]()
+
+            result = self.query_objects(object_type, limit=1, filters={"objectId": key})
+            if result["rows"]:
+                return result["rows"][0]
+            return {"error": "object_not_found", "objectType": object_type, "objectId": key}
+
     def load_data_file(self, file_path: Path) -> dict[str, Any]:
-        """加载上传文件；CSV 触发全量重建，RDF 文件则直接解析入图。"""
+        """
+        功能：
+        - 加载上传文件；CSV 触发全量重建，RDF 文件则直接解析入图。
+
+        输入：
+        - `file_path`: 待处理的数据文件路径。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         with self.lock:
             if file_path.suffix.lower() == ".csv":
                 self.initialize()
@@ -488,12 +550,30 @@ class SemanticService:
             }
 
     def list_cases(self) -> list[dict[str, Any]]:
-        """返回当前所有运营 case。"""
+        """
+        功能：
+        - 返回当前所有运营 case。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         with self.lock:
             return [self._enrich_case_payload(item) for item in self.runtime.list_cases()]
 
     def get_case(self, case_id: str) -> dict[str, Any]:
-        """返回单个运营 case。"""
+        """
+        功能：
+        - 返回单个运营 case。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         with self.lock:
             payload = self.runtime.get_case(case_id)
             if payload is None:
@@ -501,7 +581,17 @@ class SemanticService:
             return self._enrich_case_payload(payload, include_detail=True)
 
     def list_tasks(self, status: str | None = None, assignee_role: str | None = None) -> list[dict[str, Any]]:
-        """返回任务列表。"""
+        """
+        功能：
+        - 返回任务列表。
+
+        输入：
+        - `status`: 筛选或设置时使用的状态值。
+        - `assignee_role`: 任务或 case 负责人角色标识。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         with self.lock:
             return [
                 self._enrich_task_payload(item)
@@ -519,7 +609,22 @@ class SemanticService:
         case_id: str | None,
         parameters: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        """执行运营动作。"""
+        """
+        功能：
+        - 执行运营动作。
+
+        输入：
+        - `action_id`: 待执行动作的标识。
+        - `actor_role`: 当前执行人的角色标识。
+        - `actor_id`: 当前执行人的唯一标识。
+        - `actor_area_id`: 当前执行人所属区域标识，可为空。
+        - `entity_id`: 业务主实体标识。
+        - `case_id`: 运营 case 标识。
+        - `parameters`: 字典参数 `parameters`，承载键值形式的输入数据。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         with self.lock:
             result = self.runtime.execute_action(
                 action_id=action_id,
@@ -548,21 +653,158 @@ class SemanticService:
             return result
 
     def _build_operations_workbench(self) -> dict[str, Any]:
-        """构建前端运营工作台所需的聚合视图。"""
+        """
+        功能：
+        - 构建前端运营工作台所需的聚合视图。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         cases = [self._enrich_case_payload(item) for item in self.runtime.list_cases()]
         tasks = [self._enrich_task_payload(item) for item in self.runtime.list_tasks()]
         open_cases = [item for item in cases if item.get("state") != "CLOSED"]
         todo_tasks = [item for item in tasks if item.get("status") == "TODO"]
 
+        return {
+            "focusCases": open_cases[:6],
+            "queueLanes": self._build_workbench_queue_lanes(open_cases, todo_tasks),
+            "priorityBands": self._build_workbench_priority_bands(open_cases),
+            "recentActions": self._build_workbench_recent_actions(),
+        }
+
+    def _entity_context(self, entity_id: str) -> dict[str, Any] | None:
+        """
+        功能：
+        - 聚合实体记录、推理结果与运行时状态，减少详情与告警接口的重复取数。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+
+        输出：
+        - 返回值: 返回处理结果；当目标不存在、未命中或无法解析时返回 `None`。
+        """
+        record = self.records.get(entity_id)
+        if record is None:
+            return None
+        return {
+            "entityId": entity_id,
+            "record": record,
+            "inference": self.inference[entity_id],
+            "runtimeCase": self.runtime.get_case_for_entity(entity_id),
+            "runtimeAlert": self.runtime.get_alert_for_entity(entity_id),
+        }
+
+    def _build_alert_payload(self, context: dict[str, Any]) -> dict[str, Any]:
+        """
+        功能：
+        - 构建alert返回载荷。
+
+        输入：
+        - `context`: 错误提示或日志中使用的上下文说明。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        record = context["record"]
+        inference = context["inference"]
+        runtime_case = context["runtimeCase"] or {}
+        runtime_alert = context["runtimeAlert"] or {}
+        return {
+            "entityId": context["entityId"],
+            "nodeId": record["nodeId"],
+            "displayName": record["displayName"],
+            "riskLevel": inference["riskLevel"],
+            "recommendedAction": inference["recommendedAction"],
+            "factors": [factor.label for factor in inference["factors"]],
+            "summaryFields": self._render_display_fields(record, self.scenario.summary_fields),
+            "detailFields": self._render_display_fields(record, self.scenario.detail_fields),
+            "highlightFields": self._render_display_fields(record, self.scenario.highlight_fields),
+            "metrics": self._serialize_metrics(record["metrics"]),
+            "alertState": runtime_alert.get("state") or "",
+            "caseId": runtime_case.get("caseId") or "",
+            "caseState": runtime_case.get("state") or "",
+            "taskCount": len(runtime_case.get("tasks", [])),
+            "availableActions": runtime_case.get("availableActions", []),
+        }
+
+    def _build_subscriber_payload(self, context: dict[str, Any]) -> dict[str, Any]:
+        """
+        功能：
+        - 构建主实体详情返回载荷。
+
+        输入：
+        - `context`: 错误提示或日志中使用的上下文说明。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        record = context["record"]
+        inference = context["inference"]
+        runtime_case = context["runtimeCase"]
+        runtime_alert = context["runtimeAlert"] or {}
+        interaction_count = sum(len(record["related"].get(key, [])) for key in self.scenario.interaction_datasets)
+        return {
+            "entityId": context["entityId"],
+            "displayName": record["displayName"],
+            "riskLevel": inference["riskLevel"],
+            "recommendedAction": inference["recommendedAction"],
+            "metrics": self._serialize_metrics(record["metrics"]),
+            "factors": [factor.label for factor in inference["factors"]],
+            "rules": inference["rules"],
+            "summaryFields": self._render_display_fields(record, self.scenario.summary_fields),
+            "detailFields": self._render_display_fields(record, self.scenario.detail_fields),
+            "relatedData": self._serialize_related_data(record),
+            "inference": self._build_inference_summary(record["displayName"], inference, interaction_count),
+            "evidence": self._build_evidence(record, inference),
+            "graph": self._build_entity_graph(record, inference, runtime_case),
+            "alertState": runtime_alert.get("state") or "",
+            "case": runtime_case,
+            "tasks": (runtime_case or {}).get("tasks", []),
+            "timeline": (runtime_case or {}).get("timeline", []),
+            "actionRuns": (runtime_case or {}).get("actionRuns", []),
+            "availableActions": (runtime_case or {}).get("availableActions", []),
+        }
+
+    def _serialize_related_data(self, record: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+        """
+        功能：
+        - 序列化relateddata。
+
+        输入：
+        - `record`: 单个实体或业务对象的聚合记录。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        return {
+            dataset_key: [self._serialize_row(row) for row in rows]
+            for dataset_key, rows in record["related"].items()
+            if rows
+        }
+
+    def _build_workbench_priority_bands(self, open_cases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建workbenchprioritybands。
+
+        输入：
+        - `open_cases`: 当前仍处于打开状态的 case 列表。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         priority_meta = {
             "P1": "立即处置",
             "P2": "当班跟进",
             "P3": "持续监控",
         }
-        priority_bands = []
+        bands = []
         for priority in ("P1", "P2", "P3"):
             band_cases = [item for item in open_cases if item.get("priority") == priority]
-            priority_bands.append(
+            bands.append(
                 {
                     "priority": priority,
                     "label": priority_meta[priority],
@@ -571,13 +813,30 @@ class SemanticService:
                     "actionableCount": sum(1 for item in band_cases if item.get("availableActions")),
                 }
             )
+        return bands
 
+    def _build_workbench_queue_lanes(
+        self,
+        open_cases: list[dict[str, Any]],
+        todo_tasks: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建workbench队列lanes。
+
+        输入：
+        - `open_cases`: 当前仍处于打开状态的 case 列表。
+        - `todo_tasks`: 列表参数 `todo_tasks`，用于批量传入待处理的数据。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         queue_names = sorted({item.get("queue_name", "") for item in open_cases if item.get("queue_name")})
-        queue_lanes = []
+        lanes = []
         for queue_name in queue_names:
             lane_cases = [item for item in open_cases if item.get("queue_name") == queue_name]
             lane_tasks = [item for item in todo_tasks if item.get("queue_name") == queue_name]
-            queue_lanes.append(
+            lanes.append(
                 {
                     "queueName": queue_name,
                     "label": queue_name.replace("-", " ").title(),
@@ -587,10 +846,24 @@ class SemanticService:
                     "owners": sorted({str(item.get("owner_role") or "") for item in lane_cases if item.get("owner_role")}),
                 }
             )
+        return lanes
 
+    def _build_workbench_recent_actions(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建workbenchrecent动作列表。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         recent_actions = []
-        for run in sorted(self.runtime.action_runs.values(), key=lambda item: item.updated_at, reverse=True)[:6]:
+        recent_runs = sorted(self.runtime.action_runs.values(), key=lambda item: item.updated_at, reverse=True)[:6]
+        for run in recent_runs:
             display_name = self.records.get(run.entity_id, {}).get("displayName", run.entity_id)
+            action = self.runtime.action_definitions.get(run.action_id)
             recent_actions.append(
                 {
                     "id": run.id,
@@ -598,24 +871,402 @@ class SemanticService:
                     "entityId": run.entity_id,
                     "displayName": display_name,
                     "actionId": run.action_id,
-                    "label": self.runtime.action_definitions.get(run.action_id).label
-                    if run.action_id in self.runtime.action_definitions
-                    else run.action_id,
+                    "label": action.label if action is not None else run.action_id,
                     "actorRole": run.actor_role,
                     "status": run.status,
                     "time": run.updated_at,
                 }
             )
+        return recent_actions
 
+    def _object_rows(self, object_type: str) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 处理与 `_object_rows` 相关的逻辑。
+
+        输入：
+        - `object_type`: 对象类型名称。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        builders = {
+            "User": self._build_user_object_rows,
+            "RiskAlert": self._build_alert_object_rows,
+            "RetentionCase": self._build_case_object_rows,
+            "Task": self._build_task_object_rows,
+            "InteractionEvent": self._build_interaction_object_rows,
+            "RuleHit": self._build_rule_object_rows,
+            "ActionDefinition": self._build_action_object_rows,
+        }
+        builder = builders.get(object_type)
+        if builder is None:
+            raise ValueError(f"unsupported_object_type:{object_type}")
+        return builder()
+
+    def _build_user_object_rows(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建user对象行数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        return [self._build_user_object_row(alert) for alert in self.get_alerts()]
+
+    def _build_alert_object_rows(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建alert对象行数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        return [self._build_alert_object_row(alert) for alert in self.get_alerts()]
+
+    def _build_user_object_row(self, alert: dict[str, Any]) -> dict[str, Any]:
+        """
+        功能：
+        - 构建user对象单行数据。
+
+        输入：
+        - `alert`: 单个运行时告警对象或告警载荷。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        primary = self.records.get(alert["entityId"], {}).get("primary", {})
         return {
-            "focusCases": open_cases[:6],
-            "queueLanes": queue_lanes,
-            "priorityBands": priority_bands,
-            "recentActions": recent_actions,
+            "objectId": alert["entityId"],
+            "objectType": "User",
+            "entityId": alert["entityId"],
+            "displayName": alert["displayName"],
+            "riskLevel": alert["riskLevel"],
+            "recommendedAction": alert["recommendedAction"],
+            "alertState": alert.get("alertState") or "",
+            "caseId": alert.get("caseId") or "",
+            "caseState": alert.get("caseState") or "",
+            "areaId": str(primary.get("area_id") or ""),
+            "summary": self._field_line(alert.get("summaryFields", [])),
+        }
+
+    def _build_alert_object_row(self, alert: dict[str, Any]) -> dict[str, Any]:
+        """
+        功能：
+        - 构建alert对象单行数据。
+
+        输入：
+        - `alert`: 单个运行时告警对象或告警载荷。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        return {
+            "objectId": f"alert:{alert['entityId']}",
+            "objectType": "RiskAlert",
+            "entityId": alert["entityId"],
+            "displayName": alert["displayName"],
+            "riskLevel": alert["riskLevel"],
+            "recommendedAction": alert["recommendedAction"],
+            "alertState": alert.get("alertState") or "",
+            "caseId": alert.get("caseId") or "",
+            "caseState": alert.get("caseState") or "",
+            "summary": self._field_line(alert.get("highlightFields", []))
+            or self._field_line(alert.get("summaryFields", [])),
+        }
+
+    def _build_case_object_rows(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建case对象行数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        return [self._enrich_case_payload(item) for item in self.runtime.list_cases()]
+
+    def _build_task_object_rows(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建task对象行数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        return [self._enrich_task_payload(item) for item in self.runtime.list_tasks()]
+
+    def _build_rule_object_rows(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建规则对象行数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        return [
+            {
+                "objectId": label,
+                "objectType": "RuleHit",
+                "rule": label,
+                "count": count,
+            }
+            for label, count in sorted(self.top_rules.items(), key=lambda item: (-item[1], item[0]))
+        ]
+
+    def _build_action_object_rows(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建动作对象行数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        return [
+            {
+                **item.__dict__,
+                "objectId": item.id,
+                "objectType": "ActionDefinition",
+            }
+            for item in self.runtime.ACTION_DEFINITIONS
+        ]
+
+    def _build_interaction_object_rows(self) -> list[dict[str, Any]]:
+        """
+        功能：
+        - 构建interaction对象行数据。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
+        rows: list[dict[str, Any]] = []
+        for dataset_key in self.scenario.interaction_datasets:
+            dataset_config = self.scenario.datasets[dataset_key]
+            for row in self.source_rows.get(dataset_key, []):
+                entity_id = self._primary_entity_id_for_row(dataset_key, row)
+                display_name = self.records.get(entity_id, {}).get("displayName", "") if entity_id else ""
+                rows.append(
+                    {
+                        "objectId": str(row.get("_entity_uri") or self._node_id(dataset_key, row)),
+                        "objectType": "InteractionEvent",
+                        "datasetKey": dataset_key,
+                        "entityId": entity_id,
+                        "displayName": display_name or str(row.get("_label") or dataset_config.entity_label),
+                        "eventTime": self._interaction_time_value(row),
+                        "sourceSystem": dataset_config.source_system,
+                        "summary": self._row_brief(row),
+                    }
+                )
+        rows.sort(key=lambda item: str(item.get("eventTime") or ""), reverse=True)
+        return rows
+
+    def _matches_object_filters(self, row: dict[str, Any], filters: dict[str, Any]) -> bool:
+        """
+        功能：
+        - 处理与 `_matches_object_filters` 相关的逻辑。
+
+        输入：
+        - `row`: 单行源数据或中间对象数据。
+        - `filters`: 对象查询时使用的字段过滤条件。
+
+        输出：
+        - 返回值: 返回布尔值，表示条件是否成立或当前操作是否允许。
+        """
+        for key, value in filters.items():
+            if value in (None, ""):
+                continue
+            candidate = row.get(key)
+            if isinstance(value, (list, tuple, set)):
+                normalized = {str(item).lower() for item in value}
+                if str(candidate or "").lower() not in normalized:
+                    return False
+                continue
+            if str(candidate or "").lower() != str(value).lower():
+                return False
+        return True
+
+    def _matches_object_search(self, row: dict[str, Any], search: str | None) -> bool:
+        """
+        功能：
+        - 处理与 `_matches_object_search` 相关的逻辑。
+
+        输入：
+        - `row`: 单行源数据或中间对象数据。
+        - `search`: 对象查询时使用的搜索关键字。
+
+        输出：
+        - 返回值: 返回布尔值，表示条件是否成立或当前操作是否允许。
+        """
+        keyword = (search or "").strip().lower()
+        if not keyword:
+            return True
+        haystacks = []
+        for value in row.values():
+            if isinstance(value, (str, int, float, bool)):
+                haystacks.append(str(value))
+        return any(keyword in item.lower() for item in haystacks)
+
+    def _field_line(self, fields: list[dict[str, Any]]) -> str:
+        """
+        功能：
+        - 处理与 `_field_line` 相关的逻辑。
+
+        输入：
+        - `fields`: 用于展示或拼接的字段定义列表。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
+        parts = []
+        for field in fields:
+            label = str(field.get("label") or "").strip()
+            value = field.get("value")
+            if not label or value in (None, ""):
+                continue
+            parts.append(f"{label}: {value}")
+        return " | ".join(parts)
+
+    def _interaction_time_value(self, row: dict[str, Any]) -> str:
+        """
+        功能：
+        - 处理与 `_interaction_time_value` 相关的逻辑。
+
+        输入：
+        - `row`: 单行源数据或中间对象数据。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
+        for field_name in (
+            "query_time",
+            "accept_time",
+            "maintain_time",
+            "start_date",
+            "create_time",
+            "latest_date",
+            "stat_date",
+            "event_time",
+        ):
+            value = row.get(field_name)
+            if value not in (None, ""):
+                return str(value)
+        return ""
+
+    def _row_brief(self, row: dict[str, Any]) -> str:
+        """
+        功能：
+        - 处理与 `_row_brief` 相关的逻辑。
+
+        输入：
+        - `row`: 单行源数据或中间对象数据。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
+        preview_fields = []
+        for key, value in row.items():
+            if key.startswith("_") or value in (None, ""):
+                continue
+            preview_fields.append(f"{key}={value}")
+            if len(preview_fields) >= 3:
+                break
+        return " | ".join(preview_fields)
+
+    def _primary_entity_id_for_row(self, dataset_key: str, row: dict[str, Any]) -> str:
+        """
+        功能：
+        - 处理与 `_primary_entity_id_for_row` 相关的逻辑。
+
+        输入：
+        - `dataset_key`: 需要持久化或查询的 RDF 数据集对象。
+        - `row`: 单行源数据或中间对象数据。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
+        primary_dataset = self.scenario.datasets[self.scenario.primary_dataset]
+        dataset_config = self.scenario.datasets[dataset_key]
+        primary_indexes = self.dataset_indexes.get(self.scenario.primary_dataset, {})
+        for canonical_key, dataset_field in dataset_config.join_keys.items():
+            if canonical_key not in primary_dataset.join_keys:
+                continue
+            value = row.get(dataset_field)
+            if value in (None, ""):
+                continue
+            for match in primary_indexes.get(canonical_key, {}).get(str(value), []):
+                entity_id = match.get(self.scenario.primary_id_field)
+                if entity_id not in (None, ""):
+                    return str(entity_id)
+        return ""
+
+    def _get_task_object(self, task_id: str) -> dict[str, Any]:
+        """
+        功能：
+        - 获取task对象。
+
+        输入：
+        - `task_id`: 任务标识。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        task = next((item for item in self.runtime.list_tasks() if str(item.get("id") or "") == task_id), None)
+        if task is None:
+            return {"error": "object_not_found", "objectType": "Task", "objectId": task_id}
+        return self._enrich_task_payload(task)
+
+    def _get_action_definition_object(self, object_id: str) -> dict[str, Any]:
+        """
+        功能：
+        - 获取动作definition对象。
+
+        输入：
+        - `object_id`: 对象标识。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        action = self.runtime.action_definitions.get(object_id)
+        if action is None:
+            return {"error": "object_not_found", "objectType": "ActionDefinition", "objectId": object_id}
+        return {
+            **action.__dict__,
+            "objectType": "ActionDefinition",
+            "objectId": object_id,
         }
 
     def _enrich_case_payload(self, payload: dict[str, Any], include_detail: bool = False) -> dict[str, Any]:
-        """补齐前端工作台所需的 case 展示字段。"""
+        """
+        功能：
+        - 补齐前端工作台所需的 case 展示字段。
+
+        输入：
+        - `payload`: 请求体或内部处理中使用的载荷数据。
+        - `include_detail`: 布尔参数 `include_detail`，用于控制当前分支或开关行为。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         enriched = dict(payload)
         entity_id = str(enriched.get("entityId") or "")
         record = self.records.get(entity_id)
@@ -642,7 +1293,16 @@ class SemanticService:
         return enriched
 
     def _enrich_task_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
-        """补齐任务列表展示字段。"""
+        """
+        功能：
+        - 补齐任务列表展示字段。
+
+        输入：
+        - `payload`: 请求体或内部处理中使用的载荷数据。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         enriched = dict(payload)
         entity_id = str(enriched.get("entity_id") or "")
         record = self.records.get(entity_id)
@@ -660,14 +1320,32 @@ class SemanticService:
         return enriched
 
     def _risk_distribution(self) -> dict[str, int]:
-        """统计当前推理结果中的风险等级分布。"""
+        """
+        功能：
+        - 统计当前推理结果中的风险等级分布。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         distribution = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
         for item in self.inference.values():
             distribution[item["riskLevel"]] += 1
         return distribution
 
     def _extract_query(self, payload: str | None) -> str:
-        """从请求体中提取查询语句。"""
+        """
+        功能：
+        - 从请求体中提取查询语句。
+
+        输入：
+        - `payload`: 请求体或内部处理中使用的载荷数据。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         if payload is None:
             return ""
         text = payload.strip()
@@ -682,7 +1360,18 @@ class SemanticService:
         return text
 
     def _build_inference_summary(self, name: str, inference: dict[str, Any], interaction_count: int) -> dict[str, Any]:
-        """生成详情页顶部的推理摘要卡片。"""
+        """
+        功能：
+        - 生成详情页顶部的推理摘要卡片。
+
+        输入：
+        - `name`: 名称、字段名或标识名。
+        - `inference`: 按实体组织的推理结果集合。
+        - `interaction_count`: 函数执行所需的 `interaction_count` 参数。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         risk_level = inference["riskLevel"]
         summary = {
             "headline": f"{name} 被推理为 {risk_level} 风险",
@@ -701,7 +1390,17 @@ class SemanticService:
         return summary
 
     def _build_evidence(self, record: dict[str, Any], inference: dict[str, Any]) -> list[dict[str, Any]]:
-        """把高亮字段和命中规则整理成前端可直接展示的证据列表。"""
+        """
+        功能：
+        - 把高亮字段和命中规则整理成前端可直接展示的证据列表。
+
+        输入：
+        - `record`: 单个实体或业务对象的聚合记录。
+        - `inference`: 按实体组织的推理结果集合。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         evidence: list[dict[str, Any]] = []
         for field in self.scenario.highlight_fields:
             rendered = self._render_display_field(record, field)
@@ -727,7 +1426,16 @@ class SemanticService:
         return evidence
 
     def _build_source_cards(self) -> list[dict[str, Any]]:
-        """根据场景配置生成首页数据源卡片。"""
+        """
+        功能：
+        - 根据场景配置生成首页数据源卡片。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         cards: list[dict[str, Any]] = []
         for card in self.scenario.source_cards:
             if card.count_mode == "primary":
@@ -746,160 +1454,22 @@ class SemanticService:
             )
         return cards
 
-    def _overview_cluster_offsets(self) -> dict[str, tuple[float, float]]:
-        """定义概览图中各关联节点相对主实体的布局偏移。"""
-        return {
-            "porting_query": (0.0, -78.0),
-            "contract_info": (80.0, -34.0),
-            "charge_info": (88.0, 42.0),
-            "arrear_info": (0.0, 94.0),
-            "customer_service": (-88.0, 42.0),
-            "retention_action": (-80.0, -34.0),
-            "voice_usage": (-96.0, 0.0),
-        }
-
-    def _add_overview_node(
-        self,
-        nodes_by_id: dict[str, dict[str, Any]],
-        position_accumulators: dict[str, dict[str, float]],
-        node_id: str,
-        label: str,
-        node_type: str,
-        x: float,
-        y: float,
-    ) -> None:
-        """向概览图累加节点及其平均坐标。"""
-        nodes_by_id.setdefault(
-            node_id,
-            {
-                "id": node_id,
-                "label": label,
-                "type": node_type,
-            },
-        )
-        accumulator = position_accumulators.setdefault(node_id, {"x": 0.0, "y": 0.0, "count": 0.0})
-        accumulator["x"] += x
-        accumulator["y"] += y
-        accumulator["count"] += 1.0
-
-    def _overview_related_node_id(self, dataset_key: str, row: dict[str, Any]) -> str:
-        """为概览图中的关联节点生成稳定 ID。"""
-        label = str(row.get("_label") or self.scenario.datasets[dataset_key].entity_label)
-        return f"overview:{self.scenario.datasets[dataset_key].node_type.lower()}:{quote(label, safe='')}"
-
-    def _rows_match_relation(
-        self,
-        relation: RelationConfig,
-        source_row: dict[str, Any],
-        target_row: dict[str, Any],
-    ) -> bool:
-        """判断两条原始记录是否满足某条场景关系配置。"""
-        source_field = self.scenario.datasets[relation.source_dataset].join_keys[relation.source_join_key]
-        target_field = self.scenario.datasets[relation.target_dataset].join_keys[relation.target_join_key]
-        source_value = source_row.get(source_field)
-        target_value = target_row.get(target_field)
-        if source_value in (None, "") or target_value in (None, ""):
-            return False
-        return str(source_value) == str(target_value)
-
     def _build_overview_graph(self) -> dict[str, Any]:
-        """构建首页概览图，只抽样展示每个主实体的一组代表性关联节点。"""
-        nodes_by_id: dict[str, dict[str, Any]] = {}
-        position_accumulators: dict[str, dict[str, float]] = {}
-        edges_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
-        primary_items = list(self.records.values())
-        if not primary_items:
-            return {
-                "nodes": [],
-                "edges": [],
-                "totalPrimaryEntities": 0,
-                "totalInteractions": 0,
-                "displayedPrimaryEntities": 0,
-            }
+        """
+        功能：
+        - 构建首页概览图，只抽样展示每个主实体的一组代表性关联节点。
 
-        cols = max(4, math.ceil(math.sqrt(len(primary_items))))
-        cluster_width = 260.0
-        cluster_height = 220.0
-        margin_x = 160.0
-        margin_y = 150.0
-        cluster_offsets = self._overview_cluster_offsets()
+        输入：
+        - 无。
 
-        for index, record in enumerate(primary_items):
-            row = index // cols
-            col = index % cols
-            center_x = margin_x + col * cluster_width
-            center_y = margin_y + row * cluster_height
-            sampled_rows: dict[str, dict[str, Any]] = {
-                self.scenario.primary_dataset: record["primary"],
-            }
-            sampled_node_ids: dict[str, str] = {}
-            primary_node_id = record["nodeId"]
-            sampled_node_ids[self.scenario.primary_dataset] = primary_node_id
-            self._add_overview_node(
-                nodes_by_id,
-                position_accumulators,
-                primary_node_id,
-                record["displayName"],
-                self.scenario.primary_node_type,
-                center_x,
-                center_y,
-            )
-
-            for dataset_key in self.scenario.graph_datasets:
-                related_rows = record["related"].get(dataset_key, [])
-                if not related_rows:
-                    continue
-                related = related_rows[0]
-                sampled_rows[dataset_key] = related
-                related_node_id = self._overview_related_node_id(dataset_key, related)
-                sampled_node_ids[dataset_key] = related_node_id
-                offset_x, offset_y = cluster_offsets.get(dataset_key, (0.0, 0.0))
-                self._add_overview_node(
-                    nodes_by_id,
-                    position_accumulators,
-                    related_node_id,
-                    str(related.get("_label") or self.scenario.datasets[dataset_key].entity_label),
-                    self.scenario.datasets[dataset_key].node_type,
-                    center_x + offset_x,
-                    center_y + offset_y,
-                )
-
-            for relation in self.scenario.relations:
-                source_row = sampled_rows.get(relation.source_dataset)
-                target_row = sampled_rows.get(relation.target_dataset)
-                if source_row is None or target_row is None:
-                    continue
-                if not self._rows_match_relation(relation, source_row, target_row):
-                    continue
-                source_id = sampled_node_ids.get(relation.source_dataset)
-                target_id = sampled_node_ids.get(relation.target_dataset)
-                if source_id is None or target_id is None:
-                    continue
-                edges_by_key[(source_id, target_id, relation.label)] = {
-                    "source": source_id,
-                    "target": target_id,
-                    "label": relation.label,
-                }
-
-        nodes = []
-        for node_id, node in nodes_by_id.items():
-            accumulator = position_accumulators[node_id]
-            count = max(accumulator["count"], 1.0)
-            nodes.append(
-                {
-                    **node,
-                    "x": accumulator["x"] / count,
-                    "y": accumulator["y"] / count,
-                }
-            )
-
-        return {
-            "nodes": nodes,
-            "edges": list(edges_by_key.values()),
-            "totalPrimaryEntities": len(self.records),
-            "totalInteractions": sum(len(self.source_rows.get(key, [])) for key in self.scenario.interaction_datasets),
-            "displayedPrimaryEntities": len(primary_items),
-        }
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        return build_overview_graph(
+            records=self.records,
+            source_rows=self.source_rows,
+            scenario=self.scenario,
+        )
 
     def _build_entity_graph(
         self,
@@ -907,109 +1477,57 @@ class SemanticService:
         inference: dict[str, Any],
         runtime_case: dict[str, Any] | None,
     ) -> dict[str, Any]:
-        """构建单个实体的详情图谱。"""
-        primary_node = {
-            "id": record["nodeId"],
-            "label": record["displayName"],
-            "type": self.scenario.primary_node_type,
-        }
-        nodes = [primary_node]
-        edges = []
+        """
+        功能：
+        - 构建单个实体的详情图谱。
 
-        result_node = {
-            "id": f"risk:{record['entityId']}",
-            "label": f"{inference['riskLevel']} 风险",
-            "type": "RiskResult",
-        }
-        action_node = {
-            "id": f"action:{record['entityId']}",
-            "label": inference["recommendedAction"],
-            "type": "Action",
-        }
-        nodes.extend([result_node, action_node])
-        edges.append({"source": primary_node["id"], "target": result_node["id"], "label": "推理输出"})
-        edges.append({"source": result_node["id"], "target": action_node["id"], "label": "推荐动作"})
+        输入：
+        - `record`: 单个实体或业务对象的聚合记录。
+        - `inference`: 按实体组织的推理结果集合。
+        - `runtime_case`: 单个动作执行记录。
 
-        for dataset_key in self.scenario.graph_datasets:
-            for row in record["related"].get(dataset_key, [])[:2]:
-                node_id = self._node_id(dataset_key, row)
-                nodes.append(
-                    {
-                        "id": node_id,
-                        "label": str(row.get("_label") or self.scenario.datasets[dataset_key].entity_label),
-                        "type": self.scenario.datasets[dataset_key].node_type,
-                    }
-                )
-                edges.append({"source": primary_node["id"], "target": node_id, "label": self._relation_label(self.scenario.primary_dataset, dataset_key)})
-
-        for factor in inference["factors"]:
-            node_id = f"factor:{factor.code}"
-            nodes.append({"id": node_id, "label": factor.label, "type": "Inference"})
-            edges.append({"source": primary_node["id"], "target": node_id, "label": "命中风险因子"})
-            edges.append({"source": node_id, "target": result_node["id"], "label": "支撑结论"})
-
-        for rule_label in inference["rules"]:
-            node_id = f"rule:{rule_label.encode('utf-8').hex()}"
-            nodes.append({"id": node_id, "label": rule_label, "type": "Inference"})
-            edges.append({"source": primary_node["id"], "target": node_id, "label": "命中规则"})
-            edges.append({"source": node_id, "target": result_node["id"], "label": "触发推理"})
-
-        if runtime_case:
-            case_node_id = f"case:{record['entityId']}"
-            nodes.append(
-                {
-                    "id": case_node_id,
-                    "label": f"{runtime_case['state']} Case",
-                    "type": "Case",
-                }
-            )
-            edges.append({"source": primary_node["id"], "target": case_node_id, "label": "运营处置"})
-
-            for task in runtime_case.get("tasks", [])[:3]:
-                task_node_id = f"task:{task['id']}"
-                nodes.append(
-                    {
-                        "id": task_node_id,
-                        "label": f"{task['title']} [{task['status']}]",
-                        "type": "Task",
-                    }
-                )
-                edges.append({"source": case_node_id, "target": task_node_id, "label": "任务"})
-
-            for action in runtime_case.get("availableActions", [])[:3]:
-                action_def_node_id = f"action-definition:{action['id']}"
-                nodes.append(
-                    {
-                        "id": action_def_node_id,
-                        "label": action["label"],
-                        "type": "ActionDefinition",
-                    }
-                )
-                edges.append({"source": case_node_id, "target": action_def_node_id, "label": "可执行动作"})
-
-            for timeline_item in runtime_case.get("timeline", [])[:4]:
-                event_node_id = f"timeline:{record['entityId']}:{quote(str(timeline_item['time']), safe='')}"
-                nodes.append(
-                    {
-                        "id": event_node_id,
-                        "label": timeline_item["title"],
-                        "type": "Event",
-                    }
-                )
-                edges.append({"source": case_node_id, "target": event_node_id, "label": "时间线"})
-
-        return {"nodes": nodes, "edges": edges}
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
+        return build_entity_graph(
+            record=record,
+            inference=inference,
+            runtime_case=runtime_case,
+            scenario=self.scenario,
+            node_id_for_row=self._node_id,
+            relation_label_for=self._relation_label,
+        )
 
     def _render_display_fields(
         self,
         record: dict[str, Any],
         fields: tuple[AlertDisplayField, ...],
     ) -> list[dict[str, Any]]:
-        """批量渲染展示字段。"""
+        """
+        功能：
+        - 批量渲染展示字段。
+
+        输入：
+        - `record`: 单个实体或业务对象的聚合记录。
+        - `fields`: 用于展示或拼接的字段定义列表。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         return [self._render_display_field(record, field) for field in fields]
 
     def _render_display_field(self, record: dict[str, Any], field: AlertDisplayField) -> dict[str, Any]:
-        """根据字段来源规则提取展示值。"""
+        """
+        功能：
+        - 根据字段来源规则提取展示值。
+
+        输入：
+        - `record`: 单个实体或业务对象的聚合记录。
+        - `field`: 函数执行所需的 `field` 参数。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         value: Any = ""
         if field.fact:
             value = record["metrics"].get(field.fact)
@@ -1025,7 +1543,16 @@ class SemanticService:
         }
 
     def _alert_sort_key(self, item: dict[str, Any]) -> tuple[Any, ...]:
-        """生成告警排序键，先按风险等级，再按场景配置事实值排序。"""
+        """
+        功能：
+        - 生成告警排序键，先按风险等级，再按场景配置事实值排序。
+
+        输入：
+        - `item`: 字典参数 `item`，承载键值形式的输入数据。
+
+        输出：
+        - 返回值: 返回元组结果，按既定顺序携带多个返回值。
+        """
         key_parts: list[Any] = [-self._risk_weight(item["riskLevel"])]
         metrics = item["metrics"]
         for sort_field in self.scenario.alert_sort:
@@ -1036,11 +1563,29 @@ class SemanticService:
         return tuple(key_parts)
 
     def _risk_weight(self, level: str) -> int:
-        """把文本风险等级转换成可排序权重。"""
+        """
+        功能：
+        - 把文本风险等级转换成可排序权重。
+
+        输入：
+        - `level`: 函数执行所需的 `level` 参数。
+
+        输出：
+        - 返回值: 返回整数结果，通常用于计数、排序权重或状态统计。
+        """
         return {"HIGH": 3, "MEDIUM": 2, "LOW": 1}.get(level, 0)
 
     def _sortable_value(self, value: Any) -> float:
-        """把多种事实值归一为可排序的数字。"""
+        """
+        功能：
+        - 把多种事实值归一为可排序的数字。
+
+        输入：
+        - `value`: 待解析、转换或比较的原始值。
+
+        输出：
+        - 返回值: 返回浮点结果，通常用于数值计算或排序比较。
+        """
         if isinstance(value, bool):
             return 1.0 if value else 0.0
         if isinstance(value, Decimal):
@@ -1054,168 +1599,45 @@ class SemanticService:
         except (TypeError, ValueError):
             return 0.0
 
-    def _evaluate_fact(
-        self,
-        fact: FactConfig,
-        primary_row: dict[str, Any],
-        related_rows: dict[str, list[dict[str, Any]]],
-    ) -> Any:
-        """根据聚合类型计算单个事实指标。"""
-        rows = [primary_row] if fact.source_dataset == self.scenario.primary_dataset else related_rows.get(fact.source_dataset, [])
-        candidates = [row for row in rows if not fact.where or self._row_matches(fact.where, row)]
-
-        if fact.aggregate == "first":
-            value = candidates[0].get(fact.field or "") if candidates else fact.default
-            return self._apply_cast(value, fact.cast, fact.default)
-        if fact.aggregate == "latest":
-            if not candidates or not fact.field or not fact.order_by:
-                return self._apply_cast(fact.default, fact.cast, fact.default)
-            ordered = sorted(candidates, key=lambda row: self._order_key(row.get(fact.order_by)))
-            return self._apply_cast(ordered[-1].get(fact.field), fact.cast, fact.default)
-        if fact.aggregate == "exists":
-            return bool(candidates)
-        if fact.aggregate == "count":
-            return len(candidates)
-        if fact.aggregate == "sum":
-            total = sum((self._coerce_scalar(row.get(fact.field or ""), fact.cast or "decimal") or Decimal("0")) for row in candidates)
-            return total
-        if fact.aggregate == "min_days_since":
-            if not candidates or not fact.field:
-                return fact.default
-            days = [
-                self._days_since(row.get(fact.field))
-                for row in candidates
-            ]
-            values = [value for value in days if value is not None]
-            return min(values) if values else fact.default
-        raise ValueError(f"Unsupported fact aggregate: {fact.aggregate}")
-
-    def _row_matches(self, condition: dict[str, Any], row: dict[str, Any]) -> bool:
-        """评估单行数据是否满足 where 条件。"""
-        if "all" in condition:
-            return all(self._row_matches(item, row) for item in condition["all"])
-        if "any" in condition:
-            return any(self._row_matches(item, row) for item in condition["any"])
-        if "not" in condition:
-            return not self._row_matches(condition["not"], row)
-
-        field = str(condition["field"])
-        operator = str(condition["op"])
-        expected = condition.get("value")
-        actual = row.get(field)
-
-        if operator == "within_days":
-            days = self._days_since(actual)
-            return days is not None and 0 <= days <= int(expected)
-        if operator == "date_on_or_after":
-            actual_date = self._parse_date_value(actual)
-            if actual_date is None:
-                return False
-            expected_date = self.reference_date if expected == "today" else date.fromisoformat(str(expected))
-            return actual_date >= expected_date
-        if operator == "not_empty":
-            return actual not in (None, "")
-
-        return self._compare(actual, operator, expected)
-
-    def _compare(self, actual: Any, operator: str, expected: Any) -> bool:
-        """在基础 Python 类型上执行统一比较。"""
-        if isinstance(actual, bool):
-            actual_value = actual
-            expected_value = self._coerce_scalar(expected, "bool")
-        elif isinstance(actual, Decimal):
-            actual_value = actual
-            expected_value = self._coerce_scalar(expected, "decimal")
-        elif isinstance(actual, int):
-            actual_value = actual
-            expected_value = self._coerce_scalar(expected, "int")
-        else:
-            actual_value = "" if actual is None else actual
-            expected_value = expected
-
-        if operator == ">":
-            return actual_value > expected_value
-        if operator == ">=":
-            return actual_value >= expected_value
-        if operator == "<":
-            return actual_value < expected_value
-        if operator == "<=":
-            return actual_value <= expected_value
-        if operator == "==":
-            return actual_value == expected_value
-        if operator == "!=":
-            return actual_value != expected_value
-        if operator == "in":
-            return actual_value in expected_value
-        if operator == "not in":
-            return actual_value not in expected_value
-        raise ValueError(f"Unsupported row operator: {operator}")
-
-    def _days_since(self, value: Any) -> int | None:
-        """计算给定日期距参考日的天数差。"""
-        parsed = self._parse_date_value(value)
-        if parsed is None:
-            return None
-        return (self.reference_date - parsed).days
-
-    def _parse_date_value(self, value: Any) -> date | None:
-        """尽量把输入解析为日期对象，兼容 ISO 日期和时间戳字符串。"""
-        if value in (None, ""):
-            return None
-        text = str(value).strip()
-        if not text:
-            return None
-        try:
-            return datetime.fromisoformat(text.replace("Z", "+00:00")).date()
-        except ValueError:
-            pass
-        try:
-            return date.fromisoformat(text)
-        except ValueError:
-            return None
-
-    def _apply_cast(self, value: Any, cast: str | None, default: Any) -> Any:
-        """按事实定义的 cast 规则转换值，并处理空值默认值。"""
-        if value in (None, ""):
-            return default
-        if not cast:
-            return value
-        converted = self._coerce_scalar(value, cast)
-        return default if converted is None else converted
-
-    def _coerce_scalar(self, value: Any, value_type: str) -> Any:
-        """把字符串或原始值转换为规则/映射要求的标量类型。"""
-        if value in (None, ""):
-            return None
-        if isinstance(value, (int, float, Decimal, bool)) and value_type.lower() not in {"string", "str"}:
-            if value_type.lower() in {"bool", "boolean"}:
-                return bool(value)
-            return value
-
-        text = str(value).strip()
-        lowered = value_type.lower()
-        if lowered in {"int", "integer"}:
-            return int(text)
-        if lowered == "decimal":
-            return Decimal(text)
-        if lowered in {"float", "double"}:
-            return float(text)
-        if lowered in {"bool", "boolean"}:
-            return text.lower() in {"1", "true", "yes", "y"}
-        return text
-
     def _json_ready_value(self, value: Any) -> Any:
-        """把不能直接 JSON 序列化的值转换为前端友好格式。"""
+        """
+        功能：
+        - 把不能直接 JSON 序列化的值转换为前端友好格式。
+
+        输入：
+        - `value`: 待解析、转换或比较的原始值。
+
+        输出：
+        - 返回值: 返回 `Any` 类型结果，供后续流程继续消费。
+        """
         if isinstance(value, Decimal):
             return float(value)
         return value
 
     def _serialize_metrics(self, metrics: dict[str, Any]) -> dict[str, Any]:
-        """序列化事实指标字典。"""
+        """
+        功能：
+        - 序列化事实指标字典。
+
+        输入：
+        - `metrics`: 实体聚合后的指标字典。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         return {key: self._json_ready_value(value) for key, value in metrics.items()}
 
     def _serialize_row(self, row: dict[str, Any]) -> dict[str, Any]:
-        """剔除内部辅助字段后输出原始行数据。"""
+        """
+        功能：
+        - 剔除内部辅助字段后输出原始行数据。
+
+        输入：
+        - `row`: 单行源数据或中间对象数据。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         payload: dict[str, Any] = {}
         for key, value in row.items():
             if key.startswith("_"):
@@ -1223,83 +1645,18 @@ class SemanticService:
             payload[key] = self._json_ready_value(value)
         return payload
 
-    def _order_key(self, value: Any) -> Any:
-        """为 latest 聚合生成统一排序键。"""
-        parsed_date = self._parse_date_value(value)
-        if parsed_date is not None:
-            return parsed_date.toordinal()
-        if isinstance(value, Decimal):
-            return float(value)
-        if isinstance(value, (int, float)):
-            return value
-        return "" if value is None else str(value)
-
-    def _target_type_for_dataset(self, dataset_key: str) -> str:
-        """从映射表中推断某个数据集对应的目标类型。"""
-        rows = self.mapping_by_dataset.get(dataset_key, [])
-        if not rows:
-            raise ValueError(f"No mapping rows configured for dataset: {dataset_key}")
-        return rows[0].target_type
-
-    def _entity_uri(self, dataset_key: str, row: dict[str, Any], index: int) -> URIRef:
-        """为原始行构造稳定的实体 URI。"""
-        dataset_config = self.scenario.datasets[dataset_key]
-        parts = []
-        for field_name in dataset_config.id_fields:
-            value = row.get(field_name)
-            if value not in (None, ""):
-                parts.append(quote(str(value), safe=""))
-        if not parts:
-            parts.append(f"row-{index + 1}")
-        dataset_segment = dataset_key.replace("_", "-")
-        return URIRef(f"{self.settings.data_ns}{dataset_segment}/{'/'.join(parts)}")
-
-    def _entity_label(self, dataset_key: str, row: dict[str, Any]) -> str:
-        """为实体生成展示标签，优先模板，再退回单字段或序号。"""
-        dataset_config = self.scenario.datasets[dataset_key]
-        if dataset_config.label_template:
-            values = {key: "" if value is None else str(value) for key, value in row.items()}
-            return dataset_config.label_template.format(**values)
-        if dataset_config.label_field:
-            value = row.get(dataset_config.label_field)
-            if value not in (None, ""):
-                return str(value)
-        return f"{dataset_config.entity_label}-{int(row['_row_index']) + 1}"
-
-    def _resolve_curie(self, curie: str) -> URIRef:
-        """把 CURIE 形式的谓词或类型解析为完整 URI。"""
-        namespace, local = curie.split(":", 1)
-        if namespace == "rdf":
-            return URIRef(str(RDF[local]))
-        if namespace == "rdfs":
-            return URIRef(str(RDFS[local]))
-        return URIRef(str(make_namespaces(self.settings)[namespace][local]))
-
-    def _literal_for_value(self, value: Any, value_type: str) -> Literal:
-        """按映射值类型构造 RDF Literal。"""
-        lowered = value_type.lower()
-        if lowered in {"int", "integer"}:
-            return Literal(int(value), datatype=XSD.integer)
-        if lowered == "decimal":
-            return Literal(Decimal(str(value)), datatype=XSD.decimal)
-        if lowered in {"bool", "boolean"}:
-            return Literal(bool(value), datatype=XSD.boolean)
-        return Literal(value)
-
-    def _relation_id(
-        self,
-        source_dataset: str,
-        source_row: dict[str, Any],
-        target_dataset: str,
-        target_row: dict[str, Any],
-    ) -> str:
-        """为关系节点构造稳定 ID。"""
-        source_bits = [source_dataset, str(source_row["_row_index"])]
-        target_bits = [target_dataset, str(target_row["_row_index"])]
-        return "-".join(source_bits + target_bits)
-
     def _node_id(self, dataset_key: str, row: dict[str, Any]) -> str:
-        """为前端图谱节点生成稳定标识。"""
+        """
+        功能：
+        - 为前端图谱节点生成稳定标识。
+
+        输入：
+        - `dataset_key`: 需要持久化或查询的 RDF 数据集对象。
+        - `row`: 单行源数据或中间对象数据。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         dataset_config = self.scenario.datasets[dataset_key]
         identifiers = [str(row.get(field)) for field in dataset_config.id_fields if row.get(field) not in (None, "")]
         if not identifiers:
@@ -1307,7 +1664,17 @@ class SemanticService:
         return f"{dataset_config.node_type.lower()}:{'|'.join(identifiers)}"
 
     def _relation_label(self, source_dataset: str, target_dataset: str) -> str:
-        """根据场景配置查找两个数据集之间的默认关系文案。"""
+        """
+        功能：
+        - 根据场景配置查找两个数据集之间的默认关系文案。
+
+        输入：
+        - `source_dataset`: 函数执行所需的 `source_dataset` 参数。
+        - `target_dataset`: 函数执行所需的 `target_dataset` 参数。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         for relation in self.scenario.relations:
             if relation.source_dataset == source_dataset and relation.target_dataset == target_dataset:
                 return relation.label

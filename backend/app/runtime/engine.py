@@ -1,4 +1,9 @@
-"""运营运行时引擎。"""
+"""
+模块功能：
+- 运营运行时引擎。
+- 该文件位于 `backend/app/runtime/engine.py`，实现当前领域的核心引擎逻辑，负责状态推进、规则处理或运行时协调。
+- 文件中定义的核心类包括：`RuntimeEngine`。
+"""
 
 from __future__ import annotations
 
@@ -28,7 +33,12 @@ from app.runtime.policies import PolicyEngine
 
 
 class RuntimeEngine:
-    """维护 case/task/action/event 的运营状态。"""
+    """
+    功能：
+    - 维护 case/task/action/event 的运营状态。
+    - 该类定义在 `backend/app/runtime/engine.py` 中，用于组织与 `RuntimeEngine` 相关的数据或行为。
+    - 类中声明的主要字段包括：`ACTION_DEFINITIONS`。
+    """
 
     ACTION_DEFINITIONS: tuple[ActionDefinition, ...] = (
         ActionDefinition(
@@ -114,6 +124,16 @@ class RuntimeEngine:
     )
 
     def __init__(self, settings: Settings) -> None:
+        """
+        功能：
+        - 初始化当前对象并准备后续调用所需的依赖、状态和缓存。
+
+        输入：
+        - `settings`: 运行时配置对象，提供目录路径、命名空间和环境参数。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         self.settings = settings
         self.policy_engine = PolicyEngine()
         self.action_definitions = {item.id: item for item in self.ACTION_DEFINITIONS}
@@ -130,7 +150,17 @@ class RuntimeEngine:
         records: dict[str, dict[str, Any]],
         inference: dict[str, dict[str, Any]],
     ) -> None:
-        """按最新推理结果构建或刷新运营态。"""
+        """
+        功能：
+        - 按最新推理结果构建或刷新运营态。
+
+        输入：
+        - `records`: 按实体标识组织的聚合记录集合。
+        - `inference`: 按实体组织的推理结果集合。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         self._load_state_once()
         active_entities = set(records)
 
@@ -147,7 +177,16 @@ class RuntimeEngine:
         self._save_state()
 
     def operational_summary(self) -> dict[str, Any]:
-        """返回运营态汇总指标。"""
+        """
+        功能：
+        - 返回运营态汇总指标。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         case_distribution = self._count_by(self.cases.values(), "state")
         task_distribution = self._count_by(self.tasks.values(), "status")
         alert_distribution = self._count_by(self.alerts.values(), "state")
@@ -165,13 +204,31 @@ class RuntimeEngine:
         }
 
     def list_cases(self) -> list[dict[str, Any]]:
-        """列出所有 case 摘要。"""
+        """
+        功能：
+        - 列出所有 case 摘要。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         payload = [self._case_payload(case) for case in self.cases.values()]
         payload.sort(key=lambda item: (item["priority"], item["entityId"]))
         return payload
 
     def get_case(self, case_id: str) -> dict[str, Any] | None:
-        """返回单个 case 详情。"""
+        """
+        功能：
+        - 返回单个 case 详情。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+
+        输出：
+        - 返回值: 返回处理结果；当目标不存在、未命中或无法解析时返回 `None`。
+        """
         case = self.cases.get(case_id)
         if case is None:
             return None
@@ -182,14 +239,32 @@ class RuntimeEngine:
         return payload
 
     def get_case_for_entity(self, entity_id: str) -> dict[str, Any] | None:
-        """按实体 ID 获取 case。"""
+        """
+        功能：
+        - 按实体 ID 获取 case。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+
+        输出：
+        - 返回值: 返回处理结果；当目标不存在、未命中或无法解析时返回 `None`。
+        """
         case = self.cases.get(self._case_id(entity_id))
         if case is None:
             return None
         return self.get_case(case.id)
 
     def get_alert_for_entity(self, entity_id: str) -> dict[str, Any] | None:
-        """按实体 ID 获取运行时告警。"""
+        """
+        功能：
+        - 按实体 ID 获取运行时告警。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+
+        输出：
+        - 返回值: 返回处理结果；当目标不存在、未命中或无法解析时返回 `None`。
+        """
         alert = self.alerts.get(self._alert_id(entity_id))
         if alert is None:
             return None
@@ -202,7 +277,18 @@ class RuntimeEngine:
         status: str | None = None,
         assignee_role: str | None = None,
     ) -> list[dict[str, Any]]:
-        """列出任务。"""
+        """
+        功能：
+        - 列出任务。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+        - `status`: 筛选或设置时使用的状态值。
+        - `assignee_role`: 任务或 case 负责人角色标识。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         payload: list[dict[str, Any]] = []
         for task in self.tasks.values():
             if case_id and task.case_id != case_id:
@@ -216,13 +302,31 @@ class RuntimeEngine:
         return payload
 
     def list_action_runs(self, case_id: str) -> list[dict[str, Any]]:
-        """列出某个 case 下的动作执行记录。"""
+        """
+        功能：
+        - 列出某个 case 下的动作执行记录。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         payload = [serialize_dataclass(run) for run in self.action_runs.values() if run.case_id == case_id]
         payload.sort(key=lambda item: item["created_at"])
         return payload
 
     def get_timeline(self, case_id: str) -> list[dict[str, Any]]:
-        """构造 case 时间线。"""
+        """
+        功能：
+        - 构造 case 时间线。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         case = self.cases.get(case_id)
         if case is None:
             return []
@@ -262,7 +366,16 @@ class RuntimeEngine:
         return items
 
     def available_actions(self, entity_id: str) -> list[dict[str, Any]]:
-        """返回当前 case 可执行的动作清单。"""
+        """
+        功能：
+        - 返回当前 case 可执行的动作清单。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+
+        输出：
+        - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+        """
         case = self.cases.get(self._case_id(entity_id))
         if case is None:
             return []
@@ -284,7 +397,20 @@ class RuntimeEngine:
         case_id: str | None = None,
         parameters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """执行动作并写入动作记录、事件和状态迁移。"""
+        """
+        功能：
+        - 执行动作并写入动作记录、事件和状态迁移。
+
+        输入：
+        - `action_id`: 待执行动作的标识。
+        - `actor`: 函数执行所需的 `actor` 参数。
+        - `entity_id`: 业务主实体标识。
+        - `case_id`: 运营 case 标识。
+        - `parameters`: 字典参数 `parameters`，承载键值形式的输入数据。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         if action_id not in self.action_definitions:
             raise ValueError(f"unknown_action:{action_id}")
 
@@ -329,7 +455,18 @@ class RuntimeEngine:
         settings: Settings,
         records: dict[str, dict[str, Any]],
     ) -> None:
-        """把运营态对象物化为 RDF。"""
+        """
+        功能：
+        - 把运营态对象物化为 RDF。
+
+        输入：
+        - `graph`: 需要读取或写入的 RDF 图对象。
+        - `settings`: 运行时配置对象，提供目录路径、命名空间和环境参数。
+        - `records`: 按实体标识组织的聚合记录集合。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         namespaces = make_namespaces(settings)
         telecom = namespaces["telecom"]
 
@@ -432,6 +569,17 @@ class RuntimeEngine:
             graph.add((transition_uri, telecom.forCase, case_uri))
 
     def _ensure_alert(self, entity_id: str, result: dict[str, Any]) -> OperationalAlert:
+        """
+        功能：
+        - 确保alert。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+        - `result`: 当前实体对应的推理结果。
+
+        输出：
+        - 返回值: 返回 `OperationalAlert` 类型结果，供后续流程继续消费。
+        """
         alert_id = self._alert_id(entity_id)
         alert = self.alerts.get(alert_id)
         target_state = "NEW" if result["riskLevel"] in {"HIGH", "MEDIUM"} else "MONITORING"
@@ -479,6 +627,19 @@ class RuntimeEngine:
         result: dict[str, Any],
         area_id: str | None,
     ) -> RetentionCase:
+        """
+        功能：
+        - 确保case。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+        - `alert`: 单个运行时告警对象或告警载荷。
+        - `result`: 当前实体对应的推理结果。
+        - `area_id`: 函数执行所需的 `area_id` 参数。
+
+        输出：
+        - 返回值: 返回 `RetentionCase` 类型结果，供后续流程继续消费。
+        """
         case_id = self._case_id(entity_id)
         runtime_case = self.cases.get(case_id)
         if runtime_case is None:
@@ -511,6 +672,17 @@ class RuntimeEngine:
         return runtime_case
 
     def _refresh_case_priority(self, case: RetentionCase, result: dict[str, Any]) -> None:
+        """
+        功能：
+        - 刷新casepriority。
+
+        输入：
+        - `case`: 单个运营 case 对象。
+        - `result`: 当前实体对应的推理结果。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         case.priority = self._priority_for_risk(result["riskLevel"])
         case.queue_name = self._queue_for_risk(result["riskLevel"])
         case.updated_at = utcnow_iso()
@@ -521,6 +693,18 @@ class RuntimeEngine:
         alert: OperationalAlert,
         result: dict[str, Any],
     ) -> None:
+        """
+        功能：
+        - 刷新case状态。
+
+        输入：
+        - `case`: 单个运营 case 对象。
+        - `alert`: 单个运行时告警对象或告警载荷。
+        - `result`: 当前实体对应的推理结果。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         if result["riskLevel"] in {"HIGH", "MEDIUM"} and case.state == "MONITORING":
             self._transition_case(case, "OPEN", "risk-escalated")
             alert.state = "NEW"
@@ -531,6 +715,16 @@ class RuntimeEngine:
         alert.updated_at = utcnow_iso()
 
     def _ensure_default_work_items(self, case: RetentionCase) -> None:
+        """
+        功能：
+        - 确保defaultworkitems。
+
+        输入：
+        - `case`: 单个运营 case 对象。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         if case.risk_level not in {"HIGH", "MEDIUM"}:
             return
         if any(self.tasks[task_id].status == "TODO" for task_id in case.task_ids if task_id in self.tasks):
@@ -560,6 +754,16 @@ class RuntimeEngine:
         )
 
     def _mark_stale_entities(self, active_entities: set[str]) -> None:
+        """
+        功能：
+        - 标记staleentities。
+
+        输入：
+        - `active_entities`: 函数执行所需的 `active_entities` 参数。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         for runtime_case in self.cases.values():
             if runtime_case.entity_id in active_entities:
                 continue
@@ -571,6 +775,17 @@ class RuntimeEngine:
                 alert.updated_at = utcnow_iso()
 
     def _resolve_case(self, *, case_id: str | None, entity_id: str | None) -> RetentionCase | None:
+        """
+        功能：
+        - 解析并返回case。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+        - `entity_id`: 业务主实体标识。
+
+        输出：
+        - 返回值: 返回处理结果；当目标不存在、未命中或无法解析时返回 `None`。
+        """
         if case_id:
             return self.cases.get(case_id)
         if entity_id:
@@ -583,6 +798,18 @@ class RuntimeEngine:
         case: RetentionCase,
         parameters: dict[str, Any],
     ) -> dict[str, Any]:
+        """
+        功能：
+        - 应用动作。
+
+        输入：
+        - `run`: 单个动作执行记录。
+        - `case`: 单个运营 case 对象。
+        - `parameters`: 字典参数 `parameters`，承载键值形式的输入数据。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         alert = self.alerts[case.alert_id]
         side_effect = self.action_definitions[run.action_id].side_effect
 
@@ -678,6 +905,18 @@ class RuntimeEngine:
         }
 
     def _transition_case(self, case: RetentionCase, to_state: str, reason: str) -> None:
+        """
+        功能：
+        - 处理与 `_transition_case` 相关的逻辑。
+
+        输入：
+        - `case`: 单个运营 case 对象。
+        - `to_state`: 函数执行所需的 `to_state` 参数。
+        - `reason`: 函数执行所需的 `reason` 参数。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         if case.state == to_state:
             return
         event = self._emit_event(
@@ -716,6 +955,22 @@ class RuntimeEngine:
         case_id: str,
         payload: dict[str, Any],
     ) -> DomainEvent:
+        """
+        功能：
+        - 处理与 `_emit_event` 相关的逻辑。
+
+        输入：
+        - `event_type`: 函数执行所需的 `event_type` 参数。
+        - `title`: 函数执行所需的 `title` 参数。
+        - `subject_type`: 函数执行所需的 `subject_type` 参数。
+        - `subject_id`: 函数执行所需的 `subject_id` 参数。
+        - `entity_id`: 业务主实体标识。
+        - `case_id`: 运营 case 标识。
+        - `payload`: 请求体或内部处理中使用的载荷数据。
+
+        输出：
+        - 返回值: 返回 `DomainEvent` 类型结果，供后续流程继续消费。
+        """
         event = DomainEvent(
             id=f"event:{uuid4().hex}",
             event_type=event_type,
@@ -740,6 +995,18 @@ class RuntimeEngine:
         action_id: str | None = None,
         output: dict[str, Any] | None = None,
     ) -> None:
+        """
+        功能：
+        - 完成任务列表。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+        - `action_id`: 待执行动作的标识。
+        - `output`: 字典参数 `output`，承载键值形式的输入数据。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         for task in self.tasks.values():
             if task.case_id != case_id or task.status != "TODO":
                 continue
@@ -751,6 +1018,16 @@ class RuntimeEngine:
             task.output = dict(output or {})
 
     def _cancel_open_tasks(self, case_id: str) -> None:
+        """
+        功能：
+        - 取消open任务列表。
+
+        输入：
+        - `case_id`: 运营 case 标识。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         for task in self.tasks.values():
             if task.case_id != case_id or task.status != "TODO":
                 continue
@@ -759,6 +1036,16 @@ class RuntimeEngine:
             task.completed_at = task.updated_at
 
     def _case_payload(self, case: RetentionCase) -> dict[str, Any]:
+        """
+        功能：
+        - 处理与 `_case_payload` 相关的逻辑。
+
+        输入：
+        - `case`: 单个运营 case 对象。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         alert = self.alerts.get(case.alert_id)
         return {
             **serialize_dataclass(case),
@@ -772,9 +1059,29 @@ class RuntimeEngine:
         }
 
     def _priority_for_risk(self, risk_level: str) -> str:
+        """
+        功能：
+        - 处理与 `_priority_for_risk` 相关的逻辑。
+
+        输入：
+        - `risk_level`: 待映射或判断的风险等级。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         return {"HIGH": "P1", "MEDIUM": "P2", "LOW": "P3"}.get(risk_level, "P3")
 
     def _queue_for_risk(self, risk_level: str) -> str:
+        """
+        功能：
+        - 处理与 `_queue_for_risk` 相关的逻辑。
+
+        输入：
+        - `risk_level`: 待映射或判断的风险等级。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         return {
             "HIGH": "retention-high-priority",
             "MEDIUM": "retention-standard",
@@ -782,18 +1089,71 @@ class RuntimeEngine:
         }.get(risk_level, "retention-monitoring")
 
     def _owner_role_for_risk(self, risk_level: str) -> str:
+        """
+        功能：
+        - 处理与 `_owner_role_for_risk` 相关的逻辑。
+
+        输入：
+        - `risk_level`: 待映射或判断的风险等级。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         return "senior_agent" if risk_level == "HIGH" else "agent"
 
     def _runtime_uri(self, settings: Settings, segment: str, identifier: str) -> URIRef:
+        """
+        功能：
+        - 处理与 `_runtime_uri` 相关的逻辑。
+
+        输入：
+        - `settings`: 运行时配置对象，提供目录路径、命名空间和环境参数。
+        - `segment`: URI 或资源分类片段。
+        - `identifier`: 用于构造稳定标识的原始值。
+
+        输出：
+        - 返回值: 返回 RDF 资源 URI。
+        """
         return URIRef(f"{settings.data_ns}runtime/{segment}/{quote(identifier, safe='')}")
 
     def _alert_id(self, entity_id: str) -> str:
+        """
+        功能：
+        - 处理与 `_alert_id` 相关的逻辑。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         return f"alert:{entity_id}"
 
     def _case_id(self, entity_id: str) -> str:
+        """
+        功能：
+        - 处理与 `_case_id` 相关的逻辑。
+
+        输入：
+        - `entity_id`: 业务主实体标识。
+
+        输出：
+        - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+        """
         return f"case:{entity_id}"
 
     def _count_by(self, items: Any, field_name: str) -> dict[str, int]:
+        """
+        功能：
+        - 统计by。
+
+        输入：
+        - `items`: 需要统计或遍历的对象集合。
+        - `field_name`: 需要读取或统计的字段名称。
+
+        输出：
+        - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+        """
         counts: dict[str, int] = {}
         for item in items:
             value = str(getattr(item, field_name, "") or "UNKNOWN")
@@ -801,6 +1161,16 @@ class RuntimeEngine:
         return counts
 
     def _load_state_once(self) -> None:
+        """
+        功能：
+        - 加载状态once。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         if self._loaded:
             return
         self._loaded = True
@@ -836,6 +1206,16 @@ class RuntimeEngine:
         }
 
     def _save_state(self) -> None:
+        """
+        功能：
+        - 保存状态。
+
+        输入：
+        - 无。
+
+        输出：
+        - 返回值: 无返回值；处理结果会通过更新对象状态、修改入参或其他副作用体现。
+        """
         if not self.settings.runtime_persistence_enabled:
             return
         path: Path = self.settings.runtime_state_path
