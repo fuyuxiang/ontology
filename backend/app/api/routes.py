@@ -63,6 +63,36 @@ class ScenarioActivationRequest(BaseModel):
     scenarioKey: str
 
 
+class OntologyDraftChangeRequest(BaseModel):
+    """
+    功能：
+    - 本体草稿变更请求。
+    """
+
+    resourceType: str
+    resourceId: str
+    changes: dict[str, Any] = Field(default_factory=dict)
+    actorId: str = "api-user"
+
+
+class OntologyPublishRequest(BaseModel):
+    """
+    功能：
+    - 本体草稿发布请求。
+    """
+
+    actorId: str = "api-user"
+
+
+class OntologyRevertRequest(BaseModel):
+    """
+    功能：
+    - 本体草稿变更回退请求。
+    """
+
+    changeId: str
+
+
 def _raise_agent_http_error(exc: ValueError) -> None:
     """
     功能：
@@ -192,6 +222,68 @@ def summary(service: SemanticService = Depends(get_service)) -> dict:
     - 返回值: 返回字典结构，包含本次处理产生的结果数据。
     """
     return service.get_summary()
+
+
+@router.get("/ontology/workspace")
+def ontology_workspace(service: SemanticService = Depends(get_service)) -> dict:
+    """
+    功能：
+    - 返回面向本体工作台的资源化本体模型。
+
+    输入：
+    - `service`: 语义服务实例。
+
+    输出：
+    - 返回值: 返回字典结构，包含 object types、link types、action types、interfaces 与规则资源。
+    """
+    return service.get_ontology_workspace()
+
+
+@router.post("/ontology/draft/change")
+def ontology_draft_change(payload: OntologyDraftChangeRequest, service: SemanticService = Depends(get_service)) -> dict:
+    """
+    功能：
+    - 保存本体草稿变更。
+    """
+    try:
+        return service.save_ontology_draft_change(
+            resource_type=payload.resourceType,
+            resource_id=payload.resourceId,
+            changes=payload.changes,
+            actor_id=payload.actorId,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/ontology/draft/publish")
+def ontology_draft_publish(payload: OntologyPublishRequest, service: SemanticService = Depends(get_service)) -> dict:
+    """
+    功能：
+    - 发布当前本体草稿。
+    """
+    return service.publish_ontology_draft(actor_id=payload.actorId)
+
+
+@router.post("/ontology/draft/revert")
+def ontology_draft_revert(payload: OntologyRevertRequest, service: SemanticService = Depends(get_service)) -> dict:
+    """
+    功能：
+    - 回退一条本体草稿变更。
+    """
+    try:
+        return service.revert_ontology_draft_change(change_id=payload.changeId)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/ontology/draft/discard")
+def ontology_draft_discard(service: SemanticService = Depends(get_service)) -> dict:
+    """
+    功能：
+    - 丢弃当前全部本体草稿变更。
+    """
+    return service.discard_ontology_draft()
 
 
 @router.get("/alerts")

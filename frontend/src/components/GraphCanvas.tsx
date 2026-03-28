@@ -46,6 +46,11 @@ export const NODE_TYPE_COLORS: Record<string, string> = {
   RetentionAction: "#eb2f96",
   Interaction: "#52c41a",
   Action: "#13c2c2",
+  OntologyEntity: "#1677ff",
+  OntologyProperty: "#13c2c2",
+  OntologyRelation: "#fa8c16",
+  OntologyRule: "#cf1322",
+  OntologyAction: "#237804",
 };
 
 export const NODE_TYPE_LABELS: Record<string, string> = {
@@ -64,6 +69,11 @@ export const NODE_TYPE_LABELS: Record<string, string> = {
   RetentionAction: "维系动作",
   Interaction: "交互记录",
   Action: "动作",
+  OntologyEntity: "实体",
+  OntologyProperty: "属性",
+  OntologyRelation: "关系",
+  OntologyRule: "规则",
+  OntologyAction: "动作",
 };
 
 export const RISK_COLORS: Record<RiskLevel, string> = {
@@ -74,6 +84,22 @@ export const RISK_COLORS: Record<RiskLevel, string> = {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function nodeRadius(type: string) {
+  if (type === "User" || type === "OntologyEntity") {
+    return 20;
+  }
+  if (type === "OntologyProperty") {
+    return 13;
+  }
+  if (type === "OntologyRelation") {
+    return 15;
+  }
+  if (type === "OntologyRule" || type === "OntologyAction") {
+    return 17;
+  }
+  return 16;
 }
 
 /** 在缺少后端坐标时生成默认布局。 */
@@ -148,7 +174,7 @@ function buildGraphBounds(graph: GraphData, positions: Map<string, Point>): View
     if (!position) {
       continue;
     }
-    const radius = node.type === "User" ? 28 : 22;
+    const radius = nodeRadius(node.type) + 8;
     minX = Math.min(minX, position.x - radius);
     minY = Math.min(minY, position.y - radius);
     maxX = Math.max(maxX, position.x + radius);
@@ -389,7 +415,7 @@ export function GraphCanvas({
           }
 
           const fill = NODE_TYPE_COLORS[node.type] || "#999999";
-          const radius = node.type === "User" ? 20 : 16;
+          const radius = nodeRadius(node.type);
           const isSelected = selectedNodeId === node.id;
           const riskLevel = riskByNodeId?.[node.id];
           const riskStroke = riskLevel ? RISK_COLORS[riskLevel] : null;

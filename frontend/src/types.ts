@@ -401,3 +401,149 @@ export interface ActionExecutionResult {
   operationalMetrics: Summary["operationalMetrics"];
   workbench: OperationsWorkbench;
 }
+
+export interface OntologyWorkspaceProperty {
+  name: string;
+  label: string;
+  required: boolean;
+  typeClasses: string[];
+}
+
+export interface OntologyWorkspaceObjectType {
+  id: string;
+  key: string;
+  name: string;
+  category: string;
+  sourceSystem: string;
+  datasetKey: string | null;
+  ontologyType: string;
+  description: string;
+  identityFields: string[];
+  titleField: string;
+  properties: OntologyWorkspaceProperty[];
+  capabilityTags: string[];
+  implements: string[];
+  sharedPropertyIds: string[];
+  groupIds: string[];
+  incomingLinkTypeIds: string[];
+  outgoingLinkTypeIds: string[];
+  actionTypeIds: string[];
+}
+
+export interface OntologyWorkspaceSharedProperty {
+  id: string;
+  name: string;
+  description: string;
+  typeClasses: string[];
+  implementedBy: string[];
+  fields: Array<{
+    objectTypeId: string;
+    propertyName: string;
+    label: string;
+    required: boolean;
+  }>;
+}
+
+export interface OntologyWorkspaceObjectTypeGroup {
+  id: string;
+  name: string;
+  description: string;
+  objectTypeIds: string[];
+  interfaceIds: string[];
+  capabilities: string[];
+}
+
+export interface OntologyWorkspaceLinkType {
+  id: string;
+  name: string;
+  description: string;
+  sourceObjectTypeId: string;
+  targetObjectTypeId: string;
+  predicate: string;
+  cardinality: string;
+  typeClasses: string[];
+}
+
+export interface OntologyWorkspaceActionType {
+  id: string;
+  name: string;
+  description: string;
+  queueHint: string;
+  sideEffect: string;
+  allowedRoles: string[];
+  allowedStates: string[];
+  allowedRiskLevels: string[];
+  implements: string[];
+  boundObjectTypeIds: string[];
+}
+
+export interface OntologyWorkspaceInterface {
+  id: string;
+  name: string;
+  description: string;
+  purpose: string;
+  requiredProperties: string[];
+  sharedPropertyIds: string[];
+  capabilities: string[];
+  implementedBy: string[];
+}
+
+export interface OntologyWorkspaceRule {
+  id: string;
+  name: string;
+  description: string;
+  riskLevel: string;
+  signalProperties: string[];
+  targetObjectTypeIds: string[];
+  actionTypeIds: string[];
+  hitCount: number;
+}
+
+export interface OntologyWorkspace {
+  scenario: {
+    key: string;
+    name: string;
+    title: string;
+    subtitle: string;
+  };
+  philosophy: Array<{
+    title: string;
+    description: string;
+  }>;
+  metrics: {
+    objectTypeCount: number;
+    sharedPropertyCount: number;
+    objectTypeGroupCount: number;
+    linkTypeCount: number;
+    actionTypeCount: number;
+    interfaceCount: number;
+    ruleCount: number;
+  };
+  capabilities: Array<{
+    name: string;
+    summary: string;
+  }>;
+  objectTypes: OntologyWorkspaceObjectType[];
+  sharedProperties: OntologyWorkspaceSharedProperty[];
+  objectTypeGroups: OntologyWorkspaceObjectTypeGroup[];
+  linkTypes: OntologyWorkspaceLinkType[];
+  actionTypes: OntologyWorkspaceActionType[];
+  interfaces: OntologyWorkspaceInterface[];
+  rules: OntologyWorkspaceRule[];
+  governance: {
+    draftId: string | null;
+    status: string;
+    lastPublishedAt: string | null;
+    changeCount: number;
+    changes: Array<{
+      id: string;
+      resourceType: string;
+      resourceId: string;
+      field: string;
+      oldValue: unknown;
+      newValue: unknown;
+      actorId: string;
+      time: string;
+    }>;
+  };
+}
