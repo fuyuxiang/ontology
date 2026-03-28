@@ -7,6 +7,7 @@ import type {
   InferenceTriggerResult,
   OperationalCase,
   OperationalCaseSummary,
+  OntologyWorkspace,
   PlatformScenario,
   PlatformSummary,
   SparqlResult,
@@ -50,6 +51,48 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 /** 获取首页汇总数据。 */
 export function getSummary(signal?: AbortSignal): Promise<Summary> {
   return requestJson<Summary>("/summary", { signal });
+}
+
+/** 获取本体工作台资源模型。 */
+export function getOntologyWorkspace(signal?: AbortSignal): Promise<OntologyWorkspace> {
+  return requestJson<OntologyWorkspace>("/ontology/workspace", { signal });
+}
+
+/** 保存本体草稿变更。 */
+export function saveOntologyDraftChange(payload: {
+  resourceType: string;
+  resourceId: string;
+  changes: Record<string, unknown>;
+  actorId?: string;
+}): Promise<OntologyWorkspace["governance"]> {
+  return requestJson<OntologyWorkspace["governance"]>("/ontology/draft/change", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+/** 发布当前本体草稿。 */
+export function publishOntologyDraft(payload?: { actorId?: string }): Promise<OntologyWorkspace["governance"]> {
+  return requestJson<OntologyWorkspace["governance"]>("/ontology/draft/publish", {
+    method: "POST",
+    body: JSON.stringify(payload ?? {}),
+  });
+}
+
+/** 回退单条本体草稿变更。 */
+export function revertOntologyDraftChange(changeId: string): Promise<OntologyWorkspace["governance"]> {
+  return requestJson<OntologyWorkspace["governance"]>("/ontology/draft/revert", {
+    method: "POST",
+    body: JSON.stringify({ changeId }),
+  });
+}
+
+/** 丢弃当前本体草稿。 */
+export function discardOntologyDraft(): Promise<OntologyWorkspace["governance"]> {
+  return requestJson<OntologyWorkspace["governance"]>("/ontology/draft/discard", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 /** 获取平台概览。 */

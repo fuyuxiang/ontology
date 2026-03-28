@@ -37,7 +37,7 @@ class Settings:
     功能：
     - 集中保存后端运行所需的路径、命名空间和服务参数。
     - 该类定义在 `backend/app/config/settings.py` 中，用于组织与 `Settings` 相关的数据或行为。
-    - 类中声明的主要字段包括：`project_dir`, `scenario_key`, `data_dir`, `mappings_dir`, `mapping_path`, `ontology_dir`, `rules_dir`, `scenarios_dir`, `runtime_dir`, `runtime_state_path`, `platform_state_path`, `store_dir`, `reports_dir`, `ontology_core_path`, `ontology_domain_path`, `ontology_shapes_path`, `rules_path`, `scenario_path`, `host`, `port`, `doim_ns`, `telecom_ns`, `data_ns`, `base_graph_uri`, `deductions_graph_uri`, `default_query`, `runtime_persistence_enabled`, `llm_base_url`, `llm_api_key`, `llm_model`, `llm_timeout_seconds`。
+    - 类中声明的主要字段包括：`project_dir`, `scenario_key`, `data_dir`, `mappings_dir`, `mapping_path`, `ontology_dir`, `rules_dir`, `scenarios_dir`, `runtime_dir`, `runtime_state_path`, `platform_state_path`, `ontology_governance_state_path`, `store_dir`, `reports_dir`, `ontology_core_path`, `ontology_domain_path`, `ontology_shapes_path`, `rules_path`, `scenario_path`, `host`, `port`, `doim_ns`, `telecom_ns`, `data_ns`, `base_graph_uri`, `deductions_graph_uri`, `default_query`, `runtime_persistence_enabled`, `llm_base_url`, `llm_api_key`, `llm_model`, `llm_timeout_seconds`。
     """
 
     project_dir: Path
@@ -51,6 +51,7 @@ class Settings:
     runtime_dir: Path
     runtime_state_path: Path
     platform_state_path: Path
+    ontology_governance_state_path: Path
     store_dir: Path
     reports_dir: Path
     ontology_core_path: Path
@@ -112,6 +113,7 @@ def get_settings(active_scenario_key_override: str | None = None) -> Settings:
         runtime_dir=project_dir / "runtime",
         runtime_state_path=project_dir / "runtime" / "operations-state.json",
         platform_state_path=project_dir / "runtime" / "platform-state.json",
+        ontology_governance_state_path=project_dir / "runtime" / "ontology-governance-state.json",
         store_dir=project_dir / "runtime" / "store",
         reports_dir=project_dir / "runtime" / "reports",
         ontology_core_path=resolved_paths["ontology_core_path"],
