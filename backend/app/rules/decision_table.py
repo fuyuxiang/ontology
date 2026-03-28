@@ -1,4 +1,10 @@
-"""风险决策表模型与加载逻辑。"""
+"""
+模块功能：
+- 风险决策表模型与加载逻辑。
+- 该文件位于 `backend/app/rules/decision_table.py`，负责解析决策表配置并提供规则匹配能力，供推理引擎调用。
+- 文件中定义的核心类包括：`RiskFactorDef`, `FactorRule`, `DecisionRule`, `DecisionTable`。
+- 文件中对外暴露或复用的主要函数包括：`_as_mapping`, `_as_sequence`, `load_decision_table`, `_load_factor_rules`, `_load_decision_rules`, `matches_condition`。
+"""
 
 from __future__ import annotations
 
@@ -14,7 +20,12 @@ except ImportError:  # pragma: no cover
 
 @dataclass(frozen=True)
 class RiskFactorDef:
-    """单个风险因子的静态定义。"""
+    """
+    功能：
+    - 单个风险因子的静态定义。
+    - 该类定义在 `backend/app/rules/decision_table.py` 中，用于组织与 `RiskFactorDef` 相关的数据或行为。
+    - 类中声明的主要字段包括：`code`, `label`, `rule_label`。
+    """
 
     code: str
     label: str
@@ -23,7 +34,12 @@ class RiskFactorDef:
 
 @dataclass(frozen=True)
 class FactorRule:
-    """命中后会附着风险因子的规则。"""
+    """
+    功能：
+    - 命中后会附着风险因子的规则。
+    - 该类定义在 `backend/app/rules/decision_table.py` 中，用于组织与 `FactorRule` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `rule_label`, `factor`, `when`。
+    """
 
     id: str
     rule_label: str
@@ -33,7 +49,12 @@ class FactorRule:
 
 @dataclass(frozen=True)
 class DecisionRule:
-    """用于产出最终风险等级的决策规则。"""
+    """
+    功能：
+    - 用于产出最终风险等级的决策规则。
+    - 该类定义在 `backend/app/rules/decision_table.py` 中，用于组织与 `DecisionRule` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `rule_label`, `priority`, `when`, `risk_level`。
+    """
 
     id: str
     rule_label: str
@@ -44,7 +65,12 @@ class DecisionRule:
 
 @dataclass(frozen=True)
 class DecisionTable:
-    """完整的风险规则表，包含动作映射、因子规则和决策规则。"""
+    """
+    功能：
+    - 完整的风险规则表，包含动作映射、因子规则和决策规则。
+    - 该类定义在 `backend/app/rules/decision_table.py` 中，用于组织与 `DecisionTable` 相关的数据或行为。
+    - 类中声明的主要字段包括：`risk_actions`, `factor_rules`, `decision_rules`。
+    """
 
     risk_actions: dict[str, str]
     factor_rules: tuple[FactorRule, ...]
@@ -64,21 +90,50 @@ OPS = {
 
 
 def _as_mapping(value: Any, context: str) -> dict[str, Any]:
-    """断言对象为映射类型，失败时带上明确上下文。"""
+    """
+    功能：
+    - 断言对象为映射类型，失败时带上明确上下文。
+
+    输入：
+    - `value`: 待解析、转换或比较的原始值。
+    - `context`: 错误提示或日志中使用的上下文说明。
+
+    输出：
+    - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+    """
     if not isinstance(value, dict):
         raise ValueError(f"{context} must be a mapping")
     return value
 
 
 def _as_sequence(value: Any, context: str) -> list[Any]:
-    """断言对象为列表类型，失败时带上明确上下文。"""
+    """
+    功能：
+    - 断言对象为列表类型，失败时带上明确上下文。
+
+    输入：
+    - `value`: 待解析、转换或比较的原始值。
+    - `context`: 错误提示或日志中使用的上下文说明。
+
+    输出：
+    - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+    """
     if not isinstance(value, list):
         raise ValueError(f"{context} must be a list")
     return value
 
 
 def load_decision_table(path: Path) -> DecisionTable:
-    """从 YAML 文件加载风险决策表。"""
+    """
+    功能：
+    - 从 YAML 文件加载风险决策表。
+
+    输入：
+    - `path`: 待读取或写入的路径对象。
+
+    输出：
+    - 返回值: 返回已解析完成的决策表对象。
+    """
     if yaml is None:  # pragma: no cover
         raise RuntimeError("PyYAML is required to load decision tables")
     if not path.exists():
@@ -100,7 +155,16 @@ def load_decision_table(path: Path) -> DecisionTable:
 
 
 def _load_factor_rules(raw_rules: Any) -> list[FactorRule]:
-    """解析风险因子规则列表。"""
+    """
+    功能：
+    - 解析风险因子规则列表。
+
+    输入：
+    - `raw_rules`: 尚未转换成对象的规则配置集合。
+
+    输出：
+    - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+    """
     factor_rules: list[FactorRule] = []
     for index, raw_rule in enumerate(_as_sequence(raw_rules, "factor_rules"), start=1):
         rule = _as_mapping(raw_rule, f"factor_rules[{index}]")
@@ -121,7 +185,16 @@ def _load_factor_rules(raw_rules: Any) -> list[FactorRule]:
 
 
 def _load_decision_rules(raw_rules: Any) -> list[DecisionRule]:
-    """解析决策规则，并按优先级从高到低排序。"""
+    """
+    功能：
+    - 解析决策规则，并按优先级从高到低排序。
+
+    输入：
+    - `raw_rules`: 尚未转换成对象的规则配置集合。
+
+    输出：
+    - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+    """
     decision_rules: list[DecisionRule] = []
     for index, raw_rule in enumerate(_as_sequence(raw_rules, "decision_rules"), start=1):
         rule = _as_mapping(raw_rule, f"decision_rules[{index}]")
@@ -139,7 +212,17 @@ def _load_decision_rules(raw_rules: Any) -> list[DecisionRule]:
 
 
 def matches_condition(condition: dict[str, Any], facts: dict[str, Any]) -> bool:
-    """递归匹配 all/any/not 组合条件和基础比较条件。"""
+    """
+    功能：
+    - 递归匹配 all/any/not 组合条件和基础比较条件。
+
+    输入：
+    - `condition`: 规则或过滤匹配条件。
+    - `facts`: 参与规则匹配的事实字典。
+
+    输出：
+    - 返回值: 返回布尔值，表示条件是否成立或当前操作是否允许。
+    """
     if "all" in condition:
         children = _as_sequence(condition["all"], "all")
         return all(matches_condition(_as_mapping(child, "all child"), facts) for child in children)

@@ -2,10 +2,13 @@
 
 import type {
   ActionExecutionResult,
+  AgentResponse,
   Alert,
   InferenceTriggerResult,
   OperationalCase,
   OperationalCaseSummary,
+  PlatformScenario,
+  PlatformSummary,
   SparqlResult,
   SubscriberDetail,
   SubscriberListItem,
@@ -49,6 +52,24 @@ export function getSummary(signal?: AbortSignal): Promise<Summary> {
   return requestJson<Summary>("/summary", { signal });
 }
 
+/** 获取平台概览。 */
+export function getPlatformSummary(signal?: AbortSignal): Promise<PlatformSummary> {
+  return requestJson<PlatformSummary>("/platform", { signal });
+}
+
+/** 获取平台场景包列表。 */
+export function getPlatformScenarios(signal?: AbortSignal): Promise<PlatformScenario[]> {
+  return requestJson<PlatformScenario[]>("/platform/scenarios", { signal });
+}
+
+/** 激活场景包。 */
+export function activateScenario(scenarioKey: string): Promise<PlatformSummary> {
+  return requestJson<PlatformSummary>("/platform/scenarios/activate", {
+    method: "POST",
+    body: JSON.stringify({ scenarioKey }),
+  });
+}
+
 /** 获取风险告警列表。 */
 export function getAlerts(signal?: AbortSignal): Promise<Alert[]> {
   return requestJson<Alert[]>("/alerts", { signal });
@@ -70,6 +91,19 @@ export function runSparql(query: string): Promise<SparqlResult> {
   return requestJson<SparqlResult>("/sparql", {
     method: "POST",
     body: JSON.stringify({ query }),
+  });
+}
+
+/** 调用监督式 agent。 */
+export function askAgent(payload: {
+  question: string;
+  actorRole?: string;
+  actorId?: string;
+  actorAreaId?: string;
+}): Promise<AgentResponse> {
+  return requestJson<AgentResponse>("/agent/ask", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

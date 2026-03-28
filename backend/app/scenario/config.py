@@ -1,4 +1,10 @@
-"""场景配置模型与 YAML 解析器。"""
+"""
+模块功能：
+- 场景配置模型与 YAML 解析器。
+- 该文件位于 `backend/app/scenario/config.py`，定义场景配置模型并解析 YAML 配置，统一约束场景元数据结构。
+- 文件中定义的核心类包括：`DatasetConfig`, `RelationConfig`, `FactConfig`, `AlertDisplayField`, `SortConfig`, `SourceCardConfig`, `OntologyFileConfig`, `RuleCardConfig`, `ScenarioConfig`。
+- 文件中对外暴露或复用的主要函数包括：`load_scenario_config`, `_load_dataset_config`, `_load_relation`, `_load_fact`, `_load_display_field`, `_load_sort`, `_load_source_card`, `_load_ontology_file`, `_load_rule_card`, `_parse_date_optional`, `_as_mapping`, `_as_sequence`, `_as_string_list`。
+"""
 
 from __future__ import annotations
 
@@ -12,7 +18,12 @@ import yaml
 
 @dataclass(frozen=True)
 class DatasetConfig:
-    """描述一个原始数据集的文件、标识字段和图谱节点映射方式。"""
+    """
+    功能：
+    - 描述一个原始数据集的文件、标识字段和图谱节点映射方式。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `DatasetConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`key`, `file`, `source_system`, `id_fields`, `join_keys`, `label_field`, `label_template`, `node_type`, `entity_label`。
+    """
 
     key: str
     file: str
@@ -27,7 +38,12 @@ class DatasetConfig:
 
 @dataclass(frozen=True)
 class RelationConfig:
-    """描述两个数据集之间的关联关系生成规则。"""
+    """
+    功能：
+    - 描述两个数据集之间的关联关系生成规则。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `RelationConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`source_dataset`, `target_dataset`, `source_join_key`, `target_join_key`, `predicate`, `label`, `source_system`。
+    """
 
     source_dataset: str
     target_dataset: str
@@ -40,7 +56,12 @@ class RelationConfig:
 
 @dataclass(frozen=True)
 class FactConfig:
-    """描述事实指标的聚合来源与计算方式。"""
+    """
+    功能：
+    - 描述事实指标的聚合来源与计算方式。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `FactConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`key`, `label`, `source_dataset`, `aggregate`, `field`, `cast`, `order_by`, `default`, `where`。
+    """
 
     key: str
     label: str
@@ -55,7 +76,12 @@ class FactConfig:
 
 @dataclass(frozen=True)
 class AlertDisplayField:
-    """描述告警卡片中的一个展示字段。"""
+    """
+    功能：
+    - 描述告警卡片中的一个展示字段。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `AlertDisplayField` 相关的数据或行为。
+    - 类中声明的主要字段包括：`label`, `source`, `field`, `fact`。
+    """
 
     label: str
     source: str | None
@@ -65,7 +91,12 @@ class AlertDisplayField:
 
 @dataclass(frozen=True)
 class SortConfig:
-    """描述告警列表的排序规则。"""
+    """
+    功能：
+    - 描述告警列表的排序规则。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `SortConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`fact`, `order`。
+    """
 
     fact: str
     order: str
@@ -73,7 +104,12 @@ class SortConfig:
 
 @dataclass(frozen=True)
 class SourceCardConfig:
-    """描述首页数据源卡片。"""
+    """
+    功能：
+    - 描述首页数据源卡片。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `SourceCardConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`key`, `dataset`, `label`, `file`, `icon`, `tone`, `count_mode`。
+    """
 
     key: str
     dataset: str
@@ -86,7 +122,12 @@ class SourceCardConfig:
 
 @dataclass(frozen=True)
 class OntologyFileConfig:
-    """描述前端展示的本体文件说明项。"""
+    """
+    功能：
+    - 描述前端展示的本体文件说明项。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `OntologyFileConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`name`, `desc`, `tone`。
+    """
 
     name: str
     desc: str
@@ -95,7 +136,12 @@ class OntologyFileConfig:
 
 @dataclass(frozen=True)
 class RuleCardConfig:
-    """描述前端展示的规则卡片说明项。"""
+    """
+    功能：
+    - 描述前端展示的规则卡片说明项。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `RuleCardConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`label`, `desc`, `tone`。
+    """
 
     label: str
     desc: str
@@ -104,7 +150,12 @@ class RuleCardConfig:
 
 @dataclass(frozen=True)
 class ScenarioConfig:
-    """聚合整个场景运行所需的 UI、数据和规则配置。"""
+    """
+    功能：
+    - 聚合整个场景运行所需的 UI、数据和规则配置。
+    - 该类定义在 `backend/app/scenario/config.py` 中，用于组织与 `ScenarioConfig` 相关的数据或行为。
+    - 类中声明的主要字段包括：`key`, `name`, `app_title`, `header_title`, `dashboard_subtitle`, `reference_date`, `primary_dataset`, `primary_entity_label`, `primary_entity_plural_label`, `primary_id_field`, `primary_label_field`, `primary_node_type`, `search_fields`, `risk_terms`, `sample_query`, `question_suggestions`, `interaction_datasets`, `graph_datasets`, `source_cards`, `ontology_files`, `rule_cards`, `architecture`, `mapping_examples`, `datasets`, `relations`, `facts`, `summary_fields`, `detail_fields`, `highlight_fields`, `alert_sort`。
+    """
 
     key: str
     name: str
@@ -139,7 +190,16 @@ class ScenarioConfig:
 
 
 def load_scenario_config(path: Path) -> ScenarioConfig:
-    """从 YAML 文件加载完整场景配置。"""
+    """
+    功能：
+    - 从 YAML 文件加载完整场景配置。
+
+    输入：
+    - `path`: 待读取或写入的路径对象。
+
+    输出：
+    - 返回值: 返回解析后的场景配置对象。
+    """
     raw = yaml.safe_load(path.read_text(encoding="utf-8"))
     config = _as_mapping(raw, "scenario config")
     scenario_raw = _as_mapping(config.get("scenario"), "scenario")
@@ -199,7 +259,17 @@ def load_scenario_config(path: Path) -> ScenarioConfig:
 
 
 def _load_dataset_config(key: str, raw: Any) -> DatasetConfig:
-    """解析单个数据集配置。"""
+    """
+    功能：
+    - 解析单个数据集配置。
+
+    输入：
+    - `key`: 函数执行所需的 `key` 参数。
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `DatasetConfig` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, f"datasets.{key}")
     return DatasetConfig(
         key=key,
@@ -215,7 +285,16 @@ def _load_dataset_config(key: str, raw: Any) -> DatasetConfig:
 
 
 def _load_relation(raw: Any) -> RelationConfig:
-    """解析关系配置。"""
+    """
+    功能：
+    - 解析关系配置。
+
+    输入：
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `RelationConfig` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, "relation")
     return RelationConfig(
         source_dataset=str(item["source_dataset"]),
@@ -229,7 +308,16 @@ def _load_relation(raw: Any) -> RelationConfig:
 
 
 def _load_fact(raw: Any) -> FactConfig:
-    """解析事实指标配置。"""
+    """
+    功能：
+    - 解析事实指标配置。
+
+    输入：
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `FactConfig` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, "fact")
     return FactConfig(
         key=str(item["key"]),
@@ -245,7 +333,16 @@ def _load_fact(raw: Any) -> FactConfig:
 
 
 def _load_display_field(raw: Any) -> AlertDisplayField:
-    """解析告警展示字段配置。"""
+    """
+    功能：
+    - 解析告警展示字段配置。
+
+    输入：
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `AlertDisplayField` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, "display field")
     return AlertDisplayField(
         label=str(item["label"]),
@@ -256,7 +353,16 @@ def _load_display_field(raw: Any) -> AlertDisplayField:
 
 
 def _load_sort(raw: Any) -> SortConfig:
-    """解析排序配置。"""
+    """
+    功能：
+    - 解析排序配置。
+
+    输入：
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `SortConfig` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, "sort field")
     return SortConfig(
         fact=str(item["fact"]),
@@ -265,7 +371,16 @@ def _load_sort(raw: Any) -> SortConfig:
 
 
 def _load_source_card(raw: Any) -> SourceCardConfig:
-    """解析首页数据源卡片配置。"""
+    """
+    功能：
+    - 解析首页数据源卡片配置。
+
+    输入：
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `SourceCardConfig` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, "source card")
     return SourceCardConfig(
         key=str(item["key"]),
@@ -279,7 +394,16 @@ def _load_source_card(raw: Any) -> SourceCardConfig:
 
 
 def _load_ontology_file(raw: Any) -> OntologyFileConfig:
-    """解析本体文件展示配置。"""
+    """
+    功能：
+    - 解析本体文件展示配置。
+
+    输入：
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `OntologyFileConfig` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, "ontology file")
     return OntologyFileConfig(
         name=str(item["name"]),
@@ -289,7 +413,16 @@ def _load_ontology_file(raw: Any) -> OntologyFileConfig:
 
 
 def _load_rule_card(raw: Any) -> RuleCardConfig:
-    """解析规则卡片配置。"""
+    """
+    功能：
+    - 解析规则卡片配置。
+
+    输入：
+    - `raw`: 尚未校验或转换的原始配置值。
+
+    输出：
+    - 返回值: 返回 `RuleCardConfig` 类型结果，供后续流程继续消费。
+    """
     item = _as_mapping(raw, "rule card")
     return RuleCardConfig(
         label=str(item["label"]),
@@ -299,26 +432,65 @@ def _load_rule_card(raw: Any) -> RuleCardConfig:
 
 
 def _parse_date_optional(value: Any) -> date | None:
-    """把可选日期字段解析为 `date` 对象。"""
+    """
+    功能：
+    - 把可选日期字段解析为 `date` 对象。
+
+    输入：
+    - `value`: 待解析、转换或比较的原始值。
+
+    输出：
+    - 返回值: 返回处理结果；当目标不存在、未命中或无法解析时返回 `None`。
+    """
     if value in (None, ""):
         return None
     return date.fromisoformat(str(value))
 
 
 def _as_mapping(value: Any, context: str) -> dict[str, Any]:
-    """确保 YAML 节点是映射结构。"""
+    """
+    功能：
+    - 确保 YAML 节点是映射结构。
+
+    输入：
+    - `value`: 待解析、转换或比较的原始值。
+    - `context`: 错误提示或日志中使用的上下文说明。
+
+    输出：
+    - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+    """
     if not isinstance(value, dict):
         raise ValueError(f"{context} must be a mapping")
     return value
 
 
 def _as_sequence(value: Any, context: str) -> list[Any]:
-    """确保 YAML 节点是列表结构。"""
+    """
+    功能：
+    - 确保 YAML 节点是列表结构。
+
+    输入：
+    - `value`: 待解析、转换或比较的原始值。
+    - `context`: 错误提示或日志中使用的上下文说明。
+
+    输出：
+    - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+    """
     if not isinstance(value, list):
         raise ValueError(f"{context} must be a list")
     return value
 
 
 def _as_string_list(value: Any, context: str) -> list[str]:
-    """把 YAML 列表节点规范化为字符串列表。"""
+    """
+    功能：
+    - 把 YAML 列表节点规范化为字符串列表。
+
+    输入：
+    - `value`: 待解析、转换或比较的原始值。
+    - `context`: 错误提示或日志中使用的上下文说明。
+
+    输出：
+    - 返回值: 返回列表结果，供调用方遍历、展示或继续筛选。
+    """
     return [str(item) for item in _as_sequence(value, context)]
