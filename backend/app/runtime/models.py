@@ -1,4 +1,10 @@
-"""运营运行时数据模型。"""
+"""
+模块功能：
+- 运营运行时数据模型。
+- 该文件位于 `backend/app/runtime/models.py`，定义运行时使用的数据模型与序列化辅助函数，统一数据结构表达。
+- 文件中定义的核心类包括：`ActorContext`, `ActionDefinition`, `OperationalAlert`, `RetentionCase`, `Task`, `ActionRun`, `DomainEvent`, `StateTransition`, `PolicyDecision`。
+- 文件中对外暴露或复用的主要函数包括：`utcnow_iso`, `serialize_dataclass`。
+"""
 
 from __future__ import annotations
 
@@ -8,18 +14,41 @@ from typing import Any
 
 
 def utcnow_iso() -> str:
-    """返回标准 UTC 时间戳，作为运行时对象默认时间。"""
+    """
+    功能：
+    - 返回标准 UTC 时间戳，作为运行时对象默认时间。
+
+    输入：
+    - 无。
+
+    输出：
+    - 返回值: 返回字符串结果，供调用方继续展示、拼接或查询。
+    """
     return datetime.now(tz=UTC).replace(microsecond=0).isoformat()
 
 
 def serialize_dataclass(instance: Any) -> dict[str, Any]:
-    """把 dataclass 递归转换成 JSON 友好字典。"""
+    """
+    功能：
+    - 把 dataclass 递归转换成 JSON 友好字典。
+
+    输入：
+    - `instance`: 待序列化或处理的实例对象。
+
+    输出：
+    - 返回值: 返回字典结构，包含本次处理产生的结果数据。
+    """
     return asdict(instance)
 
 
 @dataclass(frozen=True)
 class ActorContext:
-    """动作执行时的操作者上下文。"""
+    """
+    功能：
+    - 动作执行时的操作者上下文。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `ActorContext` 相关的数据或行为。
+    - 类中声明的主要字段包括：`role`, `actor_id`, `area_id`。
+    """
 
     role: str
     actor_id: str
@@ -28,7 +57,12 @@ class ActorContext:
 
 @dataclass(frozen=True)
 class ActionDefinition:
-    """动作类型定义。"""
+    """
+    功能：
+    - 动作类型定义。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `ActionDefinition` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `label`, `description`, `allowed_roles`, `allowed_states`, `allowed_risk_levels`, `side_effect`, `queue_hint`。
+    """
 
     id: str
     label: str
@@ -42,7 +76,12 @@ class ActionDefinition:
 
 @dataclass
 class OperationalAlert:
-    """围绕风险判定生成的运营告警。"""
+    """
+    功能：
+    - 围绕风险判定生成的运营告警。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `OperationalAlert` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `entity_id`, `case_id`, `risk_level`, `state`, `recommended_action`, `created_at`, `updated_at`。
+    """
 
     id: str
     entity_id: str
@@ -56,7 +95,12 @@ class OperationalAlert:
 
 @dataclass
 class RetentionCase:
-    """围绕主实体展开的运营处置 case。"""
+    """
+    功能：
+    - 围绕主实体展开的运营处置 case。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `RetentionCase` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `entity_id`, `alert_id`, `risk_level`, `state`, `priority`, `queue_name`, `owner_role`, `area_id`, `created_at`, `updated_at`, `task_ids`, `action_run_ids`, `event_ids`, `transition_ids`。
+    """
 
     id: str
     entity_id: str
@@ -77,7 +121,12 @@ class RetentionCase:
 
 @dataclass
 class Task:
-    """运营待办任务。"""
+    """
+    功能：
+    - 运营待办任务。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `Task` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `case_id`, `entity_id`, `action_id`, `title`, `status`, `assignee_role`, `queue_name`, `due_sla_hours`, `created_at`, `updated_at`, `completed_at`, `output`。
+    """
 
     id: str
     case_id: str
@@ -96,7 +145,12 @@ class Task:
 
 @dataclass
 class ActionRun:
-    """动作执行实例。"""
+    """
+    功能：
+    - 动作执行实例。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `ActionRun` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `action_id`, `case_id`, `entity_id`, `actor_role`, `actor_id`, `status`, `policy_reason`, `created_at`, `updated_at`, `parameters`, `output`。
+    """
 
     id: str
     action_id: str
@@ -114,7 +168,12 @@ class ActionRun:
 
 @dataclass
 class DomainEvent:
-    """系统内部记录的业务事件。"""
+    """
+    功能：
+    - 系统内部记录的业务事件。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `DomainEvent` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `event_type`, `title`, `subject_type`, `subject_id`, `entity_id`, `case_id`, `created_at`, `payload`。
+    """
 
     id: str
     event_type: str
@@ -129,7 +188,12 @@ class DomainEvent:
 
 @dataclass
 class StateTransition:
-    """对象状态迁移记录。"""
+    """
+    功能：
+    - 对象状态迁移记录。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `StateTransition` 相关的数据或行为。
+    - 类中声明的主要字段包括：`id`, `subject_type`, `subject_id`, `from_state`, `to_state`, `reason`, `event_id`, `case_id`, `entity_id`, `created_at`。
+    """
 
     id: str
     subject_type: str
@@ -145,7 +209,12 @@ class StateTransition:
 
 @dataclass(frozen=True)
 class PolicyDecision:
-    """动作授权校验结果。"""
+    """
+    功能：
+    - 动作授权校验结果。
+    - 该类定义在 `backend/app/runtime/models.py` 中，用于组织与 `PolicyDecision` 相关的数据或行为。
+    - 类中声明的主要字段包括：`allowed`, `reason`, `matched_rules`。
+    """
 
     allowed: bool
     reason: str

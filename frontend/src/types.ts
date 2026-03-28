@@ -35,6 +35,7 @@ export interface FieldDisplay {
 
 export interface Summary {
   /** 首页概览接口返回值。 */
+  scenarioKey: string;
   scenario: string;
   appTitle: string;
   headerTitle: string;
@@ -108,6 +109,26 @@ export interface Summary {
     actionCatalog: ActionDefinition[];
   };
   operationsWorkbench: OperationsWorkbench;
+  ontologyObjects: Array<{
+    key: string;
+    label: string;
+    ontologyType: string;
+    identityField: string;
+    description: string;
+    attributes: string[];
+  }>;
+  toolCatalog: Array<{
+    name: string;
+    description: string;
+    inputs: string[];
+  }>;
+  agentProfile: {
+    name: string;
+    mode: string;
+    planner: string;
+    objectCount: number;
+    toolCount: number;
+  };
   caseDistribution: Record<string, number>;
   taskDistribution: Record<string, number>;
   alertDistribution: Record<string, number>;
@@ -316,6 +337,59 @@ export interface OperationsWorkbench {
     status: string;
     time: string;
   }>;
+}
+
+export interface AgentToolRun {
+  tool: string;
+  arguments: Record<string, unknown>;
+  summary: string;
+  resultCount: number;
+}
+
+export interface PendingAction {
+  actionId: string;
+  actionLabel: string;
+  caseId: string;
+  entityId: string;
+  actorRole: string;
+  actorId: string;
+  actorAreaId: string;
+}
+
+export interface AgentResponse {
+  mode: string;
+  question: string;
+  answer: string;
+  toolRuns: AgentToolRun[];
+  suggestions: string[];
+  primaryObjectType: string;
+  objects: Array<Record<string, unknown>>;
+  requiresConfirmation: boolean;
+  pendingAction: PendingAction | null;
+}
+
+export interface PlatformScenario {
+  key: string;
+  name: string;
+  version: string;
+  description: string;
+  scenarioPath: string;
+  dataDir: string;
+  mappingPath: string;
+  ontologyCorePath: string;
+  ontologyDomainPath: string;
+  ontologyShapesPath: string;
+  rulesPath: string;
+  active: boolean;
+}
+
+export interface PlatformSummary {
+  activeScenarioKey: string;
+  activeScenarioName: string;
+  scenarioCount: number;
+  statePath: string;
+  scenarios: PlatformScenario[];
+  capabilities: string[];
 }
 
 export interface ActionExecutionResult {

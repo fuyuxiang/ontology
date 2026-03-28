@@ -1,18 +1,20 @@
 /** 前端主页面，统一编排概览、图谱、问答和设置视图。 */
 
-import { type KeyboardEvent, startTransition, useEffect, useState } from "react";
+import { type KeyboardEvent, startTransition, useEffect, useRef, useState } from "react";
 
 import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS, RISK_COLORS } from "./components/GraphCanvas";
 import { OperationsWorkbench } from "./components/OperationsWorkbench";
 import {
+  activateScenario,
+  askAgent,
   executeAction,
   getAlerts,
   getCase,
   getCases,
+  getPlatformSummary,
   getSubscriber,
   getSummary,
   getTasks,
-  runSparql,
   triggerInference,
 } from "./services/api";
 import type {
@@ -20,8 +22,9 @@ import type {
   GraphData,
   OperationalCase,
   OperationalCaseSummary,
+  PendingAction,
+  PlatformSummary,
   RiskLevel,
-  SparqlResult,
   SubscriberDetail,
   Summary,
   TaskItem,
@@ -34,16 +37,15 @@ interface ChatMessage {
   id: string;
   role: "assistant" | "user";
   content: string;
+  toolSummary?: string;
+  pendingAction?: PendingAction | null;
+  requiresConfirmation?: boolean;
 }
 
 interface FeedbackState {
   tone: "success" | "error";
   text: string;
 }
-
-const TELECOM_NS = "http://example.com/telecom#";
-const RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
-const RDFS_NS = "http://www.w3.org/2000/01/rdf-schema#";
 
 const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: IconName }> = [
   { key: "dashboard", label: "仪表盘", icon: "dashboard" },
@@ -168,157 +170,6 @@ function buildRiskScopedGraph(graph: GraphData | null, alerts: Alert[], riskFilt
   };
 }
 
-/** 生成问答页默认查询。 */
-function buildDefaultQuestionQuery(defaultQuery?: string) {
-  if (defaultQuery?.trim()) {
-    return defaultQuery;
-  }
-  return [
-    `PREFIX rdf: <${RDF_NS}>`,
-    `PREFIX rdfs: <${RDFS_NS}>`,
-    `PREFIX telecom: <${TELECOM_NS}>`,
-    "SELECT ?userId ?deviceNumber ?riskLevel ?areaId",
-    "WHERE {",
-    "  ?user a telecom:User ;",
-    "        telecom:userId ?userId ;",
-    "        telecom:deviceNumber ?deviceNumber ;",
-    "        telecom:inferredRiskLevel ?riskLevel .",
-    "  OPTIONAL { ?user telecom:areaId ?areaId }",
-    "}",
-    "ORDER BY DESC(?riskLevel) ?userId",
-    "LIMIT 10",
-  ].join("\n");
-}
-
-/** 使用规则模板把自然语言问题转换为 SPARQL。 */
-function convertQuestionToSparql(question: string, defaultQuery?: string) {
-  const q = question.toLowerCase();
-  const prefixes = [
-    `PREFIX rdf: <${RDF_NS}>`,
-    `PREFIX rdfs: <${RDFS_NS}>`,
-    `PREFIX telecom: <${TELECOM_NS}>`,
-  ].join("\n");
-
-  if (q.includes("风险因子") || q.includes("因子有哪些")) {
-    return `${prefixes}
-SELECT ?factor ?label
-WHERE {
-  ?factor a telecom:RiskFactor .
-  OPTIONAL { ?factor rdfs:label ?label }
-}
-ORDER BY ?label
-LIMIT 20`;
-  }
-
-  if (q.includes("高风险") || (q.includes("风险") && q.includes("用户"))) {
-    return `${prefixes}
-SELECT ?userId ?deviceNumber ?areaId ?riskLevel
-WHERE {
-  ?user a telecom:User ;
-        telecom:userId ?userId ;
-        telecom:deviceNumber ?deviceNumber ;
-        telecom:inferredRiskLevel ?riskLevel .
-  OPTIONAL { ?user telecom:areaId ?areaId }
-  FILTER(?riskLevel = "HIGH")
-}
-ORDER BY ?userId
-LIMIT 10`;
-  }
-
-  if (q.includes("交互") || q.includes("事件") || q.includes("interaction")) {
-    return `${prefixes}
-SELECT ?deviceNumber ?queryTime ?servContent
-WHERE {
-  {
-    ?query a telecom:PortingQuery ;
-           telecom:deviceNumber ?deviceNumber ;
-           telecom:queryTime ?queryTime .
-  }
-  UNION
-  {
-    ?service a telecom:CustomerServiceInteraction ;
-             telecom:deviceNumber ?deviceNumber ;
-             telecom:servContent ?servContent .
-  }
-}
-ORDER BY ?deviceNumber
-LIMIT 10`;
-  }
-
-  if (q.includes("规则") || q.includes("rule")) {
-    return `${prefixes}
-SELECT ?userId ?ruleLabel
-WHERE {
-  ?user a telecom:User ;
-     telecom:userId ?userId ;
-     <http://purl.org/doim/1.0#taggedByRule> ?rule .
-  ?rule rdfs:label ?ruleLabel .
-}
-ORDER BY ?userId ?ruleLabel
-LIMIT 15`;
-  }
-
-  if (q.includes("用户") || q.includes("subscriber")) {
-    return `${prefixes}
-SELECT ?userId ?deviceNumber ?areaId ?userType
-WHERE {
-  ?user a telecom:User ;
-        telecom:userId ?userId ;
-        telecom:deviceNumber ?deviceNumber .
-  OPTIONAL { ?user telecom:areaId ?areaId }
-  OPTIONAL { ?user telecom:userType ?userType }
-}
-ORDER BY ?userId
-LIMIT 10`;
-  }
-
-  return buildDefaultQuestionQuery(defaultQuery);
-}
-
-/** 将查询结果整理为聊天面板文案。 */
-function formatAnswer(result: SparqlResult, question: string) {
-  const rows = result.rows ?? [];
-  if (rows.length === 0) {
-    return "根据当前知识图谱，没有检索到匹配结果。可以试试询问高风险用户、风险因子或交互事件。";
-  }
-
-  const q = question.toLowerCase();
-  if (q.includes("风险因子") || q.includes("因子有哪些")) {
-    return `系统中定义的风险因子共 ${rows.length} 类：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.label || row.factor || "-"}`)
-      .join("\n")}`;
-  }
-
-  if (q.includes("高风险") || (q.includes("风险") && q.includes("用户"))) {
-    return `找到 ${rows.length} 个高风险用户：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.deviceNumber || row.userId || "-"} · ${row.areaId || "-"} · ${row.riskLevel || "HIGH"}`)
-      .join("\n")}`;
-  }
-
-  if (q.includes("交互") || q.includes("事件")) {
-    return `最近的关键交互事件如下：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.deviceNumber || "-"} · ${row.queryTime || row.servContent || "-"}`)
-      .join("\n")}`;
-  }
-
-  if (q.includes("规则")) {
-    return `规则命中样例如下：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.userId || "-"} · ${row.ruleLabel || "-"}`)
-      .join("\n")}`;
-  }
-
-  if (q.includes("用户") || q.includes("subscriber")) {
-    return `找到 ${rows.length} 个用户：\n\n${rows
-      .map((row, index) => `${index + 1}. ${row.deviceNumber || row.userId || "-"} · ${row.areaId || "-"} · ${row.userType || "-"}`)
-      .join("\n")}`;
-  }
-
-  return `查询返回 ${result.rowCount} 条记录：\n\n${rows
-    .slice(0, 5)
-    .map((row, index) => `${index + 1}. ${result.variables.map((variable) => `${variable}: ${row[variable] || "-"}`).join(" | ")}`)
-    .join("\n")}`;
-}
-
 /** 渲染内置 SVG 图标。 */
 function SvgIcon({ name, size = 20, color = "currentColor" }: { name: IconName; size?: number; color?: string }) {
   return (
@@ -384,6 +235,7 @@ function EmptyState({ message }: { message: string }) {
 export default function App() {
   const [page, setPage] = useState<PageKey>("dashboard");
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [platformSummary, setPlatformSummary] = useState<PlatformSummary | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [cases, setCases] = useState<OperationalCaseSummary[]>([]);
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -400,17 +252,21 @@ export default function App() {
   const [questionInput, setQuestionInput] = useState("");
   const [askingQuestion, setAskingQuestion] = useState(false);
   const [runningInference, setRunningInference] = useState(false);
+  const [switchingScenario, setSwitchingScenario] = useState(false);
   const [actionBusyKey, setActionBusyKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState | null>(null);
+  const appLoadRequestRef = useRef(0);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: "您好，我是本体问答助手。您可以询问高风险用户、规则命中、风险因子或交互事件。",
+      content: "我是运营智能问答助手。你可以直接询问风险对象、规则命中、交互事件、Case、任务或动作建议。",
     },
   ]);
 
   async function loadAppData() {
+    const requestId = appLoadRequestRef.current + 1;
+    appLoadRequestRef.current = requestId;
     setLoading(true);
     setAppError("");
     setSubscriberDetails({});
@@ -418,17 +274,28 @@ export default function App() {
     setDetailLoadingId(null);
     setCaseLoadingId(null);
     setDetailError("");
-    const [summaryResult, alertsResult, casesResult, tasksResult] = await Promise.allSettled([
+    const [summaryResult, platformResult, alertsResult, casesResult, tasksResult] = await Promise.allSettled([
       getSummary(),
+      getPlatformSummary(),
       getAlerts(),
       getCases(),
       getTasks(),
     ]);
 
+    if (requestId !== appLoadRequestRef.current) {
+      return;
+    }
+
     if (summaryResult.status === "fulfilled") {
       setSummary(summaryResult.value);
     } else {
       setAppError(summaryResult.reason instanceof Error ? summaryResult.reason.message : "加载 summary 失败");
+    }
+
+    if (platformResult.status === "fulfilled") {
+      setPlatformSummary(platformResult.value);
+    } else {
+      setAppError((current) => current || (platformResult.reason instanceof Error ? platformResult.reason.message : "加载 platform 失败"));
     }
 
     if (alertsResult.status === "fulfilled") {
@@ -450,6 +317,27 @@ export default function App() {
     }
 
     setLoading(false);
+  }
+
+  async function handleActivateScenario(scenarioKey: string) {
+    setSwitchingScenario(true);
+    setFeedback(null);
+    try {
+      const result = await activateScenario(scenarioKey);
+      setPlatformSummary(result);
+      await loadAppData();
+      setFeedback({
+        tone: "success",
+        text: `当前已切换到场景包 ${result.activeScenarioName}。`,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "切换场景失败",
+      });
+    } finally {
+      setSwitchingScenario(false);
+    }
   }
 
   useEffect(() => {
@@ -560,6 +448,58 @@ export default function App() {
     }
   }
 
+  async function handleConfirmPendingAction(messageId: string, pendingAction: PendingAction) {
+    const actionId = pendingAction.actionId.trim();
+    if (!actionId) {
+      return;
+    }
+    const busyKey = `${pendingAction.caseId}:${actionId}`;
+    setActionBusyKey(busyKey);
+    setFeedback(null);
+
+    try {
+      await executeAction({
+        actionId,
+        caseId: pendingAction.caseId || undefined,
+        entityId: pendingAction.entityId || undefined,
+        actorRole: pendingAction.actorRole || undefined,
+        actorId: pendingAction.actorId || undefined,
+        actorAreaId: pendingAction.actorAreaId || undefined,
+      });
+      await loadAppData();
+      if (pendingAction.caseId) {
+        await refreshCaseDetail(pendingAction.caseId);
+        setSelectedCaseId(pendingAction.caseId);
+      }
+      if (pendingAction.entityId) {
+        await refreshSubscriberDetail(pendingAction.entityId);
+      }
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? {
+                ...message,
+                content: `${message.content}\n\n已确认执行动作：${pendingAction.actionLabel || actionId}`,
+                pendingAction: null,
+                requiresConfirmation: false,
+              }
+            : message,
+        ),
+      );
+      setFeedback({
+        tone: "success",
+        text: `动作 ${pendingAction.actionLabel || actionId} 已执行。`,
+      });
+    } catch (error) {
+      setFeedback({
+        tone: "error",
+        text: error instanceof Error ? error.message : "动作执行失败",
+      });
+    } finally {
+      setActionBusyKey(null);
+    }
+  }
+
   async function handleAskQuestion(questionOverride?: string) {
     const question = (questionOverride ?? questionInput).trim();
     if (!question || askingQuestion) {
@@ -576,10 +516,23 @@ export default function App() {
     setAskingQuestion(true);
 
     try {
-      const query = convertQuestionToSparql(question, summary?.sampleQuery);
-      const result = await runSparql(query);
-      const answer = formatAnswer(result, question);
-      setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, content: answer } : message)));
+      const result = await askAgent({ question });
+      const toolSummary = result.toolRuns.length
+        ? `工具链路：${result.toolRuns.map((item) => item.tool).join(" -> ")}`
+        : undefined;
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                content: result.answer,
+                toolSummary,
+                pendingAction: result.pendingAction,
+                requiresConfirmation: result.requiresConfirmation,
+              }
+            : message,
+        ),
+      );
     } catch (error) {
       const failureText = error instanceof Error ? error.message : "问答执行失败";
       setMessages((current) => current.map((message) => (message.id === assistantId ? { ...message, content: `抱歉，检索失败：${failureText}` } : message)));
@@ -1367,7 +1320,7 @@ export default function App() {
 
           {page === "qa" ? (
             <div className="page active">
-              <PageHeader title="智能问答" subtitle="基于本体知识与 SPARQL 查询的问答系统" />
+              <PageHeader title="智能问答" subtitle="基于本体对象与工具编排的运营问答助手" />
 
               <div className="qa-container">
                 <div className="qa-capability-card">
@@ -1376,12 +1329,14 @@ export default function App() {
                       <SvgIcon name="bot" size={32} color="#ffffff" />
                     </div>
                     <div className="capability-text">
-                      <h3>本体增强问答</h3>
-                      <p>根据问题自动生成 SPARQL 查询，并结合图谱返回结构化答案。</p>
+                      <h3>{summary?.agentProfile.name || "运营智能问答"}</h3>
+                      <p>以 ontology objects 为上下文，以 query/get/semantic-query/execute-action 为工具，受控编排回答运营问题。</p>
                     </div>
                   </div>
                   <div className="capability-status">
-                    <span className={`status-badge ${summary ? "success" : "error"}`}>{summary ? "图数据库已连接" : "等待后端连接"}</span>
+                    <span className={`status-badge ${summary ? "success" : "error"}`}>
+                      {summary ? `${summary.agentProfile.objectCount} Objects / ${summary.agentProfile.toolCount} Tools` : "等待后端连接"}
+                    </span>
                   </div>
                 </div>
 
@@ -1393,6 +1348,26 @@ export default function App() {
                       </div>
                       <div className="message-content">
                         <p>{message.content}</p>
+                        {message.toolSummary ? <div className="message-meta">{message.toolSummary}</div> : null}
+                        {message.requiresConfirmation && message.pendingAction ? (
+                          <div className="message-action-card">
+                            <div className="message-action-title">待确认动作</div>
+                            <div className="message-action-desc">
+                              {message.pendingAction.actionLabel || message.pendingAction.actionId}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              disabled={
+                                !message.pendingAction.actionId ||
+                                actionBusyKey === `${message.pendingAction.caseId}:${message.pendingAction.actionId}`
+                              }
+                              onClick={() => void handleConfirmPendingAction(message.id, message.pendingAction!)}
+                            >
+                              {actionBusyKey === `${message.pendingAction.caseId}:${message.pendingAction.actionId}` ? "执行中..." : "确认执行"}
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   ))}
@@ -1438,6 +1413,10 @@ export default function App() {
                 <div className="settings-card">
                   <h3>系统信息</h3>
                   <div className="setting-item">
+                    <span className="setting-label">场景 Key</span>
+                    <span className="setting-value">{summary?.scenarioKey || "加载中..."}</span>
+                  </div>
+                  <div className="setting-item">
                     <span className="setting-label">场景</span>
                     <span className="setting-value">{summary?.scenario || "加载中..."}</span>
                   </div>
@@ -1468,6 +1447,42 @@ export default function App() {
                     <SvgIcon name="refresh" size={16} color="#ffffff" />
                     {runningInference ? "推理中..." : "触发推理"}
                   </button>
+                </div>
+
+                <div className="settings-card">
+                  <h3>平台场景包</h3>
+                  <div className="setting-item">
+                    <span className="setting-label">当前激活</span>
+                    <span className="setting-value">{platformSummary?.activeScenarioName || "加载中..."}</span>
+                  </div>
+                  <div className="setting-item">
+                    <span className="setting-label">场景数量</span>
+                    <span className="setting-value">{platformSummary?.scenarioCount ?? "-"}</span>
+                  </div>
+                  <div className="setting-item multiline">
+                    <span className="setting-label">平台状态文件</span>
+                    <span className="setting-value setting-path">{platformSummary?.statePath || "-"}</span>
+                  </div>
+                  <div className="platform-scenario-list">
+                    {(platformSummary?.scenarios || []).map((item) => (
+                      <div key={item.key} className={`platform-scenario-item ${item.active ? "active" : ""}`}>
+                        <div className="platform-scenario-head">
+                          <strong>{item.name}</strong>
+                          <span>{item.version}</span>
+                        </div>
+                        <div className="platform-scenario-meta">{item.key}</div>
+                        <div className="platform-scenario-desc">{item.description || "未提供描述"}</div>
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          disabled={switchingScenario || item.active}
+                          onClick={() => void handleActivateScenario(item.key)}
+                        >
+                          {item.active ? "当前场景" : switchingScenario ? "切换中..." : "激活场景"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
