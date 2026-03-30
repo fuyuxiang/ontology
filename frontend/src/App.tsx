@@ -3,6 +3,7 @@
 import { type KeyboardEvent, startTransition, useEffect, useRef, useState } from "react";
 
 import { GraphCanvas, NODE_TYPE_COLORS, NODE_TYPE_LABELS, RISK_COLORS } from "./components/GraphCanvas";
+import { OntologySimulationWorkbench } from "./components/OntologySimulationWorkbench";
 import { OntologyWorkbench } from "./components/OntologyWorkbench";
 import { OperationsWorkbench } from "./components/OperationsWorkbench";
 import {
@@ -38,7 +39,16 @@ import type {
   TaskItem,
 } from "./types";
 
-type PageKey = "dashboard" | "ontologyStudio" | "operations" | "ontology" | "ontologyMap" | "graph" | "qa" | "settings";
+type PageKey =
+  | "dashboard"
+  | "ontologyStudio"
+  | "simulation"
+  | "operations"
+  | "ontology"
+  | "ontologyMap"
+  | "graph"
+  | "qa"
+  | "settings";
 type GraphRiskFilter = "ALL" | RiskLevel;
 type OntologyKind = "entity" | "property" | "relation" | "rule" | "action";
 
@@ -83,6 +93,7 @@ interface OntologyGraphPayload {
 const NAV_ITEMS: Array<{ key: PageKey; label: string; icon: IconName }> = [
   { key: "dashboard", label: "仪表盘", icon: "dashboard" },
   { key: "ontologyStudio", label: "本体工作台", icon: "relation" },
+  { key: "simulation", label: "本体模拟", icon: "event" },
   { key: "operations", label: "运营工作台", icon: "data" },
   { key: "ontology", label: "构建流水线", icon: "globe" },
   { key: "ontologyMap", label: "本体图谱", icon: "graph" },
@@ -613,12 +624,15 @@ export default function App() {
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedOntologyNodeId, setSelectedOntologyNodeId] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [simulationEntityId, setSimulationEntityId] = useState<string | null>(null);
   const [graphRiskFilter, setGraphRiskFilter] = useState<GraphRiskFilter>("ALL");
   const [subscriberDetails, setSubscriberDetails] = useState<Record<string, SubscriberDetail>>({});
   const [caseDetails, setCaseDetails] = useState<Record<string, OperationalCase>>({});
   const [detailLoadingId, setDetailLoadingId] = useState<string | null>(null);
   const [caseLoadingId, setCaseLoadingId] = useState<string | null>(null);
   const [detailError, setDetailError] = useState("");
+  const [simulationDetailLoading, setSimulationDetailLoading] = useState(false);
+  const [simulationDetailError, setSimulationDetailError] = useState("");
   const [questionInput, setQuestionInput] = useState("");
   const [askingQuestion, setAskingQuestion] = useState(false);
   const [runningInference, setRunningInference] = useState(false);
@@ -767,14 +781,30 @@ export default function App() {
     }
   }, [cases, selectedCaseId]);
 
+  useEffect(() => {
+    if (!alerts.length) {
+      if (simulationEntityId) {
+        setSimulationEntityId(null);
+      }
+      return;
+    }
+
+    if (!simulationEntityId || !alerts.some((item) => item.entityId === simulationEntityId)) {
+      const defaultEntity = alerts.find((item) => item.availableActions?.length) ?? alerts[0];
+      setSimulationEntityId(defaultEntity.entityId);
+    }
+  }, [alerts, simulationEntityId]);
+
   async function handleRefresh() {
     setFeedback(null);
     await loadAppData();
     if (selectedCaseId) {
       await refreshCaseDetail(selectedCaseId);
     }
-    if (selectedEntityId) {
-      await refreshSubscriberDetail(selectedEntityId);
+
+    const entityIds = Array.from(new Set([selectedEntityId, simulationEntityId].filter((item): item is string => Boolean(item))));
+    if (entityIds.length) {
+      await Promise.all(entityIds.map((entityId) => refreshSubscriberDetail(entityId)));
     }
   }
 
@@ -787,8 +817,10 @@ export default function App() {
       if (selectedCaseId) {
         await refreshCaseDetail(selectedCaseId);
       }
-      if (selectedEntityId) {
-        await refreshSubscriberDetail(selectedEntityId);
+
+      const entityIds = Array.from(new Set([selectedEntityId, simulationEntityId].filter((item): item is string => Boolean(item))));
+      if (entityIds.length) {
+        await Promise.all(entityIds.map((entityId) => refreshSubscriberDetail(entityId)));
       }
       setFeedback({
         tone: "success",
@@ -1132,6 +1164,7 @@ export default function App() {
   const selectedRuntimeCase =
     selectedSubscriber?.case ??
     (selectedEntityAlert?.caseId ? caseDetails[selectedEntityAlert.caseId] ?? cases.find((item) => item.caseId === selectedEntityAlert.caseId) ?? null : null);
+  const selectedSimulationSubscriber = simulationEntityId ? subscriberDetails[simulationEntityId] ?? null : null;
 
   useEffect(() => {
     if (!selectedEntityId || subscriberDetails[selectedEntityId]) {
@@ -1194,6 +1227,36 @@ export default function App() {
       cancelled = true;
     };
   }, [caseDetails, selectedCaseId]);
+
+  useEffect(() => {
+    if (!simulationEntityId || subscriberDetails[simulationEntityId]) {
+      setSimulationDetailError("");
+      setSimulationDetailLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setSimulationDetailLoading(true);
+    setSimulationDetailError("");
+
+    void refreshSubscriberDetail(simulationEntityId)
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setSimulationDetailError(error instanceof Error ? error.message : "加载模拟对象失败");
+      })
+      .finally(() => {
+        if (cancelled) {
+          return;
+        }
+        setSimulationDetailLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [simulationEntityId, subscriberDetails]);
 
   return (
     <div className="app-container">
@@ -1379,6 +1442,27 @@ export default function App() {
                 onDiscardDraft={() => {
                   void handleDiscardOntologyDraft();
                 }}
+              />
+            </div>
+          ) : null}
+
+          {page === "simulation" ? (
+            <div className="page active">
+              <OntologySimulationWorkbench
+                entityLabel={summary?.primaryEntityLabel || "实体"}
+                alerts={alerts}
+                selectedEntityId={simulationEntityId}
+                selectedSubscriber={selectedSimulationSubscriber}
+                loading={loading}
+                detailLoading={simulationDetailLoading}
+                detailError={simulationDetailError}
+                actionBusyKey={actionBusyKey}
+                onSelectEntity={setSimulationEntityId}
+                onExecuteAction={(actionId, caseId, entityId) => {
+                  void handleExecuteRuntimeAction(actionId, caseId, entityId);
+                }}
+                onOpenGraph={openEntityInGraph}
+                onOpenCase={openCaseInWorkbench}
               />
             </div>
           ) : null}
