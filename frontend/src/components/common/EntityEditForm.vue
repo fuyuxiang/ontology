@@ -48,6 +48,7 @@
 import { reactive, ref, watch } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { entityApi } from '../../api/ontology'
+import { useToast } from '../../composables/useToast'
 
 interface EntityData {
   id: string; name: string; name_cn: string; tier: number; status: string; description: string
@@ -55,6 +56,7 @@ interface EntityData {
 
 const props = defineProps<{ visible: boolean; entity: EntityData | null }>()
 const emit = defineEmits<{ close: []; updated: []; deleted: [] }>()
+const toast = useToast()
 
 const tierNames: Record<number, string> = { 1: '核心', 2: '领域', 3: '场景' }
 const submitting = ref(false)
@@ -76,10 +78,11 @@ async function handleSubmit() {
   submitting.value = true
   try {
     await entityApi.update(props.entity.id, form as never)
+    toast.success('保存成功')
     emit('updated')
     emit('close')
   } catch (e) {
-    alert(`保存失败: ${(e as Error).message}`)
+    toast.error(`保存失败: ${(e as Error).message}`)
   } finally {
     submitting.value = false
   }
@@ -91,10 +94,11 @@ async function handleDelete() {
   submitting.value = true
   try {
     await entityApi.remove(props.entity.id)
+    toast.success('对象已删除')
     emit('deleted')
     emit('close')
   } catch (e) {
-    alert(`删除失败: ${(e as Error).message}`)
+    toast.error(`删除失败: ${(e as Error).message}`)
   } finally {
     submitting.value = false
   }

@@ -14,6 +14,8 @@
       </div>
     </div>
 
+    <PageState :loading="loading" text="加载看板数据...">
+
     <!-- KPI 卡片行 -->
     <div class="dashboard__kpi-row">
       <div class="kpi-card" v-for="kpi in kpis" :key="kpi.label" :class="`kpi-card--${kpi.color}`">
@@ -97,6 +99,8 @@
       </div>
       <ReasoningChain title="高价值续约策略 #strategy_001" :steps="reasoningSteps" />
     </div>
+
+    </PageState>
   </div>
 </template>
 
@@ -104,6 +108,7 @@
 import { ref, computed, onMounted } from 'vue'
 import ReasoningChain from '../../components/common/ReasoningChain.vue'
 import type { ReasoningStep } from '../../components/common/ReasoningChain.vue'
+import PageState from '../../components/common/PageState.vue'
 import { dashboardApi } from '../../api/dashboard'
 
 const reasoningSteps: ReasoningStep[] = [
