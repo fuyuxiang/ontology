@@ -54,9 +54,11 @@ import { reactive, ref, onMounted } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { ruleApi } from '../../api/rules'
 import { entityApi } from '../../api/ontology'
+import { useToast } from '../../composables/useToast'
 
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; created: [] }>()
+const toast = useToast()
 
 const submitting = ref(false)
 const entities = ref<{ id: string; name: string; name_cn: string }[]>([])
@@ -84,6 +86,7 @@ async function handleSubmit() {
   submitting.value = true
   try {
     await ruleApi.create(form as never)
+    toast.success('规则创建成功')
     form.name = ''
     form.entity_id = ''
     form.condition_expr = ''
@@ -93,7 +96,7 @@ async function handleSubmit() {
     emit('created')
     emit('close')
   } catch (e) {
-    alert(`创建失败: ${(e as Error).message}`)
+    toast.error(`创建失败: ${(e as Error).message}`)
   } finally {
     submitting.value = false
   }

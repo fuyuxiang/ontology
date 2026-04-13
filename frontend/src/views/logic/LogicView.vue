@@ -134,8 +134,10 @@ import { useRulesStore } from '../../store/rules'
 import RuleCreateForm from '../../components/common/RuleCreateForm.vue'
 import ModalDialog from '../../components/common/ModalDialog.vue'
 import { ruleApi } from '../../api/rules'
+import { useToast } from '../../composables/useToast'
 
 const store = useRulesStore()
+const toast = useToast()
 const expandedId = ref<string | null>(null)
 const showAdd = ref(false)
 const showEdit = ref(false)
@@ -158,23 +160,25 @@ async function handleSaveEdit() {
       action_desc: editForm.action_desc, priority: editForm.priority, status: editForm.status,
     } as never)
     showEdit.value = false
+    toast.success('规则保存成功')
     store.fetchRules()
-  } catch (e) { alert(`保存失败: ${(e as Error).message}`) }
+  } catch (e) { toast.error(`保存失败: ${(e as Error).message}`) }
 }
 
 async function handleDelete(id: string, name: string) {
   if (!confirm(`确定删除规则 "${name}"？`)) return
   try {
     await ruleApi.remove(id)
+    toast.success('规则已删除')
     expandedId.value = null
     store.fetchRules()
-  } catch (e) { alert(`删除失败: ${(e as Error).message}`) }
+  } catch (e) { toast.error(`删除失败: ${(e as Error).message}`) }
 }
 
 async function handleExecute(id: string) {
   const result = await store.executeRule(id)
   if (result) {
-    alert(result.message)
+    toast.success(result.message)
     store.fetchRules()
   }
 }
