@@ -22,13 +22,13 @@ const router = createRouter({
     {
       path: '/dataflow',
       name: 'dataflow',
-      component: () => import('../views/PlaceholderView.vue'),
-      meta: { title: '数据流' }
+      component: () => import('../views/dataflow/DataflowView.vue'),
+      meta: { title: '关系画布' }
     },
     {
       path: '/logic',
       name: 'logic',
-      component: () => import('../views/PlaceholderView.vue'),
+      component: () => import('../views/logic/LogicView.vue'),
       meta: { title: '业务逻辑' }
     },
     {

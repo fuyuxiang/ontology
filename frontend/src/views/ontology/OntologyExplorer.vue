@@ -106,7 +106,52 @@
             </div>
           </template>
 
-          <!-- 规则/动作占位 -->
+          <!-- 规则列表 -->
+          <template v-else-if="activeTab === '规则'">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>规则ID</th>
+                  <th>规则名称</th>
+                  <th>触发条件</th>
+                  <th>执行动作</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="rule in selectedRules" :key="rule.id">
+                  <td><code class="text-code">{{ rule.id }}</code></td>
+                  <td class="text-body-medium">{{ rule.name }}</td>
+                  <td><code class="text-code">{{ rule.condition }}</code></td>
+                  <td class="text-body">{{ rule.action }}</td>
+                  <td>
+                    <span class="status-dot" :class="rule.status === 'active' ? 'status-dot--success' : 'status-dot--warning'"></span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </template>
+
+          <!-- 动作列表 -->
+          <template v-else-if="activeTab === '动作'">
+            <div class="action-list">
+              <div class="action-item" v-for="act in selectedActions" :key="act.id">
+                <div class="action-item__info">
+                  <span class="action-item__name text-body-medium">{{ act.name }}</span>
+                  <span class="action-item__type text-caption">{{ act.type }}</span>
+                </div>
+                <span class="action-status" :class="`action-status--${act.status}`">{{ act.status }}</span>
+                <button class="action-exec-btn">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor"/>
+                  </svg>
+                  执行
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- 血缘占位 -->
           <template v-else>
             <div class="placeholder-tab">
               <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
@@ -230,6 +275,45 @@ const selectedRelations = computed(() => [
   { name: 'has_product', type: 'has_one', target: 'Product', targetTier: 1 as const },
   { name: 'in_campaign', type: 'many_to_many', target: 'Campaign', targetTier: 2 as const },
 ])
+
+const ruleMap: Record<string, { id: string; name: string; condition: string; action: string; status: string }[]> = {
+  customer: [
+    { id: 'rule_001', name: '高价值客户识别', condition: 'ltv_score >= 80 AND tenure >= 12', action: '标记为高价值', status: 'active' },
+    { id: 'rule_002', name: '流失预警', condition: 'churn_risk >= 0.7', action: '触发挽留策略', status: 'active' },
+    { id: 'rule_003', name: '沉默客户唤醒', condition: 'last_active_days > 90', action: '推送唤醒活动', status: 'active' },
+  ],
+  'fttr-sub': [
+    { id: 'rule_005', name: '到期续约提醒', condition: 'days_to_expire <= 30', action: '发送续约提醒', status: 'active' },
+    { id: 'rule_006', name: '欠费预警', condition: 'overdue_days > 7', action: '发送催缴通知', status: 'warning' },
+  ],
+  campaign: [
+    { id: 'rule_004', name: '预算超限预警', condition: 'spend > budget * 0.9', action: '通知负责人', status: 'active' },
+  ],
+}
+const selectedRules = computed(() =>
+  ruleMap[selectedId.value ?? ''] ?? [
+    { id: 'rule_default', name: '默认校验规则', condition: 'id IS NOT NULL', action: '拒绝空值', status: 'active' },
+  ]
+)
+
+const actionMap: Record<string, { id: string; name: string; type: string; status: string }[]> = {
+  customer: [
+    { id: 'act_001', name: '发送续约优惠', type: 'campaign', status: 'active' },
+    { id: 'act_002', name: '升级FTTR套餐', type: 'upsell', status: 'active' },
+  ],
+  'fttr-sub': [
+    { id: 'act_003', name: '自动续约', type: 'automation', status: 'active' },
+    { id: 'act_004', name: '到期提醒短信', type: 'notification', status: 'active' },
+  ],
+  campaign: [
+    { id: 'act_005', name: '启动活动', type: 'lifecycle', status: 'active' },
+  ],
+}
+const selectedActions = computed(() =>
+  actionMap[selectedId.value ?? ''] ?? [
+    { id: 'act_default', name: '查看详情', type: 'navigation', status: 'active' },
+  ]
+)
 </script>
 
 <style scoped>
@@ -431,7 +515,35 @@ const selectedRelations = computed(() => [
   border-radius: var(--radius-full);
 }
 .status-dot--success { background: var(--status-success); }
+.status-dot--warning { background: var(--status-warning); }
 .status-dot--muted { background: var(--neutral-300); }
+
+/* 动作列表 */
+.action-list { display: flex; flex-direction: column; gap: 8px; }
+.action-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: var(--neutral-0);
+  border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+.action-item:hover { border-color: var(--kinetic-400); }
+.action-item__info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.action-item__name { font-size: 13px; }
+.action-item__type { font-size: 11px; color: var(--neutral-500); }
+.action-status {
+  font-size: 11px; font-weight: 500; padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+.action-status--active { background: var(--status-success-bg); color: var(--status-success); }
+.action-status--inactive { background: var(--neutral-100); color: var(--neutral-500); }
+.action-status--warning { background: var(--status-warning-bg); color: var(--status-warning); }
+.action-exec-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: var(--radius-md); border: none;
+  background: var(--kinetic-500); color: #fff; font-size: 12px;
+  font-weight: 500; cursor: pointer; transition: background var(--transition-fast);
+}
+.action-exec-btn:hover { background: var(--kinetic-600); }
 
 /* 关系列表 */
 .relation-list { display: flex; flex-direction: column; gap: 12px; }
