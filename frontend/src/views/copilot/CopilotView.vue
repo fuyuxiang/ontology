@@ -194,51 +194,62 @@ async function sendMessage(text?: string) {
   reasoningSteps.value = []
   relatedObjects.value = []
 
-  // 模拟推理过程
-  await delay(800)
-  reasoningSteps.value.push({
-    type: 'ontology', typeLabel: '本体查询',
-    result: '检索 FTTRSubscription 对象，筛选 days_to_expire < 30',
-    source: 'FTTRSubscription.days_to_expire'
-  })
+  // 构建消息历史
+  const apiMessages = messages.value
+    .filter(m => m.role === 'user' || m.role === 'ai')
+    .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
 
-  await delay(600)
-  reasoningSteps.value.push({
-    type: 'ml', typeLabel: 'ML 评分',
-    result: '调用流失风险模型，识别高风险客户 847 人',
-    source: 'churn_risk_model_v2'
-  })
+  // 创建 AI 消息占位
+  const aiMsg: Message = { id: ++msgId, role: 'ai', content: '', time: now() }
+  messages.value.push(aiMsg)
 
-  await delay(600)
-  reasoningSteps.value.push({
-    type: 'rule', typeLabel: '规则匹配',
-    result: 'rule_007 触发：月费 > 200 且 churn_risk > 0.7',
-    source: 'RuleSet.rule_007'
-  })
+  try {
+    const response = await fetch('/api/v1/copilot/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messages: apiMessages, stream: true }),
+    })
 
-  await delay(400)
-  reasoningSteps.value.push({
-    type: 'output', typeLabel: '策略输出',
-    result: '推荐执行"专属优惠外呼"策略，预期转化率 4.1%',
-    source: 'FTTRStrategy.exclusive_offer'
-  })
+    if (!response.ok) {
+      aiMsg.content = `请求失败: ${response.status}`
+      isTyping.value = false
+      return
+    }
 
-  relatedObjects.value = [
-    { name: 'Customer', tier: 1 },
-    { name: 'FTTRSubscription', tier: 3 },
-    { name: 'Campaign', tier: 2 },
-    { name: 'RuleSet', tier: 2 },
-  ]
+    const reader = response.body?.getReader()
+    const decoder = new TextDecoder()
 
-  isTyping.value = false
-  messages.value.push({
-    id: ++msgId,
-    role: 'ai',
-    content: `根据本体分析，当前共有 847 名客户存在 FTTR 续约风险：\n\n• 距到期 < 30 天：312 人\n• 流失风险评分 > 0.7：535 人\n\n推荐策略：专属优惠外呼\n预期转化率：4.1%（高于短信 1.2%、APP 2.8%）\n\n是否立即执行续约策略？`,
-    time: now()
-  })
-
-  await scrollToBottom()
+    if (reader) {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const text = decoder.decode(value, { stream: true })
+        for (const line of text.split('\n')) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') break
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.content) {
+                aiMsg.content += parsed.content
+                await scrollToBottom()
+              }
+              if (parsed.error) {
+                aiMsg.content += `\n[错误: ${parsed.error}]`
+              }
+            } catch {
+              // 非 JSON，忽略
+            }
+          }
+        }
+      }
+    }
+  } catch (e) {
+    aiMsg.content = `连接失败: ${(e as Error).message}`
+  } finally {
+    isTyping.value = false
+    await scrollToBottom()
+  }
 }
 
 function clearChat() {
@@ -258,10 +269,6 @@ function autoResize(e: Event) {
   const el = e.target as HTMLTextAreaElement
   el.style.height = 'auto'
   el.style.height = Math.min(el.scrollHeight, 120) + 'px'
-}
-
-function delay(ms: number) {
-  return new Promise(r => setTimeout(r, ms))
 }
 </script>
 

@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str = "ontology123"
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
-    ANTHROPIC_API_KEY: str = ""
+    LLM_API_BASE: str = "https://api2.penguinsaichat.dpdns.org/v1"
+    LLM_API_KEY: str = ""
+    LLM_MODEL: str = "claude-sonnet-4-20250514"
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
