@@ -48,7 +48,7 @@
             </div>
             <div v-else class="search-command-hint">
               <p class="text-caption-upper" style="margin-bottom:8px;">快速跳转</p>
-              <div v-for="s in shortcuts" :key="s.label" class="search-command-shortcut" @click="select(s)">
+              <div v-for="s in shortcuts" :key="s.id" class="search-command-shortcut" @click="select(s)">
                 <span class="search-command-item__icon" :class="`search-command-item__icon--${s.type}`">{{ typeIcon[s.type] }}</span>
                 <span class="search-command-item__name">{{ s.name }}</span>
                 <span class="search-command-item__meta">{{ s.meta }}</span>
@@ -84,7 +84,7 @@ const visible = ref(false)
 const query = ref('')
 const activeIndex = ref(0)
 const inputEl = ref<HTMLInputElement>()
-const resultsEl = ref<HTMLElement>()
+const resultsEl = ref<HTMLElement>() // used by template ref
 const router = useRouter()
 
 const typeLabel: Record<string, string> = {
@@ -117,7 +117,7 @@ const results = computed(() => {
   ).slice(0, 8)
 })
 
-watch(results, () => { activeIndex.value = 0 })
+watch(results, () => { activeIndex.value = 0; resultsEl.value?.scrollTo(0, 0) })
 
 function open() {
   visible.value = true
