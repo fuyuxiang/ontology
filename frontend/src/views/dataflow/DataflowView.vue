@@ -87,66 +87,51 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useOntologyStore } from '../../store/ontology'
 
-interface Node {
-  id: string; name: string; nameCn: string; tier: 1 | 2 | 3; relCount: number
-}
-interface Relation {
-  fromId: string; from: string; toId: string; to: string; label: string; cardinality: string
-}
-
-const nodes: Node[] = [
-  { id: 'customer', name: 'Customer', nameCn: '客户', tier: 1, relCount: 5 },
-  { id: 'order', name: 'Order', nameCn: '订单', tier: 1, relCount: 3 },
-  { id: 'product', name: 'Product', nameCn: '产品', tier: 1, relCount: 3 },
-  { id: 'touchpoint', name: 'Touchpoint', nameCn: '触点', tier: 1, relCount: 2 },
-  { id: 'channel', name: 'Channel', nameCn: '渠道', tier: 1, relCount: 2 },
-  { id: 'agent', name: 'Agent', nameCn: '坐席', tier: 1, relCount: 2 },
-  { id: 'contract', name: 'Contract', nameCn: '合同', tier: 1, relCount: 3 },
-  { id: 'campaign', name: 'Campaign', nameCn: '营销活动', tier: 2, relCount: 4 },
-  { id: 'segment', name: 'CustomerSegment', nameCn: '客户分群', tier: 2, relCount: 3 },
-  { id: 'strategy', name: 'Strategy', nameCn: '策略', tier: 2, relCount: 3 },
-  { id: 'rule', name: 'RuleSet', nameCn: '规则集', tier: 2, relCount: 2 },
-  { id: 'fttr-sub', name: 'FTTRSubscription', nameCn: 'FTTR订阅', tier: 3, relCount: 3 },
-  { id: 'fttr-strat', name: 'FTTRStrategy', nameCn: 'FTTR策略', tier: 3, relCount: 3 },
-]
-
-const allRelations: Relation[] = [
-  { fromId: 'customer', from: 'Customer', toId: 'order', to: 'Order', label: 'has_order', cardinality: '1:N' },
-  { fromId: 'customer', from: 'Customer', toId: 'fttr-sub', to: 'FTTRSubscription', label: 'has_subscription', cardinality: '1:N' },
-  { fromId: 'customer', from: 'Customer', toId: 'segment', to: 'CustomerSegment', label: 'belongs_to_segment', cardinality: 'N:1' },
-  { fromId: 'customer', from: 'Customer', toId: 'contract', to: 'Contract', label: 'has_contract', cardinality: '1:N' },
-  { fromId: 'customer', from: 'Customer', toId: 'touchpoint', to: 'Touchpoint', label: 'has_touchpoint', cardinality: '1:N' },
-  { fromId: 'order', from: 'Order', toId: 'product', to: 'Product', label: 'contains_product', cardinality: 'N:N' },
-  { fromId: 'campaign', from: 'Campaign', toId: 'segment', to: 'CustomerSegment', label: 'targets_segment', cardinality: 'N:N' },
-  { fromId: 'campaign', from: 'Campaign', toId: 'channel', to: 'Channel', label: 'uses_channel', cardinality: 'N:N' },
-  { fromId: 'strategy', from: 'Strategy', toId: 'rule', to: 'RuleSet', label: 'applies_rules', cardinality: '1:N' },
-  { fromId: 'strategy', from: 'Strategy', toId: 'campaign', to: 'Campaign', label: 'drives_campaign', cardinality: '1:N' },
-  { fromId: 'fttr-sub', from: 'FTTRSubscription', toId: 'product', to: 'Product', label: 'uses_product', cardinality: 'N:1' },
-  { fromId: 'fttr-strat', from: 'FTTRStrategy', toId: 'segment', to: 'CustomerSegment', label: 'uses_segment', cardinality: 'N:N' },
-  { fromId: 'fttr-strat', from: 'FTTRStrategy', toId: 'product', to: 'Product', label: 'promotes_product', cardinality: 'N:N' },
-  { fromId: 'agent', from: 'Agent', toId: 'touchpoint', to: 'Touchpoint', label: 'handles', cardinality: '1:N' },
-]
-
+const store = useOntologyStore()
 const selectedId = ref<string | null>(null)
 
-const tierGroups = [
-  { tier: 1, name: '核心对象', nodes: nodes.filter(n => n.tier === 1) },
-  { tier: 2, name: '领域对象', nodes: nodes.filter(n => n.tier === 2) },
-  { tier: 3, name: '场景对象', nodes: nodes.filter(n => n.tier === 3) },
-]
-
-const displayRelations = computed(() => {
-  if (!selectedId.value) return allRelations
-  return allRelations.filter(r => r.fromId === selectedId.value || r.toId === selectedId.value)
+onMounted(async () => {
+  if (store.entities.length === 0) await store.fetchEntities()
+  await store.fetchGraph()
 })
 
-const selectedNode = computed(() => nodes.find(n => n.id === selectedId.value) ?? null)
+interface Node { id: string; name: string; nameCn: string; tier: 1 | 2 | 3; relCount: number }
+interface Relation { fromId: string; from: string; toId: string; to: string; label: string; cardinality: string }
+
+const nodes = computed<Node[]>(() =>
+  store.graphData?.nodes.map(n => ({
+    id: n.id, name: n.name, nameCn: n.name_cn,
+    tier: n.tier as 1 | 2 | 3, relCount: n.relation_count,
+  })) ?? []
+)
+
+const allRelations = computed<Relation[]>(() =>
+  store.graphData?.edges.map(e => ({
+    fromId: e.from_id, from: e.from_name,
+    toId: e.to_id, to: e.to_name,
+    label: e.label, cardinality: e.cardinality,
+  })) ?? []
+)
+
+const tierGroups = computed(() => [
+  { tier: 1, name: '核心对象', nodes: nodes.value.filter(n => n.tier === 1) },
+  { tier: 2, name: '领域对象', nodes: nodes.value.filter(n => n.tier === 2) },
+  { tier: 3, name: '场景对象', nodes: nodes.value.filter(n => n.tier === 3) },
+])
+
+const displayRelations = computed(() => {
+  if (!selectedId.value) return allRelations.value
+  return allRelations.value.filter(r => r.fromId === selectedId.value || r.toId === selectedId.value)
+})
+
+const selectedNode = computed(() => nodes.value.find(n => n.id === selectedId.value) ?? null)
 
 const nodeRelations = computed(() => {
   if (!selectedId.value) return []
-  return allRelations
+  return allRelations.value
     .filter(r => r.fromId === selectedId.value || r.toId === selectedId.value)
     .map(r => ({
       label: r.label,

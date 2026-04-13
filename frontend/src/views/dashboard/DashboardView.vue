@@ -61,7 +61,7 @@
             <div class="activity-item__icon" :class="`activity-icon--${a.type}`" v-html="a.icon"></div>
             <div class="activity-item__body">
               <p class="text-body-medium">{{ a.title }}</p>
-              <p class="text-caption">{{ a.desc }}</p>
+              <p class="text-caption">{{ a.description }}</p>
             </div>
             <span class="activity-item__time text-caption">{{ a.time }}</span>
           </div>
@@ -101,8 +101,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
 import ReasoningChain from '../../components/common/ReasoningChain.vue'
 import type { ReasoningStep } from '../../components/common/ReasoningChain.vue'
+import { dashboardApi } from '../../api/dashboard'
 
 const reasoningSteps: ReasoningStep[] = [
   { type: 'ontology', title: '本体查询: CustomerSegment', source: 'BSS系统 (CRM_CUSTOMER)', result: '筛选出 2,847 名高价值用户' },
@@ -111,77 +113,53 @@ const reasoningSteps: ReasoningStep[] = [
   { type: 'output', title: '策略输出: strategy_recommend', source: '产品: FTTR千兆升级包', result: '预测转化率: 3.2%，触点: APP推送(优先) + 短信(备选)' },
 ]
 
-const kpis = [
-  {
-    label: '对象类型',
-    value: '15',
-    trend: 7.1,
-    color: 'semantic',
-    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="4" cy="15" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="15" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M10 8v4M10 12L4 12.5M10 12l6 .5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
-  },
-  {
-    label: '活跃规则',
-    value: '68',
-    trend: 12.5,
-    color: 'kinetic',
-    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M4 6h8M4 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
-  },
-  {
-    label: '策略执行',
-    value: '2,847',
-    trend: 23.4,
-    color: 'dynamic',
-    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14l4-4 3 3 4-5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-  },
-  {
-    label: '转化率',
-    value: '3.2%',
-    trend: -1.8,
-    color: 'warning',
-    icon: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
-  },
-]
+// 从 API 加载的数据
+const stats = ref<Record<string, unknown>>({})
+const loading = ref(true)
 
-const tierDist = [
-  { tier: 1, name: '核心对象', count: 7, pct: 70 },
-  { tier: 2, name: '领域对象', count: 4, pct: 40 },
-  { tier: 3, name: '场景对象', count: 4, pct: 40 },
-]
+onMounted(async () => {
+  try {
+    stats.value = await dashboardApi.stats() as unknown as Record<string, unknown>
+  } finally {
+    loading.value = false
+  }
+})
 
-const activities = [
-  {
-    id: 1, type: 'create', title: '新增对象类型 FTTRStrategy', desc: '由 系统管理员 创建', time: '2小时前',
-    icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
-  },
-  {
-    id: 2, type: 'update', title: '更新规则 rule_007', desc: '触发条件修改：days_to_expire < 30', time: '5小时前',
-    icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 0110 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 5l2 2-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
-  },
-  {
-    id: 3, type: 'execute', title: '执行续约策略', desc: '影响 2,847 名客户，转化率 3.2%', time: '1天前',
-    icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 2l8 5-8 5V2z" fill="currentColor"/></svg>`
-  },
-  {
-    id: 4, type: 'warning', title: 'Touchpoint 数据异常', desc: '近24小时数据缺失率 12%', time: '2天前',
-    icon: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2l5.5 10H1.5L7 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 6v3M7 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
-  },
-]
+const kpiIcons = {
+  entity: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="4" cy="15" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="15" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M10 8v4M10 12L4 12.5M10 12l6 .5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  rule: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 10h12M4 6h8M4 14h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  relation: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M3 14l4-4 3 3 4-5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  active: `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M10 6v4l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+}
 
-const allObjects = [
-  { name: 'Customer', tier: 1, status: 'active' },
-  { name: 'Order', tier: 1, status: 'active' },
-  { name: 'Product', tier: 1, status: 'active' },
-  { name: 'Touchpoint', tier: 1, status: 'warning' },
-  { name: 'Channel', tier: 1, status: 'active' },
-  { name: 'Agent', tier: 1, status: 'active' },
-  { name: 'Contract', tier: 1, status: 'active' },
-  { name: 'Campaign', tier: 2, status: 'active' },
-  { name: 'CustomerSegment', tier: 2, status: 'active' },
-  { name: 'Strategy', tier: 2, status: 'warning' },
-  { name: 'RuleSet', tier: 2, status: 'active' },
-  { name: 'FTTRSubscription', tier: 3, status: 'active' },
-  { name: 'FTTRStrategy', tier: 3, status: 'active' },
-]
+const kpis = computed(() => [
+  { label: '对象类型', value: String(stats.value.entity_count ?? '-'), trend: 0, color: 'semantic', icon: kpiIcons.entity },
+  { label: '活跃规则', value: String(stats.value.active_rule_count ?? '-'), trend: 0, color: 'kinetic', icon: kpiIcons.rule },
+  { label: '关系数量', value: String(stats.value.relation_count ?? '-'), trend: 0, color: 'dynamic', icon: kpiIcons.relation },
+  { label: '总规则数', value: String(stats.value.rule_count ?? '-'), trend: 0, color: 'warning', icon: kpiIcons.active },
+])
+
+const tierDist = computed(() => (stats.value.tier_distribution as { tier: number; name: string; count: number; pct: number }[]) ?? [])
+
+const activityIcons: Record<string, string> = {
+  create: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  update: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 0110 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 5l2 2-2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  execute: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 2l8 5-8 5V2z" fill="currentColor"/></svg>`,
+  warning: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2l5.5 10H1.5L7 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 6v3M7 10.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  delete: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 3l8 8M11 3l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  rollback: `<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7a5 5 0 0110 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+}
+
+const activities = computed(() =>
+  ((stats.value.recent_activities as { id: string; type: string; title: string; description: string; time: string }[]) ?? []).map(a => ({
+    ...a,
+    icon: activityIcons[a.type] ?? activityIcons.update,
+  }))
+)
+
+const allObjects = computed(() =>
+  (stats.value.health_status as { id: string; name: string; tier: number; status: string }[]) ?? []
+)
 </script>
 
 <style scoped>
