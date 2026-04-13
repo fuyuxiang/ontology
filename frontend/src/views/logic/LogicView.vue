@@ -18,19 +18,19 @@
     <!-- 统计卡片 -->
     <div class="logic-page__stats">
       <div class="stat-card stat-card--semantic">
-        <div class="stat-card__value">{{ rules.length }}</div>
+        <div class="stat-card__value">{{ store.stats.total }}</div>
         <div class="stat-card__label">总规则数</div>
       </div>
       <div class="stat-card stat-card--dynamic">
-        <div class="stat-card__value">{{ rules.filter(r => r.status === 'active').length }}</div>
+        <div class="stat-card__value">{{ store.stats.active }}</div>
         <div class="stat-card__label">活跃规则</div>
       </div>
       <div class="stat-card stat-card--kinetic">
-        <div class="stat-card__value">{{ rules.filter(r => r.status === 'warning').length }}</div>
+        <div class="stat-card__value">{{ store.stats.warning }}</div>
         <div class="stat-card__label">需关注</div>
       </div>
       <div class="stat-card stat-card--error">
-        <div class="stat-card__value">{{ rules.filter(r => r.status === 'disabled').length }}</div>
+        <div class="stat-card__value">{{ store.stats.disabled }}</div>
         <div class="stat-card__label">已禁用</div>
       </div>
     </div>
@@ -103,12 +103,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRulesStore } from '../../store/rules'
 
-const search = ref('')
-const activeFilter = ref('all')
+const store = useRulesStore()
 const expandedId = ref<string | null>(null)
 const showAdd = ref(false)
+
+onMounted(() => { store.fetchRules() })
+
+const search = computed({
+  get: () => store.filter.search,
+  set: (v: string) => { store.filter.search = v },
+})
+const activeFilter = computed({
+  get: () => store.filter.status,
+  set: (v: string) => { store.filter.status = v as 'all' | 'active' | 'warning' | 'disabled' },
+})
 
 const filters = [
   { label: '全部', value: 'all' },
@@ -117,34 +128,20 @@ const filters = [
   { label: '已禁用', value: 'disabled' },
 ]
 
-interface Rule {
-  id: string; name: string; entity: string; condition: string; action: string
-  status: 'active' | 'warning' | 'disabled'; priority: 'high' | 'medium' | 'low'
-  triggerCount: number; lastTriggered: string
-}
-
-const rules: Rule[] = [
-  { id: 'rule_001', name: '高价值客户识别', entity: 'Customer', condition: 'ltv_score >= 80 AND tenure >= 12', action: '标记为高价值客户', status: 'active', priority: 'high', triggerCount: 1247, lastTriggered: '2小时前' },
-  { id: 'rule_002', name: '流失预警', entity: 'Customer', condition: 'churn_risk >= 0.7', action: '触发挽留策略', status: 'active', priority: 'high', triggerCount: 892, lastTriggered: '30分钟前' },
-  { id: 'rule_003', name: '大额订单审批', entity: 'Order', condition: 'amount >= 5000', action: '触发人工审批流程', status: 'active', priority: 'medium', triggerCount: 156, lastTriggered: '1天前' },
-  { id: 'rule_004', name: '预算超限预警', entity: 'Campaign', condition: 'spend > budget * 0.9', action: '通知活动负责人', status: 'warning', priority: 'high', triggerCount: 23, lastTriggered: '3小时前' },
-  { id: 'rule_005', name: '到期续约提醒', entity: 'FTTRSubscription', condition: 'days_to_expire <= 30', action: '发送续约提醒', status: 'active', priority: 'high', triggerCount: 2847, lastTriggered: '1小时前' },
-  { id: 'rule_006', name: '欠费预警', entity: 'FTTRSubscription', condition: 'overdue_days > 7', action: '发送催缴通知', status: 'warning', priority: 'medium', triggerCount: 67, lastTriggered: '5小时前' },
-  { id: 'rule_007', name: '高价值续约', entity: 'FTTRSubscription', condition: 'monthly_fee >= 200 AND churn_risk >= 0.5', action: '触发专属优惠', status: 'active', priority: 'high', triggerCount: 534, lastTriggered: '45分钟前' },
-  { id: 'rule_008', name: '沉默客户唤醒', entity: 'Customer', condition: 'last_active_days > 90', action: '推送唤醒活动', status: 'active', priority: 'medium', triggerCount: 312, lastTriggered: '2天前' },
-  { id: 'rule_009', name: '策略效果评估', entity: 'FTTRStrategy', condition: 'actual_conversion < predicted * 0.5', action: '暂停策略并通知', status: 'active', priority: 'low', triggerCount: 8, lastTriggered: '1周前' },
-  { id: 'rule_010', name: '旧版分群规则（废弃）', entity: 'CustomerSegment', condition: 'segment_version < 2', action: '迁移至新版', status: 'disabled', priority: 'low', triggerCount: 0, lastTriggered: '—' },
-]
-
-const filteredRules = computed(() => {
-  let list = rules as Rule[]
-  if (activeFilter.value !== 'all') list = list.filter(r => r.status === activeFilter.value)
-  if (search.value) {
-    const q = search.value.toLowerCase()
-    list = list.filter(r => r.name.includes(q) || r.id.includes(q) || r.condition.toLowerCase().includes(q))
-  }
-  return list
-})
+// 映射后端字段到模板需要的格式
+const filteredRules = computed(() =>
+  store.filtered.map(r => ({
+    id: r.id,
+    name: r.name,
+    entity: r.entityName,
+    condition: r.condition,
+    action: r.action,
+    status: r.status as 'active' | 'warning' | 'disabled',
+    priority: r.priority as 'high' | 'medium' | 'low',
+    triggerCount: r.triggerCount,
+    lastTriggered: r.lastTriggered || '—',
+  }))
+)
 </script>
 
 <style scoped>

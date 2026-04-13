@@ -134,26 +134,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
 import MetricCard from '../../components/common/MetricCard.vue'
+import { useOntologyStore } from '../../store/ontology'
 
 const route = useRoute()
+const store = useOntologyStore()
 const activeTab = ref('属性')
 const tabs = ['属性', '关系', '规则', '动作', '血缘']
 
-const entity = computed(() => ({
-  id: route.params.id as string,
-  name: 'FTTRSubscription',
-  nameCn: 'FTTR续约订阅',
-  tier: 3 as const,
-  attrs: 18,
-  relations: 5,
-  rules: 3,
-  actions: 2,
-  status: 'active' as const,
-}))
+const entityId = computed(() => route.params.id as string)
+
+onMounted(() => { store.fetchEntity(entityId.value) })
+watch(entityId, (id) => { if (id) store.fetchEntity(id) })
+
+const detail = computed(() => store.currentEntity)
+
+const entity = computed(() => detail.value ? {
+  id: detail.value.id,
+  name: detail.value.name,
+  nameCn: detail.value.name_cn,
+  tier: detail.value.tier as 1 | 2 | 3,
+  attrs: detail.value.attributes.length,
+  relations: detail.value.relations.length,
+  rules: detail.value.rules.length,
+  actions: detail.value.actions.length,
+  status: detail.value.status as 'active' | 'warning' | 'error',
+} : { id: '', name: '加载中...', nameCn: '', tier: 1 as const, attrs: 0, relations: 0, rules: 0, actions: 0, status: 'active' as const })
 
 const tierLabel = computed(() => ({ 1: '核心对象', 2: '领域对象', 3: '场景对象' }[entity.value.tier]))
 const statusLabel = computed(() => ({ active: '活跃', warning: '警告', error: '异常' }[entity.value.status]))
@@ -161,48 +170,43 @@ const statusLabel = computed(() => ({ active: '活跃', warning: '警告', error
 const breadcrumbs = computed(() => [
   { label: '本体管理', path: '/ontology' },
   { label: '对象类型', path: '/ontology' },
-  { label: `Tier ${entity.value.tier} 场景`, tier: entity.value.tier },
+  { label: `Tier ${entity.value.tier} ${tierLabel.value}`, tier: entity.value.tier },
   { label: entity.value.name },
 ])
 
 const metrics = computed(() => [
-  { label: '属性', value: entity.value.attrs,     trend:  2.1 },
-  { label: '关系', value: entity.value.relations, trend:  0   },
-  { label: '规则', value: entity.value.rules,     trend: -1.5 },
-  { label: '动作', value: entity.value.actions,   trend:  5.0 },
+  { label: '属性', value: entity.value.attrs, trend: 0 },
+  { label: '关系', value: entity.value.relations, trend: 0 },
+  { label: '规则', value: entity.value.rules, trend: 0 },
+  { label: '动作', value: entity.value.actions, trend: 0 },
 ])
 
-const attrs = [
-  { name: 'subscription_id', type: 'string', desc: '订阅唯一标识', required: true, example: 'sub_20240101_001' },
-  { name: 'customer_id', type: 'ref', desc: '关联客户 → Customer', required: true, example: 'cust_10086' },
-  { name: 'product_id', type: 'ref', desc: '关联产品 → Product', required: true, example: 'prod_fttr_200m' },
-  { name: 'expire_date', type: 'date', desc: '到期日期', required: true, example: '2024-03-31' },
-  { name: 'days_to_expire', type: 'computed', desc: '距到期天数（实时计算）', required: false, example: '28' },
-  { name: 'monthly_fee', type: 'number', desc: '月费（元）', required: true, example: '299.00' },
-  { name: 'bandwidth', type: 'string', desc: '带宽规格', required: true, example: '200M' },
-  { name: 'contract_years', type: 'number', desc: '合同年限', required: true, example: '2' },
-  { name: 'auto_renew', type: 'boolean', desc: '是否自动续约', required: false, example: 'false' },
-  { name: 'churn_risk', type: 'computed', desc: '流失风险评分 (0-1)', required: false, example: '0.73' },
-]
+const attrs = computed(() =>
+  detail.value?.attributes.map(a => ({
+    name: a.name, type: a.type, desc: a.description, required: a.required, example: a.example || '',
+  })) ?? []
+)
 
-const relations = [
-  { name: 'subscribed_by', type: 'belongs_to', target: 'Customer', cardinality: 'N:1' },
-  { name: 'uses_product', type: 'has_one', target: 'Product', cardinality: '1:1' },
-  { name: 'in_campaign', type: 'many_to_many', target: 'Campaign', cardinality: 'N:N' },
-  { name: 'managed_by', type: 'belongs_to', target: 'Agent', cardinality: 'N:1' },
-  { name: 'has_strategy', type: 'has_many', target: 'FTTRStrategy', cardinality: '1:N' },
-]
+const relations = computed(() =>
+  detail.value?.relations.map(r => ({
+    name: r.name, type: r.rel_type,
+    target: r.to_entity_name || r.from_entity_name,
+    cardinality: r.cardinality,
+  })) ?? []
+)
 
-const rules = [
-  { id: 'rule_005', name: '到期续约提醒', condition: 'days_to_expire <= 30', action: '发送续约提醒', status: 'active' },
-  { id: 'rule_006', name: '欠费预警', condition: 'overdue_days > 7', action: '发送催缴通知', status: 'warning' },
-  { id: 'rule_007', name: '高价值续约', condition: 'monthly_fee >= 200 AND churn_risk >= 0.5', action: '触发专属优惠', status: 'active' },
-]
+const rules = computed(() =>
+  detail.value?.rules.map(r => ({
+    id: r.id, name: r.name,
+    condition: r.condition_expr, action: r.action_desc, status: r.status,
+  })) ?? []
+)
 
-const actions = [
-  { id: 'act_003', name: '自动续约', type: 'automation', status: 'active' },
-  { id: 'act_004', name: '到期提醒短信', type: 'notification', status: 'active' },
-]
+const actions = computed(() =>
+  detail.value?.actions.map(a => ({
+    id: a.id, name: a.name, type: a.type, status: a.status,
+  })) ?? []
+)
 </script>
 
 <style scoped>
