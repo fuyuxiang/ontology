@@ -2,8 +2,11 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/ontology"
+    DATABASE_URL: str = "sqlite:///./ontology.db"
     REDIS_URL: str = "redis://localhost:6379/0"
+    NEO4J_URI: str = "bolt://localhost:7687"
+    NEO4J_USER: str = "neo4j"
+    NEO4J_PASSWORD: str = "ontology123"
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
     ANTHROPIC_API_KEY: str = ""
