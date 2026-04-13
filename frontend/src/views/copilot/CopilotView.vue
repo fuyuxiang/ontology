@@ -13,7 +13,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-body-medium">智能副驾</p>
+            <p class="text-body-medium">智能对话</p>
             <p class="text-caption">本体驱动 · 实时推理</p>
           </div>
         </div>
@@ -80,7 +80,7 @@
         <textarea
           v-model="inputText"
           class="copilot__input"
-          placeholder="向智能副驾提问，例如：哪些客户有续约风险？"
+          placeholder="向智能对话提问，例如：哪些客户有续约风险？"
           rows="1"
           @keydown.enter.exact.prevent="sendMessage()"
           @input="autoResize"

@@ -8,12 +8,29 @@
           <path d="M10 6L14 8.5V13L10 15.5L6 13V8.5L10 6Z" fill="#0f1117" stroke="#748ffc" stroke-width="0.5"/>
         </svg>
       </div>
-      <span class="sidebar__logo-text">BONC</span>
+      <div class="sidebar__logo-info">
+        <span class="sidebar__logo-text">Bonc</span>
+        <span class="sidebar__logo-text">Agentic Ontology</span>
+        <span class="sidebar__logo-sub">Bonc本体智能体平台</span>
+      </div>
     </div>
 
     <!-- 主导航 -->
     <nav class="sidebar__nav">
-      <div class="sidebar__section-label">核心模块</div>
+      <div class="sidebar__section-label">数据基座</div>
+      <RouterLink
+        v-for="item in dataNav"
+        :key="item.path"
+        :to="item.path"
+        class="sidebar__item"
+        :class="{ 'sidebar__item--active': isActive(item.path) }"
+      >
+        <span class="sidebar__item-icon" v-html="item.icon"></span>
+        <span class="sidebar__item-label">{{ item.label }}</span>
+      </RouterLink>
+
+      <div class="sidebar__divider"></div>
+      <div class="sidebar__section-label">本体中心</div>
       <RouterLink
         v-for="item in mainNav"
         :key="item.path"
@@ -27,7 +44,20 @@
       </RouterLink>
 
       <div class="sidebar__divider"></div>
-      <div class="sidebar__section-label">分析工具</div>
+      <div class="sidebar__section-label">AIP场景</div>
+      <RouterLink
+        v-for="item in sceneNav"
+        :key="item.path"
+        :to="item.path"
+        class="sidebar__item"
+        :class="{ 'sidebar__item--active': isActive(item.path) }"
+      >
+        <span class="sidebar__item-icon" v-html="item.icon"></span>
+        <span class="sidebar__item-label">{{ item.label }}</span>
+      </RouterLink>
+
+      <div class="sidebar__divider"></div>
+      <div class="sidebar__section-label">智能交互</div>
       <RouterLink
         v-for="item in toolNav"
         :key="item.path"
@@ -63,6 +93,19 @@ const themeStore = useThemeStore()
 
 const isActive = (path: string) => route.path.startsWith(path)
 
+const dataNav = [
+  {
+    path: '/dashboard',
+    label: '数据看板',
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="8" width="3" height="6" rx="1" fill="currentColor" opacity="0.6"/><rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor" opacity="0.8"/><rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/></svg>`
+  },
+  {
+    path: '/datasource',
+    label: '数据工坊',
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="currentColor" stroke-width="1.5"/><path d="M3 8v4c0 1.1 2.24 2 5 2s5-.9 5-2V8" stroke="currentColor" stroke-width="1.5"/></svg>`
+  },
+]
+
 const mainNav = [
   {
     path: '/ontology',
@@ -82,15 +125,28 @@ const mainNav = [
   },
 ]
 
-const toolNav = [
+const sceneNav = [
   {
-    path: '/dashboard',
-    label: '数据看板',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="8" width="3" height="6" rx="1" fill="currentColor" opacity="0.6"/><rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor" opacity="0.8"/><rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/></svg>`
+    path: '/scene/fttr',
+    label: 'FTTR续约策划',
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 13V7l4-4 4 4v6H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.5 13v-3h3v3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`
   },
   {
+    path: '/scene/broadband',
+    label: '宽带退单原因稽核',
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 8h4M6 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
+  },
+  {
+    path: '/scene/enterprise',
+    label: '政企根因分析',
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+  },
+]
+
+const toolNav = [
+  {
     path: '/copilot',
-    label: '智能副驾',
+    label: '智能对话',
     icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2z" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 9.5s.5 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="7" r="0.75" fill="currentColor"/><circle cx="10" cy="7" r="0.75" fill="currentColor"/></svg>`
   },
 ]
@@ -130,10 +186,24 @@ const sunIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ci
 }
 
 .sidebar__logo-text {
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--sidebar-text-active);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.sidebar__logo-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar__logo-sub {
+  font-size: 10px;
+  color: var(--sidebar-text-muted);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
 }
 
 .sidebar__nav {

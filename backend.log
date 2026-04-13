@@ -1,0 +1,100 @@
+INFO:     Will watch for changes in these directories: ['/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend']
+INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
+INFO:     Started reloader process [95992] using WatchFiles
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [95995]
+INFO:     Waiting for application startup.
+(trapped) error reading bcrypt version
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
+    version = _bcrypt.__about__.__version__
+              ^^^^^^^^^^^^^^^^^
+AttributeError: module 'bcrypt' has no attribute '__about__'
+ERROR:    Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 692, in lifespan
+    async with self.lifespan_context(app) as maybe_state:
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
+    async with original_context(app) as maybe_original_state:
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
+    return await anext(self.gen)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/main.py", line 27, in lifespan
+    seed_admin(db)
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/auth.py", line 42, in seed_admin
+    password_hash=hash_password("admin123"),
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/core/security.py", line 14, in hash_password
+    return pwd_context.hash(password)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/context.py", line 2258, in hash
+    return record.hash(secret, **kwds)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 779, in hash
+    self.checksum = self._calc_checksum(secret)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 591, in _calc_checksum
+    self._stub_requires_backend()
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2254, in _stub_requires_backend
+    cls.set_backend()
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2156, in set_backend
+    return owner.set_backend(name, dryrun=dryrun)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2163, in set_backend
+    return cls.set_backend(name, dryrun=dryrun)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2188, in set_backend
+    cls._set_backend(name, dryrun)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2311, in _set_backend
+    super(SubclassBackendMixin, cls)._set_backend(name, dryrun)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2224, in _set_backend
+    ok = loader(**kwds)
+         ^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 626, in _load_backend_mixin
+    return mixin_cls._finalize_backend_mixin(name, dryrun)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 421, in _finalize_backend_mixin
+    if detect_wrap_bug(IDENT_2A):
+       ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 380, in detect_wrap_bug
+    if verify(secret, bug_hash):
+       ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 792, in verify
+    return consteq(self._calc_checksum(secret), chk)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 655, in _calc_checksum
+    hash = _bcrypt.hashpw(secret, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ValueError: password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])
+
+ERROR:    Application startup failed. Exiting.
