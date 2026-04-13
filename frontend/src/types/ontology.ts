@@ -134,23 +134,23 @@ export interface EntityListItem {
   rule_count: number
 }
 
-// ── 图遍历结果 ──
+// ── 图遍历结果（匹配后端 snake_case）──
 export interface GraphNode {
   id: string
   name: string
-  nameCn: string
+  name_cn: string
   tier: Tier
   status: EntityStatus
-  relationCount: number
+  relation_count: number
 }
 
 export interface GraphEdge {
-  fromId: string
-  fromName: string
-  toId: string
-  toName: string
+  from_id: string
+  from_name: string
+  to_id: string
+  to_name: string
   label: string
-  cardinality: Cardinality
+  cardinality: string
 }
 
 export interface GraphData {
