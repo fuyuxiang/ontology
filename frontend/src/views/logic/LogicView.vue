@@ -89,22 +89,14 @@
       </div>
     </div>
 
-    <!-- 新建规则弹窗 -->
-    <Teleport to="body">
-      <div v-if="showAdd" class="modal-overlay" @click.self="showAdd = false">
-        <div class="modal-panel">
-          <h3 class="text-h2" style="margin-bottom: 16px;">新建业务规则</h3>
-          <p class="text-caption" style="margin-bottom: 20px;">功能开发中，敬请期待</p>
-          <button class="btn-primary" @click="showAdd = false">关闭</button>
-        </div>
-      </div>
-    </Teleport>
+    <RuleCreateForm :visible="showAdd" @close="showAdd = false" @created="store.fetchRules()" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRulesStore } from '../../store/rules'
+import RuleCreateForm from '../../components/common/RuleCreateForm.vue'
 
 const store = useRulesStore()
 const expandedId = ref<string | null>(null)
