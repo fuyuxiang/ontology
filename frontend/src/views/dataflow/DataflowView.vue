@@ -7,6 +7,8 @@
       </div>
     </div>
 
+    <PageState :loading="store.loading && nodes.length === 0" :empty="!store.loading && nodes.length === 0" text="加载关系图谱..." empty-text="暂无本体数据">
+
     <div class="canvas-page__body">
       <!-- 节点图 -->
       <div class="canvas-page__graph">
@@ -83,12 +85,14 @@
         </button>
       </div>
     </div>
+    </PageState>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useOntologyStore } from '../../store/ontology'
+import PageState from '../../components/common/PageState.vue'
 
 const store = useOntologyStore()
 const selectedId = ref<string | null>(null)
