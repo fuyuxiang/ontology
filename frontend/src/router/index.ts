@@ -42,12 +42,30 @@ const router = createRouter({
       name: 'copilot',
       component: () => import('../views/copilot/CopilotView.vue'),
       meta: { title: '智能对话' }
+    },
+    {
+      path: '/scene/fttr',
+      name: 'scene-fttr',
+      component: () => import('../views/PlaceholderView.vue'),
+      meta: { title: 'FTTR续约策划' }
+    },
+    {
+      path: '/scene/broadband',
+      name: 'scene-broadband',
+      component: () => import('../views/PlaceholderView.vue'),
+      meta: { title: '宽带正式单退单原因稽核' }
+    },
+    {
+      path: '/scene/enterprise',
+      name: 'scene-enterprise',
+      component: () => import('../views/PlaceholderView.vue'),
+      meta: { title: '政企根因分析' }
     }
   ]
 })
 
 router.afterEach((to) => {
-  document.title = `${to.meta.title ?? '本体平台'} — 本体驱动智能策略平台`
+  document.title = `${to.meta.title ?? '本体智能体平台'} — 本体智能体平台`
 })
 
 export default router
