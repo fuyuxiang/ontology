@@ -66,34 +66,72 @@ export interface EntityAction {
   impactCount?: number
 }
 
-// ── 本体实体（完整对象）──
+// ── 本体实体（完整对象，匹配后端 snake_case）──
 export interface OntologyEntity {
   id: string
   name: string
-  nameCn: string
+  name_cn: string
   tier: Tier
   status: EntityStatus
   description?: string
-  schemaJson?: Record<string, unknown>
+  schema_json?: Record<string, unknown>
   attributes: EntityAttribute[]
-  relations: EntityRelation[]
-  rules: BusinessRule[]
-  actions: EntityAction[]
-  createdAt: string
-  updatedAt: string
-  createdBy: string
+  relations: EntityRelationDetail[]
+  rules: RuleDetail[]
+  actions: ActionDetail[]
+  created_at: string
+  updated_at: string
+  created_by: string | null
 }
 
-// ── 实体列表项（轻量版，用于侧边栏/搜索）──
+// 后端返回的关系详情
+export interface EntityRelationDetail {
+  id: string
+  name: string
+  rel_type: string
+  from_entity_id: string
+  from_entity_name: string
+  to_entity_id: string
+  to_entity_name: string
+  to_entity_tier: number
+  cardinality: Cardinality
+  acyclic: boolean
+  description?: string
+}
+
+// 后端返回的规则详情
+export interface RuleDetail {
+  id: string
+  name: string
+  entity_id: string
+  entity_name: string
+  condition_expr: string
+  action_desc: string
+  status: string
+  priority: string
+  trigger_count: number
+  last_triggered: string | null
+}
+
+// 后端返回的动作详情
+export interface ActionDetail {
+  id: string
+  name: string
+  type: string
+  status: string
+  impact_count: number | null
+}
+
+// ── 实体列表项（轻量版，匹配后端 snake_case）──
 export interface EntityListItem {
   id: string
   name: string
-  nameCn: string
+  name_cn: string
   tier: Tier
   status: EntityStatus
-  attrCount: number
-  relationCount: number
-  ruleCount: number
+  attr_count: number
+  relation_count: number
+  rule_count: number
 }
 
 // ── 图遍历结果 ──

@@ -182,41 +182,46 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import EntityCard, { type Entity } from '../../components/common/EntityCard.vue'
 import TierBadge from '../../components/common/TierBadge.vue'
+import { useOntologyStore } from '../../store/ontology'
+
+const store = useOntologyStore()
 
 const searchQuery = ref('')
 const selectedId = ref<string | null>(null)
 const activeTab = ref('属性')
 const tabs = ['属性', '关系', '规则', '动作', '血缘']
 
-const allEntities: Entity[] = [
-  { id: 'customer', name: 'Customer', nameCn: '客户', tier: 1, attrs: 24, relations: 11, rules: 8, status: 'active' },
-  { id: 'order', name: 'Order', nameCn: '订单', tier: 1, attrs: 18, relations: 7, rules: 5, status: 'active' },
-  { id: 'product', name: 'Product', nameCn: '产品', tier: 1, attrs: 15, relations: 6, rules: 4, status: 'active' },
-  { id: 'touchpoint', name: 'Touchpoint', nameCn: '触点', tier: 1, attrs: 12, relations: 5, rules: 3, status: 'warning' },
-  { id: 'channel', name: 'Channel', nameCn: '渠道', tier: 1, attrs: 10, relations: 4, rules: 2, status: 'active' },
-  { id: 'agent', name: 'Agent', nameCn: '坐席', tier: 1, attrs: 9, relations: 3, rules: 2, status: 'active' },
-  { id: 'contract', name: 'Contract', nameCn: '合同', tier: 1, attrs: 14, relations: 5, rules: 6, status: 'active' },
-  { id: 'campaign', name: 'Campaign', nameCn: '营销活动', tier: 2, attrs: 16, relations: 8, rules: 7, status: 'active' },
-  { id: 'segment', name: 'CustomerSegment', nameCn: '客户分群', tier: 2, attrs: 11, relations: 4, rules: 5, status: 'active' },
-  { id: 'strategy', name: 'Strategy', nameCn: '策略', tier: 2, attrs: 13, relations: 6, rules: 9, status: 'warning' },
-  { id: 'rule', name: 'RuleSet', nameCn: '规则集', tier: 2, attrs: 8, relations: 3, rules: 12, status: 'active' },
-  { id: 'fttr-sub', name: 'FTTRSubscription', nameCn: 'FTTR续约订阅', tier: 3, attrs: 18, relations: 5, rules: 3, status: 'active' },
-  { id: 'fttr-strat', name: 'FTTRStrategy', nameCn: 'FTTR续约策略', tier: 3, attrs: 14, relations: 4, rules: 6, status: 'active' },
-]
+onMounted(() => {
+  store.fetchEntities()
+})
 
-const groups = [
-  { tier: 1 as const, label: 'Tier 1 核心对象', entities: allEntities.filter(e => e.tier === 1) },
-  { tier: 2 as const, label: 'Tier 2 领域对象', entities: allEntities.filter(e => e.tier === 2) },
-  { tier: 3 as const, label: 'Tier 3 场景对象', entities: allEntities.filter(e => e.tier === 3) },
-]
+// 将 store 数据映射为 EntityCard 需要的格式
+const allEntities = computed<Entity[]>(() =>
+  store.entities.map(e => ({
+    id: e.id,
+    name: e.name,
+    nameCn: e.name_cn,
+    tier: e.tier as 1 | 2 | 3,
+    attrs: e.attr_count,
+    relations: e.relation_count,
+    rules: e.rule_count,
+    status: e.status as 'active' | 'warning' | 'error',
+  }))
+)
+
+const groups = computed(() => [
+  { tier: 1 as const, label: 'Tier 1 核心对象', entities: allEntities.value.filter(e => e.tier === 1) },
+  { tier: 2 as const, label: 'Tier 2 领域对象', entities: allEntities.value.filter(e => e.tier === 2) },
+  { tier: 3 as const, label: 'Tier 3 场景对象', entities: allEntities.value.filter(e => e.tier === 3) },
+])
 
 const filteredGroups = computed(() => {
-  if (!searchQuery.value) return groups
+  if (!searchQuery.value) return groups.value
   const q = searchQuery.value.toLowerCase()
-  return groups.map(g => ({
+  return groups.value.map(g => ({
     ...g,
     entities: g.entities.filter(e =>
       e.name.toLowerCase().includes(q) || e.nameCn.includes(q)
@@ -224,15 +229,34 @@ const filteredGroups = computed(() => {
   })).filter(g => g.entities.length > 0)
 })
 
-const totalEntities = allEntities.length
-const selected = computed(() => allEntities.find(e => e.id === selectedId.value) ?? null)
+const totalEntities = computed(() => allEntities.value.length)
+const selected = computed(() => allEntities.value.find(e => e.id === selectedId.value) ?? null)
 
-const metrics = computed(() => selected.value ? [
-  { label: '属性', value: selected.value.attrs },
-  { label: '关系', value: selected.value.relations },
-  { label: '规则', value: selected.value.rules },
-  { label: '动作', value: 2 },
-] : [])
+// 选中实体时从 API 加载详情
+watch(selectedId, async (id) => {
+  if (id) {
+    await store.fetchEntity(id)
+  }
+})
+
+const detail = computed(() => store.currentEntity)
+
+const metrics = computed(() => {
+  if (!detail.value) {
+    return selected.value ? [
+      { label: '属性', value: selected.value.attrs },
+      { label: '关系', value: selected.value.relations },
+      { label: '规则', value: selected.value.rules },
+      { label: '动作', value: 0 },
+    ] : []
+  }
+  return [
+    { label: '属性', value: detail.value.attributes.length },
+    { label: '关系', value: detail.value.relations.length },
+    { label: '规则', value: detail.value.rules.length },
+    { label: '动作', value: detail.value.actions.length },
+  ]
+})
 
 const tierLabel = (t: number) => ({ 1: '核心对象', 2: '领域对象', 3: '场景对象' }[t] ?? '')
 
@@ -241,78 +265,34 @@ function selectEntity(entity: Entity) {
   activeTab.value = '属性'
 }
 
-const attrMap: Record<string, { name: string; type: string; desc: string; required: boolean }[]> = {
-  customer: [
-    { name: 'customer_id', type: 'string', desc: '客户唯一标识', required: true },
-    { name: 'name', type: 'string', desc: '客户姓名', required: true },
-    { name: 'phone', type: 'string', desc: '联系电话', required: true },
-    { name: 'segment', type: 'ref', desc: '所属分群 → CustomerSegment', required: false },
-    { name: 'ltv_score', type: 'number', desc: '生命周期价值评分', required: false },
-    { name: 'churn_risk', type: 'computed', desc: '流失风险概率 (0-1)', required: false },
-    { name: 'created_at', type: 'date', desc: '创建时间', required: true },
-  ],
-  'fttr-sub': [
-    { name: 'subscription_id', type: 'string', desc: '订阅唯一标识', required: true },
-    { name: 'customer_id', type: 'ref', desc: '关联客户 → Customer', required: true },
-    { name: 'product_id', type: 'ref', desc: '关联产品 → Product', required: true },
-    { name: 'expire_date', type: 'date', desc: '到期日期', required: true },
-    { name: 'days_to_expire', type: 'computed', desc: '距到期天数', required: false },
-    { name: 'monthly_fee', type: 'number', desc: '月费（元）', required: true },
-  ],
-}
-
+// 属性、关系、规则、动作全部从详情 API 获取
 const selectedAttrs = computed(() =>
-  attrMap[selectedId.value ?? ''] ?? [
-    { name: 'id', type: 'string', desc: '唯一标识', required: true },
-    { name: 'name', type: 'string', desc: '名称', required: true },
-    { name: 'created_at', type: 'date', desc: '创建时间', required: true },
-    { name: 'updated_at', type: 'date', desc: '更新时间', required: false },
-  ]
+  detail.value?.attributes.map(a => ({
+    name: a.name, type: a.type, desc: a.description, required: a.required,
+  })) ?? []
 )
 
-const selectedRelations = computed(() => [
-  { name: 'belongs_to', type: 'belongs_to', target: 'Customer', targetTier: 1 as const },
-  { name: 'has_product', type: 'has_one', target: 'Product', targetTier: 1 as const },
-  { name: 'in_campaign', type: 'many_to_many', target: 'Campaign', targetTier: 2 as const },
-])
+const selectedRelations = computed(() =>
+  detail.value?.relations.map(r => ({
+    name: r.name,
+    type: r.rel_type,
+    target: r.to_entity_name || r.from_entity_name,
+    targetTier: (r.to_entity_tier || 1) as 1 | 2 | 3,
+  })) ?? []
+)
 
-const ruleMap: Record<string, { id: string; name: string; condition: string; action: string; status: string }[]> = {
-  customer: [
-    { id: 'rule_001', name: '高价值客户识别', condition: 'ltv_score >= 80 AND tenure >= 12', action: '标记为高价值', status: 'active' },
-    { id: 'rule_002', name: '流失预警', condition: 'churn_risk >= 0.7', action: '触发挽留策略', status: 'active' },
-    { id: 'rule_003', name: '沉默客户唤醒', condition: 'last_active_days > 90', action: '推送唤醒活动', status: 'active' },
-  ],
-  'fttr-sub': [
-    { id: 'rule_005', name: '到期续约提醒', condition: 'days_to_expire <= 30', action: '发送续约提醒', status: 'active' },
-    { id: 'rule_006', name: '欠费预警', condition: 'overdue_days > 7', action: '发送催缴通知', status: 'warning' },
-  ],
-  campaign: [
-    { id: 'rule_004', name: '预算超限预警', condition: 'spend > budget * 0.9', action: '通知负责人', status: 'active' },
-  ],
-}
 const selectedRules = computed(() =>
-  ruleMap[selectedId.value ?? ''] ?? [
-    { id: 'rule_default', name: '默认校验规则', condition: 'id IS NOT NULL', action: '拒绝空值', status: 'active' },
-  ]
+  detail.value?.rules.map(r => ({
+    id: r.id, name: r.name,
+    condition: r.condition_expr, action: r.action_desc,
+    status: r.status,
+  })) ?? []
 )
 
-const actionMap: Record<string, { id: string; name: string; type: string; status: string }[]> = {
-  customer: [
-    { id: 'act_001', name: '发送续约优惠', type: 'campaign', status: 'active' },
-    { id: 'act_002', name: '升级FTTR套餐', type: 'upsell', status: 'active' },
-  ],
-  'fttr-sub': [
-    { id: 'act_003', name: '自动续约', type: 'automation', status: 'active' },
-    { id: 'act_004', name: '到期提醒短信', type: 'notification', status: 'active' },
-  ],
-  campaign: [
-    { id: 'act_005', name: '启动活动', type: 'lifecycle', status: 'active' },
-  ],
-}
 const selectedActions = computed(() =>
-  actionMap[selectedId.value ?? ''] ?? [
-    { id: 'act_default', name: '查看详情', type: 'navigation', status: 'active' },
-  ]
+  detail.value?.actions.map(a => ({
+    id: a.id, name: a.name, type: a.type, status: a.status,
+  })) ?? []
 )
 </script>
 
