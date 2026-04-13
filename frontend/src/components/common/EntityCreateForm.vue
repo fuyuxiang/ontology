@@ -56,9 +56,11 @@
 import { reactive, ref } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { entityApi } from '../../api/ontology'
+import { useToast } from '../../composables/useToast'
 
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; created: [] }>()
+const toast = useToast()
 
 const tierNames: Record<number, string> = { 1: '核心', 2: '领域', 3: '场景' }
 const attrTypes = ['string', 'number', 'boolean', 'date', 'ref', 'computed', 'enum', 'json']
@@ -92,10 +94,11 @@ async function handleSubmit() {
     form.tier = 1
     form.description = ''
     form.attributes = []
+    toast.success('对象创建成功')
     emit('created')
     emit('close')
   } catch (e) {
-    alert(`创建失败: ${(e as Error).message}`)
+    toast.error(`创建失败: ${(e as Error).message}`)
   } finally {
     submitting.value = false
   }

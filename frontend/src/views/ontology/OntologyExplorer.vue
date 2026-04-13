@@ -14,6 +14,13 @@
         新建对象
       </button>
 
+      <div v-if="store.loading && allEntities.length === 0" class="explorer__panel-loading">
+        <div class="spinner"></div>
+      </div>
+      <div v-else-if="allEntities.length === 0" class="explorer__panel-empty">
+        <p class="text-caption">暂无对象类型</p>
+      </div>
+      <template v-else>
       <div class="explorer__tier-group" v-for="group in filteredGroups" :key="group.tier">
         <div class="explorer__tier-header">
           <TierBadge :tier="group.tier" />
@@ -28,6 +35,7 @@
           @click="selectEntity"
         />
       </div>
+      </template>
     </aside>
 
     <!-- 右侧详情区 -->
@@ -244,8 +252,10 @@ import EntityEditForm from '../../components/common/EntityEditForm.vue'
 import ModalDialog from '../../components/common/ModalDialog.vue'
 import { useOntologyStore } from '../../store/ontology'
 import { relationApi } from '../../api/relations'
+import { useToast } from '../../composables/useToast'
 
 const store = useOntologyStore()
+const toast = useToast()
 const showCreateEntity = ref(false)
 const showEditEntity = ref(false)
 
@@ -381,16 +391,18 @@ async function handleCreateRelation() {
     })
     relForm.name = ''; relForm.to_entity_id = ''
     showCreateRelation.value = false
+    toast.success('关系创建成功')
     store.fetchEntity(selectedId.value)
-  } catch (e) { alert(`创建失败: ${(e as Error).message}`) }
+  } catch (e) { toast.error(`创建失败: ${(e as Error).message}`) }
 }
 
 async function handleDeleteRelation(id: string, name: string) {
   if (!confirm(`确定删除关系 "${name}"？`)) return
   try {
     await relationApi.remove(id)
+    toast.success('关系已删除')
     if (selectedId.value) store.fetchEntity(selectedId.value)
-  } catch (e) { alert(`删除失败: ${(e as Error).message}`) }
+  } catch (e) { toast.error(`删除失败: ${(e as Error).message}`) }
 }
 
 const selectedRules = computed(() =>
@@ -475,6 +487,17 @@ const selectedActions = computed(() =>
 .btn-primary:hover { background: var(--semantic-700); }
 .btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; cursor: pointer; }
 .btn-secondary:hover { background: var(--neutral-50); }
+
+.explorer__panel-loading, .explorer__panel-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 40px 0; gap: 8px; color: var(--neutral-400);
+}
+.spinner {
+  width: 24px; height: 24px; border: 3px solid var(--neutral-200);
+  border-top-color: var(--semantic-500); border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
 .explorer__search-input {
   width: 100%;
   padding: 7px 10px 7px 32px;
