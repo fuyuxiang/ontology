@@ -21,6 +21,7 @@ def list_entities(
     tier: int | None = None,
     status: str | None = None,
     search: str | None = None,
+    namespace: str | None = None,
     db: Session = Depends(get_db),
 ):
     q = db.query(OntologyEntity)
@@ -28,6 +29,8 @@ def list_entities(
         q = q.filter(OntologyEntity.tier == tier)
     if status:
         q = q.filter(OntologyEntity.status == status)
+    if namespace:
+        q = q.filter(OntologyEntity.id.like(f"{namespace}_%"))
     if search:
         pattern = f"%{search}%"
         q = q.filter(
