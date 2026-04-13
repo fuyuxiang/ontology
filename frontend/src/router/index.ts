@@ -41,7 +41,7 @@ const router = createRouter({
       path: '/copilot',
       name: 'copilot',
       component: () => import('../views/copilot/CopilotView.vue'),
-      meta: { title: '智能副驾' }
+      meta: { title: '智能对话' }
     }
   ]
 })

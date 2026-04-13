@@ -1,0 +1,203 @@
+
+> frontend@0.0.0 dev
+> vite
+
+20:45:38 [vite] (client) Re-optimizing dependencies because lockfile has changed
+
+  VITE v8.0.8  ready in 510 ms
+
+  ➜  Local:   http://localhost:5177/
+  ➜  Network: use --host to expose
+20:45:51 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:46:08 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:46:11 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:46:12 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:46:15 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:46:15 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:46:18 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:47:32 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:48:03 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:48:03 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:48:07 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:49:52 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+20:50:16 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+20:50:28 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+20:50:56 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:04 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:08 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:15 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:16 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:16 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:24 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:25 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:28 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:32 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:40 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:51:47 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:52:28 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+20:52:29 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+20:52:55 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:52:55 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:53:03 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:53:11 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:53:47 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+20:54:59 [vite] (client) page reload src/router/index.ts
+20:55:00 [vite] (client) hmr update /src/views/copilot/CopilotView.vue
+20:55:01 [vite] (client) hmr update /src/views/copilot/CopilotView.vue
+20:55:02 [vite] (client) hmr update /src/components/common/AppTopbar.vue
+20:56:34 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:56:38 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:56:42 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:56:46 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:56:57 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:57:04 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:57:06 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:57:07 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:57:12 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+20:57:12 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+21:05:08 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:05:26 [vite] (client) hmr update /src/components/common/AppSidebar.vue?vue&type=style&index=0&scoped=2ee126a4&lang.css
+21:06:49 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:06:50 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:06:51 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:06:56 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:07:01 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:07:25 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+21:07:26 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+21:07:28 [vite] http proxy error: /api/v1/rules
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+21:07:34 [vite] http proxy error: /api/v1/entities
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+21:07:42 [vite] http proxy error: /api/v1/entities/graph
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+21:11:53 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:12:39 [vite] (client) hmr update /src/components/common/AppSidebar.vue
+21:12:56 [vite] http proxy error: /api/v1/dashboard/stats
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1122:18)
+    at afterConnectMultiple (node:net:1689:7)
+21:13:25 [vite] (client) hmr update /src/components/common/AppTopbar.vue
+21:14:05 [vite] (client) hmr update /src/components/common/AppSidebar.vue

@@ -4,16 +4,6 @@
       <OntologyBreadcrumb :items="breadcrumbs" />
     </div>
     <div class="topbar__right">
-      <div class="topbar__scene-select">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1l1.8 3.6L13 5.3l-3 2.9.7 4.1L7 10.1l-3.7 2.2.7-4.1-3-2.9 4.2-.7L7 1z" fill="var(--kinetic-500)"/>
-        </svg>
-        <span>FTTR 续约场景</span>
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M3 4.5l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      <div class="topbar__divider"></div>
       <button class="topbar__icon-btn topbar__search-btn" title="搜索 (⌘K)" @click="emit('search')">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/>
@@ -47,7 +37,7 @@ const breadcrumbs = computed(() => {
     '/dataflow': [{ label: '数据流' }],
     '/logic': [{ label: '业务逻辑' }],
     '/dashboard': [{ label: '数据看板' }],
-    '/copilot': [{ label: '智能副驾' }],
+    '/copilot': [{ label: '智能对话' }],
   }
   const path = '/' + route.path.split('/')[1]
   return map[path] ?? [{ label: '首页' }]
