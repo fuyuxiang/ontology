@@ -9,6 +9,10 @@
         </svg>
         <input v-model="searchQuery" class="explorer__search-input" placeholder="搜索对象类型..." />
       </div>
+      <button class="explorer__add-btn" @click="showCreateEntity = true">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        新建对象
+      </button>
 
       <div class="explorer__tier-group" v-for="group in filteredGroups" :key="group.tier">
         <div class="explorer__tier-header">
@@ -178,6 +182,8 @@
         </div>
       </template>
     </div>
+
+    <EntityCreateForm :visible="showCreateEntity" @close="showCreateEntity = false" @created="store.fetchEntities()" />
   </div>
 </template>
 
@@ -185,9 +191,11 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import EntityCard, { type Entity } from '../../components/common/EntityCard.vue'
 import TierBadge from '../../components/common/TierBadge.vue'
+import EntityCreateForm from '../../components/common/EntityCreateForm.vue'
 import { useOntologyStore } from '../../store/ontology'
 
 const store = useOntologyStore()
+const showCreateEntity = ref(false)
 
 const searchQuery = ref('')
 const selectedId = ref<string | null>(null)
@@ -327,6 +335,14 @@ const selectedActions = computed(() =>
   transform: translateY(-50%);
   color: var(--neutral-500);
 }
+.explorer__add-btn {
+  display: flex; align-items: center; gap: 6px; width: calc(100% - 24px);
+  margin: 0 12px 8px; padding: 7px 12px; border-radius: var(--radius-md);
+  border: 1px dashed var(--semantic-400); background: transparent;
+  color: var(--semantic-600); font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.explorer__add-btn:hover { background: var(--semantic-50); border-style: solid; }
 .explorer__search-input {
   width: 100%;
   padding: 7px 10px 7px 32px;
