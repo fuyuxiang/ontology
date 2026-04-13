@@ -46,19 +46,19 @@ const router = createRouter({
     {
       path: '/scene/fttr',
       name: 'scene-fttr',
-      component: () => import('../views/PlaceholderView.vue'),
+      component: () => import('../views/scene/FttrScene.vue'),
       meta: { title: 'FTTR续约策划' }
     },
     {
       path: '/scene/broadband',
       name: 'scene-broadband',
-      component: () => import('../views/PlaceholderView.vue'),
-      meta: { title: '宽带正式单退单原因稽核' }
+      component: () => import('../views/scene/BroadbandScene.vue'),
+      meta: { title: '宽带退单稽核' }
     },
     {
       path: '/scene/enterprise',
       name: 'scene-enterprise',
-      component: () => import('../views/PlaceholderView.vue'),
+      component: () => import('../views/scene/EnterpriseScene.vue'),
       meta: { title: '政企根因分析' }
     }
   ]

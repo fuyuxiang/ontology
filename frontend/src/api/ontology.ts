@@ -5,6 +5,7 @@ export interface EntityQuery {
   tier?: Tier
   status?: EntityStatus
   search?: string
+  namespace?: string
 }
 
 export const entityApi = {
