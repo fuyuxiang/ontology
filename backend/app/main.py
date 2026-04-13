@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +11,8 @@ from app.database import Base
 from app.api.v1.entities import router as entities_router
 from app.api.v1.auth import router as auth_router, seed_admin
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -20,7 +23,24 @@ async def lifespan(app: FastAPI):
         seed_admin(db)
     finally:
         db.close()
+
+    # 初始化 Neo4j（可选，连不上不影响基础功能）
+    try:
+        from app.services.graph import get_driver, ensure_constraints
+        driver = get_driver()
+        ensure_constraints(driver)
+        logger.info("Neo4j 连接成功")
+    except Exception as e:
+        logger.warning(f"Neo4j 未连接，图遍历功能不可用: {e}")
+
     yield
+
+    # 关闭 Neo4j
+    try:
+        from app.services.graph import close_driver
+        close_driver()
+    except Exception:
+        pass
 
 
 app = FastAPI(
