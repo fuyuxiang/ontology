@@ -82,6 +82,20 @@
             <span class="rule-detail-label">最后触发</span>
             <span>{{ rule.lastTriggered }}</span>
           </div>
+          <div class="rule-card__actions">
+            <button class="btn-sm-exec" @click.stop="handleExecute(rule.id)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor"/></svg>
+              执行
+            </button>
+            <button class="btn-sm-edit" @click.stop="openEdit(rule)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 1l2 2-6 6H3V7l6-6z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              编辑
+            </button>
+            <button class="btn-sm-del" @click.stop="handleDelete(rule.id, rule.name)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4 3V2h4v1M3 3v7h6V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              删除
+            </button>
+          </div>
         </div>
       </div>
       <div v-if="filteredRules.length === 0" class="logic-empty">
@@ -90,17 +104,80 @@
     </div>
 
     <RuleCreateForm :visible="showAdd" @close="showAdd = false" @created="store.fetchRules()" />
+
+    <!-- 编辑规则弹窗 -->
+    <ModalDialog :visible="showEdit" title="编辑规则" width="560px" @close="showEdit = false">
+      <form v-if="editForm" class="rule-form" @submit.prevent="handleSaveEdit">
+        <div class="form-row"><label class="form-label">规则名称</label><input v-model="editForm.name" class="form-input" /></div>
+        <div class="form-row"><label class="form-label">触发条件</label><input v-model="editForm.condition_expr" class="form-input form-input--code" /></div>
+        <div class="form-row"><label class="form-label">执行动作</label><input v-model="editForm.action_desc" class="form-input" /></div>
+        <div class="form-row-inline">
+          <div class="form-row" style="flex:1"><label class="form-label">优先级</label>
+            <select v-model="editForm.priority" class="form-input"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select>
+          </div>
+          <div class="form-row" style="flex:1"><label class="form-label">状态</label>
+            <select v-model="editForm.status" class="form-input"><option value="active">活跃</option><option value="warning">警告</option><option value="disabled">禁用</option></select>
+          </div>
+        </div>
+      </form>
+      <template #footer>
+        <button class="btn-secondary" @click="showEdit = false">取消</button>
+        <button class="btn-primary" @click="handleSaveEdit">保存</button>
+      </template>
+    </ModalDialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRulesStore } from '../../store/rules'
 import RuleCreateForm from '../../components/common/RuleCreateForm.vue'
+import ModalDialog from '../../components/common/ModalDialog.vue'
+import { ruleApi } from '../../api/rules'
 
 const store = useRulesStore()
 const expandedId = ref<string | null>(null)
 const showAdd = ref(false)
+const showEdit = ref(false)
+const editForm = reactive({ id: '', name: '', condition_expr: '', action_desc: '', priority: 'medium', status: 'active' })
+
+function openEdit(rule: { id: string; name: string; condition: string; action: string; priority: string; status: string }) {
+  editForm.id = rule.id
+  editForm.name = rule.name
+  editForm.condition_expr = rule.condition
+  editForm.action_desc = rule.action
+  editForm.priority = rule.priority
+  editForm.status = rule.status
+  showEdit.value = true
+}
+
+async function handleSaveEdit() {
+  try {
+    await ruleApi.update(editForm.id, {
+      name: editForm.name, condition_expr: editForm.condition_expr,
+      action_desc: editForm.action_desc, priority: editForm.priority, status: editForm.status,
+    } as never)
+    showEdit.value = false
+    store.fetchRules()
+  } catch (e) { alert(`保存失败: ${(e as Error).message}`) }
+}
+
+async function handleDelete(id: string, name: string) {
+  if (!confirm(`确定删除规则 "${name}"？`)) return
+  try {
+    await ruleApi.remove(id)
+    expandedId.value = null
+    store.fetchRules()
+  } catch (e) { alert(`删除失败: ${(e as Error).message}`) }
+}
+
+async function handleExecute(id: string) {
+  const result = await store.executeRule(id)
+  if (result) {
+    alert(result.message)
+    store.fetchRules()
+  }
+}
 
 onMounted(() => { store.fetchRules() })
 
@@ -177,6 +254,26 @@ const filteredRules = computed(() =>
 .rule-detail-row { display: flex; gap: 12px; padding: 4px 0; font-size: 12px; color: var(--neutral-700); }
 .rule-detail-label { width: 80px; flex-shrink: 0; font-weight: 500; color: var(--neutral-500); }
 .logic-empty { padding: 40px; text-align: center; }
+
+.rule-card__actions { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--neutral-100); }
+.btn-sm-exec, .btn-sm-edit, .btn-sm-del {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: var(--radius-md); font-size: 11px; font-weight: 500; cursor: pointer; border: 1px solid;
+}
+.btn-sm-exec { border-color: var(--kinetic-400); background: var(--kinetic-50); color: var(--kinetic-700); }
+.btn-sm-exec:hover { background: var(--kinetic-500); color: #fff; }
+.btn-sm-edit { border-color: var(--semantic-400); background: var(--semantic-50); color: var(--semantic-600); }
+.btn-sm-edit:hover { background: var(--semantic-500); color: #fff; }
+.btn-sm-del { border-color: var(--status-error); background: var(--status-error-bg); color: var(--status-error); }
+.btn-sm-del:hover { background: var(--status-error); color: #fff; }
+
+.rule-form { display: flex; flex-direction: column; gap: 14px; }
+.form-row { display: flex; flex-direction: column; gap: 4px; }
+.form-row-inline { display: flex; gap: 12px; }
+.form-label { font-size: 12px; font-weight: 500; color: var(--neutral-600); }
+.form-input { padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 13px; color: var(--neutral-800); background: var(--neutral-0); outline: none; }
+.form-input:focus { border-color: var(--semantic-500); }
+.form-input--code { font-family: var(--font-mono); font-size: 12px; }
 
 .btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; transition: background var(--transition-fast); }
 .btn-primary:hover { background: var(--semantic-700); }
