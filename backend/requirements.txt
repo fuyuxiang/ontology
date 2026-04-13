@@ -9,5 +9,5 @@ python-jose[cryptography]==3.4.*
 passlib[bcrypt]==1.7.*
 python-multipart==0.0.*
 redis==5.2.*
-anthropic==0.52.*
+openai>=1.0
 neo4j==5.27.*
