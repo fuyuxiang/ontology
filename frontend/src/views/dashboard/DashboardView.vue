@@ -88,10 +88,29 @@
         </div>
       </div>
     </div>
+
+    <!-- 推理链示例 -->
+    <div class="dash-card">
+      <div class="dash-card__header">
+        <h3 class="text-h3">推理链追溯</h3>
+        <span class="text-caption">策略推荐全链路可解释</span>
+      </div>
+      <ReasoningChain title="高价值续约策略 #strategy_001" :steps="reasoningSteps" />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import ReasoningChain from '../../components/common/ReasoningChain.vue'
+import type { ReasoningStep } from '../../components/common/ReasoningChain.vue'
+
+const reasoningSteps: ReasoningStep[] = [
+  { type: 'ontology', title: '本体查询: CustomerSegment', source: 'BSS系统 (CRM_CUSTOMER)', result: '筛选出 2,847 名高价值用户' },
+  { type: 'ml', title: 'ML预测: churn_prediction_model', source: '输入: arpu, tenure, complaint_count', result: 'churn_probability = 0.73' },
+  { type: 'rule', title: '规则匹配: rule_007_high_value_renewal', source: '条件: arpu >= 100 AND tenure >= 12', result: '触发"续约优惠+设备升级"策略' },
+  { type: 'output', title: '策略输出: strategy_recommend', source: '产品: FTTR千兆升级包', result: '预测转化率: 3.2%，触点: APP推送(优先) + 短信(备选)' },
+]
+
 const kpis = [
   {
     label: '对象类型',

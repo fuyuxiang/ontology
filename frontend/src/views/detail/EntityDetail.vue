@@ -69,6 +69,57 @@
         </table>
       </template>
 
+      <!-- 关系 -->
+      <template v-else-if="activeTab === '关系'">
+        <div class="relation-list">
+          <div class="relation-item" v-for="rel in relations" :key="rel.name">
+            <span class="relation-item__from">{{ entity.name }}</span>
+            <span class="relation-item__arrow">
+              <span class="relation-item__type">{{ rel.type }}</span>
+              →
+            </span>
+            <span class="relation-item__to">{{ rel.target }}</span>
+            <span class="relation-item__card">{{ rel.cardinality }}</span>
+          </div>
+        </div>
+      </template>
+
+      <!-- 规则 -->
+      <template v-else-if="activeTab === '规则'">
+        <table class="data-table">
+          <thead>
+            <tr><th>规则ID</th><th>规则名称</th><th>触发条件</th><th>执行动作</th><th>状态</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="rule in rules" :key="rule.id">
+              <td><code class="text-code">{{ rule.id }}</code></td>
+              <td class="text-body-medium">{{ rule.name }}</td>
+              <td><code class="text-code">{{ rule.condition }}</code></td>
+              <td class="text-body">{{ rule.action }}</td>
+              <td><span class="status-dot" :class="rule.status === 'active' ? 'status-dot--success' : 'status-dot--warning'"></span></td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+
+      <!-- 动作 -->
+      <template v-else-if="activeTab === '动作'">
+        <div class="action-list">
+          <div class="action-item" v-for="act in actions" :key="act.id">
+            <div class="action-item__info">
+              <span class="action-item__name text-body-medium">{{ act.name }}</span>
+              <span class="action-item__type text-caption">{{ act.type }}</span>
+            </div>
+            <span class="action-status" :class="`action-status--${act.status}`">{{ act.status }}</span>
+            <button class="action-exec-btn">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor"/></svg>
+              执行
+            </button>
+          </div>
+        </div>
+      </template>
+
+      <!-- 血缘占位 -->
       <template v-else>
         <div class="placeholder-tab">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
@@ -132,6 +183,25 @@ const attrs = [
   { name: 'contract_years', type: 'number', desc: '合同年限', required: true, example: '2' },
   { name: 'auto_renew', type: 'boolean', desc: '是否自动续约', required: false, example: 'false' },
   { name: 'churn_risk', type: 'computed', desc: '流失风险评分 (0-1)', required: false, example: '0.73' },
+]
+
+const relations = [
+  { name: 'subscribed_by', type: 'belongs_to', target: 'Customer', cardinality: 'N:1' },
+  { name: 'uses_product', type: 'has_one', target: 'Product', cardinality: '1:1' },
+  { name: 'in_campaign', type: 'many_to_many', target: 'Campaign', cardinality: 'N:N' },
+  { name: 'managed_by', type: 'belongs_to', target: 'Agent', cardinality: 'N:1' },
+  { name: 'has_strategy', type: 'has_many', target: 'FTTRStrategy', cardinality: '1:N' },
+]
+
+const rules = [
+  { id: 'rule_005', name: '到期续约提醒', condition: 'days_to_expire <= 30', action: '发送续约提醒', status: 'active' },
+  { id: 'rule_006', name: '欠费预警', condition: 'overdue_days > 7', action: '发送催缴通知', status: 'warning' },
+  { id: 'rule_007', name: '高价值续约', condition: 'monthly_fee >= 200 AND churn_risk >= 0.5', action: '触发专属优惠', status: 'active' },
+]
+
+const actions = [
+  { id: 'act_003', name: '自动续约', type: 'automation', status: 'active' },
+  { id: 'act_004', name: '到期提醒短信', type: 'notification', status: 'active' },
 ]
 </script>
 
@@ -258,7 +328,45 @@ const attrs = [
   border-radius: var(--radius-full);
 }
 .status-dot--success { background: var(--status-success); }
+.status-dot--warning { background: var(--status-warning); }
 .status-dot--muted { background: var(--neutral-300); }
+
+/* 关系列表 */
+.relation-list { display: flex; flex-direction: column; gap: 8px; }
+.relation-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: var(--neutral-0);
+  border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
+}
+.relation-item__from, .relation-item__to { font-size: 13px; font-weight: 500; color: var(--neutral-800); }
+.relation-item__arrow { font-size: 11px; color: var(--neutral-400); display: flex; flex-direction: column; align-items: center; }
+.relation-item__type { font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--neutral-500); }
+.relation-item__card { font-size: 10px; font-weight: 500; color: var(--neutral-500); background: var(--neutral-50); padding: 1px 6px; border-radius: 3px; margin-left: auto; }
+
+/* 动作列表 */
+.action-list { display: flex; flex-direction: column; gap: 8px; }
+.action-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 16px; background: var(--neutral-0);
+  border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast);
+}
+.action-item:hover { border-color: var(--kinetic-400); }
+.action-item__info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.action-item__name { font-size: 13px; }
+.action-item__type { font-size: 11px; color: var(--neutral-500); }
+.action-status {
+  font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: var(--radius-full);
+}
+.action-status--active { background: var(--status-success-bg); color: var(--status-success); }
+.action-status--warning { background: var(--status-warning-bg); color: var(--status-warning); }
+.action-exec-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: var(--radius-md); border: none;
+  background: var(--kinetic-500); color: #fff; font-size: 12px;
+  font-weight: 500; cursor: pointer; transition: background var(--transition-fast);
+}
+.action-exec-btn:hover { background: var(--kinetic-600); }
 
 .placeholder-tab {
   display: flex;
