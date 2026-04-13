@@ -29,6 +29,9 @@ const title = computed(() => {
   const map: Record<string, string> = {
     '/dataflow': '数据流',
     '/logic': '业务逻辑',
+    '/scene/fttr': 'FTTR续约策划',
+    '/scene/broadband': '宽带正式单退单原因稽核',
+    '/scene/enterprise': '政企根因分析',
   }
   return map[route.path] ?? '未知'
 })
