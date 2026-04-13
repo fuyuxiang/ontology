@@ -1,0 +1,148 @@
+@import './tokens.css';
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #app {
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: var(--font-features);
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-leading);
+  color: var(--neutral-700);
+  background: var(--neutral-0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── 排版工具类 ── */
+.text-display {
+  font-size: var(--text-display-size);
+  font-weight: var(--text-display-weight);
+  line-height: var(--text-display-leading);
+  letter-spacing: var(--text-display-tracking);
+  color: var(--neutral-900);
+}
+.text-h1 {
+  font-size: var(--text-h1-size);
+  font-weight: var(--text-h1-weight);
+  line-height: var(--text-h1-leading);
+  letter-spacing: var(--text-h1-tracking);
+  color: var(--neutral-900);
+}
+.text-h2 {
+  font-size: var(--text-h2-size);
+  font-weight: var(--text-h2-weight);
+  line-height: var(--text-h2-leading);
+  letter-spacing: var(--text-h2-tracking);
+  color: var(--neutral-800);
+}
+.text-h3 {
+  font-size: var(--text-h3-size);
+  font-weight: var(--text-h3-weight);
+  line-height: var(--text-h3-leading);
+  letter-spacing: var(--text-h3-tracking);
+  color: var(--neutral-800);
+}
+.text-body {
+  font-size: var(--text-body-size);
+  font-weight: var(--text-body-weight);
+  line-height: var(--text-body-leading);
+  color: var(--neutral-700);
+}
+.text-body-medium {
+  font-size: var(--text-body-medium-size);
+  font-weight: var(--text-body-medium-weight);
+  line-height: var(--text-body-medium-leading);
+  color: var(--neutral-700);
+}
+.text-caption {
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-leading);
+  letter-spacing: var(--text-caption-tracking);
+  color: var(--neutral-600);
+}
+.text-caption-upper {
+  font-size: var(--text-caption-upper-size);
+  font-weight: var(--text-caption-upper-weight);
+  line-height: var(--text-caption-upper-leading);
+  letter-spacing: var(--text-caption-upper-tracking);
+  text-transform: uppercase;
+  color: var(--neutral-500);
+}
+.text-code {
+  font-family: var(--font-mono);
+  font-size: var(--text-code-size);
+  font-weight: var(--text-code-weight);
+  line-height: var(--text-code-leading);
+}
+
+/* ── 骨架屏 ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--neutral-100) 0%, var(--neutral-200) 40%, var(--neutral-100) 80%);
+  background-size: 200% 100%;
+  animation: shimmer 1500ms linear infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── 页面过渡 ── */
+.page-enter-active { transition: opacity 200ms ease-out; }
+.page-leave-active { transition: opacity 100ms ease-in; }
+.page-enter-from, .page-leave-to { opacity: 0; }
+
+/* ── 消息滑入 ── */
+.message-enter-active { transition: opacity 250ms ease-out, transform 250ms ease-out; }
+.message-enter-from { opacity: 0; transform: translateY(12px); }
+
+/* ── Toast ── */
+.toast-enter-active { transition: opacity 300ms ease-out, transform 300ms ease-out; }
+.toast-leave-active { transition: opacity 250ms ease-in, transform 250ms ease-in; }
+.toast-enter-from { opacity: 0; transform: translateX(100%); }
+.toast-leave-to { opacity: 0; transform: translateX(100%); }
+
+/* ── 减弱动画 ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── 无障碍聚焦样式 ── */
+*:focus-visible {
+  outline: 2px solid var(--semantic-500);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+.sidebar *:focus-visible {
+  outline-color: var(--semantic-400);
+}
+
+/* ── 节点选中光晕 ── */
+.node-selected {
+  animation: node-glow 300ms ease-out forwards;
+}
+@keyframes node-glow {
+  0% { transform: scale(1); box-shadow: none; }
+  100% { transform: scale(1.05); box-shadow: var(--shadow-glow-semantic); }
+}
+
+/* ── 滚动条 ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--neutral-300); border-radius: var(--radius-full); }
+::-webkit-scrollbar-thumb:hover { background: var(--neutral-400); }
