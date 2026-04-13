@@ -41,6 +41,10 @@
               <h1 class="text-h1">{{ selected.name }}</h1>
               <p class="text-caption">{{ selected.nameCn }} · Tier {{ selected.tier }} {{ tierLabel(selected.tier) }}</p>
             </div>
+            <button class="explorer__edit-btn" @click="showEditEntity = true">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10.5 1.5l2 2-7 7H3.5v-2l7-7z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              编辑
+            </button>
           </div>
         </div>
 
@@ -90,6 +94,9 @@
 
           <!-- 关系列表 -->
           <template v-else-if="activeTab === '关系'">
+            <div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+              <button class="btn-sm-add" @click="showCreateRelation = true">+ 添加关系</button>
+            </div>
             <div class="relation-list">
               <div class="relation-item" v-for="rel in selectedRelations" :key="rel.name">
                 <div class="relation-item__from">
@@ -106,8 +113,42 @@
                   <TierBadge :tier="rel.targetTier" />
                   <span>{{ rel.target }}</span>
                 </div>
+                <button class="btn-icon-del" @click="handleDeleteRelation(rel.id, rel.name)" title="删除关系">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
               </div>
             </div>
+
+            <!-- 创建关系弹窗 -->
+            <ModalDialog :visible="showCreateRelation" title="添加关系" width="480px" @close="showCreateRelation = false">
+              <form class="rel-form" @submit.prevent="handleCreateRelation">
+                <div class="form-row"><label class="form-label">关系名称</label><input v-model="relForm.name" class="form-input" placeholder="如 has_order" required /></div>
+                <div class="form-row"><label class="form-label">目标实体</label>
+                  <select v-model="relForm.to_entity_id" class="form-input" required>
+                    <option value="" disabled>选择目标实体...</option>
+                    <option v-for="e in allEntities" :key="e.id" :value="e.id">{{ e.name }} ({{ e.nameCn }})</option>
+                  </select>
+                </div>
+                <div class="form-row-inline">
+                  <div class="form-row" style="flex:1"><label class="form-label">关系类型</label>
+                    <select v-model="relForm.rel_type" class="form-input">
+                      <option value="has_many">has_many</option><option value="has_one">has_one</option>
+                      <option value="belongs_to">belongs_to</option><option value="many_to_many">many_to_many</option>
+                    </select>
+                  </div>
+                  <div class="form-row" style="flex:1"><label class="form-label">基数</label>
+                    <select v-model="relForm.cardinality" class="form-input">
+                      <option value="1:N">1:N</option><option value="N:1">N:1</option>
+                      <option value="1:1">1:1</option><option value="N:N">N:N</option>
+                    </select>
+                  </div>
+                </div>
+              </form>
+              <template #footer>
+                <button class="btn-secondary" @click="showCreateRelation = false">取消</button>
+                <button class="btn-primary" @click="handleCreateRelation">创建</button>
+              </template>
+            </ModalDialog>
           </template>
 
           <!-- 规则列表 -->
@@ -184,18 +225,52 @@
     </div>
 
     <EntityCreateForm :visible="showCreateEntity" @close="showCreateEntity = false" @created="store.fetchEntities()" />
+    <EntityEditForm
+      :visible="showEditEntity"
+      :entity="editEntityData"
+      @close="showEditEntity = false"
+      @updated="onEntityUpdated"
+      @deleted="onEntityDeleted"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import EntityCard, { type Entity } from '../../components/common/EntityCard.vue'
 import TierBadge from '../../components/common/TierBadge.vue'
 import EntityCreateForm from '../../components/common/EntityCreateForm.vue'
+import EntityEditForm from '../../components/common/EntityEditForm.vue'
+import ModalDialog from '../../components/common/ModalDialog.vue'
 import { useOntologyStore } from '../../store/ontology'
+import { relationApi } from '../../api/relations'
 
 const store = useOntologyStore()
 const showCreateEntity = ref(false)
+const showEditEntity = ref(false)
+
+const editEntityData = computed(() => {
+  if (!detail.value) return null
+  return {
+    id: detail.value.id,
+    name: detail.value.name,
+    name_cn: detail.value.name_cn,
+    tier: detail.value.tier,
+    status: detail.value.status,
+    description: detail.value.description || '',
+  }
+})
+
+function onEntityUpdated() {
+  store.fetchEntities()
+  if (selectedId.value) store.fetchEntity(selectedId.value)
+}
+
+function onEntityDeleted() {
+  selectedId.value = null
+  store.currentEntity = null
+  store.fetchEntities()
+}
 
 const searchQuery = ref('')
 const selectedId = ref<string | null>(null)
@@ -282,12 +357,41 @@ const selectedAttrs = computed(() =>
 
 const selectedRelations = computed(() =>
   detail.value?.relations.map(r => ({
+    id: r.id,
     name: r.name,
     type: r.rel_type,
     target: r.to_entity_name || r.from_entity_name,
     targetTier: (r.to_entity_tier || 1) as 1 | 2 | 3,
   })) ?? []
 )
+
+// ── 关系管理 ──
+const showCreateRelation = ref(false)
+const relForm = reactive({ name: '', to_entity_id: '', rel_type: 'has_many', cardinality: '1:N' })
+
+async function handleCreateRelation() {
+  if (!selectedId.value || !relForm.name || !relForm.to_entity_id) return
+  try {
+    await relationApi.create({
+      from_entity_id: selectedId.value,
+      to_entity_id: relForm.to_entity_id,
+      name: relForm.name,
+      rel_type: relForm.rel_type,
+      cardinality: relForm.cardinality,
+    })
+    relForm.name = ''; relForm.to_entity_id = ''
+    showCreateRelation.value = false
+    store.fetchEntity(selectedId.value)
+  } catch (e) { alert(`创建失败: ${(e as Error).message}`) }
+}
+
+async function handleDeleteRelation(id: string, name: string) {
+  if (!confirm(`确定删除关系 "${name}"？`)) return
+  try {
+    await relationApi.remove(id)
+    if (selectedId.value) store.fetchEntity(selectedId.value)
+  } catch (e) { alert(`删除失败: ${(e as Error).message}`) }
+}
 
 const selectedRules = computed(() =>
   detail.value?.rules.map(r => ({
@@ -343,6 +447,34 @@ const selectedActions = computed(() =>
   transition: all var(--transition-fast);
 }
 .explorer__add-btn:hover { background: var(--semantic-50); border-style: solid; }
+.explorer__edit-btn {
+  display: flex; align-items: center; gap: 4px; margin-left: auto;
+  padding: 5px 12px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300);
+  background: var(--neutral-0); color: var(--neutral-600); font-size: 12px; cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.explorer__edit-btn:hover { border-color: var(--semantic-400); color: var(--semantic-600); background: var(--semantic-50); }
+
+.btn-sm-add {
+  padding: 4px 10px; border-radius: var(--radius-md); border: 1px solid var(--semantic-400);
+  background: transparent; color: var(--semantic-600); font-size: 11px; cursor: pointer;
+}
+.btn-sm-add:hover { background: var(--semantic-50); }
+.btn-icon-del {
+  width: 24px; height: 24px; border: none; background: transparent;
+  color: var(--neutral-400); cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: auto;
+}
+.btn-icon-del:hover { color: var(--status-error); }
+.rel-form { display: flex; flex-direction: column; gap: 14px; }
+.form-row { display: flex; flex-direction: column; gap: 4px; }
+.form-row-inline { display: flex; gap: 12px; }
+.form-label { font-size: 12px; font-weight: 500; color: var(--neutral-600); }
+.form-input { padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 13px; color: var(--neutral-800); background: var(--neutral-0); outline: none; }
+.form-input:focus { border-color: var(--semantic-500); }
+.btn-primary { padding: 8px 20px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-primary:hover { background: var(--semantic-700); }
+.btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; cursor: pointer; }
+.btn-secondary:hover { background: var(--neutral-50); }
 .explorer__search-input {
   width: 100%;
   padding: 7px 10px 7px 32px;
