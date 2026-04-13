@@ -38,8 +38,12 @@ const breadcrumbs = computed(() => {
     '/logic': [{ label: '业务逻辑' }],
     '/dashboard': [{ label: '数据看板' }],
     '/copilot': [{ label: '智能对话' }],
+    '/scene/fttr': [{ label: 'FTTR续约策划' }],
+    '/scene/broadband': [{ label: '宽带正式单退单原因稽核' }],
+    '/scene/enterprise': [{ label: '政企根因分析' }],
   }
-  const path = '/' + route.path.split('/')[1]
+  const p = route.path
+  const path = Object.keys(map).find(k => p.startsWith(k)) ?? ''
   return map[path] ?? [{ label: '首页' }]
 })
 </script>
