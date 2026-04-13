@@ -10,6 +10,8 @@ from app.models import *  # noqa: F401,F403 — 确保所有模型注册
 from app.database import Base
 from app.api.v1.entities import router as entities_router
 from app.api.v1.auth import router as auth_router, seed_admin
+from app.api.v1.rules import router as rules_router
+from app.api.v1.dashboard import router as dashboard_router
 
 logger = logging.getLogger(__name__)
 
@@ -24,23 +26,11 @@ async def lifespan(app: FastAPI):
     finally:
         db.close()
 
-    # 初始化 Neo4j（可选，连不上不影响基础功能）
-    try:
-        from app.services.graph import get_driver, ensure_constraints
-        driver = get_driver()
-        ensure_constraints(driver)
-        logger.info("Neo4j 连接成功")
-    except Exception as e:
-        logger.warning(f"Neo4j 未连接，图遍历功能不可用: {e}")
+    # Neo4j 初始化暂时跳过（需要修复 numpy/pandas 版本冲突后启用）
+    # 基础功能（实体CRUD、规则、看板）不依赖 Neo4j
+    logger.info("服务启动完成（Neo4j 待配置）")
 
     yield
-
-    # 关闭 Neo4j
-    try:
-        from app.services.graph import close_driver
-        close_driver()
-    except Exception:
-        pass
 
 
 app = FastAPI(
@@ -58,6 +48,8 @@ app.add_middleware(
 )
 
 app.include_router(entities_router, prefix="/api/v1")
+app.include_router(rules_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 
 
