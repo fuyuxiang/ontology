@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -8,6 +8,7 @@ from app.schemas.entity import (
     EntityCreate, EntityUpdate, EntityDetail, EntityListItem,
     AttributeOut, RelationOut, RuleOut, ActionOut,
     GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
+    FileImportResult,
 )
 from app.core.deps import get_current_user
 from app.models.user import User
@@ -225,6 +226,62 @@ def create_from_datasource(
     )
     db.commit()
     return get_entity(eid, db)
+
+
+@router.post("/from-file", response_model=FileImportResult, status_code=201)
+async def create_from_file(
+    file: UploadFile = File(...),
+    file_type: str = Form(...),
+    namespace: str = Form(""),
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    """从文件导入本体：支持 json / owl / ttl 格式。"""
+    from app.services.file_import import parse_json_ontology, parse_owl_ontology
+
+    if file_type not in ("json", "owl", "ttl"):
+        raise HTTPException(status_code=400, detail="file_type 必须为 json、owl 或 ttl")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+
+    try:
+        if file_type == "json":
+            import json as _json
+            data = _json.loads(content.decode("utf-8"))
+            result = parse_json_ontology(data, namespace, db)
+        elif file_type == "owl":
+            result = parse_owl_ontology(content, "xml", db)
+        else:  # ttl
+            result = parse_owl_ontology(content, "turtle", db)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}")
+
+    write_audit(
+        db, user_id=user.id if user else None,
+        user_name=user.name if user else None,
+        action="import", target_type="file",
+        target_id=file.filename or "unknown",
+        target_name=file.filename or "unknown",
+        snapshot_after={
+            "file_type": file_type,
+            "entities_created": result.entities_created,
+            "relations_created": result.relations_created,
+        },
+    )
+    db.commit()
+
+    return FileImportResult(
+        entities_created=result.entities_created,
+        entities_skipped=result.entities_skipped,
+        attributes_created=result.attributes_created,
+        relations_created=result.relations_created,
+        rules_created=result.rules_created,
+        actions_created=result.actions_created,
+        errors=result.errors,
+    )
 
 
 @router.get("/{entity_id}", response_model=EntityDetail)

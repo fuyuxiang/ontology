@@ -81,15 +81,14 @@ if frontend_pids="$(port_pids "$FRONTEND_PORT")" && [ -n "$frontend_pids" ]; the
     exit 1
 fi
 
-echo "[1/3] Init database..."
+echo "[1/3] Installing backend dependencies..."
 cd "$BACKEND_DIR"
-if ! "$BACKEND_PYTHON" seed.py; then
-    echo "Database initialization failed."
-    exit 1
-fi
+"$BACKEND_PYTHON" -m pip install -r requirements.txt --quiet 2>&1 | tail -1
+echo "Dependencies ready."
 echo
 
 echo "[2/3] Starting backend (port $BACKEND_PORT)..."
+cd "$BACKEND_DIR"
 backend_args=(app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" --log-level info)
 if [ "$BACKEND_RELOAD" = "1" ]; then
     backend_args+=(--reload)

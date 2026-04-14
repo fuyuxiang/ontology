@@ -41,19 +41,34 @@ def get_datasource(ds_id: str, db: Session = Depends(get_db)):
     return ds
 
 
-@router.post("", response_model=DataSourceDetail, status_code=201)
+@router.post("", response_model=list[DataSourceDetail], status_code=201)
 def create_datasource(body: DataSourceCreate, db: Session = Depends(get_db)):
-    if db.query(DataSource).filter(DataSource.name == body.name).first():
-        raise HTTPException(409, "数据源名称已存在")
-    ds = DataSource(**body.model_dump())
-    db.add(ds)
-    db.commit()
-    db.refresh(ds)
-    # 尝试获取表数量
-    ds.table_count = _count_tables(ds)
-    db.commit()
-    db.refresh(ds)
-    return ds
+    """连接数据库，获取所有表，为每张表创建一条数据源记录"""
+    # 先用连接信息获取表列表
+    tmp_ds = DataSource(**body.model_dump(), name="_tmp")
+    try:
+        tables = _list_tables(tmp_ds)
+    except Exception as e:
+        raise HTTPException(400, f"连接数据库失败: {e}")
+    if not tables:
+        raise HTTPException(400, "未获取到任何表，请检查连接信息和权限")
+
+    created = []
+    for tbl in tables:
+        # 跳过已存在的同名记录
+        if db.query(DataSource).filter(DataSource.name == tbl).first():
+            continue
+        ds = DataSource(
+            **body.model_dump(),
+            name=tbl,
+            table_name=tbl,
+            enabled=True,
+        )
+        db.add(ds)
+        db.commit()
+        db.refresh(ds)
+        created.append(ds)
+    return created
 
 
 @router.put("/{ds_id}", response_model=DataSourceDetail)
@@ -90,6 +105,17 @@ def test_connection_inline(body: DataSourceCreate):
     return _test_conn(body.host, body.port)
 
 
+@router.post("/fetch-tables", response_model=TableListResult)
+def fetch_tables_inline(body: DataSourceCreate):
+    """根据连接信息动态获取数据库中的表列表（无需先创建数据源）"""
+    ds = DataSource(**body.model_dump(), name="_tmp")
+    try:
+        tables = _list_tables(ds)
+        return {"tables": tables}
+    except Exception as e:
+        raise HTTPException(400, f"获取表列表失败: {e}")
+
+
 def _test_conn(host: str, port: int) -> dict:
     try:
         sock = socket.create_connection((host, port), timeout=5)
@@ -115,38 +141,33 @@ def refresh_tables(ds_id: str, db: Session = Depends(get_db)):
     ds = db.get(DataSource, ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
-    ds.table_count = _count_tables(ds)
+    if not ds.table_name:
+        raise HTTPException(400, "该数据源未关联数据表，请先编辑选择数据表")
+    count, err = _count_records(ds)
+    if err:
+        raise HTTPException(400, f"同步失败: {err}")
+    ds.record_count = count
     db.commit()
     db.refresh(ds)
     return ds
 
 
-def _count_tables(ds: DataSource) -> int:
-    """连接数据库并查询表数量"""
+def _count_records(ds: DataSource) -> tuple[int, str | None]:
+    """连接数据库并查询当前数据表的记录条数，返回 (count, error_msg)"""
     try:
         conn = _get_connection(ds)
         if not conn:
-            return 0
+            return 0, f"不支持的数据源类型: {ds.type}"
         cur = conn.cursor()
-        if ds.type == "mysql":
-            cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = %s", (ds.database,))
-        elif ds.type == "postgresql":
-            cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'public'")
-        elif ds.type == "oracle":
-            cur.execute("SELECT COUNT(*) FROM user_tables")
-        elif ds.type == "sqlserver":
-            cur.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_type = 'BASE TABLE'")
-        else:
-            cur.close()
-            conn.close()
-            return 0
+        quote = "`" if ds.type == "mysql" else '"'
+        cur.execute(f"SELECT COUNT(*) FROM {quote}{ds.table_name}{quote}")
         count = cur.fetchone()[0]
         cur.close()
         conn.close()
-        return count
+        return count, None
     except Exception as e:
-        logger.warning(f"获取表数量失败 [{ds.name}]: {e}")
-        return 0
+        logger.warning(f"获取记录条数失败 [{ds.name}]: {e}")
+        return 0, str(e)
 
 
 def _get_connection(ds: DataSource):
@@ -216,6 +237,22 @@ def get_tables(ds_id: str, db: Session = Depends(get_db)):
         return {"tables": tables}
     except Exception as e:
         raise HTTPException(400, f"获取表列表失败: {e}")
+
+
+@router.get("/{ds_id}/preview", response_model=TablePreviewResult)
+def preview_datasource(ds_id: str, db: Session = Depends(get_db)):
+    """直接预览该数据源关联表的前20条数据"""
+    ds = db.get(DataSource, ds_id)
+    if not ds:
+        raise HTTPException(404, "数据源不存在")
+    if not ds.table_name:
+        raise HTTPException(400, "该数据源未关联数据表")
+    try:
+        return _preview_table(ds, ds.table_name)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(400, f"查询失败: {e}")
 
 
 @router.get("/{ds_id}/tables/{table_name}/preview", response_model=TablePreviewResult)

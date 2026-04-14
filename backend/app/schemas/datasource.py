@@ -14,8 +14,15 @@ class DataSourceBase(BaseModel):
     description: str | None = None
 
 
-class DataSourceCreate(DataSourceBase):
-    pass
+class DataSourceCreate(BaseModel):
+    type: str
+    host: str
+    port: int
+    database: str = ""
+    username: str = ""
+    password: str = ""
+    params: dict | None = None
+    description: str | None = None
 
 
 class DataSourceUpdate(BaseModel):
@@ -26,6 +33,7 @@ class DataSourceUpdate(BaseModel):
     database: str | None = None
     username: str | None = None
     password: str | None = None
+    table_name: str | None = None
     params: dict | None = None
     description: str | None = None
     status: str | None = None
@@ -41,7 +49,8 @@ class DataSourceListItem(BaseModel):
     username: str
     password: str
     status: str
-    table_count: int = 0
+    table_name: str = ""
+    record_count: int = 0
     enabled: bool = False
     description: str | None = None
     created_at: datetime
@@ -52,7 +61,8 @@ class DataSourceListItem(BaseModel):
 class DataSourceDetail(DataSourceBase):
     id: str
     status: str
-    table_count: int = 0
+    table_name: str = ""
+    record_count: int = 0
     enabled: bool = False
     created_at: datetime
     updated_at: datetime

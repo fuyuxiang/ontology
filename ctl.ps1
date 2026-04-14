@@ -23,6 +23,10 @@ function Start-Services {
     if ($bpid) {
         Write-Host "  Backend already running on port $BACKEND_PORT (PID: $bpid)" -ForegroundColor Yellow
     } else {
+        Write-Host "  Installing backend dependencies..."
+        Push-Location "$ROOT\backend"
+        & pip install -r requirements.txt --quiet 2>$null
+        Pop-Location
         Write-Host "  Starting backend (port $BACKEND_PORT)..."
         Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d $ROOT\backend && venv\Scripts\python.exe -m uvicorn app.main:app --reload --port $BACKEND_PORT --log-level info" -WindowStyle Minimized
         Start-Sleep -Seconds 3
@@ -94,8 +98,6 @@ function Init-Database {
     Write-Host "[INIT] Database" -ForegroundColor Cyan
     Write-Host ""
     Push-Location "$ROOT\backend"
-    Write-Host "  Running seed.py..."
-    python seed.py
     Write-Host "  Running import_schema.py..."
     python import_schema.py
     Pop-Location

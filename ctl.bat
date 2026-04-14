@@ -25,6 +25,9 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%BACKEND_PORT% " ^| findstr
 )
 
 echo Starting backend (port %BACKEND_PORT%)...
+cd /d %ROOT%backend
+echo Installing backend dependencies...
+pip install -r requirements.txt --quiet 2>nul
 start "Ontology-Backend" /min cmd /c "cd /d %ROOT%backend && uvicorn app.main:app --reload --port %BACKEND_PORT% --log-level info > %ROOT%backend.log 2>&1"
 timeout /t 3 /nobreak >nul
 
@@ -97,8 +100,6 @@ goto end
 echo [INIT] Database
 echo.
 cd /d %ROOT%backend
-echo Running seed.py...
-python seed.py
 echo Running import_schema.py...
 python import_schema.py
 echo Done.

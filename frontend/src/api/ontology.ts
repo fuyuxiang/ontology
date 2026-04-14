@@ -1,5 +1,5 @@
 import { get, post, put, del } from './client'
-import type { OntologyEntity, EntityListItem, GraphData, Tier, EntityStatus } from '../types'
+import type { OntologyEntity, EntityListItem, GraphData, Tier, EntityStatus, FileImportResult } from '../types'
 
 export interface EntityQuery {
   tier?: Tier
@@ -47,5 +47,13 @@ export const entityApi = {
 
   createFromDatasource(data: { datasource_id: string; table_name: string; name_cn: string; tier: number; namespace?: string }) {
     return post<OntologyEntity>('/entities/from-datasource', data)
+  },
+
+  importFromFile(file: File, fileType: string, namespace?: string) {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('file_type', fileType)
+    if (namespace) formData.append('namespace', namespace)
+    return post<FileImportResult>('/entities/from-file', formData)
   },
 }

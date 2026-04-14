@@ -52,7 +52,7 @@
             <th>类型</th>
             <th>连接地址</th>
             <th>数据库</th>
-            <th>表数量</th>
+            <th>记录条数</th>
             <th>管道状态</th>
             <th>创建时间</th>
             <th>操作</th>
@@ -60,11 +60,11 @@
         </thead>
         <tbody>
           <tr v-for="ds in store.items" :key="ds.id">
-            <td class="text-body-medium">{{ ds.name }}</td>
+            <td class="text-body-medium">{{ TABLE_NAME_MAP[ds.table_name] || ds.name }}</td>
             <td><span class="ds-type-badge">{{ ds.type }}</span></td>
             <td class="text-code">{{ ds.host }}:{{ ds.port }}</td>
             <td>{{ ds.database || '-' }}</td>
-            <td>{{ ds.table_count }}</td>
+            <td>{{ ds.record_count }}</td>
             <td>
               <button class="ds-toggle" :class="ds.enabled ? 'ds-toggle--on' : 'ds-toggle--off'" @click="handleToggle(ds)" :disabled="toggling === ds.id">
                 <span class="ds-toggle__dot"></span>
@@ -77,7 +77,6 @@
                 {{ refreshing === ds.id ? '同步中...' : '同步' }}
               </button>
               <button class="btn-sm-detail" @click="openDetail(ds)">详情</button>
-              <button class="btn-sm-edit" @click="openEdit(ds)">编辑</button>
               <button class="btn-sm-del" @click="handleDelete(ds)">删除</button>
             </td>
           </tr>
@@ -88,13 +87,9 @@
       </div>
     </div>
 
-    <!-- 新建/编辑弹窗 -->
-    <ModalDialog :visible="showModal" :title="editingId ? '编辑数据源' : '新建数据源'" width="560px" @close="showModal = false">
+    <!-- 新建弹窗 -->
+    <ModalDialog :visible="showModal" title="新建数据源" width="560px" @close="showModal = false">
       <form class="ds-form" @submit.prevent="handleSave">
-        <div class="form-row">
-          <label class="form-label">数据源名称</label>
-          <input v-model="form.name" class="form-input" placeholder="如：业务主库" required />
-        </div>
         <div class="form-row-inline">
           <div class="form-row" style="flex:1">
             <label class="form-label">类型</label>
@@ -133,34 +128,17 @@
         </div>
         <div class="ds-form__footer">
           <button type="button" class="btn-secondary" @click="showModal = false">取消</button>
-          <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? '保存中...' : '保存' }}</button>
+          <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? '连接中...' : '保存' }}</button>
         </div>
       </form>
     </ModalDialog>
 
     <!-- 详情弹窗 -->
-    <ModalDialog :visible="showDetail" :title="detailName + ' — ' + (previewTable ? previewTable : '表列表')" width="800px" @close="closeDetail">
-      <!-- 表列表视图 -->
-      <div v-if="!previewTable">
+    <ModalDialog :visible="showDetail" :title="detailName + ' — 数据预览'" width="800px" @close="showDetail = false">
+      <div>
         <div v-if="detailLoading" class="ds-detail-loading">加载中...</div>
-        <div v-else-if="tableList.length === 0" class="ds-detail-empty">
-          <p class="text-caption">未获取到表（请检查连接权限）</p>
-        </div>
-        <div v-else class="ds-detail-tables">
-          <div v-for="t in tableList" :key="t" class="ds-detail-table-item" @click="loadPreview(t)">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.2"/><path d="M1 5.5h12M5 5.5V12" stroke="currentColor" stroke-width="1.2"/></svg>
-            <span>{{ t }}</span>
-          </div>
-        </div>
-      </div>
-      <!-- 数据预览视图 -->
-      <div v-else>
-        <div class="ds-preview-header">
-          <button class="btn-secondary btn-sm-back" @click="previewTable = null">← 返回表列表</button>
-          <span class="text-caption">前 20 条数据</span>
-        </div>
-        <div v-if="previewLoading" class="ds-detail-loading">加载中...</div>
         <div v-else class="ds-preview-table-wrap">
+          <p class="text-caption" style="margin-bottom: 8px;">前 20 条数据</p>
           <table class="ds-table ds-preview-table">
             <thead>
               <tr>
@@ -173,8 +151,8 @@
               </tr>
             </tbody>
           </table>
-          <div v-if="previewRows.length === 0" class="ds-detail-empty">
-            <p class="text-caption">该表暂无数据</p>
+          <div v-if="previewRows.length === 0 && previewColumns.length === 0" class="ds-detail-empty">
+            <p class="text-caption">查询失败或该表暂无数据</p>
           </div>
         </div>
       </div>
@@ -194,23 +172,31 @@ const store = useDataSourceStore()
 const search = ref('')
 const activeType = ref('')
 const showModal = ref(false)
-const editingId = ref<string | null>(null)
 const saving = ref(false)
 const toggling = ref<string | null>(null)
 const refreshing = ref<string | null>(null)
 
 // 详情弹窗状态
 const showDetail = ref(false)
-const detailId = ref<string | null>(null)
 const detailName = ref('')
 const detailLoading = ref(false)
-const tableList = ref<string[]>([])
-const previewTable = ref<string | null>(null)
-const previewLoading = ref(false)
 const previewColumns = ref<string[]>([])
 const previewRows = ref<unknown[][]>([])
 
 const dsTypes = ['mysql', 'postgresql', 'oracle', 'sqlserver', 'clickhouse', 'hive', 'kafka', 'elasticsearch', 'api']
+
+const TABLE_NAME_MAP: Record<string, string> = {
+  'dwa_v_d_cus_cb_user_info': 'CBSS 用户信息系统',
+  'dwd_d_cus_np_turn_query_user': '携转资格查询系统',
+  'dwa_v_d_cus_cb_act_info': 'CBSS 活动合约系统',
+  'dwa_v_m_cus_cb_sing_charge': 'CBSS 出账系统',
+  'dwd_m_mrt_al_chl_owe': '欠费信息系统',
+  'dwd_d_use_cb_f_voice': '语音详单系统',
+  'dwd_d_evt_kf_order_main': '客服工单系统',
+  'dwd_d_cus_qk_turn_maintain': '全客携转维系系统',
+  'DWA_V_D_CUS_CB_OM_DATUM': '融合业务信息系统',
+  't_mnp_risk_warning': '携转预警结果存储',
+}
 
 const defaultPort: Record<string, number> = {
   mysql: 3306, postgresql: 5432, oracle: 1521, sqlserver: 1433,
@@ -218,7 +204,7 @@ const defaultPort: Record<string, number> = {
 }
 
 const emptyForm = (): DataSourceCreate => ({
-  name: '', type: 'mysql', host: '', port: 3306, database: '', username: '', password: '', description: '',
+  type: 'mysql', host: '', port: 3306, database: '', username: '', password: '', description: '',
 })
 
 const form = ref<DataSourceCreate>(emptyForm())
@@ -252,30 +238,14 @@ function onSearch() {
 }
 
 function openCreate() {
-  editingId.value = null
   form.value = emptyForm()
-  showModal.value = true
-}
-
-async function openEdit(ds: DataSource) {
-  editingId.value = ds.id
-  try {
-    const detail = await api.getDataSource(ds.id)
-    form.value = { name: detail.name, type: detail.type, host: detail.host, port: detail.port, database: detail.database, username: detail.username, password: detail.password, description: detail.description }
-  } catch {
-    form.value = { name: ds.name, type: ds.type, host: ds.host, port: ds.port, database: ds.database, username: ds.username, password: ds.password, description: ds.description }
-  }
   showModal.value = true
 }
 
 async function handleSave() {
   saving.value = true
   try {
-    if (editingId.value) {
-      await api.updateDataSource(editingId.value, form.value)
-    } else {
-      await api.createDataSource(form.value)
-    }
+    await api.createDataSource(form.value)
     showModal.value = false
     store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
   } catch (e: any) {
@@ -298,7 +268,7 @@ async function handleToggle(ds: DataSource) {
 }
 
 async function handleDelete(ds: DataSource) {
-  if (!confirm(`确认删除数据源「${ds.name}」？`)) return
+  if (!confirm(`确认删除数据源「${TABLE_NAME_MAP[ds.table_name] || ds.name}」？`)) return
   try {
     await api.deleteDataSource(ds.id)
     store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
@@ -311,57 +281,29 @@ async function handleRefresh(ds: DataSource) {
   refreshing.value = ds.id
   try {
     const res = await api.refreshTables(ds.id)
-    if (res.table_count === 0) {
-      alert('同步完成，但未获取到表（请检查数据库连接权限）')
-    } else {
-      alert(`同步完成，共 ${res.table_count} 张表`)
-    }
+    alert(`同步完成，共 ${res.record_count} 条记录`)
     store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
-  } catch {
-    alert('同步失败')
+  } catch (e: any) {
+    alert(e.response?.data?.detail || '同步失败')
   } finally {
     refreshing.value = null
   }
 }
 
 async function openDetail(ds: DataSource) {
-  detailId.value = ds.id
-  detailName.value = ds.name
-  tableList.value = []
-  previewTable.value = null
+  detailName.value = TABLE_NAME_MAP[ds.table_name] || ds.name
   previewColumns.value = []
   previewRows.value = []
   showDetail.value = true
   detailLoading.value = true
   try {
-    const res = await api.getTableList(ds.id)
-    tableList.value = res.tables
-  } catch {
-    alert('获取表列表失败，请检查连接')
-  } finally {
-    detailLoading.value = false
-  }
-}
-
-function closeDetail() {
-  showDetail.value = false
-  detailId.value = null
-  previewTable.value = null
-}
-
-async function loadPreview(tableName: string) {
-  previewTable.value = tableName
-  previewLoading.value = true
-  previewColumns.value = []
-  previewRows.value = []
-  try {
-    const res = await api.getTablePreview(detailId.value!, tableName)
+    const res = await api.previewDatasource(ds.id)
     previewColumns.value = res.columns
     previewRows.value = res.rows
-  } catch {
-    alert('查询数据失败')
+  } catch (e: any) {
+    alert(e.response?.data?.detail || '查询数据失败')
   } finally {
-    previewLoading.value = false
+    detailLoading.value = false
   }
 }
 </script>

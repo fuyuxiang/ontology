@@ -109,6 +109,16 @@ class EntityDetail(EntityBase):
     model_config = {"from_attributes": True}
 
 
+class FileImportResult(BaseModel):
+    entities_created: int = 0
+    entities_skipped: int = 0
+    attributes_created: int = 0
+    relations_created: int = 0
+    rules_created: int = 0
+    actions_created: int = 0
+    errors: list[str] = []
+
+
 class GraphNode(BaseModel):
     id: str
     name: str
