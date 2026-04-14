@@ -302,6 +302,7 @@ const allEntities = computed<Entity[]>(() =>
     relations: e.relation_count,
     rules: e.rule_count,
     status: e.status as 'active' | 'warning' | 'error',
+    datasource: e.datasource_name || null,
   }))
 )
 

@@ -44,3 +44,7 @@ export function getTableList(id: string) {
 export function getTablePreview(id: string, tableName: string) {
   return get<{ table: string; columns: string[]; rows: unknown[][] }>(`/datasources/${id}/tables/${encodeURIComponent(tableName)}/preview`)
 }
+
+export function getTableSchema(id: string, tableName: string) {
+  return get<{ table: string; columns: { name: string; type: string; nullable: boolean; is_pk: boolean; comment: string }[] }>(`/datasources/${id}/tables/${encodeURIComponent(tableName)}/schema`)
+}

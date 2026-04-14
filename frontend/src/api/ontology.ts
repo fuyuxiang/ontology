@@ -44,4 +44,8 @@ export const entityApi = {
   search(keyword: string) {
     return get<EntityListItem[]>('/entities', { params: { search: keyword } })
   },
+
+  createFromDatasource(data: { datasource_id: string; table_name: string; name_cn: string; tier: number; namespace?: string }) {
+    return post<OntologyEntity>('/entities/from-datasource', data)
+  },
 }

@@ -7,7 +7,7 @@ from app.models import OntologyEntity, EntityAttribute, EntityRelation
 from app.schemas.entity import (
     EntityCreate, EntityUpdate, EntityDetail, EntityListItem,
     AttributeOut, RelationOut, RuleOut, ActionOut,
-    GraphData, GraphNode, GraphEdge,
+    GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
 )
 from app.core.deps import get_current_user
 from app.models.user import User
@@ -49,6 +49,7 @@ def list_entities(
             attr_count=len(e.attributes),
             relation_count=rel_count,
             rule_count=len(e.rules),
+            datasource_name=(e.schema_json or {}).get("datasource_name"),
         ))
     return result
 
@@ -138,6 +139,92 @@ def get_entity_lineage(
             ))
 
     return GraphData(nodes=nodes, edges=edges)
+
+
+# ── DB 类型 → 本体类型映射 ──
+_TYPE_MAP = {
+    "varchar": "string", "char": "string", "text": "string", "longtext": "string",
+    "mediumtext": "string", "tinytext": "string", "nvarchar": "string", "nchar": "string",
+    "int": "number", "integer": "number", "bigint": "number", "smallint": "number",
+    "tinyint": "number", "float": "number", "double": "number", "decimal": "number",
+    "numeric": "number", "real": "number", "number": "number",
+    "boolean": "boolean", "bool": "boolean", "bit": "boolean",
+    "date": "date", "datetime": "date", "timestamp": "date", "datetime2": "date",
+    "timestamp without time zone": "date", "timestamp with time zone": "date",
+    "json": "json", "jsonb": "json",
+}
+
+
+def _map_db_type(db_type: str) -> str:
+    t = db_type.lower().split("(")[0].strip()
+    return _TYPE_MAP.get(t, "string")
+
+
+@router.post("/from-datasource", response_model=EntityDetail, status_code=201)
+def create_from_datasource(
+    body: FromDatasourceRequest,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    from app.models.datasource import DataSource
+    from app.api.v1.datasources import _get_table_schema
+
+    ds = db.get(DataSource, body.datasource_id)
+    if not ds:
+        raise HTTPException(status_code=404, detail="数据源不存在")
+
+    columns = _get_table_schema(ds, body.table_name)
+    if not columns:
+        raise HTTPException(status_code=400, detail="表无列信息")
+
+    # 生成实体 ID
+    table_pascal = body.table_name.replace("_", " ").title().replace(" ", "")
+    eid = f"{body.namespace}_{table_pascal}" if body.namespace else table_pascal
+
+    if db.get(OntologyEntity, eid):
+        raise HTTPException(status_code=409, detail=f"实体 {eid} 已存在")
+
+    # 识别主键
+    pk_cols = [c["name"] for c in columns if c.get("is_pk")]
+    primary_key = pk_cols[0] if pk_cols else None
+
+    entity = OntologyEntity(
+        id=eid,
+        name=table_pascal,
+        name_cn=body.name_cn,
+        tier=body.tier,
+        status="active",
+        description=f"从数据源 {ds.name} 的表 {body.table_name} 自动生成",
+        schema_json={
+            "datasource_id": ds.id,
+            "datasource_name": ds.name,
+            "table_name": body.table_name,
+            "primary_key": primary_key,
+        },
+        created_by=user.id if user else None,
+    )
+    db.add(entity)
+
+    for col in columns:
+        attr = EntityAttribute(
+            entity_id=eid,
+            name=col["name"],
+            type=_map_db_type(col["type"]),
+            description=col.get("comment") or col["name"],
+            required=not col.get("nullable", True),
+        )
+        db.add(attr)
+
+    db.flush()
+    write_audit(
+        db, user_id=user.id if user else None,
+        user_name=user.name if user else None,
+        action="create", target_type="entity",
+        target_id=eid, target_name=table_pascal,
+        snapshot_after={"source": "datasource", "datasource": ds.name, "table": body.table_name},
+    )
+    db.commit()
+    return get_entity(eid, db)
 
 
 @router.get("/{entity_id}", response_model=EntityDetail)
