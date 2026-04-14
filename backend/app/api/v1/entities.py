@@ -53,6 +53,93 @@ def list_entities(
     return result
 
 
+@router.get("/graph", response_model=GraphData)
+def get_full_graph(db: Session = Depends(get_db)):
+    entities = db.query(OntologyEntity).all()
+    relations = db.query(EntityRelation).all()
+
+    nodes = []
+    for e in entities:
+        rc = sum(1 for r in relations if r.from_entity_id == e.id or r.to_entity_id == e.id)
+        nodes.append(GraphNode(
+            id=e.id, name=e.name, name_cn=e.name_cn,
+            tier=e.tier, status=e.status, relation_count=rc,
+        ))
+
+    edges = []
+    entity_map = {e.id: e for e in entities}
+    for r in relations:
+        f = entity_map.get(r.from_entity_id)
+        t = entity_map.get(r.to_entity_id)
+        if f and t:
+            edges.append(GraphEdge(
+                from_id=f.id, from_name=f.name,
+                to_id=t.id, to_name=t.name,
+                label=r.name, cardinality=r.cardinality,
+            ))
+
+    return GraphData(nodes=nodes, edges=edges)
+
+
+@router.get("/{entity_id}/lineage", response_model=GraphData)
+def get_entity_lineage(
+    entity_id: str,
+    depth: int = Query(default=2, ge=1, le=5),
+    db: Session = Depends(get_db),
+):
+    """BFS traversal to get N-hop neighborhood of an entity."""
+    entity = db.get(OntologyEntity, entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="实体不存在")
+
+    visited_ids: set[str] = set()
+    frontier: set[str] = {entity_id}
+    collected_rels: list[EntityRelation] = []
+
+    for _ in range(depth):
+        if not frontier:
+            break
+        rels = db.query(EntityRelation).filter(
+            (EntityRelation.from_entity_id.in_(frontier)) |
+            (EntityRelation.to_entity_id.in_(frontier))
+        ).all()
+        visited_ids.update(frontier)
+        next_frontier: set[str] = set()
+        for r in rels:
+            if r not in collected_rels:
+                collected_rels.append(r)
+            if r.from_entity_id not in visited_ids:
+                next_frontier.add(r.from_entity_id)
+            if r.to_entity_id not in visited_ids:
+                next_frontier.add(r.to_entity_id)
+        frontier = next_frontier
+
+    visited_ids.update(frontier)
+    all_entities = db.query(OntologyEntity).filter(OntologyEntity.id.in_(visited_ids)).all()
+    entity_map = {e.id: e for e in all_entities}
+
+    nodes = []
+    for e in all_entities:
+        rc = sum(1 for r in collected_rels if r.from_entity_id == e.id or r.to_entity_id == e.id)
+        nodes.append(GraphNode(
+            id=e.id, name=e.name, name_cn=e.name_cn,
+            tier=e.tier, status=e.status, relation_count=rc,
+        ))
+
+    edges = []
+    for r in collected_rels:
+        f = entity_map.get(r.from_entity_id)
+        t = entity_map.get(r.to_entity_id)
+        if f and t:
+            edges.append(GraphEdge(
+                from_id=f.id, from_name=f.name,
+                to_id=t.id, to_name=t.name,
+                label=r.name, cardinality=r.cardinality,
+            ))
+
+    return GraphData(nodes=nodes, edges=edges)
+
+
 @router.get("/{entity_id}", response_model=EntityDetail)
 def get_entity(entity_id: str, db: Session = Depends(get_db)):
     entity = db.get(OntologyEntity, entity_id)
@@ -170,31 +257,3 @@ def delete_entity(
     )
     db.delete(entity)
     db.commit()
-
-
-@router.get("/graph", response_model=GraphData)
-def get_full_graph(db: Session = Depends(get_db)):
-    entities = db.query(OntologyEntity).all()
-    relations = db.query(EntityRelation).all()
-
-    nodes = []
-    for e in entities:
-        rc = sum(1 for r in relations if r.from_entity_id == e.id or r.to_entity_id == e.id)
-        nodes.append(GraphNode(
-            id=e.id, name=e.name, name_cn=e.name_cn,
-            tier=e.tier, status=e.status, relation_count=rc,
-        ))
-
-    edges = []
-    entity_map = {e.id: e for e in entities}
-    for r in relations:
-        f = entity_map.get(r.from_entity_id)
-        t = entity_map.get(r.to_entity_id)
-        if f and t:
-            edges.append(GraphEdge(
-                from_id=f.id, from_name=f.name,
-                to_id=t.id, to_name=t.name,
-                label=r.name, cardinality=r.cardinality,
-            ))
-
-    return GraphData(nodes=nodes, edges=edges)
