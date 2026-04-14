@@ -6,10 +6,11 @@ export default defineConfig({
   plugins: [vue()],
   optimizeDeps: { include: ['dagre'] },
   server: {
-    port: 5177,
+    host: '127.0.0.1',
+    port: Number(process.env.FRONTEND_PORT || 5177),
     proxy: {
       '/api': {
-        target: 'http://localhost:8001',
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8001',
         changeOrigin: true,
       },
     },
