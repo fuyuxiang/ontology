@@ -1,1 +1,22 @@
 backend/venv/
+
+# Local databases
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+!backend/ontology.db
+
+# Runtime logs and process IDs
+*.log
+*.pid
+
+# Local AI/editor workspace files
+.claude/
+.workbuddy/
+
+# OS/editor noise
+.DS_Store
+.idea/
