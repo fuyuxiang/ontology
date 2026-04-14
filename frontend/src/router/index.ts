@@ -38,6 +38,12 @@ const router = createRouter({
       meta: { title: '数据看板' }
     },
     {
+      path: '/datasource',
+      name: 'datasource',
+      component: () => import('../views/datasource/DataSourceView.vue'),
+      meta: { title: '数据源管理' }
+    },
+    {
       path: '/copilot',
       name: 'copilot',
       component: () => import('../views/copilot/CopilotView.vue'),
