@@ -5,31 +5,38 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/ontology'
+      redirect: '/browser'
     },
     {
-      path: '/ontology',
-      name: 'ontology',
-      component: () => import('../views/ontology/OntologyExplorer.vue'),
-      meta: { title: '本体管理' }
+      path: '/browser',
+      component: () => import('../views/browser/OntologyBrowser.vue'),
+      meta: { title: '本体浏览器' },
+      children: [
+        {
+          path: '',
+          name: 'browser-objects',
+          component: () => import('../views/ontology/OntologyExplorer.vue'),
+          meta: { title: '对象管理' }
+        },
+        {
+          path: 'graph',
+          name: 'browser-graph',
+          component: () => import('../views/dataflow/DataflowView.vue'),
+          meta: { title: '关系画布' }
+        },
+        {
+          path: 'rules',
+          name: 'browser-rules',
+          component: () => import('../views/logic/LogicView.vue'),
+          meta: { title: '业务规则' }
+        },
+      ]
     },
     {
       path: '/ontology/:id',
       name: 'ontology-detail',
       component: () => import('../views/detail/EntityDetail.vue'),
       meta: { title: '实体详情' }
-    },
-    {
-      path: '/dataflow',
-      name: 'dataflow',
-      component: () => import('../views/dataflow/DataflowView.vue'),
-      meta: { title: '关系画布' }
-    },
-    {
-      path: '/logic',
-      name: 'logic',
-      component: () => import('../views/logic/LogicView.vue'),
-      meta: { title: '业务逻辑' }
     },
     {
       path: '/dashboard',

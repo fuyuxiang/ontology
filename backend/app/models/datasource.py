@@ -25,7 +25,9 @@ class DataSource(Base):
     params: Mapped[dict | None] = mapped_column(JSON)  # extra connection params
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="active")  # active, inactive, error
-    table_count: Mapped[int] = mapped_column(Integer, default=0)
+    table_name: Mapped[str] = mapped_column(String(200), default="")
+    record_count: Mapped[int] = mapped_column(Integer, default=0)
+    table_count: Mapped[int] = mapped_column(Integer, default=0)  # 旧字段，保留兼容
     enabled: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

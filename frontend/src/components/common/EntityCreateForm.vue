@@ -3,7 +3,7 @@
     <!-- 模式切换 -->
     <div class="mode-tabs">
       <button class="mode-tab" :class="{ 'mode-tab--active': mode === 'manual' }" @click="mode = 'manual'">手动创建</button>
-      <button class="mode-tab" :class="{ 'mode-tab--active': mode === 'import' }" @click="mode = 'import'">从数据源导入</button>
+      <button class="mode-tab" :class="{ 'mode-tab--active': mode === 'import' }" @click="mode = 'import'">从文件导入</button>
     </div>
 
     <!-- 手动创建 -->
@@ -49,59 +49,70 @@
       </div>
     </form>
 
-    <!-- 从数据源导入 -->
+    <!-- 从文件导入 -->
     <div v-else class="entity-form">
-      <!-- Step 1: 选数据源 -->
+      <!-- 文件格式选择 -->
       <div class="form-row">
-        <label class="form-label">选择数据源</label>
-        <select v-model="importForm.datasource_id" class="form-input" @change="onDsChange">
-          <option value="">请选择数据源...</option>
-          <option v-for="ds in datasources" :key="ds.id" :value="ds.id">{{ ds.name }} ({{ ds.type }} · {{ ds.host }})</option>
-        </select>
+        <label class="form-label">文件格式</label>
+        <div class="form-radio-group">
+          <label class="form-radio" :class="{ 'form-radio--active': fileFormat === 'json' }">
+            <input type="radio" value="json" v-model="fileFormat" />
+            <span>JSON（本体规范）</span>
+          </label>
+          <label class="form-radio" :class="{ 'form-radio--active': fileFormat === 'owl' }">
+            <input type="radio" value="owl" v-model="fileFormat" />
+            <span>OWL / RDF</span>
+          </label>
+          <label class="form-radio" :class="{ 'form-radio--active': fileFormat === 'ttl' }">
+            <input type="radio" value="ttl" v-model="fileFormat" />
+            <span>Turtle (TTL)</span>
+          </label>
+        </div>
       </div>
 
-      <!-- Step 2: 选表 -->
-      <div class="form-row" v-if="importForm.datasource_id">
-        <label class="form-label">选择表 <span v-if="loadingTables" class="text-caption">(加载中...)</span></label>
-        <select v-model="importForm.table_name" class="form-input" @change="onTableChange" :disabled="loadingTables">
-          <option value="">请选择表...</option>
-          <option v-for="t in tables" :key="t" :value="t">{{ t }}</option>
-        </select>
+      <!-- 文件选择 -->
+      <div class="form-row">
+        <label class="form-label">选择文件</label>
+        <div class="file-picker">
+          <input ref="fileInputRef" type="file" :accept="fileAccept" class="file-input" @change="onFileChange" />
+          <span v-if="selectedFile" class="file-name">{{ selectedFile.name }}</span>
+        </div>
       </div>
 
-      <!-- Step 3: 预览列 -->
-      <div v-if="columns.length > 0" class="form-section">
+      <!-- JSON 预览 -->
+      <div v-if="fileFormat === 'json' && jsonPreview" class="form-section">
         <div class="form-section-header">
-          <span class="form-label">表结构预览 ({{ columns.length }} 列)</span>
+          <span class="form-label">文件预览</span>
         </div>
-        <div class="import-columns">
-          <div class="import-col-header">
-            <span>列名</span><span>DB类型</span><span>本体类型</span><span>可空</span><span>主键</span>
-          </div>
-          <div v-for="col in columns" :key="col.name" class="import-col-row" :class="{ 'import-col-row--pk': col.is_pk }">
-            <span class="text-code">{{ col.name }}</span>
-            <span class="text-caption">{{ col.type }}</span>
-            <span class="import-col-mapped">{{ mapType(col.type) }}</span>
-            <span>{{ col.nullable ? '✓' : '—' }}</span>
-            <span>{{ col.is_pk ? '🔑' : '' }}</span>
-          </div>
+        <div class="import-preview">
+          <div class="preview-item"><span class="preview-label">场景</span><span>{{ jsonPreview.scenario }}</span></div>
+          <div class="preview-item"><span class="preview-label">本体对象</span><span>{{ jsonPreview.objectCount }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">关系</span><span>{{ jsonPreview.linkCount }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">动作</span><span>{{ jsonPreview.actionCount }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">业务规则</span><span>{{ jsonPreview.ruleCount }} 个</span></div>
         </div>
       </div>
 
-      <!-- Step 4: 实体信息 -->
-      <div v-if="importForm.table_name" class="import-entity-info">
-        <div class="form-row">
-          <label class="form-label">中文名称</label>
-          <input v-model="importForm.name_cn" class="form-input" placeholder="如 客户表, 订单表" required />
+      <!-- JSON 模式下的 namespace -->
+      <div v-if="fileFormat === 'json'" class="form-row">
+        <label class="form-label">命名空间（可选，留空则从文件读取）</label>
+        <input v-model="fileNamespace" class="form-input" placeholder="如 s1, s2" />
+      </div>
+
+      <!-- 导入结果 -->
+      <div v-if="importResult" class="form-section">
+        <div class="form-section-header">
+          <span class="form-label">导入结果</span>
         </div>
-        <div class="form-row">
-          <label class="form-label">Tier 层级</label>
-          <div class="form-radio-group">
-            <label v-for="t in [1,2,3]" :key="t" class="form-radio" :class="{ 'form-radio--active': importForm.tier === t }">
-              <input type="radio" :value="t" v-model="importForm.tier" />
-              <span class="tier-dot" :style="{ background: `var(--tier${t}-primary)` }"></span>
-              Tier {{ t }} {{ tierNames[t] }}
-            </label>
+        <div class="import-preview import-result">
+          <div class="preview-item"><span class="preview-label">创建实体</span><span>{{ importResult.entities_created }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">跳过实体</span><span>{{ importResult.entities_skipped }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">创建属性</span><span>{{ importResult.attributes_created }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">创建关系</span><span>{{ importResult.relations_created }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">创建规则</span><span>{{ importResult.rules_created }} 个</span></div>
+          <div class="preview-item"><span class="preview-label">创建动作</span><span>{{ importResult.actions_created }} 个</span></div>
+          <div v-if="importResult.errors.length" class="preview-errors">
+            <div v-for="(err, i) in importResult.errors" :key="i" class="preview-error">{{ err }}</div>
           </div>
         </div>
       </div>
@@ -112,19 +123,19 @@
       <button v-if="mode === 'manual'" class="btn-primary" @click="handleSubmit" :disabled="submitting">
         {{ submitting ? '创建中...' : '创建对象' }}
       </button>
-      <button v-else class="btn-primary" @click="handleImport" :disabled="submitting || !importForm.table_name">
-        {{ submitting ? '导入中...' : '导入为本体对象' }}
+      <button v-else class="btn-primary" @click="handleFileImport" :disabled="submitting || !selectedFile">
+        {{ submitting ? '导入中...' : '导入文件' }}
       </button>
     </template>
   </ModalDialog>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, computed } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { entityApi } from '../../api/ontology'
-import { listDataSources, getTableList, getTableSchema } from '../../api/datasource'
 import { useToast } from '../../composables/useToast'
+import type { FileImportResult } from '../../types'
 
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; created: [] }>()
@@ -156,62 +167,58 @@ async function handleSubmit() {
   finally { submitting.value = false }
 }
 
-// ── 数据源导入 ──
-const datasources = ref<{ id: string; name: string; type: string; host: string }[]>([])
-const tables = ref<string[]>([])
-const columns = ref<{ name: string; type: string; nullable: boolean; is_pk: boolean; comment: string }[]>([])
-const loadingTables = ref(false)
+// ── 文件导入 ──
+const fileFormat = ref<'json' | 'owl' | 'ttl'>('json')
+const selectedFile = ref<File | null>(null)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const fileNamespace = ref('')
+const jsonPreview = ref<{ scenario: string; objectCount: number; linkCount: number; actionCount: number; ruleCount: number } | null>(null)
+const importResult = ref<FileImportResult | null>(null)
 
-const importForm = reactive({ datasource_id: '', table_name: '', name_cn: '', tier: 3 as number })
-
-const typeMap: Record<string, string> = {
-  varchar: 'string', char: 'string', text: 'string', longtext: 'string', nvarchar: 'string',
-  int: 'number', integer: 'number', bigint: 'number', smallint: 'number', float: 'number',
-  double: 'number', decimal: 'number', numeric: 'number',
-  boolean: 'boolean', bool: 'boolean', bit: 'boolean',
-  date: 'date', datetime: 'date', timestamp: 'date',
-  json: 'json', jsonb: 'json',
-}
-function mapType(dbType: string) { return typeMap[dbType.toLowerCase().split('(')[0]] || 'string' }
-
-onMounted(async () => {
-  try { datasources.value = await listDataSources() } catch { /* ignore */ }
+const fileAccept = computed(() => {
+  if (fileFormat.value === 'json') return '.json'
+  if (fileFormat.value === 'owl') return '.owl,.rdf,.xml'
+  return '.ttl'
 })
 
-async function onDsChange() {
-  importForm.table_name = ''; tables.value = []; columns.value = []
-  if (!importForm.datasource_id) return
-  loadingTables.value = true
-  try {
-    const res = await getTableList(importForm.datasource_id)
-    tables.value = res.tables
-  } catch { toast.error('获取表列表失败') }
-  finally { loadingTables.value = false }
+function onFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0] || null
+  selectedFile.value = file
+  jsonPreview.value = null
+  importResult.value = null
+
+  if (file && fileFormat.value === 'json') {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const data = JSON.parse(reader.result as string)
+        const scenario = data.scenario
+        jsonPreview.value = {
+          scenario: scenario?.scenario_name || scenario?.scenario_short_name || '未知',
+          objectCount: data.object_types?.length || 0,
+          linkCount: data.link_types?.length || 0,
+          actionCount: data.action_types?.length || 0,
+          ruleCount: data.business_rules?.length || 0,
+        }
+        if (scenario?.namespace && !fileNamespace.value) {
+          fileNamespace.value = scenario.namespace
+        }
+      } catch { jsonPreview.value = null }
+    }
+    reader.readAsText(file)
+  }
 }
 
-async function onTableChange() {
-  columns.value = []
-  if (!importForm.table_name) return
-  try {
-    const res = await getTableSchema(importForm.datasource_id, importForm.table_name)
-    columns.value = res.columns
-  } catch { toast.error('获取表结构失败') }
-}
-
-async function handleImport() {
-  if (!importForm.datasource_id || !importForm.table_name || !importForm.name_cn) return
+async function handleFileImport() {
+  if (!selectedFile.value) return
   submitting.value = true
+  importResult.value = null
   try {
-    await entityApi.createFromDatasource({
-      datasource_id: importForm.datasource_id,
-      table_name: importForm.table_name,
-      name_cn: importForm.name_cn,
-      tier: importForm.tier,
-    })
-    toast.success('从数据源导入成功')
-    importForm.datasource_id = ''; importForm.table_name = ''; importForm.name_cn = ''
-    tables.value = []; columns.value = []
-    emit('created'); emit('close')
+    const res = await entityApi.importFromFile(selectedFile.value, fileFormat.value, fileNamespace.value || undefined)
+    importResult.value = res
+    toast.success(`导入完成：创建 ${res.entities_created} 个实体，${res.relations_created} 个关系`)
+    emit('created')
   } catch (e) { toast.error(`导入失败: ${(e as Error).message}`) }
   finally { submitting.value = false }
 }
@@ -260,18 +267,20 @@ async function handleImport() {
 .btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; cursor: pointer; }
 .btn-secondary:hover { background: var(--neutral-50); }
 
-/* 导入模式 */
-.import-columns { border: 1px solid var(--neutral-200); border-radius: 8px; overflow: hidden; max-height: 240px; overflow-y: auto; }
-.import-col-header {
-  display: grid; grid-template-columns: 2fr 1fr 1fr 50px 50px; gap: 8px; padding: 8px 12px;
-  background: var(--neutral-50); font-size: 11px; font-weight: 600; color: var(--neutral-500); text-transform: uppercase; letter-spacing: 0.3px;
-  position: sticky; top: 0;
+/* 文件导入 */
+.file-picker { position: relative; }
+.file-input {
+  width: 100%; padding: 8px 12px; border: 1px dashed var(--neutral-300); border-radius: var(--radius-md);
+  font-size: 13px; color: var(--neutral-600); background: var(--neutral-0); cursor: pointer;
 }
-.import-col-row {
-  display: grid; grid-template-columns: 2fr 1fr 1fr 50px 50px; gap: 8px; padding: 6px 12px;
-  font-size: 12px; border-top: 1px solid var(--neutral-100);
+.file-input:hover { border-color: var(--semantic-500); }
+.file-name { display: block; margin-top: 4px; font-size: 12px; color: var(--semantic-600); }
+.import-preview {
+  border: 1px solid var(--neutral-200); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;
 }
-.import-col-row--pk { background: var(--semantic-50); }
-.import-col-mapped { color: var(--semantic-600); font-weight: 500; }
-.import-entity-info { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--neutral-100); }
+.import-result { background: var(--semantic-50); border-color: var(--semantic-200); }
+.preview-item { display: flex; justify-content: space-between; font-size: 12px; color: var(--neutral-700); }
+.preview-label { font-weight: 500; color: var(--neutral-500); }
+.preview-errors { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--neutral-200); }
+.preview-error { font-size: 11px; color: var(--status-error); margin-bottom: 2px; }
 </style>

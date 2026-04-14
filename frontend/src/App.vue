@@ -12,7 +12,7 @@
       </main>
       <!-- 底部状态栏 -->
       <footer class="app-statusbar">
-        <span>12 对象类型 · 17 关系 · 8 规则</span>
+        <span>{{ statsText }}</span>
         <span class="app-statusbar__dot app-statusbar__dot--success"></span>
         <span>上次保存 {{ lastSaved }}</span>
       </footer>
@@ -25,8 +25,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useThemeStore } from './store/theme'
+import { get } from './api/client'
 import AppSidebar from './components/common/AppSidebar.vue'
 import AppTopbar from './components/common/AppTopbar.vue'
 import SearchCommand from './components/common/SearchCommand.vue'
@@ -34,6 +35,15 @@ import ToastContainer from './components/common/ToastContainer.vue'
 
 const themeStore = useThemeStore()
 const searchRef = ref<InstanceType<typeof SearchCommand>>()
+
+const stats = ref<{ entity_count: number; relation_count: number; rule_count: number }>({ entity_count: 0, relation_count: 0, rule_count: 0 })
+const statsText = computed(() => `${stats.value.entity_count} 对象类型 · ${stats.value.relation_count} 关系 · ${stats.value.rule_count} 规则`)
+
+async function fetchStats() {
+  try {
+    stats.value = await get<typeof stats.value>('/dashboard/stats')
+  } catch { /* ignore */ }
+}
 
 const lastSaved = ref('')
 function updateTime() {
@@ -44,6 +54,7 @@ onMounted(() => {
   themeStore.init()
   updateTime()
   setInterval(updateTime, 60000)
+  fetchStats()
 })
 </script>
 
