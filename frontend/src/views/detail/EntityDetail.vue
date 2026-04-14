@@ -119,7 +119,12 @@
         </div>
       </template>
 
-      <!-- 血缘占位 -->
+      <!-- 血缘 -->
+      <template v-else-if="activeTab === '血缘'">
+        <EntityLineageGraph :entity-id="entityId" />
+      </template>
+
+      <!-- 其他占位 -->
       <template v-else>
         <div class="placeholder-tab">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
@@ -138,6 +143,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
 import MetricCard from '../../components/common/MetricCard.vue'
+import EntityLineageGraph from '../../components/canvas/EntityLineageGraph.vue'
 import { useOntologyStore } from '../../store/ontology'
 
 const route = useRoute()

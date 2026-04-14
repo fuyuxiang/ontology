@@ -24,7 +24,7 @@ function Start-Services {
         Write-Host "  Backend already running on port $BACKEND_PORT (PID: $bpid)" -ForegroundColor Yellow
     } else {
         Write-Host "  Starting backend (port $BACKEND_PORT)..."
-        Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d $ROOT\backend && uvicorn app.main:app --reload --port $BACKEND_PORT --log-level info" -WindowStyle Minimized
+        Start-Process -FilePath "cmd.exe" -ArgumentList "/c cd /d $ROOT\backend && venv\Scripts\python.exe -m uvicorn app.main:app --reload --port $BACKEND_PORT --log-level info" -WindowStyle Minimized
         Start-Sleep -Seconds 3
         Write-Host "  Backend started." -ForegroundColor Green
     }
