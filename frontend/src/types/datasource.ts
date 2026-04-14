@@ -10,7 +10,8 @@ export interface DataSource {
   params: Record<string, unknown> | null
   description: string | null
   status: string
-  table_count: number
+  table_name: string
+  record_count: number
   enabled: boolean
   created_at: string
   updated_at: string
@@ -18,7 +19,6 @@ export interface DataSource {
 }
 
 export interface DataSourceCreate {
-  name: string
   type: string
   host: string
   port: number

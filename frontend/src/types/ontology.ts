@@ -159,6 +159,17 @@ export interface GraphData {
   edges: GraphEdge[]
 }
 
+// ── 文件导入结果 ──
+export interface FileImportResult {
+  entities_created: number
+  entities_skipped: number
+  attributes_created: number
+  relations_created: number
+  rules_created: number
+  actions_created: number
+  errors: string[]
+}
+
 // ── 看板统计 ──
 export interface DashboardStats {
   entityCount: number

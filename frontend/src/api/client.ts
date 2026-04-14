@@ -9,11 +9,14 @@ const client: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// 请求拦截：附加 JWT
+// 请求拦截：附加 JWT，FormData 自动处理 Content-Type
 client.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`
+  }
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type']
   }
   return config
 })

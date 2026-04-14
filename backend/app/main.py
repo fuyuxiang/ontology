@@ -23,6 +23,27 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # 启动：建表 + 初始化管理员
     Base.metadata.create_all(bind=engine)
+
+    # SQLite 迁移：datasources 表增加 table_name / record_count 列
+    with engine.connect() as conn:
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(engine)
+        if "datasources" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("datasources")}
+            if "table_name" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN table_name VARCHAR(200) DEFAULT ''"))
+            if "record_count" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN record_count INTEGER DEFAULT 0"))
+                if "table_count" in cols:
+                    conn.execute(text("UPDATE datasources SET record_count = table_count"))
+            # 旧 table_count 列有 NOT NULL 约束，需保留默认值以兼容
+            if "table_count" in cols:
+                try:
+                    conn.execute(text("UPDATE datasources SET table_count = 0 WHERE table_count IS NULL"))
+                except Exception:
+                    pass
+            conn.commit()
+
     db = SessionLocal()
     try:
         seed_admin(db)

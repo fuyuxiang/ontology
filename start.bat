@@ -6,9 +6,10 @@ echo.
 
 cd /d "%~dp0"
 
-echo [1/3] Init database...
-cd backend
-python seed.py 2>nul
+echo [1/3] Installing backend dependencies...
+cd /d "%~dp0backend"
+pip install -r requirements.txt --quiet 2>nul
+echo Dependencies ready.
 echo.
 
 echo [2/3] Starting backend (port 8001)...
