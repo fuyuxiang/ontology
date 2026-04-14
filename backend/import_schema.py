@@ -114,6 +114,15 @@ def import_schema(json_path: str, db):
                 from_id = source
             if db.get(OntologyEntity, target):
                 to_id = target
+            # 尝试按 name 字段查找
+            if not db.get(OntologyEntity, from_id):
+                found = db.query(OntologyEntity).filter(OntologyEntity.name == source).first()
+                if found:
+                    from_id = found.id
+            if not db.get(OntologyEntity, to_id):
+                found = db.query(OntologyEntity).filter(OntologyEntity.name == target).first()
+                if found:
+                    to_id = found.id
             if not db.get(OntologyEntity, from_id) or not db.get(OntologyEntity, to_id):
                 print(f"  [skip link] {source} -> {target} (entity not found)")
                 continue
@@ -176,6 +185,7 @@ if __name__ == "__main__":
     json_files = [
         r"E:\工作\国信\AI数据集项目\本体\材料\场景1-宽带装机退单稽核 本体Schema v2(1).json",
         r"E:\工作\国信\AI数据集项目\本体\材料\scenario4_ge_kpi_ontology_v5(1).json",
+        r"E:\工作\国信\AI数据集项目\本体\材料\fttr_renewal_ontology.json",
     ]
 
     for jf in json_files:

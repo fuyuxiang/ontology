@@ -7,6 +7,7 @@ pydantic==2.11.*
 pydantic-settings==2.9.*
 python-jose[cryptography]==3.4.*
 passlib[bcrypt]==1.7.*
+bcrypt==4.0.*
 python-multipart==0.0.*
 redis==5.2.*
 openai>=1.0
