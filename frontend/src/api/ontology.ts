@@ -33,6 +33,10 @@ export const entityApi = {
     return get<GraphData>(`/entities/${id}/graph`, { params: { depth, direction } })
   },
 
+  lineage(id: string, depth = 2) {
+    return get<GraphData>(`/entities/${id}/lineage`, { params: { depth } })
+  },
+
   graphAll() {
     return get<GraphData>('/entities/graph')
   },
