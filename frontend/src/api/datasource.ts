@@ -10,7 +10,7 @@ export function getDataSource(id: string) {
 }
 
 export function createDataSource(data: DataSourceCreate) {
-  return post<DataSource>('/datasources', data)
+  return post<DataSource[]>('/datasources', data)
 }
 
 export function updateDataSource(id: string, data: DataSourceUpdate) {
@@ -29,12 +29,20 @@ export function testConnectionInline(data: DataSourceCreate) {
   return post<TestConnectionResult>('/datasources/test', data)
 }
 
+export function fetchTablesInline(data: DataSourceCreate) {
+  return post<{ tables: string[] }>('/datasources/fetch-tables', data)
+}
+
 export function toggleDataSource(id: string) {
   return post<DataSource>(`/datasources/${id}/toggle`)
 }
 
 export function refreshTables(id: string) {
   return post<DataSource>(`/datasources/${id}/refresh-tables`)
+}
+
+export function previewDatasource(id: string) {
+  return get<{ table: string; columns: string[]; rows: unknown[][] }>(`/datasources/${id}/preview`)
 }
 
 export function getTableList(id: string) {
