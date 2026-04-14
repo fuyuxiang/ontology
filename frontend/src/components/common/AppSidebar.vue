@@ -45,16 +45,21 @@
 
       <div class="sidebar__divider"></div>
       <div class="sidebar__section-label">AIP场景</div>
-      <RouterLink
-        v-for="item in sceneNav"
-        :key="item.path"
-        :to="item.path"
-        class="sidebar__item"
-        :class="{ 'sidebar__item--active': isActive(item.path) }"
-      >
-        <span class="sidebar__item-icon" v-html="item.icon"></span>
-        <span class="sidebar__item-label">{{ item.label }}</span>
-      </RouterLink>
+      <template v-for="item in sceneNav" :key="item.path">
+        <RouterLink
+          v-if="!item.disabled"
+          :to="item.path"
+          class="sidebar__item"
+          :class="{ 'sidebar__item--active': isActive(item.path) }"
+        >
+          <span class="sidebar__item-icon" v-html="item.icon"></span>
+          <span class="sidebar__item-label">{{ item.label }}</span>
+        </RouterLink>
+        <div v-else class="sidebar__item sidebar__item--disabled">
+          <span class="sidebar__item-icon" v-html="item.icon"></span>
+          <span class="sidebar__item-label">{{ item.label }}</span>
+        </div>
+      </template>
 
       <div class="sidebar__divider"></div>
       <div class="sidebar__section-label">智能交互</div>
@@ -129,22 +134,26 @@ const sceneNav = [
   {
     path: '/scene/fttr',
     label: 'FTTR续约策划',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 13V7l4-4 4 4v6H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.5 13v-3h3v3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 13V7l4-4 4 4v6H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.5 13v-3h3v3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+    disabled: true,
   },
   {
     path: '/scene/broadband',
     label: '宽带退单原因稽核',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 8h4M6 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 8h4M6 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    disabled: true,
   },
   {
     path: '/scene/enterprise',
     label: '政企根因分析',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    disabled: true,
   },
   {
     path: '/scene/mnp',
     label: '携号转网预警',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l5 3v6l-5 3-5-3V5l5-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="0.8" fill="currentColor"/></svg>`
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l5 3v6l-5 3-5-3V5l5-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="0.8" fill="currentColor"/></svg>`,
+    disabled: false,
   },
 ]
 
@@ -246,6 +255,12 @@ const sunIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ci
 .sidebar__item:hover {
   background: var(--sidebar-bg-hover);
   color: var(--sidebar-text-active);
+}
+
+.sidebar__item--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .sidebar__item--active {
