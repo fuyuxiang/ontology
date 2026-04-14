@@ -141,6 +141,11 @@ const sceneNav = [
     label: '政企根因分析',
     icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`
   },
+  {
+    path: '/scene/mnp',
+    label: '携号转网预警',
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l5 3v6l-5 3-5-3V5l5-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="0.8" fill="currentColor"/></svg>`
+  },
 ]
 
 const toolNav = [

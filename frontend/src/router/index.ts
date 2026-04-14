@@ -66,6 +66,18 @@ const router = createRouter({
       name: 'scene-enterprise',
       component: () => import('../views/scene/EnterpriseScene.vue'),
       meta: { title: '政企根因分析' }
+    },
+    {
+      path: '/scene/mnp',
+      name: 'scene-mnp',
+      component: () => import('../views/scene/MnpScene.vue'),
+      meta: { title: '携号转网预警' }
+    },
+    {
+      path: '/scene/mnp/workbench',
+      name: 'scene-mnp-workbench',
+      component: () => import('../views/scene/MnpWorkbench.vue'),
+      meta: { title: '携号转网工作台' }
     }
   ]
 })
