@@ -14,6 +14,10 @@
         <span>属性: {{ entity.attrs }}</span>
         <span>关系: {{ entity.relations }}</span>
         <span>规则: {{ entity.rules }}</span>
+        <span v-if="entity.datasource" class="entity-card__ds" title="已关联数据源">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 3.5A1.5 1.5 0 013.5 2h5A1.5 1.5 0 0110 3.5v0A1.5 1.5 0 018.5 5h-5A1.5 1.5 0 012 3.5zm0 5A1.5 1.5 0 013.5 7h5A1.5 1.5 0 0110 8.5v0A1.5 1.5 0 018.5 10h-5A1.5 1.5 0 012 8.5z" stroke="currentColor" stroke-width="1"/></svg>
+          {{ entity.datasource }}
+        </span>
       </div>
     </div>
     <div class="entity-card__status" :class="`status--${entity.status}`"></div>
@@ -32,6 +36,7 @@ export interface Entity {
   relations: number
   rules: number
   status: 'active' | 'warning' | 'error'
+  datasource?: string | null
 }
 
 defineProps<{ entity: Entity; selected?: boolean }>()
@@ -106,4 +111,10 @@ defineEmits<{ click: [entity: Entity] }>()
 .status--active { background: var(--status-success); }
 .status--warning { background: var(--status-warning); }
 .status--error { background: var(--status-error); }
+
+.entity-card__ds {
+  display: inline-flex; align-items: center; gap: 2px;
+  color: #1971c2; font-size: 10px; font-weight: 500;
+  max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 </style>
