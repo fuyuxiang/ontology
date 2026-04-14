@@ -14,6 +14,7 @@ from app.api.v1.rules import router as rules_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.copilot import router as copilot_router
 from app.api.v1.relations import router as relations_router
+from app.api.v1.datasources import router as datasources_router
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(copilot_router, prefix="/api/v1")
 app.include_router(relations_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(datasources_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

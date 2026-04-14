@@ -1,198 +1,1116 @@
 INFO:     Will watch for changes in these directories: ['/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend']
 INFO:     Uvicorn running on http://127.0.0.1:8001 (Press CTRL+C to quit)
-INFO:     Started reloader process [948] using WatchFiles
+INFO:     Started reloader process [45030] using WatchFiles
 /Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
   class EntityBase(BaseModel):
 /Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
   class EntityUpdate(BaseModel):
-INFO:     Started server process [951]
+INFO:     Started server process [45033]
 INFO:     Waiting for application startup.
-(trapped) error reading bcrypt version
-Traceback (most recent call last):
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
-    version = _bcrypt.__about__.__version__
-              ^^^^^^^^^^^^^^^^^
-AttributeError: module 'bcrypt' has no attribute '__about__'
-ERROR:    Traceback (most recent call last):
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 692, in lifespan
-    async with self.lifespan_context(app) as maybe_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/main.py", line 27, in lifespan
-    seed_admin(db)
-  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/auth.py", line 42, in seed_admin
-    password_hash=hash_password("admin123"),
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/core/security.py", line 14, in hash_password
-    return pwd_context.hash(password)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/context.py", line 2258, in hash
-    return record.hash(secret, **kwds)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 779, in hash
-    self.checksum = self._calc_checksum(secret)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 591, in _calc_checksum
-    self._stub_requires_backend()
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2254, in _stub_requires_backend
-    cls.set_backend()
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2156, in set_backend
-    return owner.set_backend(name, dryrun=dryrun)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2163, in set_backend
-    return cls.set_backend(name, dryrun=dryrun)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2188, in set_backend
-    cls._set_backend(name, dryrun)
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2311, in _set_backend
-    super(SubclassBackendMixin, cls)._set_backend(name, dryrun)
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2224, in _set_backend
-    ok = loader(**kwds)
-         ^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 626, in _load_backend_mixin
-    return mixin_cls._finalize_backend_mixin(name, dryrun)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 421, in _finalize_backend_mixin
-    if detect_wrap_bug(IDENT_2A):
-       ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 380, in detect_wrap_bug
-    if verify(secret, bug_hash):
-       ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 792, in verify
-    return consteq(self._calc_checksum(secret), chk)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 655, in _calc_checksum
-    hash = _bcrypt.hashpw(secret, config)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])
-
-ERROR:    Application startup failed. Exiting.
-WARNING:  WatchFiles detected changes in 'import_schema.py'. Reloading...
+INFO:     Application startup complete.
+INFO:     127.0.0.1:61518 - "GET /api/v1/entities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61523 - "GET /api/v1/dashboard/stats HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py', 'app/models/datasource.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [45033]
 /Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
   class EntityBase(BaseModel):
 /Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
   class EntityUpdate(BaseModel):
-INFO:     Started server process [3400]
+WARNING:  WatchFiles detected changes in 'app/models/datasource.py', 'app/schemas/datasource.py'. Reloading...
+INFO:     Started server process [46602]
 INFO:     Waiting for application startup.
-(trapped) error reading bcrypt version
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46602]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [46604]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/v1/datasources.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46604]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [46610]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/v1/datasources.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46610]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [46631]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/models/__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46631]
+WARNING:  WatchFiles detected changes in 'app/main.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [46636]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46636]
+WARNING:  WatchFiles detected changes in 'app/main.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [46639]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46639]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [46640]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:49336 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50155 - "POST /api/v1/datasources HTTP/1.1" 201 Created
+INFO:     127.0.0.1:50160 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50194 - "POST /api/v1/datasources/4319ce46-e000-4031-9b97-fc598e83096a/test HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app/models/datasource.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [46640]
+WARNING:  WatchFiles detected changes in 'app/models/datasource.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47360]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47360]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47364]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/models/datasource.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47364]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47367]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/models/datasource.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47367]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47368]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47368]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+INFO:     Started server process [47376]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47376]
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47378]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47378]
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47380]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47380]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47381]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/v1/datasources.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47381]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47386]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/v1/datasources.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47386]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47390]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/api/v1/datasources.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47390]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47408]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:51230 - "GET /api/v1/datasources HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
 Traceback (most recent call last):
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 620, in _load_backend_mixin
-    version = _bcrypt.__about__.__version__
-              ^^^^^^^^^^^^^^^^^
-AttributeError: module 'bcrypt' has no attribute '__about__'
-ERROR:    Traceback (most recent call last):
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 692, in lifespan
-    async with self.lifespan_context(app) as maybe_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 133, in merged_lifespan
-    async with original_context(app) as maybe_original_state:
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/contextlib.py", line 210, in __aenter__
-    return await anext(self.gen)
-           ^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/main.py", line 27, in lifespan
-    seed_admin(db)
-  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/auth.py", line 42, in seed_admin
-    password_hash=hash_password("admin123"),
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/core/security.py", line 14, in hash_password
-    return pwd_context.hash(password)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/context.py", line 2258, in hash
-    return record.hash(secret, **kwds)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 779, in hash
-    self.checksum = self._calc_checksum(secret)
-                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 591, in _calc_checksum
-    self._stub_requires_backend()
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2254, in _stub_requires_backend
-    cls.set_backend()
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2156, in set_backend
-    return owner.set_backend(name, dryrun=dryrun)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2163, in set_backend
-    return cls.set_backend(name, dryrun=dryrun)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2188, in set_backend
-    cls._set_backend(name, dryrun)
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2311, in _set_backend
-    super(SubclassBackendMixin, cls)._set_backend(name, dryrun)
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 2224, in _set_backend
-    ok = loader(**kwds)
-         ^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 626, in _load_backend_mixin
-    return mixin_cls._finalize_backend_mixin(name, dryrun)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 421, in _finalize_backend_mixin
-    if detect_wrap_bug(IDENT_2A):
-       ^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 380, in detect_wrap_bug
-    if verify(secret, bug_hash):
-       ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/utils/handlers.py", line 792, in verify
-    return consteq(self._calc_checksum(secret), chk)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/passlib/handlers/bcrypt.py", line 655, in _calc_checksum
-    hash = _bcrypt.hashpw(secret, config)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-ValueError: password cannot be longer than 72 bytes, truncate manually if necessary (e.g. my_password[:72])
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: datasources.table_count
 
-ERROR:    Application startup failed. Exiting.
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 214, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/concurrency.py", line 37, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 32, in list_datasources
+    return query.order_by(DataSource.created_at.desc()).all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: datasources.table_count
+[SQL: SELECT datasources.id AS datasources_id, datasources.name AS datasources_name, datasources.type AS datasources_type, datasources.host AS datasources_host, datasources.port AS datasources_port, datasources."database" AS datasources_database, datasources.username AS datasources_username, datasources.password AS datasources_password, datasources.params AS datasources_params, datasources.description AS datasources_description, datasources.status AS datasources_status, datasources.table_count AS datasources_table_count, datasources.enabled AS datasources_enabled, datasources.created_at AS datasources_created_at, datasources.updated_at AS datasources_updated_at, datasources.created_by AS datasources_created_by 
+FROM datasources ORDER BY datasources.created_at DESC]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:51247 - "GET /api/v1/datasources HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: datasources.table_count
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 214, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/concurrency.py", line 37, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 32, in list_datasources
+    return query.order_by(DataSource.created_at.desc()).all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: datasources.table_count
+[SQL: SELECT datasources.id AS datasources_id, datasources.name AS datasources_name, datasources.type AS datasources_type, datasources.host AS datasources_host, datasources.port AS datasources_port, datasources."database" AS datasources_database, datasources.username AS datasources_username, datasources.password AS datasources_password, datasources.params AS datasources_params, datasources.description AS datasources_description, datasources.status AS datasources_status, datasources.table_count AS datasources_table_count, datasources.enabled AS datasources_enabled, datasources.created_at AS datasources_created_at, datasources.updated_at AS datasources_updated_at, datasources.created_by AS datasources_created_by 
+FROM datasources ORDER BY datasources.created_at DESC]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:51296 - "GET /api/v1/datasources HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: datasources.table_count
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 214, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/concurrency.py", line 37, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 32, in list_datasources
+    return query.order_by(DataSource.created_at.desc()).all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: datasources.table_count
+[SQL: SELECT datasources.id AS datasources_id, datasources.name AS datasources_name, datasources.type AS datasources_type, datasources.host AS datasources_host, datasources.port AS datasources_port, datasources."database" AS datasources_database, datasources.username AS datasources_username, datasources.password AS datasources_password, datasources.params AS datasources_params, datasources.description AS datasources_description, datasources.status AS datasources_status, datasources.table_count AS datasources_table_count, datasources.enabled AS datasources_enabled, datasources.created_at AS datasources_created_at, datasources.updated_at AS datasources_updated_at, datasources.created_by AS datasources_created_by 
+FROM datasources ORDER BY datasources.created_at DESC]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47408]
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47548]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47548]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [47550]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:51508 - "POST /api/v1/datasources HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: datasources.table_count
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 214, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/concurrency.py", line 37, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 45, in create_datasource
+    if db.query(DataSource).filter(DataSource.name == body.name).first():
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2759, in first
+    return self.limit(1)._iter().first()  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: datasources.table_count
+[SQL: SELECT datasources.id AS datasources_id, datasources.name AS datasources_name, datasources.type AS datasources_type, datasources.host AS datasources_host, datasources.port AS datasources_port, datasources."database" AS datasources_database, datasources.username AS datasources_username, datasources.password AS datasources_password, datasources.params AS datasources_params, datasources.description AS datasources_description, datasources.status AS datasources_status, datasources.table_count AS datasources_table_count, datasources.enabled AS datasources_enabled, datasources.created_at AS datasources_created_at, datasources.updated_at AS datasources_updated_at, datasources.created_by AS datasources_created_by 
+FROM datasources 
+WHERE datasources.name = ?
+ LIMIT ? OFFSET ?]
+[parameters: ('携号转网数据', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:51520 - "GET /api/v1/datasources HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: datasources.table_count
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 85, in __call__
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 214, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/concurrency.py", line 37, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 32, in list_datasources
+    return query.order_by(DataSource.created_at.desc()).all()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2704, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: datasources.table_count
+[SQL: SELECT datasources.id AS datasources_id, datasources.name AS datasources_name, datasources.type AS datasources_type, datasources.host AS datasources_host, datasources.port AS datasources_port, datasources."database" AS datasources_database, datasources.username AS datasources_username, datasources.password AS datasources_password, datasources.params AS datasources_params, datasources.description AS datasources_description, datasources.status AS datasources_status, datasources.table_count AS datasources_table_count, datasources.enabled AS datasources_enabled, datasources.created_at AS datasources_created_at, datasources.updated_at AS datasources_updated_at, datasources.created_by AS datasources_created_by 
+FROM datasources ORDER BY datasources.created_at DESC]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:51626 - "POST /api/v1/datasources HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlite3.OperationalError: no such column: datasources.table_count
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/protocols/http/httptools_impl.py", line 416, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/applications.py", line 1054, in __call__
+    await super().__call__(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/applications.py", line 112, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 187, in __call__
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/errors.py", line 165, in __call__
+    await self.app(scope, receive, _send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 62, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 714, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 734, in app
+    await route.handle(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 288, in handle
+    await self.app(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 76, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/routing.py", line 73, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 301, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/fastapi/routing.py", line 214, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/starlette/concurrency.py", line 37, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/to_thread.py", line 63, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2502, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 986, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 45, in create_datasource
+    if db.query(DataSource).filter(DataSource.name == body.name).first():
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2759, in first
+    return self.limit(1)._iter().first()  # type: ignore
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2857, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2351, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2249, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 306, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1419, in execute
+    return meth(
+           ^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 527, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1641, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2363, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: datasources.table_count
+[SQL: SELECT datasources.id AS datasources_id, datasources.name AS datasources_name, datasources.type AS datasources_type, datasources.host AS datasources_host, datasources.port AS datasources_port, datasources."database" AS datasources_database, datasources.username AS datasources_username, datasources.password AS datasources_password, datasources.params AS datasources_params, datasources.description AS datasources_description, datasources.status AS datasources_status, datasources.table_count AS datasources_table_count, datasources.enabled AS datasources_enabled, datasources.created_at AS datasources_created_at, datasources.updated_at AS datasources_updated_at, datasources.created_by AS datasources_created_by 
+FROM datasources 
+WHERE datasources.name = ?
+ LIMIT ? OFFSET ?]
+[parameters: ('携号转网数据', 1, 0)]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+获取表数量失败 [携号转网数据]: (1045, "Access denied for user 'debian-sys-maint'@'219.142.250.20' (using password: YES)")
+INFO:     127.0.0.1:51872 - "POST /api/v1/datasources HTTP/1.1" 201 Created
+INFO:     127.0.0.1:51876 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51884 - "POST /api/v1/datasources/4319ce46-e000-4031-9b97-fc598e83096a/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51887 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51903 - "DELETE /api/v1/datasources/4319ce46-e000-4031-9b97-fc598e83096a HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:51906 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51915 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51918 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51944 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51979 - "GET /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52110 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52371 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52374 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52382 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52385 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52388 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52391 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52394 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52397 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52400 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52403 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52406 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52409 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52557 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52559 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52630 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+获取表数量失败 [携号转网数据]: (1045, "Access denied for user 'debian-sys-maint'@'219.142.250.20' (using password: YES)")
+INFO:     127.0.0.1:52669 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52692 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+获取表数量失败 [携号转网数据]: (1045, "Access denied for user 'debian-sys-maint'@'219.142.250.20' (using password: YES)")
+INFO:     127.0.0.1:52695 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52745 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+获取表数量失败 [携号转网数据]: (1045, "Access denied for user 'debian-sys-maint'@'219.142.250.20' (using password: YES)")
+INFO:     127.0.0.1:52751 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52762 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52768 - "GET /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52779 - "PUT /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52782 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+获取表数量失败 [携号转网数据]: (1045, "Access denied for user 'debian-sys-maint'@'219.142.250.20' (using password: YES)")
+INFO:     127.0.0.1:52790 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52794 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+获取表数量失败 [携号转网数据]: (1045, "Access denied for user 'debian-sys-maint'@'219.142.250.20' (using password: YES)")
+INFO:     127.0.0.1:52995 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53020 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53026 - "GET /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53513 - "PUT /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53516 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+获取表数量失败 [携号转网数据]: (1045, "Access denied for user 'bonc'@'219.142.250.20' (using password: YES)")
+INFO:     127.0.0.1:53530 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53534 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53672 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53677 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53685 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53692 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53695 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53698 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53706 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53713 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53716 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53719 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53725 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53728 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53749 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/toggle HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53752 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53946 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53958 - "GET /api/v1/dashboard/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53963 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53965 - "GET /api/v1/dashboard/stats HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53973 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54036 - "GET /api/v1/entities HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54041 - "GET /api/v1/dashboard/stats HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'app/api/v1/datasources.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [47550]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+Process SpawnProcess-22:
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/server.py", line 86, in _serve
+    config.load()
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/config.py", line 441, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/main.py", line 17, in <module>
+    from app.api.v1.datasources import router as datasources_router
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 8, in <module>
+    from app.schemas.datasource import (
+ImportError: cannot import name 'TableListResult' from 'app.schemas.datasource' (/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/datasource.py)
+WARNING:  WatchFiles detected changes in 'app/api/v1/datasources.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+Process SpawnProcess-23:
+Traceback (most recent call last):
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/_subprocess.py", line 80, in subprocess_started
+    target(sockets=sockets)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/server.py", line 75, in run
+    return asyncio_run(self.serve(sockets=sockets), loop_factory=self.config.get_loop_factory())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/_compat.py", line 30, in asyncio_run
+    return runner.run(main)
+           ^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "uvloop/loop.pyx", line 1518, in uvloop.loop.Loop.run_until_complete
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/server.py", line 79, in serve
+    await self._serve(sockets)
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/server.py", line 86, in _serve
+    config.load()
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/config.py", line 441, in load
+    self.loaded_app = import_from_string(self.app)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/site-packages/uvicorn/importer.py", line 19, in import_from_string
+    module = importlib.import_module(module_str)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/fuyuxiang/miniconda3/envs/llm/lib/python3.11/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1204, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1176, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1147, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 690, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 940, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/main.py", line 17, in <module>
+    from app.api.v1.datasources import router as datasources_router
+  File "/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/api/v1/datasources.py", line 8, in <module>
+    from app.schemas.datasource import (
+ImportError: cannot import name 'TableListResult' from 'app.schemas.datasource' (/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/datasource.py)
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [49073]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'app/schemas/datasource.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [49073]
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:19: UserWarning: Field name "schema_json" in "EntityBase" shadows an attribute in parent "BaseModel"
+  class EntityBase(BaseModel):
+/Users/fuyuxiang/Desktop/palantir/bonc-ontology/backend/app/schemas/entity.py:32: UserWarning: Field name "schema_json" in "EntityUpdate" shadows an attribute in parent "BaseModel"
+  class EntityUpdate(BaseModel):
+INFO:     Started server process [49075]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:54747 - "GET /api/v1/datasources HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54776 - "GET /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54785 - "GET /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/tables/dwa_v_d_cus_cb_act_info/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54796 - "GET /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/tables/dwa_v_d_cus_cb_om_datum/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54806 - "POST /api/v1/datasources/06e3eb8a-da4a-4762-8b55-af7963ab27ae/refresh-tables HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54810 - "GET /api/v1/datasources HTTP/1.1" 200 OK
