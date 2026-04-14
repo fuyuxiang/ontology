@@ -73,3 +73,16 @@ class TablePreviewResult(BaseModel):
     table: str
     columns: list[str]
     rows: list[list]
+
+
+class ColumnSchema(BaseModel):
+    name: str
+    type: str
+    nullable: bool = True
+    is_pk: bool = False
+    comment: str = ""
+
+
+class TableSchemaResult(BaseModel):
+    table: str
+    columns: list[ColumnSchema]

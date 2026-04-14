@@ -13,6 +13,10 @@
             <span class="detail__tag-cn">{{ entity.nameCn }}</span>
             <span class="tier-tag" :class="`tier-tag--tier${entity.tier}`">Tier {{ entity.tier }} · {{ tierLabel }}</span>
             <span class="status-badge" :class="`status-badge--${entity.status}`">● {{ statusLabel }}</span>
+            <span v-if="dsInfo" class="ds-link-tag" :title="`数据源: ${dsInfo.datasource_name} · 表: ${dsInfo.table_name}`">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3.5A1.5 1.5 0 013.5 2h5A1.5 1.5 0 0110 3.5v0A1.5 1.5 0 018.5 5h-5A1.5 1.5 0 012 3.5zm0 5A1.5 1.5 0 013.5 7h5A1.5 1.5 0 0110 8.5v0A1.5 1.5 0 018.5 10h-5A1.5 1.5 0 012 8.5z" stroke="currentColor" stroke-width="1"/></svg>
+              {{ dsInfo.datasource_name }} · {{ dsInfo.table_name }}
+            </span>
           </div>
         </div>
       </div>
@@ -172,6 +176,12 @@ const entity = computed(() => detail.value ? {
 
 const tierLabel = computed(() => ({ 1: '核心对象', 2: '领域对象', 3: '场景对象' }[entity.value.tier]))
 const statusLabel = computed(() => ({ active: '活跃', warning: '警告', error: '异常' }[entity.value.status]))
+
+const dsInfo = computed(() => {
+  const sj = detail.value?.schema_json
+  if (!sj || !sj.datasource_id) return null
+  return { datasource_id: sj.datasource_id, datasource_name: sj.datasource_name || '未知', table_name: sj.table_name || '' }
+})
 
 const breadcrumbs = computed(() => [
   { label: '本体管理', path: '/ontology' },
@@ -377,6 +387,12 @@ const actions = computed(() =>
   font-weight: 500; cursor: pointer; transition: background var(--transition-fast);
 }
 .action-exec-btn:hover { background: var(--kinetic-600); }
+
+.ds-link-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: var(--radius-full);
+  background: #e7f5ff; color: #1971c2; font-size: 11px; font-weight: 500;
+}
 
 .placeholder-tab {
   display: flex;
