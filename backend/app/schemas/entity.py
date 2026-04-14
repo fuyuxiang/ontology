@@ -38,6 +38,14 @@ class EntityUpdate(BaseModel):
     schema_json: dict | None = None
 
 
+class FromDatasourceRequest(BaseModel):
+    datasource_id: str
+    table_name: str
+    name_cn: str
+    tier: int = 3
+    namespace: str = ""
+
+
 class EntityListItem(BaseModel):
     id: str
     name: str
@@ -47,6 +55,7 @@ class EntityListItem(BaseModel):
     attr_count: int = 0
     relation_count: int = 0
     rule_count: int = 0
+    datasource_name: str | None = None
     model_config = {"from_attributes": True}
 
 

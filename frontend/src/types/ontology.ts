@@ -132,6 +132,7 @@ export interface EntityListItem {
   attr_count: number
   relation_count: number
   rule_count: number
+  datasource_name: string | null
 }
 
 // ── 图遍历结果（匹配后端 snake_case）──
