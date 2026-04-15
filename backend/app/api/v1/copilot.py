@@ -55,10 +55,9 @@ class AgentChatRequest(BaseModel):
 
 @router.post("/agent-chat")
 def agent_chat(req: AgentChatRequest, db: Session = Depends(get_db)):
-    agent = AgentService(db)
-
     def event_stream():
         try:
+            agent = AgentService(db)
             for event in agent.ask(req.question, req.entity_id):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
