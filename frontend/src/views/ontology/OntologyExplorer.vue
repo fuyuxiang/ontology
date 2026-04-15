@@ -11,7 +11,7 @@
       </div>
       <button class="explorer__add-btn" @click="showCreateEntity = true">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        新建对象
+        新建本体对象
       </button>
 
       <div v-if="store.loading && allEntities.length === 0" class="explorer__panel-loading">
@@ -46,8 +46,8 @@
           <div class="explorer__detail-title">
             <TierBadge :tier="selected.tier" />
             <div>
-              <h1 class="text-h1">{{ selected.name }}</h1>
-              <p class="text-caption">{{ selected.nameCn }} · Tier {{ selected.tier }} {{ tierLabel(selected.tier) }}</p>
+              <h1 class="text-h1">{{ selected.nameCn }}</h1>
+              <p class="text-caption">Tier {{ selected.tier }} {{ tierLabel(selected.tier) }}</p>
             </div>
             <button class="explorer__edit-btn" @click="showEditEntity = true">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10.5 1.5l2 2-7 7H3.5v-2l7-7z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -109,10 +109,10 @@
               <div class="relation-item" v-for="rel in selectedRelations" :key="rel.name">
                 <div class="relation-item__from">
                   <TierBadge :tier="selected.tier" />
-                  <span>{{ selected.name }}</span>
+                  <span>{{ selected.nameCn }}</span>
                 </div>
                 <div class="relation-item__arrow">
-                  <span class="relation-item__type">{{ rel.type }}</span>
+                  <span class="relation-item__type">{{ rel.name }}</span>
                   <svg width="40" height="12" viewBox="0 0 40 12" fill="none">
                     <path d="M0 6h36M30 2l6 4-6 4" stroke="var(--neutral-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
@@ -134,7 +134,7 @@
                 <div class="form-row"><label class="form-label">目标实体</label>
                   <select v-model="relForm.to_entity_id" class="form-input" required>
                     <option value="" disabled>选择目标实体...</option>
-                    <option v-for="e in allEntities" :key="e.id" :value="e.id">{{ e.name }} ({{ e.nameCn }})</option>
+                    <option v-for="e in allEntities" :key="e.id" :value="e.id">{{ e.nameCn }}</option>
                   </select>
                 </div>
                 <div class="form-row-inline">
@@ -367,13 +367,15 @@ const selectedAttrs = computed(() =>
 )
 
 const selectedRelations = computed(() =>
-  detail.value?.relations.map(r => ({
-    id: r.id,
-    name: r.name,
-    type: r.rel_type,
-    target: r.to_entity_name || r.from_entity_name,
-    targetTier: (r.to_entity_tier || 1) as 1 | 2 | 3,
-  })) ?? []
+  detail.value?.relations
+    .filter(r => r.from_entity_id !== r.to_entity_id)
+    .map(r => ({
+      id: r.id,
+      name: r.name,
+      type: r.rel_type,
+      target: r.to_entity_name || r.from_entity_name,
+      targetTier: (r.to_entity_tier || 1) as 1 | 2 | 3,
+    })) ?? []
 )
 
 // ── 关系管理 ──

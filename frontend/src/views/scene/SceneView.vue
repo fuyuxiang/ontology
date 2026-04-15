@@ -1,6 +1,6 @@
 <template>
   <div class="scene">
-    <div class="scene__header">
+    <div v-if="!hideHeader" class="scene__header">
       <div class="scene__title-row">
         <div class="scene__icon" :style="{ background: config.color }">
           <span v-html="config.icon"></span>
@@ -88,7 +88,7 @@ interface SceneConfig {
   namespace: string; title: string; description: string; color: string; icon: string
 }
 
-const props = defineProps<{ config: SceneConfig }>()
+const props = defineProps<{ config: SceneConfig; hideHeader?: boolean }>()
 
 const loading = ref(true)
 const entities = ref<EntityListItem[]>([])

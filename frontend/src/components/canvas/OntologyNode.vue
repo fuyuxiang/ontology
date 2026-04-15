@@ -3,8 +3,7 @@
     <Handle type="target" :position="targetPosition" />
     <div class="ontology-node__badge" :style="{ background: tierColor }">T{{ data.tier }}</div>
     <div class="ontology-node__body">
-      <div class="ontology-node__name">{{ data.name }}</div>
-      <div class="ontology-node__cn">{{ data.nameCn }}</div>
+      <div class="ontology-node__name">{{ data.nameCn }}</div>
     </div>
     <div class="ontology-node__count">{{ data.relCount }}</div>
     <Handle type="source" :position="sourcePosition" />

@@ -9,11 +9,11 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str = "ontology123"
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
-    LLM_API_BASE: str = "https://api2.penguinsaichat.dpdns.org/v1"
+    LLM_API_BASE: str = "https://coding.dashscope.aliyuncs.com/v1"
     LLM_API_KEY: str = ""
-    LLM_MODEL: str = "claude-sonnet-4-20250514"
+    LLM_MODEL: str = "qwen3.5-plus"
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = 8001
     DEBUG: bool = True
 
     model_config = {"env_file": ".env", "extra": "ignore"}

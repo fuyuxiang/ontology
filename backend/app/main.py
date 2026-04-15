@@ -44,6 +44,23 @@ async def lifespan(app: FastAPI):
                     pass
             conn.commit()
 
+        # business_rules 表增加结构化列
+        if "business_rules" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("business_rules")}
+            if "conditions_json" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN conditions_json JSON"))
+            if "rule_meta_json" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN rule_meta_json JSON"))
+            conn.commit()
+
+        # entity_actions 表增加结构化列
+        if "entity_actions" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("entity_actions")}
+            for col in ("parameters_json", "preconditions_json", "effects_json", "action_meta_json"):
+                if col not in cols:
+                    conn.execute(text(f"ALTER TABLE entity_actions ADD COLUMN {col} JSON"))
+            conn.commit()
+
     db = SessionLocal()
     try:
         seed_admin(db)

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.services.copilot import chat_stream, chat_sync
+from app.services.agent_service import AgentService
 
 router = APIRouter(prefix="/copilot", tags=["copilot"])
 
@@ -45,3 +46,27 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
     else:
         result = chat_sync(msgs, db, req.entity_id)
         return {"content": result}
+
+
+class AgentChatRequest(BaseModel):
+    question: str
+    entity_id: str | None = None
+
+
+@router.post("/agent-chat")
+def agent_chat(req: AgentChatRequest, db: Session = Depends(get_db)):
+    agent = AgentService(db)
+
+    def event_stream():
+        try:
+            for event in agent.ask(req.question, req.entity_id):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'answer', 'content': f'服务异常: {e}', 'suggestions': []}, ensure_ascii=False)}\n\n"
+        yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

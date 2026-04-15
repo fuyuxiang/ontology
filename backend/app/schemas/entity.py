@@ -80,6 +80,10 @@ class ActionOut(BaseModel):
     type: str
     status: str
     impact_count: int | None = None
+    parameters_json: list | None = None
+    preconditions_json: list | None = None
+    effects_json: list | None = None
+    action_meta_json: dict | None = None
     model_config = {"from_attributes": True}
 
 
@@ -94,6 +98,8 @@ class RuleOut(BaseModel):
     priority: str
     trigger_count: int
     last_triggered: datetime | None = None
+    conditions_json: list | None = None
+    rule_meta_json: dict | None = None
     model_config = {"from_attributes": True}
 
 
