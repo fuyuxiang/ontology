@@ -71,26 +71,6 @@
       </div>
     </div>
 
-    <!-- 状态总览 -->
-    <div class="dash-card">
-      <div class="dash-card__header">
-        <h3 class="text-h3">对象健康状态</h3>
-        <span class="text-caption">全部 {{ allObjects.length }} 个对象</span>
-      </div>
-      <div class="health-grid">
-        <div
-          class="health-item"
-          v-for="obj in allObjects"
-          :key="obj.name"
-          :class="`health-item--${obj.status}`"
-          :title="obj.name"
-        >
-          <span class="health-item__name">{{ obj.name }}</span>
-          <span class="health-item__tier">T{{ obj.tier }}</span>
-        </div>
-      </div>
-    </div>
-
     <!-- 推理链示例 -->
     <div class="dash-card">
       <div class="dash-card__header">
@@ -112,10 +92,10 @@ import PageState from '../../components/common/PageState.vue'
 import { dashboardApi } from '../../api/dashboard'
 
 const reasoningSteps: ReasoningStep[] = [
-  { type: 'ontology', title: '本体查询: CustomerSegment', source: 'BSS系统 (CRM_CUSTOMER)', result: '筛选出 2,847 名高价值用户' },
-  { type: 'ml', title: 'ML预测: churn_prediction_model', source: '输入: arpu, tenure, complaint_count', result: 'churn_probability = 0.73' },
-  { type: 'rule', title: '规则匹配: rule_007_high_value_renewal', source: '条件: arpu >= 100 AND tenure >= 12', result: '触发"续约优惠+设备升级"策略' },
-  { type: 'output', title: '策略输出: strategy_recommend', source: '产品: FTTR千兆升级包', result: '预测转化率: 3.2%，触点: APP推送(优先) + 短信(备选)' },
+  { type: 'ontology', title: '本体查询: MobileSubscriber + PortabilityQuery', source: 'CBSS用户信息系统 + 携转资格查询系统', result: '识别近7天内查询携转资格的用户 1,263 人' },
+  { type: 'ml', title: '多维风险评估: 携转风险规则引擎', source: '输入: 合约状态、欠费信息、通话行为、投诉记录、在网时长', result: '综合风险评分 = 0.87，命中高风险规则 NP-RULE-H01' },
+  { type: 'rule', title: '规则匹配: NP-RULE-H01 高风险携转预警', source: '条件: 无有效合约 + 无欠费 + 允许携出 + 异网通话 + 投诉≥2 + 在网<12月', result: '触发高风险预警，生成 ChurnWarning 记录' },
+  { type: 'output', title: '维系策略输出: TriggerRetentionStrategy', source: '策略: 专属客服紧急维系 + 定向优惠挽留', result: '推荐产品: 5G畅享融合套餐，触点: 专属客服外呼(24h内) + 短信(备选)' },
 ]
 
 // 从 API 加载的数据
@@ -162,9 +142,6 @@ const activities = computed(() =>
   }))
 )
 
-const allObjects = computed(() =>
-  (stats.value.health_status as { id: string; name: string; tier: number; status: string }[]) ?? []
-)
 </script>
 
 <style scoped>
@@ -370,30 +347,4 @@ const allObjects = computed(() =>
 .activity-item__body { flex: 1; }
 .activity-item__time { flex-shrink: 0; padding-top: 2px; }
 
-/* 健康状态网格 */
-.health-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.health-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--neutral-200);
-  font-size: 12px;
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-.health-item--active { background: var(--status-success-bg); border-color: var(--status-success); color: var(--status-success); }
-.health-item--warning { background: var(--status-warning-bg); border-color: var(--status-warning); color: var(--status-warning); }
-.health-item--error { background: var(--status-error-bg); border-color: var(--status-error); color: var(--status-error); }
-.health-item__name { color: var(--neutral-800); }
-.health-item__tier {
-  font-size: 10px;
-  font-weight: 600;
-  opacity: 0.7;
-}
 </style>
