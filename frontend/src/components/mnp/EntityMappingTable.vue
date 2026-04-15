@@ -12,6 +12,8 @@
           <th>来源属性</th>
           <th>运算符</th>
           <th>阈值</th>
+          <th v-if="hasActual">实际值</th>
+          <th v-if="hasActual">命中</th>
         </tr>
       </thead>
       <tbody>
@@ -21,6 +23,12 @@
           <td class="attr-cell">{{ item.sourceAttribute }}</td>
           <td>{{ item.operator }}</td>
           <td>{{ item.threshold }}</td>
+          <td v-if="hasActual" class="actual-cell">{{ item.actualValue ?? '-' }}</td>
+          <td v-if="hasActual" class="match-cell">
+            <span v-if="item.matched === true" class="match-icon match--yes">&#10003;</span>
+            <span v-else-if="item.matched === false" class="match-icon match--no">&#10007;</span>
+            <span v-else>-</span>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -40,6 +48,8 @@ export interface MappingCondition {
   sourceAttribute: string
   operator: string
   threshold: string
+  actualValue?: string
+  matched?: boolean
 }
 
 const props = defineProps<{
@@ -50,6 +60,7 @@ const props = defineProps<{
 }>()
 
 const uniqueEntities = computed(() => new Set(props.conditions.map(c => c.sourceEntity)).size)
+const hasActual = computed(() => props.conditions.some(c => c.actualValue !== undefined))
 </script>
 
 <style scoped>
@@ -65,6 +76,11 @@ const uniqueEntities = computed(() => new Set(props.conditions.map(c => c.source
 .mtable td { padding: 8px 10px; border-bottom: 1px solid #f1f3f5; color: #495057; }
 .entity-cell { color: #4c6ef5; font-weight: 500; }
 .attr-cell { font-family: monospace; font-size: 11px; color: #7048e8; }
+.actual-cell { font-weight: 600; color: #212529; }
+.match-cell { text-align: center; }
+.match-icon { font-size: 14px; font-weight: 700; }
+.match--yes { color: #12b886; }
+.match--no { color: #fa5252; }
 .mapping-table__footer { margin-top: 12px; padding: 10px 12px; background: #f8f9fa; border-radius: 8px; font-size: 13px; font-weight: 500; color: #343a40; }
 .footer-icon { color: #4c6ef5; margin-right: 6px; }
 </style>
