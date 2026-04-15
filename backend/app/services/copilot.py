@@ -4,18 +4,36 @@ AI Copilot 服务 — 本体感知的智能对话
 - 自动将本体 schema + 关系图注入 system prompt
 - 支持 SSE 流式响应
 """
+import logging
+
+import httpx
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import OntologyEntity, EntityRelation, BusinessRule
 
+logger = logging.getLogger(__name__)
+
 
 def get_llm_client() -> OpenAI:
-    return OpenAI(
-        api_key=settings.LLM_API_KEY,
-        base_url=settings.LLM_API_BASE,
-    )
+    client_kwargs = {
+        "api_key": settings.LLM_API_KEY,
+        "base_url": settings.LLM_API_BASE,
+    }
+    try:
+        return OpenAI(**client_kwargs)
+    except ImportError as exc:
+        # Some environments export a SOCKS proxy, but the runtime does not
+        # include socksio. Retrying without inheriting proxy env avoids a hard
+        # failure during client construction and lets the API degrade gracefully.
+        if "socksio" not in str(exc).lower():
+            raise
+        logger.warning("检测到 SOCKS 代理但未安装 socksio，改为忽略代理环境变量直连 LLM。")
+        return OpenAI(
+            **client_kwargs,
+            http_client=httpx.Client(trust_env=False),
+        )
 
 
 def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
