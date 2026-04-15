@@ -14,7 +14,9 @@
             <div class="entity-card__en">{{ e.entityName }}</div>
             <div class="entity-card__role">{{ e.role }}</div>
             <div class="entity-card__attrs">
-              <span v-for="a in e.attributes" :key="a" class="attr-tag">{{ a }}</span>
+              <span v-for="a in e.attributes" :key="a" class="attr-tag" :class="{ 'attr-tag--valued': e.values?.[a] !== undefined }">
+                {{ a }}<template v-if="e.values?.[a] !== undefined">: <strong class="attr-val">{{ e.values[a] }}</strong></template>
+              </span>
             </div>
           </div>
         </div>
@@ -66,6 +68,8 @@ defineProps<{ stage: ProcessStage | null }>()
 .entity-card__role { font-size: 10px; color: #4c6ef5; margin-top: 4px; }
 .entity-card__attrs { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
 .attr-tag { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: #e7f5ff; color: #1c7ed6; }
+.attr-tag--valued { background: #e7f5ff; padding: 2px 8px; }
+.attr-val { color: #212529; font-weight: 600; font-size: 10px; }
 .attr-tag--out { background: #e6fcf5; color: #0ca678; }
 .flow-arrow { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 4px 0; }
 .flow-label { font-size: 11px; color: #4c6ef5; font-weight: 500; }

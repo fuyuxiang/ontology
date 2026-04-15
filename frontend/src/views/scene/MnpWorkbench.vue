@@ -29,6 +29,28 @@
       <div class="kpi-card"><div class="kpi-val">85%</div><div class="kpi-lbl">自动化率</div></div>
     </div>
 
+    <!-- 案例用户选择 -->
+    <div class="mnp-user-bar">
+      <div class="user-bar__label">案例用户</div>
+      <div class="user-bar__cards">
+        <div v-for="(u, i) in userList" :key="u.id"
+          class="user-mini-card"
+          :class="{ 'user-mini-card--active': selectedUserIndex === i }"
+          @click="selectedUserIndex = i">
+          <div class="user-mini__avatar" :class="`avatar--${u.finalRiskLevel}`">{{ u.name[0] }}</div>
+          <div class="user-mini__info">
+            <div class="user-mini__name">{{ u.name }}</div>
+            <div class="user-mini__phone">{{ u.phone }}</div>
+          </div>
+          <div class="user-mini__risk" :class="`risk--${u.finalRiskLevel}`">
+            {{ u.finalRiskLevel === 'high' ? '高风险' : u.finalRiskLevel === 'medium' ? '中风险' : '低风险' }}
+          </div>
+          <div class="user-mini__score" v-if="u.riskScore">{{ u.riskScore }}分</div>
+        </div>
+      </div>
+      <div v-if="dataLoading" class="user-bar__loading">加载中...</div>
+    </div>
+
     <!-- 流程层级带 -->
     <div class="mnp-layers">
       <div v-for="layer in layers" :key="layer.key" class="layer-band" :class="`layer-band--${layer.key}`">
@@ -68,6 +90,62 @@
           <div class="stage-desc__text">{{ currentStage.description }}</div>
         </div>
 
+        <!-- 阶段执行结果摘要 -->
+        <div class="stage-result-card" v-if="stepStates[activeStep] === 'done'">
+          <div class="stage-result__header">
+            <span class="stage-result__icon">&#9679;</span>
+            <span class="stage-result__title">{{ currentStage?.name }} — 执行结果</span>
+          </div>
+          <!-- 信号触发 -->
+          <div v-if="activeStep === 0" class="stage-result__body">
+            <div class="result-row"><span class="result-label">信号来源</span><span class="result-value">{{ selectedUser.entities.MnpEligibilityQuery?.query_channel }}</span></div>
+            <div class="result-row"><span class="result-label">触发时间</span><span class="result-value">{{ selectedUser.entities.MnpEligibilityQuery?.query_time }}</span></div>
+            <div class="result-row"><span class="result-label">携出状态</span><span class="result-value">{{ selectedUser.entities.MnpEligibilityQuery?.out_tag }}</span></div>
+          </div>
+          <!-- 本体数据拉取 -->
+          <div v-else-if="activeStep === 1" class="stage-result__body">
+            <div class="result-row"><span class="result-label">拉取实体</span><span class="result-value">7 个核心实体</span></div>
+            <div class="result-row"><span class="result-label">用户</span><span class="result-value">{{ selectedUser.name }} ({{ selectedUser.phone }})</span></div>
+            <div class="result-row"><span class="result-label">在网时长</span><span class="result-value">{{ selectedUser.entities.CbssSubscriber?.innet_months }}个月</span></div>
+            <div class="result-row"><span class="result-label">合约到期</span><span class="result-value">{{ selectedUser.entities.SubscriberContract?.end_date }}</span></div>
+          </div>
+          <!-- 规则匹配校验 -->
+          <div v-else-if="activeStep === 2" class="stage-result__body">
+            <div class="result-row" v-for="r in selectedUser.ruleResults" :key="r.ruleName">
+              <span class="result-label">{{ r.ruleName }}</span>
+              <span class="result-value">
+                <span class="result-match" :class="r.conditions.every(c => c.matched) ? 'match--yes' : 'match--partial'">
+                  {{ r.conditions.filter(c => c.matched).length }}/{{ r.conditions.length }} 条件命中
+                </span>
+              </span>
+            </div>
+          </div>
+          <!-- 风险等级定级 -->
+          <div v-else-if="activeStep === 3" class="stage-result__body">
+            <div class="result-row"><span class="result-label">风险等级</span><span class="result-value"><span class="risk-badge" :class="`risk--${selectedUser.finalRiskLevel}`">{{ selectedUser.entities.MnpRiskUser?.risk_level }}</span></span></div>
+            <div class="result-row"><span class="result-label">风险评分</span><span class="result-value result-value--bold">{{ selectedUser.riskScore }}分</span></div>
+          </div>
+          <!-- 流失根因拆解 -->
+          <div v-else-if="activeStep === 4" class="stage-result__body">
+            <div class="result-row"><span class="result-label">TOP3 流失动因</span></div>
+            <div class="result-tags">
+              <span v-for="(reason, ri) in selectedUser.churnReasonTop3" :key="ri" class="reason-tag">{{ ri + 1 }}. {{ reason }}</span>
+            </div>
+          </div>
+          <!-- 动作推荐生成 -->
+          <div v-else-if="activeStep === 5" class="stage-result__body">
+            <div class="result-row"><span class="result-label">推荐动作</span></div>
+            <div class="result-tags">
+              <span v-for="act in selectedUser.recommendedActions" :key="act" class="action-tag">{{ act }}</span>
+            </div>
+          </div>
+          <!-- 任务自动分发 -->
+          <div v-else-if="activeStep === 6" class="stage-result__body">
+            <div class="result-row"><span class="result-label">分发渠道</span><span class="result-value result-value--bold">{{ selectedUser.assignedChannel }}</span></div>
+            <div class="result-row"><span class="result-label">任务状态</span><span class="result-value"><span class="status-tag">{{ selectedUser.entities.MnpRiskUser?.task_status }}</span></span></div>
+          </div>
+        </div>
+
         <!-- 实体参与 -->
         <EntityParticipantPanel :stage="currentStage" />
 
@@ -87,7 +165,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import ProcessOrchTimeline from '../../components/mnp/ProcessOrchTimeline.vue'
 import type { OrchStep, StepState } from '../../components/mnp/ProcessOrchTimeline.vue'
 import EntityParticipantPanel from '../../components/mnp/EntityParticipantPanel.vue'
@@ -96,6 +174,8 @@ import type { MappingCondition } from '../../components/mnp/EntityMappingTable.v
 import ActionDriverPanel from '../../components/mnp/ActionDriverPanel.vue'
 import type { ActionDriver } from '../../components/mnp/ActionDriverPanel.vue'
 import { entityApi } from '../../api/ontology'
+import { sceneApi } from '../../api/scene'
+import type { MnpExecuteResult } from '../../api/scene'
 
 /* -------- TYPES -------- */
 export interface EntityRole {
@@ -103,6 +183,7 @@ export interface EntityRole {
   entityNameCn: string
   role: string
   attributes: string[]
+  values?: Record<string, string | number | boolean>
 }
 
 export interface ProcessStage {
@@ -116,11 +197,161 @@ export interface ProcessStage {
   description: string
 }
 
+/* -------- MOCK USER INSTANCES -------- */
+interface MockUserInstance {
+  id: string; name: string; phone: string
+  entities: Record<string, Record<string, string | number | boolean>>
+  ruleResults: Array<{
+    ruleName: string; riskLevel: 'high' | 'medium' | 'low'
+    conditions: Array<{ condition: string; sourceEntity: string; sourceAttribute: string; operator: string; threshold: string; actual: string; matched: boolean }>
+  }>
+  finalRiskLevel: 'high' | 'medium' | 'low'
+  riskScore: number
+  churnReasonTop3: string[]
+  recommendedActions: string[]
+  assignedChannel: string
+}
+
+const mockUsers: MockUserInstance[] = [
+  {
+    id: 'U20240315001', name: '张明华', phone: '138****6721',
+    entities: {
+      MnpEligibilityQuery: { query_time: '2024-03-15 09:32', query_channel: '手厅APP', out_tag: '可携出', limit_remark: '无限制' },
+      CbssSubscriber: { user_id: 'U20240315001', device_number: '138****6721', user_status: '在网', innet_months: 8, is_5g: true, pay_mode: '后付费' },
+      SubscriberContract: { activity_type: '5G畅享套餐', end_date: '2024-05-20', protocal_month: 12 },
+      CustomerComplaint: { complaint_type: '网络质量', complaint_count_3m: 3 },
+      NetworkQuality: { avg_download_speed: 35.2, coverage_score: 72, fault_count_3m: 2 },
+      CompetitorActivity: { competitor_name: '中国电信', offer_type: '新用户优惠', price_advantage: '30%', query_count: 4 },
+      FamilyGroup: { member_count: 4, ported_member_count: 1, family_arpu: 186 },
+      MnpRiskUser: { signal_source: '手厅APP', signal_time: '2024-03-15 09:32', matched_rule_id: 'NP-RULE-H01', condition_pass_count: 5, risk_level: '高', risk_score: 92, risk_time: '2024-03-15 09:33', churn_reason_top3: '合约即将到期,网络体验差,家庭成员已携转', recommended_actions: '发送专属优惠,网络质量优化,一键外呼关怀', task_status: '已分发', assigned_channel: '专属坐席' },
+    },
+    ruleResults: [
+      { ruleName: 'NP-RULE-H01 高风险规则', riskLevel: 'high', conditions: [
+        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '12个月', actual: '8个月', matched: true },
+        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+3个月', actual: '2024-05-20', matched: true },
+        { condition: '近3月投诉多', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '2次', actual: '3次', matched: true },
+        { condition: '竞品查询频繁', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '3次', actual: '4次', matched: true },
+        { condition: '家庭已携转', sourceEntity: 'FamilyGroup', sourceAttribute: 'ported_member_count', operator: '≥', threshold: '1人', actual: '1人', matched: true },
+      ]},
+      { ruleName: 'NP-RULE-M01 中风险规则', riskLevel: 'medium', conditions: [
+        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '24个月', actual: '8个月', matched: true },
+        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+6个月', actual: '2024-05-20', matched: true },
+        { condition: '近3月投诉', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '1次', actual: '3次', matched: true },
+      ]},
+      { ruleName: 'NP-RULE-L01 低风险规则', riskLevel: 'low', conditions: [
+        { condition: '竞品查询', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '1次', actual: '4次', matched: true },
+      ]},
+    ],
+    finalRiskLevel: 'high', riskScore: 92,
+    churnReasonTop3: ['合约即将到期', '网络体验差', '家庭成员已携转'],
+    recommendedActions: ['发送专属优惠', '网络质量优化', '一键外呼关怀'],
+    assignedChannel: '专属坐席',
+  },
+  {
+    id: 'U20240315002', name: '李婷', phone: '156****3390',
+    entities: {
+      MnpEligibilityQuery: { query_time: '2024-03-15 14:18', query_channel: '10086热线', out_tag: '可携出', limit_remark: '无限制' },
+      CbssSubscriber: { user_id: 'U20240315002', device_number: '156****3390', user_status: '在网', innet_months: 18, is_5g: false, pay_mode: '后付费' },
+      SubscriberContract: { activity_type: '畅享套餐', end_date: '2024-06-30', protocal_month: 24 },
+      CustomerComplaint: { complaint_type: '资费争议', complaint_count_3m: 1 },
+      NetworkQuality: { avg_download_speed: 58.6, coverage_score: 88, fault_count_3m: 0 },
+      CompetitorActivity: { competitor_name: '中国联通', offer_type: '套餐折扣', price_advantage: '20%', query_count: 2 },
+      FamilyGroup: { member_count: 3, ported_member_count: 0, family_arpu: 142 },
+      MnpRiskUser: { signal_source: '10086热线', signal_time: '2024-03-15 14:18', matched_rule_id: 'NP-RULE-M01', condition_pass_count: 3, risk_level: '中', risk_score: 65, risk_time: '2024-03-15 14:19', churn_reason_top3: '合约即将到期,资费竞争力不足,无5G服务', recommended_actions: ['套餐升级推荐', '一键发送挽留短信'], task_status: '已分发', assigned_channel: '自动外呼' },
+    },
+    ruleResults: [
+      { ruleName: 'NP-RULE-H01 高风险规则', riskLevel: 'high', conditions: [
+        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '12个月', actual: '18个月', matched: false },
+        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+3个月', actual: '2024-06-30', matched: false },
+        { condition: '近3月投诉多', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '2次', actual: '1次', matched: false },
+        { condition: '竞品查询频繁', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '3次', actual: '2次', matched: false },
+        { condition: '家庭已携转', sourceEntity: 'FamilyGroup', sourceAttribute: 'ported_member_count', operator: '≥', threshold: '1人', actual: '0人', matched: false },
+      ]},
+      { ruleName: 'NP-RULE-M01 中风险规则', riskLevel: 'medium', conditions: [
+        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '24个月', actual: '18个月', matched: true },
+        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+6个月', actual: '2024-06-30', matched: true },
+        { condition: '近3月投诉', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '1次', actual: '1次', matched: true },
+      ]},
+      { ruleName: 'NP-RULE-L01 低风险规则', riskLevel: 'low', conditions: [
+        { condition: '竞品查询', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '1次', actual: '2次', matched: true },
+      ]},
+    ],
+    finalRiskLevel: 'medium', riskScore: 65,
+    churnReasonTop3: ['合约即将到期', '资费竞争力不足', '无5G服务'],
+    recommendedActions: ['套餐升级推荐', '一键发送挽留短信'],
+    assignedChannel: '自动外呼',
+  },
+  {
+    id: 'U20240315003', name: '王建国', phone: '189****8845',
+    entities: {
+      MnpEligibilityQuery: { query_time: '2024-03-15 16:45', query_channel: '营业厅', out_tag: '可携出', limit_remark: '合约期内' },
+      CbssSubscriber: { user_id: 'U20240315003', device_number: '189****8845', user_status: '在网', innet_months: 36, is_5g: true, pay_mode: '预付费' },
+      SubscriberContract: { activity_type: '5G融合套餐', end_date: '2025-01-15', protocal_month: 24 },
+      CustomerComplaint: { complaint_type: '信号覆盖', complaint_count_3m: 0 },
+      NetworkQuality: { avg_download_speed: 82.5, coverage_score: 91, fault_count_3m: 1 },
+      CompetitorActivity: { competitor_name: '-', offer_type: '-', price_advantage: '-', query_count: 0 },
+      FamilyGroup: { member_count: 5, ported_member_count: 0, family_arpu: 268 },
+      MnpRiskUser: { signal_source: '营业厅', signal_time: '2024-03-15 16:45', matched_rule_id: 'NP-RULE-L01', condition_pass_count: 1, risk_level: '低', risk_score: 28, risk_time: '2024-03-15 16:46', churn_reason_top3: '偶发网络故障,合约期内限制,无明显流失动因', recommended_actions: ['一键发送挽留短信'], task_status: '已分发', assigned_channel: '短信触达' },
+    },
+    ruleResults: [
+      { ruleName: 'NP-RULE-H01 高风险规则', riskLevel: 'high', conditions: [
+        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '12个月', actual: '36个月', matched: false },
+        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+3个月', actual: '2025-01-15', matched: false },
+        { condition: '近3月投诉多', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '2次', actual: '0次', matched: false },
+        { condition: '竞品查询频繁', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '3次', actual: '0次', matched: false },
+        { condition: '家庭已携转', sourceEntity: 'FamilyGroup', sourceAttribute: 'ported_member_count', operator: '≥', threshold: '1人', actual: '0人', matched: false },
+      ]},
+      { ruleName: 'NP-RULE-M01 中风险规则', riskLevel: 'medium', conditions: [
+        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '24个月', actual: '36个月', matched: false },
+        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+6个月', actual: '2025-01-15', matched: false },
+        { condition: '近3月投诉', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '1次', actual: '0次', matched: false },
+      ]},
+      { ruleName: 'NP-RULE-L01 低风险规则', riskLevel: 'low', conditions: [
+        { condition: '竞品查询', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '1次', actual: '0次', matched: false },
+      ]},
+    ],
+    finalRiskLevel: 'low', riskScore: 28,
+    churnReasonTop3: ['偶发网络故障', '合约期内限制', '无明显流失动因'],
+    recommendedActions: ['一键发送挽留短信'],
+    assignedChannel: '短信触达',
+  },
+]
+
 /* -------- STATE -------- */
 const activeStep = ref(0)
 const execRunning = ref(false)
 const stepStates = ref<StepState[]>(Array(7).fill('pending'))
 const stepDurations = ref<(string | null)[]>(Array(7).fill(null))
+const selectedUserIndex = ref(0)
+
+/* -------- LIVE DATA -------- */
+const liveUsers = ref<MockUserInstance[]>([])
+const liveDataMap = ref<Record<string, MnpExecuteResult>>({})
+const dataLoading = ref(false)
+
+// 合并 mock + live：优先用 live 数据
+const userList = computed(() => liveUsers.value.length ? liveUsers.value : mockUsers)
+const selectedUser = computed(() => {
+  const user = userList.value[selectedUserIndex.value] || mockUsers[0]
+  // 如果有 live 执行结果，覆盖 mock 数据
+  const live = liveDataMap.value[user.id]
+  if (live) {
+    return {
+      ...user,
+      entities: live.entities as any,
+      ruleResults: live.ruleResults.map(r => ({
+        ...r,
+        riskLevel: r.riskLevel as 'high' | 'medium' | 'low',
+      })),
+      finalRiskLevel: live.finalRiskLevel as 'high' | 'medium' | 'low',
+      riskScore: live.riskScore,
+      churnReasonTop3: live.churnReasonTop3,
+      recommendedActions: live.recommendedActions,
+      assignedChannel: live.assignedChannel,
+    }
+  }
+  return user
+})
 
 /* -------- STAGES (for EntityParticipantPanel) -------- */
 const stagesData: ProcessStage[] = [
@@ -200,7 +431,14 @@ const stagesData: ProcessStage[] = [
   },
 ]
 
-const currentStage = computed(() => stagesData[activeStep.value] || null)
+const currentStage = computed<ProcessStage | null>(() => {
+  const stage = stagesData[activeStep.value]
+  if (!stage) return null
+  const user = selectedUser.value
+  const injectValues = (entities: EntityRole[]): EntityRole[] =>
+    entities.map(e => ({ ...e, values: user.entities[e.entityName] }))
+  return { ...stage, inputEntities: injectValues(stage.inputEntities), outputEntities: injectValues(stage.outputEntities) }
+})
 
 /* -------- ORCH STEPS (for timeline) -------- */
 const orchSteps: OrchStep[] = stagesData.map(s => ({
@@ -231,6 +469,59 @@ onMounted(async () => {
   } catch (e) {
     console.warn('Failed to load layer stats', e)
   }
+  // 尝试从后端加载真实用户列表
+  try {
+    const users = await sceneApi.mnpUsers(10)
+    if (users.length) {
+      liveUsers.value = users.map(u => ({
+        id: u.user_id,
+        name: u.name || u.user_id,
+        phone: u.phone || '',
+        entities: {},
+        ruleResults: [],
+        finalRiskLevel: 'low' as const,
+        riskScore: 0,
+        churnReasonTop3: [],
+        recommendedActions: [],
+        assignedChannel: '',
+      }))
+      // 自动加载第一个用户的执行数据
+      loadUserData(users[0].user_id)
+    }
+  } catch (e) {
+    console.warn('后端用户列表不可用，使用 mock 数据', e)
+  }
+})
+
+async function loadUserData(userId: string) {
+  if (liveDataMap.value[userId]) return
+  dataLoading.value = true
+  try {
+    const result = await sceneApi.mnpExecute(userId)
+    liveDataMap.value = { ...liveDataMap.value, [userId]: result }
+    // 更新 liveUsers 中对应用户的风险信息
+    const idx = liveUsers.value.findIndex(u => u.id === userId)
+    if (idx >= 0) {
+      liveUsers.value[idx] = {
+        ...liveUsers.value[idx],
+        finalRiskLevel: result.finalRiskLevel as 'high' | 'medium' | 'low',
+        riskScore: result.riskScore,
+      }
+      liveUsers.value = [...liveUsers.value]
+    }
+  } catch (e) {
+    console.warn(`加载用户 ${userId} 数据失败`, e)
+  } finally {
+    dataLoading.value = false
+  }
+}
+
+// 切换用户时自动加载数据
+watch(selectedUserIndex, (idx) => {
+  const user = userList.value[idx]
+  if (user && liveUsers.value.length) {
+    loadUserData(user.id)
+  }
 })
 
 const totalEntities = computed(() => layers.value.reduce((s, l) => s + l.entityCount, 0))
@@ -243,6 +534,8 @@ function layerLabel(layer: string) {
 }
 
 /* -------- EXECUTION LOGIC -------- */
+const stageDurations = [0.3, 0.8, 1.2, 0.5, 0.9, 0.7, 0.4]
+
 function onStepClick(i: number) {
   if (!execRunning.value) activeStep.value = i
 }
@@ -260,7 +553,7 @@ function runStep(i: number) {
   stepStates.value[i] = 'running'
   stepStates.value = [...stepStates.value]
   activeStep.value = i
-  const duration = +(0.3 + Math.random() * 0.9).toFixed(1)
+  const duration = stageDurations[i]
   setTimeout(() => {
     stepStates.value[i] = 'done'
     stepDurations.value[i] = String(duration)
@@ -316,33 +609,67 @@ const allMappings: Record<number, { title: string; badge: string; badgeType: 'hi
 const mappingTitle = computed(() => (allMappings[activeStep.value] || allMappings[0]).title)
 const mappingBadge = computed(() => (allMappings[activeStep.value] || allMappings[0]).badge)
 const mappingBadgeType = computed(() => (allMappings[activeStep.value] || allMappings[0]).badgeType)
-const mappingConditions = computed(() => (allMappings[activeStep.value] || allMappings[0]).conditions)
+const mappingConditions = computed<MappingCondition[]>(() => {
+  const base = (allMappings[activeStep.value] || allMappings[0]).conditions
+  const user = selectedUser.value
+  // For stage 2 (规则匹配校验), inject from ruleResults
+  if (activeStep.value === 2) {
+    const highRule = user.ruleResults.find(r => r.riskLevel === 'high')
+    if (highRule) return highRule.conditions.map(c => ({ ...c }))
+  }
+  // For other stages, try to resolve actual values from entity data
+  return base.map(c => {
+    const entityData = user.entities[c.sourceEntity]
+    if (!entityData) return c
+    const attrs = c.sourceAttribute.split(',').map(a => a.trim())
+    if (attrs.length === 1) {
+      const val = entityData[attrs[0]]
+      if (val !== undefined) return { ...c, actualValue: String(val), matched: c.operator === '全量拉取' ? undefined : undefined }
+    } else {
+      const vals = attrs.map(a => entityData[a]).filter(v => v !== undefined)
+      if (vals.length) return { ...c, actualValue: vals.join(', ') }
+    }
+    return c
+  })
+})
 
 /* -------- ACTION DRIVERS -------- */
 const actionDrivers = computed<ActionDriver[]>(() => {
+  const user = selectedUser.value
+  const isRecommended = (name: string) => user.recommendedActions.includes(name)
+
   if (activeStep.value === 5) return [
-    { actionName: '发送专属优惠', basis: '用户ARPU水平 + 合约到期时间', drivenBy: [
+    { actionName: '发送专属优惠', basis: '用户ARPU水平 + 合约到期时间', recommended: isRecommended('发送专属优惠'), drivenBy: [
       { entity: 'CbssSubscriber', attribute: 'pay_mode', reason: '决定优惠券面额' },
       { entity: 'SubscriberContract', attribute: 'end_date', reason: '合约即将到期时优先推送' },
     ]},
-    { actionName: '套餐升级推荐', basis: '当前套餐 + 5G终端状态', drivenBy: [
+    { actionName: '套餐升级推荐', basis: '当前套餐 + 5G终端状态', recommended: isRecommended('套餐升级推荐'), drivenBy: [
       { entity: 'CbssSubscriber', attribute: 'is_5g', reason: '5G用户推荐5G套餐' },
       { entity: 'SubscriberContract', attribute: 'activity_type', reason: '匹配升级路径' },
     ]},
-    { actionName: '网络质量优化', basis: '网络体验指标 + 投诉类型', drivenBy: [
+    { actionName: '网络质量优化', basis: '网络体验指标 + 投诉类型', recommended: isRecommended('网络质量优化'), drivenBy: [
       { entity: 'NetworkQuality', attribute: 'avg_download_speed', reason: '速率低于阈值触发优化' },
       { entity: 'CustomerComplaint', attribute: 'complaint_type', reason: '网络类投诉优先处理' },
     ]},
-    { actionName: '一键外呼关怀', basis: '风险等级 + 家庭关系', drivenBy: [
+    { actionName: '一键外呼关怀', basis: '风险等级 + 家庭关系', recommended: isRecommended('一键外呼关怀'), drivenBy: [
       { entity: 'MnpRiskUser', attribute: 'risk_level', reason: '高风险用户优先外呼' },
       { entity: 'FamilyGroup', attribute: 'ported_member_count', reason: '家庭传导风险需重点关怀' },
     ]},
+    { actionName: '一键发送挽留短信', basis: '风险等级 + 用户偏好', recommended: isRecommended('一键发送挽留短信'), drivenBy: [
+      { entity: 'MnpRiskUser', attribute: 'risk_level', reason: '所有风险等级均可触达' },
+    ]},
+    { actionName: '一键下发产品', basis: '用户套餐 + 竞品分析', recommended: isRecommended('一键下发产品'), drivenBy: [
+      { entity: 'CompetitorActivity', attribute: 'offer_type', reason: '针对竞品优惠匹配产品' },
+    ]},
   ]
-  if (activeStep.value === 6) return [
-    { actionName: '高风险→专属坐席', basis: '风险等级为HIGH', drivenBy: [{ entity: 'MnpRiskUser', attribute: 'risk_level', reason: '高风险需人工专属跟进' }] },
-    { actionName: '中风险→自动外呼', basis: '风险等级为MEDIUM', drivenBy: [{ entity: 'MnpRiskUser', attribute: 'risk_level', reason: '中风险通过IVR自动外呼' }] },
-    { actionName: '低风险→短信触达', basis: '风险等级为LOW', drivenBy: [{ entity: 'MnpRiskUser', attribute: 'risk_level', reason: '低风险通过短信批量触达' }] },
-  ]
+  if (activeStep.value === 6) {
+    const channelMap: Record<string, string> = { '专属坐席': '高风险→专属坐席', '自动外呼': '中风险→自动外呼', '短信触达': '低风险→短信触达' }
+    return [
+      { actionName: '高风险→专属坐席', basis: '风险等级为HIGH', recommended: user.assignedChannel === '专属坐席', drivenBy: [{ entity: 'MnpRiskUser', attribute: 'risk_level', reason: '高风险需人工专属跟进' }] },
+      { actionName: '中风险→自动外呼', basis: '风险等级为MEDIUM', recommended: user.assignedChannel === '自动外呼', drivenBy: [{ entity: 'MnpRiskUser', attribute: 'risk_level', reason: '中风险通过IVR自动外呼' }] },
+      { actionName: '低风险→短信触达', basis: '风险等级为LOW', recommended: user.assignedChannel === '短信触达', drivenBy: [{ entity: 'MnpRiskUser', attribute: 'risk_level', reason: '低风险通过短信批量触达' }] },
+    ]
+  }
   return [
     { actionName: '信号识别', basis: '携转资格查询实体触发', drivenBy: [{ entity: 'MnpEligibilityQuery', attribute: 'query_time', reason: '查询发生即触发信号' }] },
     { actionName: '规则校验', basis: '多实体属性交叉校验', drivenBy: [
@@ -387,4 +714,45 @@ const actionDrivers = computed<ActionDriver[]>(() => {
 .layer-tag--aggregate { background: #fff8e1; color: #e67700; }
 .layer-tag--decision { background: #f3f0ff; color: #7048e8; }
 .stage-desc__text { font-size: 13px; color: #495057; line-height: 1.6; }
+
+/* 案例用户选择条 */
+.mnp-user-bar { display: flex; align-items: center; gap: 12px; padding: 0 24px 4px; }
+.user-bar__label { font-size: 12px; font-weight: 600; color: #868e96; white-space: nowrap; }
+.user-bar__cards { display: flex; gap: 10px; flex: 1; }
+.user-mini-card { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-radius: 10px; background: #fff; border: 2px solid #e9ecef; cursor: pointer; transition: all 0.2s; flex: 1; }
+.user-mini-card:hover { border-color: #a5d8ff; }
+.user-mini-card--active { border-color: #4c6ef5; background: #f8f9ff; }
+.user-mini__avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.avatar--high { background: #fa5252; }
+.avatar--medium { background: #f59f00; }
+.avatar--low { background: #339af0; }
+.user-mini__info { flex: 1; min-width: 0; }
+.user-mini__name { font-size: 13px; font-weight: 600; color: #212529; }
+.user-mini__phone { font-size: 11px; color: #868e96; font-family: monospace; }
+.user-mini__risk { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
+.risk--high { background: #fff5f5; color: #fa5252; }
+.risk--medium { background: #fff8e1; color: #f59f00; }
+.risk--low { background: #e7f5ff; color: #339af0; }
+.user-mini__score { font-size: 12px; font-weight: 700; color: #495057; white-space: nowrap; }
+.user-bar__loading { font-size: 11px; color: #4c6ef5; white-space: nowrap; animation: fadeInOut 1.2s ease-in-out infinite; }
+@keyframes fadeInOut { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* 阶段执行结果摘要 */
+.stage-result-card { background: #fff; border-radius: 10px; border: 1px solid #e9ecef; border-left: 3px solid #12b886; padding: 14px 16px; }
+.stage-result__header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.stage-result__icon { color: #12b886; font-size: 10px; }
+.stage-result__title { font-size: 13px; font-weight: 600; color: #343a40; }
+.stage-result__body { display: flex; flex-direction: column; gap: 6px; }
+.result-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; padding: 4px 0; }
+.result-label { color: #868e96; }
+.result-value { color: #212529; font-weight: 500; }
+.result-value--bold { font-size: 18px; font-weight: 700; color: #4c6ef5; }
+.result-match { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.match--yes { background: #e6fcf5; color: #0ca678; }
+.match--partial { background: #fff8e1; color: #e67700; }
+.risk-badge { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 4px; }
+.result-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.reason-tag { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #fff8e1; color: #e67700; font-weight: 500; }
+.action-tag { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: #e6fcf5; color: #0ca678; font-weight: 500; }
+.status-tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: #e6fcf5; color: #0ca678; }
 </style>
