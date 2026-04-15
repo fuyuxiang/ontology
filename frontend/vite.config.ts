@@ -4,7 +4,7 @@ import vue from '@vitejs/plugin-vue'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue()],
-  optimizeDeps: { include: ['dagre'] },
+  optimizeDeps: { include: ['dagre', 'marked'] },
   server: {
     host: '127.0.0.1',
     port: Number(process.env.FRONTEND_PORT || 5177),
