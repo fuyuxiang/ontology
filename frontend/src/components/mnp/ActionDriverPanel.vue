@@ -6,6 +6,7 @@
         <div class="driver-header">
           <span class="driver-index">动作 {{ i + 1 }}</span>
           <span class="driver-name">{{ act.actionName }}</span>
+          <span v-if="act.recommended" class="driver-recommended">已推荐</span>
         </div>
         <div class="driver-basis">
           <span class="basis-label">本体依据:</span> {{ act.basis }}
@@ -28,6 +29,7 @@ export interface ActionDriver {
   actionName: string
   basis: string
   drivenBy: Array<{ entity: string; attribute: string; reason: string }>
+  recommended?: boolean
 }
 defineProps<{ actions: ActionDriver[] }>()
 </script>
@@ -40,6 +42,7 @@ defineProps<{ actions: ActionDriver[] }>()
 .driver-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .driver-index { font-size: 11px; color: #4c6ef5; font-weight: 600; background: #eef2ff; padding: 2px 6px; border-radius: 4px; }
 .driver-name { font-size: 13px; font-weight: 600; color: #343a40; }
+.driver-recommended { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; background: #e6fcf5; color: #0ca678; margin-left: auto; }
 .driver-basis { font-size: 11px; color: #868e96; margin-bottom: 6px; }
 .basis-label { color: #4c6ef5; font-weight: 500; }
 .driver-sources { display: flex; flex-direction: column; gap: 4px; }
