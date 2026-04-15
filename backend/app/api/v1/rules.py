@@ -6,7 +6,10 @@ from datetime import datetime
 from app.database import get_db
 from app.models import BusinessRule, OntologyEntity
 from app.schemas.entity import RuleOut
-from app.schemas.rule import RuleCreate, RuleUpdate, RuleExecuteResult
+from app.schemas.rule import (
+    RuleCreate, RuleUpdate, RuleExecuteResult,
+    RuleEvaluateRequest, RuleEvaluateResult,
+)
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.services.audit import write_audit
@@ -43,6 +46,7 @@ def list_rules(
             condition_expr=r.condition_expr, action_desc=r.action_desc,
             status=r.status, priority=r.priority,
             trigger_count=r.trigger_count, last_triggered=r.last_triggered,
+            conditions_json=r.conditions_json, rule_meta_json=r.rule_meta_json,
         ))
     return result
 
@@ -59,6 +63,7 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
         condition_expr=r.condition_expr, action_desc=r.action_desc,
         status=r.status, priority=r.priority,
         trigger_count=r.trigger_count, last_triggered=r.last_triggered,
+        conditions_json=r.conditions_json, rule_meta_json=r.rule_meta_json,
     )
 
 
@@ -76,6 +81,7 @@ def create_rule(
         entity_id=data.entity_id, name=data.name,
         condition_expr=data.condition_expr, action_desc=data.action_desc,
         status=data.status, priority=data.priority,
+        conditions_json=data.conditions_json, rule_meta_json=data.rule_meta_json,
     )
     db.add(rule)
     db.flush()
@@ -163,4 +169,49 @@ def execute_rule(
         success=True,
         affected_count=rule.trigger_count,
         message=f"规则 {rule.name} 执行成功",
+    )
+
+
+@router.post("/{rule_id}/evaluate", response_model=RuleEvaluateResult)
+def evaluate_rule(
+    rule_id: str,
+    data: RuleEvaluateRequest,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    """对指定用户评估规则，返回结构化判断结果"""
+    rule = db.get(BusinessRule, rule_id)
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+    if not rule.conditions_json:
+        raise HTTPException(status_code=400, detail="该规则没有结构化条件，无法评估")
+
+    from app.services.rule_engine import RuleEvaluator
+    evaluator = RuleEvaluator(db)
+    result = evaluator.evaluate(rule, data.user_id)
+
+    write_audit(
+        db, user_id=user.id if user else None,
+        user_name=user.name if user else None,
+        action="evaluate", target_type="rule",
+        target_id=rule.id, target_name=rule.name,
+    )
+    db.commit()
+
+    return RuleEvaluateResult(
+        rule_id=result.rule_id or rule.id,
+        rule_name=result.rule_name,
+        triggered=result.triggered,
+        matched_count=result.matched_count,
+        total_count=result.total_count,
+        confidence=result.confidence,
+        conditions=[
+            {
+                "field": c.field, "display": c.display,
+                "operator": c.operator, "expected": c.expected,
+                "actual": c.actual, "matched": c.matched,
+            }
+            for c in result.conditions
+        ],
+        risk_level=result.risk_level,
     )

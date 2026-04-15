@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import OntologyEntity, EntityAttribute, EntityRelation
+from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction
 from app.schemas.entity import (
     EntityCreate, EntityUpdate, EntityDetail, EntityListItem,
     AttributeOut, RelationOut, RuleOut, ActionOut,
@@ -55,6 +55,63 @@ def list_entities(
     return result
 
 
+# ── 场景层级映射：namespace -> { layer_key: [entity_name, ...] } ──
+_SCENE_LAYER_MAP: dict[str, dict[str, list[str]]] = {
+    "s5": {
+        "signal": [
+            "MobileSubscriber", "PortabilityQuery",
+            "UserContract", "UserArrears", "ComplaintWorkOrder",
+        ],
+        "aggregate": ["MonthlyBilling", "VoiceCallRecord", "ConvergencePackage"],
+        "decision": ["RetentionRecord"],
+    },
+}
+
+
+@router.get("/scene-layer-stats")
+def get_scene_layer_stats(
+    namespace: str = Query(..., description="场景命名空间，如 s5"),
+    db: Session = Depends(get_db),
+):
+    """按层级统计场景实体、属性、关系、规则、动作数量。"""
+    layer_map = _SCENE_LAYER_MAP.get(namespace)
+    if not layer_map:
+        raise HTTPException(status_code=404, detail=f"未找到命名空间 {namespace} 的层级映射")
+
+    layer_labels = {"signal": "语义层", "aggregate": "动力层", "decision": "动态层"}
+    result = []
+
+    for layer_key in ("signal", "aggregate", "decision"):
+        entity_names = layer_map.get(layer_key, [])
+        entity_ids = [f"{namespace}_{n}" for n in entity_names]
+
+        entity_count = len(entity_ids)
+        attr_count = db.query(func.count(EntityAttribute.id)).filter(
+            EntityAttribute.entity_id.in_(entity_ids)
+        ).scalar() or 0
+        rel_count = db.query(func.count(EntityRelation.id)).filter(
+            EntityRelation.from_entity_id.in_(entity_ids) | EntityRelation.to_entity_id.in_(entity_ids)
+        ).scalar() or 0
+        rule_count = db.query(func.count(BusinessRule.id)).filter(
+            BusinessRule.entity_id.in_(entity_ids)
+        ).scalar() or 0
+        action_count = db.query(func.count(EntityAction.id)).filter(
+            EntityAction.entity_id.in_(entity_ids)
+        ).scalar() or 0
+
+        result.append({
+            "key": layer_key,
+            "label": layer_labels.get(layer_key, layer_key),
+            "entityCount": entity_count,
+            "attrCount": attr_count,
+            "relationCount": rel_count,
+            "ruleCount": rule_count,
+            "actionCount": action_count,
+        })
+
+    return result
+
+
 @router.get("/graph", response_model=GraphData)
 def get_full_graph(db: Session = Depends(get_db)):
     entities = db.query(OntologyEntity).all()
@@ -75,8 +132,8 @@ def get_full_graph(db: Session = Depends(get_db)):
         t = entity_map.get(r.to_entity_id)
         if f and t:
             edges.append(GraphEdge(
-                from_id=f.id, from_name=f.name,
-                to_id=t.id, to_name=t.name,
+                from_id=f.id, from_name=f.name_cn,
+                to_id=t.id, to_name=t.name_cn,
                 label=r.name, cardinality=r.cardinality,
             ))
 
@@ -134,8 +191,8 @@ def get_entity_lineage(
         t = entity_map.get(r.to_entity_id)
         if f and t:
             edges.append(GraphEdge(
-                from_id=f.id, from_name=f.name,
-                to_id=t.id, to_name=t.name,
+                from_id=f.id, from_name=f.name_cn,
+                to_id=t.id, to_name=t.name_cn,
                 label=r.name, cardinality=r.cardinality,
             ))
 
@@ -300,8 +357,8 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
         to_e = db.get(OntologyEntity, r.to_entity_id)
         rel_list.append(RelationOut(
             id=r.id, name=r.name, rel_type=r.rel_type,
-            from_entity_id=r.from_entity_id, from_entity_name=from_e.name if from_e else "",
-            to_entity_id=r.to_entity_id, to_entity_name=to_e.name if to_e else "",
+            from_entity_id=r.from_entity_id, from_entity_name=from_e.name_cn if from_e else "",
+            to_entity_id=r.to_entity_id, to_entity_name=to_e.name_cn if to_e else "",
             to_entity_tier=to_e.tier if to_e else 1,
             cardinality=r.cardinality, acyclic=r.acyclic, description=r.description,
         ))
