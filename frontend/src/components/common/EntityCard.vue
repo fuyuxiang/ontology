@@ -7,8 +7,7 @@
     <TierBadge :tier="entity.tier" />
     <div class="entity-card__body">
       <div class="entity-card__header">
-        <span class="entity-card__name">{{ entity.name }}</span>
-        <span class="entity-card__name-cn">{{ entity.nameCn }}</span>
+        <span class="entity-card__name">{{ entity.nameCn }}</span>
       </div>
       <div class="entity-card__meta">
         <span>属性: {{ entity.attrs }}</span>

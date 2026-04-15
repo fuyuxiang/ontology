@@ -16,7 +16,7 @@ const router = createRouter({
           path: '',
           name: 'browser-objects',
           component: () => import('../views/ontology/OntologyExplorer.vue'),
-          meta: { title: '对象管理' }
+          meta: { title: '本体管理' }
         },
         {
           path: 'graph',
@@ -77,14 +77,8 @@ const router = createRouter({
     {
       path: '/scene/mnp',
       name: 'scene-mnp',
-      component: () => import('../views/scene/MnpScene.vue'),
-      meta: { title: '携号转网预警' }
-    },
-    {
-      path: '/scene/mnp/workbench',
-      name: 'scene-mnp-workbench',
       component: () => import('../views/scene/MnpWorkbench.vue'),
-      meta: { title: '携号转网工作台' }
+      meta: { title: '携号转网预警' }
     }
   ]
 })

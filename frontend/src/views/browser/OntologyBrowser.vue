@@ -26,7 +26,7 @@ const route = useRoute()
 const tabs = [
   {
     path: '/browser',
-    label: '对象管理',
+    label: '本体管理',
     icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="3" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 6v2M8 8L3 10M8 8l5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
   },
   {

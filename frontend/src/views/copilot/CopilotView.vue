@@ -43,7 +43,33 @@
               </svg>
             </div>
             <div class="message__bubble">
-              <p class="text-body" style="white-space: pre-wrap;">{{ msg.content }}</p>
+              <div v-if="msg.role === 'ai'" class="text-body markdown-body" v-html="renderMarkdown(msg.content)"></div>
+              <p v-else class="text-body" style="white-space: pre-wrap;">{{ msg.content }}</p>
+              <!-- AI 回复后的建议问题 -->
+              <div v-if="msg.role === 'ai' && msg.suggestions && msg.suggestions.length > 0" class="message__suggestions">
+                <button
+                  v-for="s in msg.suggestions"
+                  :key="s"
+                  class="suggestion-chip suggestion-chip--inline"
+                  @click="sendMessage(s)"
+                >{{ s }}</button>
+              </div>
+              <!-- 可执行动作按钮 -->
+              <div v-if="msg.role === 'ai' && msg.actions && msg.actions.length > 0" class="message__actions">
+                <button
+                  v-for="act in msg.actions"
+                  :key="act.action_name"
+                  class="action-btn"
+                  :disabled="executingAction === act.action_name"
+                  @click="executeAction(act)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <path d="M5 2l5 4-5 4V2z" fill="currentColor"/>
+                  </svg>
+                  {{ act.name }}
+                  <span v-if="executingAction === act.action_name" class="action-btn__loading">执行中...</span>
+                </button>
+              </div>
               <span class="message__time text-caption">{{ msg.time }}</span>
             </div>
           </div>
@@ -113,6 +139,9 @@
               <div class="reasoning-step__type" :class="`reasoning-step__type--${step.type}`">{{ step.typeLabel }}</div>
               <div class="reasoning-step__result text-body">{{ step.result }}</div>
               <code class="reasoning-step__source">{{ step.source }}</code>
+              <div v-if="step.details && step.details.length > 0" class="reasoning-step__details">
+                <div v-for="(d, di) in step.details" :key="di" class="reasoning-step__detail-item">{{ d }}</div>
+              </div>
             </div>
           </div>
           <div v-if="i < reasoningSteps.length - 1" class="reasoning-chain__connector"></div>
@@ -145,12 +174,30 @@
 
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
+import { marked } from 'marked'
+
+// marked 配置：同步解析，禁用异步
+marked.setOptions({ async: false })
+
+function renderMarkdown(content: string): string {
+  if (!content) return ''
+  return marked.parse(content) as string
+}
+
+interface ActionButton {
+  name: string
+  action_name: string
+  params: Record<string, unknown>
+  description: string
+}
 
 interface Message {
   id: number
   role: 'user' | 'ai'
   content: string
   time: string
+  suggestions?: string[]
+  actions?: ActionButton[]
 }
 
 interface ReasoningStep {
@@ -158,20 +205,36 @@ interface ReasoningStep {
   typeLabel: string
   result: string
   source: string
+  details?: string[]
+}
+
+const TOOL_TYPE_MAP: Record<string, { type: ReasoningStep['type']; label: string }> = {
+  describe_ontology_model: { type: 'ontology', label: '本体模型' },
+  get_entity_detail: { type: 'ontology', label: '实体详情' },
+  query_entity_data: { type: 'ontology', label: '本体数据查询' },
+  list_datasources: { type: 'ml', label: '数据源列表' },
+  get_table_schema: { type: 'ml', label: '表结构' },
+  query_datasource: { type: 'ml', label: '数据查询' },
+  get_business_rules: { type: 'rule', label: '业务规则' },
+  evaluate_rule: { type: 'rule', label: '规则评估' },
+  evaluate_all_rules: { type: 'rule', label: '全量规则评估' },
+  screen_users_by_rule: { type: 'rule', label: '规则筛选用户' },
+  execute_action: { type: 'output', label: '执行动作' },
 }
 
 const messages = ref<Message[]>([])
 const inputText = ref('')
 const isTyping = ref(false)
+const executingAction = ref<string | null>(null)
 const messagesEl = ref<HTMLElement>()
 const inputEl = ref<HTMLTextAreaElement>()
 let msgId = 0
 
 const suggestions = [
-  '哪些客户有 FTTR 续约风险？',
-  '本月营销活动效果如何？',
-  '规则 rule_007 的触发条件是什么？',
-  '客户分群的依据是什么？',
+  '携号转网场景有哪些预警规则？',
+  '用户 U00001 的携转风险等级是什么？',
+  '在网不到12个月且有携转查询记录的用户有哪些？',
+  '最近有哪些维系挽留未成功的用户？',
 ]
 
 const reasoningSteps = ref<ReasoningStep[]>([])
@@ -183,7 +246,7 @@ function now() {
 
 async function sendMessage(text?: string) {
   const content = (text ?? inputText.value).trim()
-  if (!content) return
+  if (!content || isTyping.value) return
 
   messages.value.push({ id: ++msgId, role: 'user', content, time: now() })
   inputText.value = ''
@@ -194,61 +257,167 @@ async function sendMessage(text?: string) {
   reasoningSteps.value = []
   relatedObjects.value = []
 
-  // 构建消息历史
-  const apiMessages = messages.value
-    .filter(m => m.role === 'user' || m.role === 'ai')
-    .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content }))
-
-  // 创建 AI 消息占位
   const aiMsg: Message = { id: ++msgId, role: 'ai', content: '', time: now() }
   messages.value.push(aiMsg)
+  // 获取响应式引用，确保修改能触发视图更新
+  const aiMsgRef = messages.value[messages.value.length - 1]
 
   try {
-    const response = await fetch('/api/v1/copilot/chat', {
+    const response = await fetch('/api/v1/copilot/agent-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: apiMessages, stream: true }),
+      body: JSON.stringify({ question: content }),
     })
 
     if (!response.ok) {
-      aiMsg.content = `请求失败: ${response.status}`
+    aiMsgRef.content = `请求失败: ${response.status}`
       isTyping.value = false
       return
     }
 
     const reader = response.body?.getReader()
     const decoder = new TextDecoder()
+    let buffer = ''
 
     if (reader) {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-        const text = decoder.decode(value, { stream: true })
-        for (const line of text.split('\n')) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim()
-            if (data === '[DONE]') break
-            try {
-              const parsed = JSON.parse(data)
-              if (parsed.content) {
-                aiMsg.content += parsed.content
-                await scrollToBottom()
-              }
-              if (parsed.error) {
-                aiMsg.content += `\n[错误: ${parsed.error}]`
-              }
-            } catch {
-              // 非 JSON，忽略
-            }
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const data = line.slice(6).trim()
+          if (data === '[DONE]') break
+          try {
+            const event = JSON.parse(data)
+            handleSSEEvent(event, aiMsgRef)
+            await scrollToBottom()
+          } catch {
+            // 非 JSON，忽略
           }
         }
       }
     }
   } catch (e) {
-    aiMsg.content = `连接失败: ${(e as Error).message}`
+    aiMsgRef.content = `连接失败: ${(e as Error).message}`
   } finally {
     isTyping.value = false
     await scrollToBottom()
+  }
+}
+
+function extractDetailLines(detail: Record<string, unknown>): string[] {
+  const lines: string[] = []
+  const t = detail.type as string
+
+  if (t === 'rules') {
+    const rules = detail.rules as Array<Record<string, unknown>> || []
+    for (const r of rules) {
+      const cond = r.has_conditions ? '可评估' : '仅描述'
+      lines.push(`规则: ${r.name} [${cond}] → 关联实体: ${r.entity}`)
+    }
+  } else if (t === 'screen') {
+    const risk = detail.risk_level as string
+    const mode = detail.match_mode as string
+    const condCount = detail.conditions_count as number
+    const matched = detail.matched_users as number
+    lines.push(`风险等级: ${risk} | 匹配模式: ${mode} | 条件数: ${condCount} | 命中: ${matched}人`)
+    const entities = detail.entities_involved as Array<Record<string, string>> || []
+    if (entities.length > 0) {
+      lines.push('涉及本体实体 → 数据源:')
+      for (const e of entities) {
+        lines.push(`  ${e.entity_cn}(${e.entity}) → ${e.datasource}`)
+      }
+    }
+    const conditions = detail.conditions as string[] || []
+    if (conditions.length > 0) {
+      lines.push('规则条件:')
+      for (const c of conditions) {
+        lines.push(`  · ${c}`)
+      }
+    }
+  } else if (t === 'evaluate') {
+    lines.push(`用户: ${detail.user_id} | 综合风险: ${detail.overall_risk}`)
+    lines.push(`评估 ${detail.evaluated_count} 条规则，${detail.triggered_count} 条触发`)
+  } else if (t === 'evaluate_single') {
+    const triggered = detail.triggered ? '触发' : '未触发'
+    lines.push(`规则: ${detail.rule_name} → ${triggered} (${detail.matched_count}/${detail.total_count})`)
+    lines.push(`风险等级: ${detail.risk_level}`)
+  } else if (t === 'entity_query') {
+    lines.push(`本体实体: ${detail.entity_cn}(${detail.entity})`)
+    lines.push(`数据源: ${detail.datasource} → 表: ${detail.table}`)
+    lines.push(`查询结果: ${detail.row_count} 条记录`)
+  } else if (t === 'entity_detail') {
+    lines.push(`实体: ${detail.entity_cn}(${detail.entity})`)
+    lines.push(`属性: ${detail.attr_count}个 | 关系: ${detail.relation_count}个 | 规则: ${detail.rule_count}条`)
+  } else if (t === 'action') {
+    const success = detail.success ? '成功' : '失败'
+    lines.push(`动作: ${detail.action_name} → ${success}`)
+    const effects = detail.effects as Array<Record<string, unknown>> || []
+    for (const e of effects) {
+      lines.push(`  效果: ${e.operation} ${e.target}`)
+    }
+  }
+
+  return lines
+}
+
+function handleSSEEvent(event: Record<string, unknown>, aiMsg: Message) {
+  const type = event.type as string
+
+  if (type === 'tool_start') {
+    const toolName = event.tool as string
+    const mapping = TOOL_TYPE_MAP[toolName] || { type: 'ml' as const, label: toolName }
+    const args = event.arguments as Record<string, unknown> | undefined
+    const argStr = args ? Object.values(args).filter(Boolean).join(', ') : ''
+    reasoningSteps.value.push({
+      type: mapping.type,
+      typeLabel: mapping.label,
+      result: '执行中...',
+      source: argStr || toolName,
+    })
+  } else if (type === 'tool_result') {
+    const lastStep = reasoningSteps.value[reasoningSteps.value.length - 1]
+    if (lastStep) {
+      lastStep.result = (event.summary as string) || '完成'
+      // 提取本体上下文详情
+      const detail = event.detail as Record<string, unknown> | undefined
+      if (detail) {
+        lastStep.details = extractDetailLines(detail)
+      }
+    }
+  } else if (type === 'content') {
+    // 流式内容追加到对话气泡
+    aiMsg.content += (event.content as string) || ''
+  } else if (type === 'done') {
+    // 完成，设置建议问题和动作按钮
+    const sug = event.suggestions as string[] | undefined
+    if (sug && sug.length > 0) {
+      aiMsg.suggestions = sug
+    }
+    const acts = event.actions as ActionButton[] | undefined
+    if (acts && acts.length > 0) {
+      aiMsg.actions = acts
+    }
+    // 添加最终输出步骤到推理链
+    reasoningSteps.value.push({
+      type: 'output',
+      typeLabel: '最终回答',
+      result: '推理完成',
+      source: 'AI',
+    })
+  } else if (type === 'tool_summary') {
+    // 工具链汇总（可选展示）
+  } else if (type === 'answer') {
+    // 兼容旧格式
+    aiMsg.content = (event.content as string) || ''
+    const sug = event.suggestions as string[] | undefined
+    if (sug && sug.length > 0) {
+      aiMsg.suggestions = sug
+    }
   }
 }
 
@@ -256,6 +425,15 @@ function clearChat() {
   messages.value = []
   reasoningSteps.value = []
   relatedObjects.value = []
+  executingAction.value = null
+}
+
+async function executeAction(action: ActionButton) {
+  executingAction.value = action.action_name
+  // 将动作执行作为新的对话消息发送给 Agent
+  const prompt = `请执行动作「${action.name}」，参数: ${JSON.stringify(action.params)}，动作英文名: ${action.action_name}`
+  await sendMessage(prompt)
+  executingAction.value = null
 }
 
 async function scrollToBottom() {
@@ -571,6 +749,20 @@ function autoResize(e: Event) {
   color: var(--neutral-700);
   margin-top: 2px;
 }
+.reasoning-step__details {
+  margin-top: 6px;
+  padding: 6px 8px;
+  background: var(--neutral-50, #fafafa);
+  border-radius: 4px;
+  border-left: 2px solid var(--semantic-300, #93b8e6);
+}
+.reasoning-step__detail-item {
+  font-size: 11px;
+  color: var(--neutral-600);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+}
 
 .reasoning-chain__connector {
   width: 2px;
@@ -596,4 +788,80 @@ function autoResize(e: Event) {
 /* 消息过渡 */
 .message-enter-active { transition: opacity 250ms ease-out, transform 250ms ease-out; }
 .message-enter-from { opacity: 0; transform: translateY(12px); }
+
+/* 消息内建议 */
+.message__suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* 可执行动作按钮 */
+.message__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--neutral-200);
+}
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md, 6px);
+  border: 1px solid var(--semantic-400, #4a90d9);
+  background: var(--semantic-50, #f0f7ff);
+  color: var(--semantic-700, #1a56a0);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+.action-btn:hover:not(:disabled) {
+  background: var(--semantic-100, #d6e8ff);
+  border-color: var(--semantic-500, #3a7bd5);
+  box-shadow: 0 1px 4px rgba(74, 144, 217, 0.2);
+}
+.action-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.action-btn__loading {
+  font-size: 11px;
+  color: var(--semantic-500);
+  margin-left: 4px;
+}
+.suggestion-chip--inline {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--semantic-200);
+  background: var(--semantic-50, #f0f7ff);
+  color: var(--semantic-600);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.suggestion-chip--inline:hover {
+  background: var(--semantic-100);
+  border-color: var(--semantic-400);
+}
+
+/* Markdown 渲染 */
+.markdown-body { font-size: 13px; line-height: 1.6; word-break: break-word; }
+.markdown-body :deep(p) { margin: 4px 0; }
+.markdown-body :deep(h3) { font-size: 14px; font-weight: 600; margin: 10px 0 4px; }
+.markdown-body :deep(h4) { font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
+.markdown-body :deep(table) { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12px; }
+.markdown-body :deep(th),
+.markdown-body :deep(td) { border: 1px solid var(--neutral-200); padding: 4px 8px; text-align: left; }
+.markdown-body :deep(th) { background: var(--neutral-100); font-weight: 600; }
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) { padding-left: 18px; margin: 4px 0; }
+.markdown-body :deep(li) { margin: 2px 0; }
+.markdown-body :deep(code) { background: var(--neutral-100); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.markdown-body :deep(pre) { background: var(--neutral-100); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
+.markdown-body :deep(pre code) { background: none; padding: 0; }
 </style>

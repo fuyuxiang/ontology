@@ -45,11 +45,38 @@ def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
         if from_e and to_e:
             ctx_parts.append(f"- {from_e.name} --[{r.name} ({r.cardinality})]-> {to_e.name}")
 
-    # 活跃规则
+    # 活跃规则（包含结构化信息）
     ctx_parts.append(f"\n### 活跃业务规则 ({len(rules)} 条)")
     for r in rules[:10]:
         entity = next((e for e in entities if e.id == r.entity_id), None)
-        ctx_parts.append(f"- {r.name}: 当 `{r.condition_expr}` 时 → {r.action_desc} (关联: {entity.name if entity else '?'})")
+        has_conditions = "可评估" if r.conditions_json else "仅描述"
+        meta = r.rule_meta_json or {}
+        risk = meta.get("risk_level", "")
+        rule_id = meta.get("rule_id", "")
+        ctx_parts.append(
+            f"- [{has_conditions}] {r.name} (ID: {rule_id}, 风险级别: {risk}): "
+            f"当 `{r.condition_expr}` 时 → {r.action_desc} (关联: {entity.name if entity else '?'})"
+        )
+
+    # 实体→数据源映射
+    ctx_parts.append("\n### 实体数据源映射")
+    for e in entities:
+        ds_ref = (e.schema_json or {}).get("datasource_ref", "")
+        pk = (e.schema_json or {}).get("primary_key", "")
+        if ds_ref:
+            ctx_parts.append(f"- {e.name} ({e.name_cn}) → 数据源: {ds_ref}, 主键: {pk}")
+
+    # 动作类型
+    from app.models.rule import EntityAction
+    actions = db.query(EntityAction).filter(EntityAction.status == "active").all()
+    if actions:
+        ctx_parts.append(f"\n### 可执行动作 ({len(actions)} 个)")
+        for a in actions:
+            meta = a.action_meta_json or {}
+            action_name = meta.get("action_name", a.name)
+            params = a.parameters_json or []
+            param_str = ", ".join(p["name"] for p in params) if params else "无参数"
+            ctx_parts.append(f"- {a.name} (英文名: {action_name}, 触发方式: {a.type}, 参数: {param_str})")
 
     # 如果指定了实体，加入详细信息
     if entity_id:

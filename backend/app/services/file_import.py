@@ -38,14 +38,39 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
         scenario = data.get("scenario", {})
         namespace = scenario.get("namespace", "")
 
+    # ── 构建数据源逻辑名→物理表名映射 ──
+    ds_logical_to_physical: dict[str, str] = {}
+    for ds_def in data.get("data_sources", []):
+        source_id = ds_def.get("source_id", "")
+        tables = ds_def.get("tables", [])
+        if source_id and tables:
+            # 取第一个表的 table_name 作为物理名
+            table_name = tables[0].get("table_name", "")
+            if table_name:
+                ds_logical_to_physical[source_id] = table_name
+
+    def _resolve_ds_ref(logical_ref: str) -> str:
+        """将逻辑数据源名翻译为物理表名，找不到则原样返回"""
+        return ds_logical_to_physical.get(logical_ref, logical_ref) if logical_ref else ""
+
     # ── object_types → OntologyEntity + EntityAttribute ──
     entity_map: dict[str, str] = {}
     for obj in data.get("object_types", []):
         eid = f"{namespace}_{obj['name']}" if namespace else obj["name"]
+        raw_ds_ref = obj.get("datasource_ref", "")
+        resolved_ds_ref = _resolve_ds_ref(raw_ds_ref)
 
         existing = db.query(OntologyEntity).filter(OntologyEntity.id == eid).first()
         if existing:
             entity_map[obj["name"]] = eid
+            # 更新已有实体的 datasource_ref（可能之前是逻辑名）
+            schema = existing.schema_json or {}
+            old_ref = schema.get("datasource_ref", "")
+            if raw_ds_ref and old_ref != resolved_ds_ref:
+                schema["datasource_ref"] = resolved_ds_ref
+                existing.schema_json = schema
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(existing, "schema_json")
             result.entities_skipped += 1
             continue
 
@@ -59,7 +84,7 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
             schema_json={
                 "namespace": namespace,
                 "primary_key": obj.get("primary_key"),
-                "datasource_ref": obj.get("datasource_ref"),
+                "datasource_ref": resolved_ds_ref,
             },
         )
         db.add(entity)
@@ -162,10 +187,17 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
     # ── action_types → EntityAction ──
     for act in data.get("action_types", []):
         entity_id = None
-        for obj_name, eid in entity_map.items():
-            if obj_name.lower() in act.get("description", "").lower() or obj_name.lower() in act["name"].lower():
-                entity_id = eid
+        # 优先从 effects 的 target 解析关联实体
+        for eff in act.get("effects", []):
+            target = eff.get("target", "")
+            if target in entity_map:
+                entity_id = entity_map[target]
                 break
+        if not entity_id:
+            for obj_name, eid in entity_map.items():
+                if obj_name.lower() in act.get("description", "").lower() or obj_name.lower() in act["name"].lower():
+                    entity_id = eid
+                    break
         if not entity_id:
             entity_id = list(entity_map.values())[0] if entity_map else None
         if entity_id:
@@ -174,6 +206,15 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
                 name=act.get("display_name", act["name"]),
                 type=act.get("trigger", "automatic"),
                 status="active",
+                parameters_json=act.get("parameters"),
+                preconditions_json=act.get("preconditions"),
+                effects_json=act.get("effects"),
+                action_meta_json={
+                    "action_name": act["name"],
+                    "reasoning_mode": act.get("reasoning_mode"),
+                    "permissions": act.get("permissions"),
+                    "audit": act.get("audit"),
+                },
             )
             db.add(action)
             result.actions_created += 1
@@ -181,30 +222,56 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
     # ── business_rules → BusinessRule ──
     for rule in data.get("business_rules", []):
         entity_id = None
-        # 尝试从 applies_to 或 category 关联实体
-        applies_to = rule.get("applies_to_objects", [])
+        # v3 格式用 applicable_objects，v2 用 applies_to_objects
+        applies_to = rule.get("applicable_objects", rule.get("applies_to_objects", []))
         if applies_to:
             for obj_name in applies_to:
                 if obj_name in entity_map:
                     entity_id = entity_map[obj_name]
                     break
+        # 如果 applicable_objects 没匹配到，从 conditions 字段前缀解析
+        if not entity_id:
+            entity_id = _resolve_entity_from_conditions(rule.get("conditions", []), entity_map, namespace)
         if not entity_id:
             entity_id = list(entity_map.values())[0] if entity_map else None
         if not entity_id:
             continue
 
-        condition = rule.get("condition", {})
-        condition_expr = json.dumps(condition, ensure_ascii=False) if condition else ""
-        actions = rule.get("actions", [])
-        action_desc = "; ".join(
-            a.get("description", a.get("action", "")) for a in actions
-        ) if actions else rule.get("description", "")
+        # 条件：v3 用 conditions（数组），v2 用 condition（对象）
+        conditions = rule.get("conditions", [])
+        condition_obj = rule.get("condition", {})
+        if conditions:
+            condition_expr = rule.get("description", "")
+        elif condition_obj:
+            condition_expr = json.dumps(condition_obj, ensure_ascii=False)
+        else:
+            condition_expr = rule.get("description", "")
+
+        # 动作描述：v3 用 action（对象），v2 用 actions（数组）
+        action_obj = rule.get("action", {})
+        actions_arr = rule.get("actions", [])
+        if action_obj:
+            action_desc = action_obj.get("reason", action_obj.get("value", ""))
+        elif actions_arr:
+            action_desc = "; ".join(
+                a.get("description", a.get("action", "")) for a in actions_arr
+            )
+        else:
+            action_desc = rule.get("description", "")
 
         priority_val = rule.get("priority", 5)
         if isinstance(priority_val, int):
             priority = "high" if priority_val <= 2 else "medium" if priority_val <= 5 else "low"
         else:
             priority = str(priority_val)
+
+        # match_mode 和 risk_level
+        match_mode = rule.get("match_mode", "all")
+        risk_level = None
+        if action_obj and action_obj.get("target", "").endswith("risk_level"):
+            risk_level = action_obj.get("value")
+        if not risk_level:
+            risk_level = rule.get("risk_level")
 
         br = BusinessRule(
             entity_id=entity_id,
@@ -213,11 +280,64 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
             action_desc=action_desc,
             status="active",
             priority=priority,
+            conditions_json=conditions if conditions else None,
+            rule_meta_json={
+                "rule_id": rule.get("rule_id"),
+                "match_mode": match_mode,
+                "risk_level": risk_level,
+                "category": rule.get("category"),
+                "source": rule.get("source"),
+            } if conditions else None,
+        )
+        db.add(br)
+        result.rules_created += 1
+
+    # ── rule_types → BusinessRule（结构化规则）──
+    for rt in data.get("rule_types", []):
+        # 从条件字段前缀解析关联实体
+        entity_id = _resolve_entity_from_conditions(rt.get("conditions", []), entity_map, namespace)
+        if not entity_id:
+            entity_id = list(entity_map.values())[0] if entity_map else None
+        if not entity_id:
+            continue
+
+        priority_val = rt.get("priority", 5)
+        if isinstance(priority_val, int):
+            priority = "high" if priority_val <= 2 else "medium" if priority_val <= 5 else "low"
+        else:
+            priority = str(priority_val)
+
+        br = BusinessRule(
+            entity_id=entity_id,
+            name=rt.get("display_name", rt.get("rule_id", "")),
+            condition_expr=rt.get("description", ""),
+            action_desc=f"触发{rt.get('risk_level', 'unknown')}级预警",
+            conditions_json=rt.get("conditions"),
+            rule_meta_json={
+                "rule_id": rt.get("rule_id"),
+                "match_mode": rt.get("match_mode", "all"),
+                "risk_level": rt.get("risk_level"),
+            },
+            status="active",
+            priority=priority,
         )
         db.add(br)
         result.rules_created += 1
 
     return result
+
+
+def _resolve_entity_from_conditions(
+    conditions: list[dict], entity_map: dict[str, str], namespace: str
+) -> str | None:
+    """从条件字段前缀（如 'SubscriberContract.is_contract_active'）解析关联实体ID"""
+    for cond in conditions:
+        field = cond.get("field", "")
+        if "." in field:
+            entity_name = field.split(".")[0]
+            if entity_name in entity_map:
+                return entity_map[entity_name]
+    return None
 
 
 # ── OWL/TTL 解析 ──

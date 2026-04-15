@@ -15,6 +15,7 @@
     "@vue-flow/minimap": "^1.5.4",
     "axios": "^1.15.0",
     "dagre": "^0.8.5",
+    "marked": "^18.0.0",
     "pinia": "^3.0.4",
     "vue": "^3.5.32",
     "vue-router": "^4.6.4"
