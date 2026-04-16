@@ -369,20 +369,37 @@ onMounted(async () => {
   dataLoading.value = true
   try {
     const caseUsers = await sceneApi.mnpCaseUsers()
-    users.value = caseUsers.map(u => ({
-      id: u.user_id,
-      name: u.name || u.user_id,
-      phone: u.phone || '',
-      entities: {},
-      ruleResults: [],
-      finalRiskLevel: (u.finalRiskLevel || 'low') as 'high' | 'medium' | 'low',
-      riskScore: u.riskScore || 0,
-      churnReasonTop3: [],
-      recommendedActions: [],
-      assignedChannel: '',
-    }))
     if (caseUsers.length) {
+      users.value = caseUsers.map(u => ({
+        id: u.user_id,
+        name: u.name || u.user_id,
+        phone: u.phone || '',
+        entities: {},
+        ruleResults: [],
+        finalRiskLevel: (u.finalRiskLevel || 'low') as 'high' | 'medium' | 'low',
+        riskScore: u.riskScore || 0,
+        churnReasonTop3: [],
+        recommendedActions: [],
+        assignedChannel: '',
+      }))
       await loadUserData(caseUsers[0].user_id)
+    } else {
+      const fallbackUsers = await sceneApi.mnpUsers(10)
+      users.value = fallbackUsers.map(u => ({
+        id: u.user_id,
+        name: u.name || u.user_id,
+        phone: u.phone || '',
+        entities: {},
+        ruleResults: [],
+        finalRiskLevel: 'low',
+        riskScore: 0,
+        churnReasonTop3: [],
+        recommendedActions: [],
+        assignedChannel: '',
+      }))
+      if (fallbackUsers.length) {
+        await loadUserData(fallbackUsers[0].user_id)
+      }
     }
   } catch (e: any) {
     loadError.value = '加载案例用户失败: ' + (e?.message || e)
