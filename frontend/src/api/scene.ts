@@ -39,9 +39,24 @@ export interface MnpExecuteResult {
   assignedChannel: string
 }
 
+export interface MnpCaseUser {
+  user_id: string
+  name?: string
+  phone?: string
+  innet_months?: number
+  is_5g?: boolean
+  pay_mode?: string
+  finalRiskLevel: string
+  riskScore: number
+}
+
 export const sceneApi = {
   mnpUsers(limit = 10) {
     return get<MnpUserBrief[]>('/scenes/mnp/users', { params: { limit } })
+  },
+
+  mnpCaseUsers() {
+    return get<MnpCaseUser[]>('/scenes/mnp/case-users')
   },
 
   mnpExecute(userId: string) {

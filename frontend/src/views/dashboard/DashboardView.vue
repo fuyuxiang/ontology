@@ -25,7 +25,7 @@ const interaction = createSceneInteraction()
   display: flex;
   width: 100%;
   height: 100vh;
-  background: #f4f4f5;
+  background: #f1f5f9;
   overflow: hidden;
 }
 
