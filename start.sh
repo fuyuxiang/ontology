@@ -95,10 +95,18 @@ if [ "$BACKEND_RELOAD" = "1" ]; then
 fi
 nohup "$BACKEND_PYTHON" -m uvicorn "${backend_args[@]}" > "$BACKEND_LOG" 2>&1 &
 echo $! > "$BACKEND_PID_FILE"
-sleep 2
 
-if ! backend_pids="$(port_pids "$BACKEND_PORT")" || [ -z "$backend_pids" ]; then
-    echo "Backend failed to start. Check backend.log"
+backend_pids=""
+for i in $(seq 1 15); do
+    sleep 1
+    if backend_pids="$(port_pids "$BACKEND_PORT")" && [ -n "$backend_pids" ]; then
+        break
+    fi
+    printf "  waiting... (%ds)\n" "$i"
+done
+
+if [ -z "$backend_pids" ]; then
+    echo "Backend failed to start after 15s. Check backend.log"
     exit 1
 fi
 echo "Backend running with PID(s):"
@@ -109,10 +117,18 @@ echo "[3/3] Starting frontend (port $FRONTEND_PORT)..."
 cd "$FRONTEND_DIR"
 nohup env VITE_PROXY_TARGET="$VITE_PROXY_TARGET" npx vite --host 127.0.0.1 --port "$FRONTEND_PORT" > "$FRONTEND_LOG" 2>&1 &
 echo $! > "$FRONTEND_PID_FILE"
-sleep 2
 
-if ! frontend_pids="$(port_pids "$FRONTEND_PORT")" || [ -z "$frontend_pids" ]; then
-    echo "Frontend failed to start. Check frontend.log"
+frontend_pids=""
+for i in $(seq 1 15); do
+    sleep 1
+    if frontend_pids="$(port_pids "$FRONTEND_PORT")" && [ -n "$frontend_pids" ]; then
+        break
+    fi
+    printf "  waiting... (%ds)\n" "$i"
+done
+
+if [ -z "$frontend_pids" ]; then
+    echo "Frontend failed to start after 15s. Check frontend.log"
     exit 1
 fi
 echo "Frontend running with PID(s):"
