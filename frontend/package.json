@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@antv/g6": "^5.1.0",
     "@tresjs/cientos": "^5.7.0",
     "@tresjs/core": "^5.8.0",
     "@vue-flow/background": "^1.3.2",
