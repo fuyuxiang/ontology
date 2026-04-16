@@ -1,42 +1,42 @@
 <template>
   <div class="iso-scene">
     <!-- 顶层：应用能力 -->
-    <div class="iso-layer iso-layer--top" :class="{ 'iso-layer--dim': activeStage === 'hydrate' }">
-      <div class="iso-platform iso-platform--top">
-        <div class="iso-platform__edge iso-platform__edge--top"></div>
-        <div class="iso-platform__face">
-          <div class="iso-platform__label">APPLICATION LAYER</div>
-          <div class="iso-top-modules">
+    <div class="iso-layer" :class="{ 'iso-layer--dim': activeStage === 'hydrate' }">
+      <div class="iso-slab iso-slab--top">
+        <div class="iso-slab__face">
+          <div class="iso-slab__label">APPLICATION LAYER</div>
+          <div class="iso-top-grid">
             <button v-for="mod in topModules" :key="mod.key"
-              class="iso-app-card" :class="[`iso-app-card--${mod.tone}`, { 'iso-app-card--sel': selectedKey === mod.key }]"
+              class="iso-app-card"
+              :class="[`iso-app-card--${mod.tone}`, { 'iso-app-card--sel': selectedKey === mod.key }]"
               @click="$emit('selectTarget', mod.key)">
-              <div class="iso-app-card__screen">
-                <div class="iso-app-card__screen-inner" v-html="screenSvg(mod.key)"></div>
+              <div class="iso-app-card__screen" v-html="screenSvg(mod.key)"></div>
+              <div class="iso-app-card__foot">
+                <span class="iso-app-card__name">{{ mod.label }}</span>
+                <span class="iso-app-card__metric">{{ mod.metric }} {{ mod.metricLabel }}</span>
               </div>
-              <div class="iso-app-card__label">{{ mod.label }}</div>
-              <div class="iso-app-card__metric">{{ mod.metric }} {{ mod.metricLabel }}</div>
             </button>
           </div>
         </div>
+        <div class="iso-slab__edge iso-slab__edge--top"></div>
       </div>
     </div>
 
     <!-- 流线：中→顶 -->
-    <div class="iso-flow iso-flow--up" :class="{ 'iso-flow--active': activeStage === 'wield' }">
-      <svg class="iso-flow__svg" viewBox="0 0 800 80" preserveAspectRatio="none">
-        <!-- 扇形收束线：从底部宽散到顶部三个点 -->
-        <path v-for="(p, i) in upperFlowPaths" :key="'uf'+i" :d="p.d" class="flow-path" :class="{ 'flow-path--active': activeStage === 'wield' }" :style="{ animationDelay: (i * 0.08) + 's' }"/>
+    <div class="iso-flow" :class="{ 'iso-flow--active': activeStage === 'wield' }">
+      <svg class="iso-flow__svg" viewBox="0 0 800 72" preserveAspectRatio="none">
+        <path v-for="(p,i) in upperPaths" :key="'u'+i"
+          :d="p" class="fline" :class="{ 'fline--on': activeStage === 'wield' }"
+          :style="{ animationDelay: (i * 0.06) + 's' }"/>
       </svg>
-      <div v-for="i in 6" :key="'pu'+i" class="flow-dot flow-dot--up" :style="{ left: (8 + i * 14) + '%', animationDelay: (i * 0.28) + 's' }"></div>
     </div>
 
     <!-- 中层：本体网络 -->
-    <div class="iso-layer iso-layer--mid" :class="{ 'iso-layer--glow': activeStage === 'activate' }">
-      <div class="iso-platform iso-platform--mid">
-        <div class="iso-platform__edge iso-platform__edge--mid"></div>
-        <div class="iso-platform__face iso-platform__face--mid">
-          <div class="iso-platform__label">ONTOLOGY</div>
-          <div class="iso-ontology-wrap">
+    <div class="iso-layer" :class="{ 'iso-layer--glow': activeStage === 'activate' }">
+      <div class="iso-slab iso-slab--mid">
+        <div class="iso-slab__face iso-slab__face--mid">
+          <div class="iso-slab__label">ONTOLOGY</div>
+          <div class="iso-onto-wrap">
             <OntologyNetwork
               :entities="entities"
               :relations="relations"
@@ -50,35 +50,41 @@
             />
           </div>
         </div>
+        <div class="iso-slab__edge iso-slab__edge--mid"></div>
       </div>
     </div>
 
     <!-- 流线：底→中 -->
-    <div class="iso-flow iso-flow--down" :class="{ 'iso-flow--active': activeStage === 'hydrate' }">
-      <svg class="iso-flow__svg" viewBox="0 0 800 80" preserveAspectRatio="none">
-        <path v-for="(p, i) in lowerFlowPaths" :key="'lf'+i" :d="p.d" class="flow-path" :class="{ 'flow-path--active': activeStage === 'hydrate' }" :style="{ animationDelay: (i * 0.08) + 's' }"/>
+    <div class="iso-flow" :class="{ 'iso-flow--active': activeStage === 'hydrate' }">
+      <svg class="iso-flow__svg" viewBox="0 0 800 72" preserveAspectRatio="none">
+        <path v-for="(p,i) in lowerPaths" :key="'l'+i"
+          :d="p" class="fline" :class="{ 'fline--on': activeStage === 'hydrate' }"
+          :style="{ animationDelay: (i * 0.06) + 's' }"/>
       </svg>
-      <div v-for="i in 6" :key="'pd'+i" class="flow-dot flow-dot--up" :style="{ left: (8 + i * 14) + '%', animationDelay: (i * 0.28) + 's' }"></div>
     </div>
 
     <!-- 底层：数据基座 -->
-    <div class="iso-layer iso-layer--bot" :class="{ 'iso-layer--dim': activeStage === 'wield' }">
-      <div class="iso-platform iso-platform--bot">
-        <div class="iso-platform__edge iso-platform__edge--bot"></div>
-        <div class="iso-platform__face">
-          <div class="iso-platform__label">FOUNDATION LAYER</div>
-          <div class="iso-bot-modules">
+    <div class="iso-layer" :class="{ 'iso-layer--dim': activeStage === 'wield' }">
+      <div class="iso-slab iso-slab--bot">
+        <div class="iso-slab__face">
+          <div class="iso-slab__label">FOUNDATION LAYER</div>
+          <div class="iso-bot-grid">
             <button v-for="mod in bottomModules" :key="mod.key"
-              class="iso-data-card" :class="[`iso-data-card--${mod.tone}`, { 'iso-data-card--sel': selectedKey === mod.key }]"
+              class="iso-data-card"
+              :class="[`iso-data-card--${mod.tone}`, { 'iso-data-card--sel': selectedKey === mod.key }]"
               @click="$emit('selectTarget', mod.key)">
-              <div class="iso-data-card__icon" v-html="moduleIcon(mod.key)"></div>
-              <div class="iso-data-card__label">{{ mod.label }}</div>
-              <div class="iso-data-card__grid">
-                <span v-for="j in 6" :key="j" class="iso-data-card__cell" :class="{ 'cell--lit': j <= 4 }"></span>
+              <div class="iso-data-card__icon" v-html="dsIcon(mod.key)"></div>
+              <div class="iso-data-card__name">{{ mod.label }}</div>
+              <div class="iso-data-card__dots">
+                <span v-for="j in 8" :key="j" class="iso-dot" :class="{ 'iso-dot--on': j <= 5 }"></span>
+              </div>
+              <div class="iso-data-card__bar">
+                <div class="iso-data-card__fill" :style="{ width: (55 + mod.key.length * 3) % 80 + 20 + '%' }"></div>
               </div>
             </button>
           </div>
         </div>
+        <div class="iso-slab__edge iso-slab__edge--bot"></div>
       </div>
     </div>
   </div>
@@ -92,7 +98,6 @@ import type { EntityListItem } from '../../../types'
 import type { RelationData } from '../../../api/relations'
 
 type StageId = 'hydrate' | 'activate' | 'wield'
-
 interface ModuleCard {
   key: string; title: string; label: string
   metric: string; metricLabel: string; tone: string
@@ -107,7 +112,6 @@ const props = defineProps<{
   topModules: ModuleCard[]
   bottomModules: ModuleCard[]
 }>()
-
 defineEmits<{ selectTarget: [key: string] }>()
 
 const selectedEntity = computed(() => {
@@ -116,79 +120,70 @@ const selectedEntity = computed(() => {
   return props.entities.find(e => e.id === id) ?? null
 })
 
-// 扇形流线：底部均匀分布 → 顶部三个汇聚点
-function buildFanPaths(topAnchors: number[], count: number) {
-  return Array.from({ length: count }, (_, i) => {
-    const bx = 40 + i * (720 / (count - 1))
-    const anchor = topAnchors[i % topAnchors.length]
-    const mx = (bx + anchor) / 2
-    return { d: `M${bx},78 C${mx},40 ${anchor},40 ${anchor},2` }
+// 扇形流线：底部均匀 → 顶部三个汇聚点
+function fanPaths(anchors: number[], n: number, fromY: number, toY: number) {
+  return Array.from({ length: n }, (_, i) => {
+    const bx = 30 + i * (740 / (n - 1))
+    const ax = anchors[i % anchors.length]
+    const my = (fromY + toY) / 2
+    return `M${bx},${fromY} C${bx},${my} ${ax},${my} ${ax},${toY}`
   })
 }
-
-const upperFlowPaths = computed(() => buildFanPaths([160, 400, 640], 18))
-const lowerFlowPaths = computed(() => buildFanPaths([200, 400, 600], 18))
+const upperPaths = computed(() => fanPaths([160, 400, 640], 20, 70, 2))
+const lowerPaths = computed(() => fanPaths([200, 400, 600], 20, 70, 2))
 
 function screenSvg(key: string): string {
-  const screens: Record<string, string> = {
-    'module:analytics': `<svg width="100%" height="100%" viewBox="0 0 80 50" fill="none">
-      <rect x="2" y="2" width="76" height="46" rx="3" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
-      <rect x="8" y="30" width="8" height="14" rx="1" fill="#3b82f6" opacity=".8"/>
-      <rect x="20" y="22" width="8" height="22" rx="1" fill="#3b82f6"/>
-      <rect x="32" y="16" width="8" height="28" rx="1" fill="#60a5fa"/>
-      <rect x="44" y="26" width="8" height="18" rx="1" fill="#3b82f6" opacity=".7"/>
-      <rect x="56" y="10" width="8" height="34" rx="1" fill="#3b82f6"/>
-      <polyline points="8,28 20,20 32,14 44,24 56,8 68,18" stroke="#10b981" stroke-width="1.5" fill="none"/>
-      <circle cx="8" cy="28" r="2" fill="#10b981"/>
-      <circle cx="56" cy="8" r="2" fill="#10b981"/>
+  const m: Record<string, string> = {
+    'module:analytics': `<svg width="100%" height="100%" viewBox="0 0 120 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="120" height="70" rx="4" fill="#0f172a"/>
+      <rect x="8" y="42" width="10" height="20" rx="1.5" fill="#3b82f6" opacity=".7"/>
+      <rect x="22" y="32" width="10" height="30" rx="1.5" fill="#3b82f6"/>
+      <rect x="36" y="22" width="10" height="40" rx="1.5" fill="#60a5fa"/>
+      <rect x="50" y="36" width="10" height="26" rx="1.5" fill="#3b82f6" opacity=".8"/>
+      <rect x="64" y="14" width="10" height="48" rx="1.5" fill="#3b82f6"/>
+      <rect x="78" y="28" width="10" height="34" rx="1.5" fill="#60a5fa" opacity=".9"/>
+      <polyline points="13,40 27,30 41,20 55,34 69,12 83,26 97,18" stroke="#10b981" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="13" cy="40" r="3" fill="#10b981"/>
+      <circle cx="69" cy="12" r="3" fill="#10b981"/>
     </svg>`,
-    'module:workflows': `<svg width="100%" height="100%" viewBox="0 0 80 50" fill="none">
-      <rect x="2" y="2" width="76" height="46" rx="3" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
-      <rect x="28" y="6" width="24" height="10" rx="2" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
-      <text x="40" y="14" text-anchor="middle" font-size="5" fill="#60a5fa">TRIGGER</text>
-      <line x1="40" y1="16" x2="40" y2="22" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 1"/>
-      <rect x="14" y="22" width="20" height="9" rx="2" fill="#052e16" stroke="#10b981" stroke-width="1"/>
-      <text x="24" y="29" text-anchor="middle" font-size="4.5" fill="#10b981">RULE CHECK</text>
-      <rect x="46" y="22" width="20" height="9" rx="2" fill="#1e1b4b" stroke="#818cf8" stroke-width="1"/>
-      <text x="56" y="29" text-anchor="middle" font-size="4.5" fill="#818cf8">ACTION</text>
-      <line x1="34" y1="31" x2="34" y2="37" stroke="#10b981" stroke-width="1" stroke-dasharray="2 1"/>
-      <rect x="22" y="37" width="36" height="9" rx="2" fill="#2d1f00" stroke="#f59e0b" stroke-width="1"/>
-      <text x="40" y="44" text-anchor="middle" font-size="4.5" fill="#f59e0b">DISPATCH</text>
+    'module:workflows': `<svg width="100%" height="100%" viewBox="0 0 120 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="120" height="70" rx="4" fill="#0f172a"/>
+      <rect x="40" y="6" width="40" height="14" rx="3" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
+      <text x="60" y="16" text-anchor="middle" font-size="7" fill="#60a5fa" font-family="monospace">TRIGGER</text>
+      <line x1="60" y1="20" x2="60" y2="28" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="3 2"/>
+      <rect x="14" y="28" width="36" height="14" rx="3" fill="#052e16" stroke="#10b981" stroke-width="1"/>
+      <text x="32" y="38" text-anchor="middle" font-size="7" fill="#10b981" font-family="monospace">RULE CHECK</text>
+      <rect x="70" y="28" width="36" height="14" rx="3" fill="#1e1b4b" stroke="#818cf8" stroke-width="1"/>
+      <text x="88" y="38" text-anchor="middle" font-size="7" fill="#818cf8" font-family="monospace">ACTION</text>
+      <line x1="32" y1="42" x2="60" y2="50" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3 2"/>
+      <line x1="88" y1="42" x2="60" y2="50" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="3 2"/>
+      <rect x="36" y="50" width="48" height="14" rx="3" fill="#2d1f00" stroke="#f59e0b" stroke-width="1"/>
+      <text x="60" y="60" text-anchor="middle" font-size="7" fill="#f59e0b" font-family="monospace">DISPATCH</text>
     </svg>`,
-    'module:integrations': `<svg width="100%" height="100%" viewBox="0 0 80 50" fill="none">
-      <rect x="2" y="2" width="76" height="46" rx="3" fill="#0a1628" stroke="#1e3a5f" stroke-width="1"/>
-      <rect x="6" y="8" width="18" height="14" rx="2" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="15" y="17" text-anchor="middle" font-size="5" fill="#94a3b8">API</text>
-      <rect x="6" y="28" width="18" height="14" rx="2" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="15" y="37" text-anchor="middle" font-size="5" fill="#94a3b8">API</text>
-      <rect x="56" y="8" width="18" height="14" rx="2" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="65" y="17" text-anchor="middle" font-size="5" fill="#94a3b8">API</text>
-      <rect x="56" y="28" width="18" height="14" rx="2" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="65" y="37" text-anchor="middle" font-size="5" fill="#94a3b8">API</text>
-      <circle cx="40" cy="25" r="8" fill="#0f1f3d" stroke="#3b82f6" stroke-width="1.5"/>
-      <text x="40" y="28" text-anchor="middle" font-size="5" fill="#60a5fa">HUB</text>
-      <line x1="24" y1="15" x2="32" y2="22" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 1"/>
-      <line x1="24" y1="35" x2="32" y2="28" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 1"/>
-      <line x1="56" y1="15" x2="48" y2="22" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 1"/>
-      <line x1="56" y1="35" x2="48" y2="28" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 1"/>
+    'module:integrations': `<svg width="100%" height="100%" viewBox="0 0 120 70" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="120" height="70" rx="4" fill="#0f172a"/>
+      <rect x="6" y="10" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="18" y="22" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
+      <rect x="6" y="42" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="18" y="54" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
+      <rect x="90" y="10" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="102" y="22" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
+      <rect x="90" y="42" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="102" y="54" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
+      <circle cx="60" cy="35" r="14" fill="#0f1f3d" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="60" y="38" text-anchor="middle" font-size="8" fill="#60a5fa" font-family="monospace">HUB</text>
+      <line x1="30" y1="19" x2="46" y2="30" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
+      <line x1="30" y1="51" x2="46" y2="40" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
+      <line x1="90" y1="19" x2="74" y2="30" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
+      <line x1="90" y1="51" x2="74" y2="40" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
     </svg>`,
   }
-  return screens[key] ?? screens['module:analytics']
+  return m[key] ?? m['module:analytics']
 }
 
-function moduleIcon(key: string): string {
-  const icons: Record<string, string> = {
-    'module:data': `<svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-      <ellipse cx="14" cy="8" rx="9" ry="4" stroke="currentColor" stroke-width="1.5"/>
-      <path d="M5 8v6c0 2.2 4 4 9 4s9-1.8 9-4V8" stroke="currentColor" stroke-width="1.5"/>
-      <path d="M5 14v6c0 2.2 4 4 9 4s9-1.8 9-4v-6" stroke="currentColor" stroke-width="1.5"/>
-    </svg>`,
-    'module:models': `<svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-      <circle cx="14" cy="14" r="4" stroke="currentColor" stroke-width="1.5"/>
-      <path d="M14 4v4M14 20v4M4 14h4M20 14h4M6.93 6.93l2.83 2.83M18.24 18.24l2.83 2.83M6.93 21.07l2.83-2.83M18.24 9.76l2.83-2.83" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-    </svg>`,
-  }
-  return icons[key] ?? icons['module:data']
+function dsIcon(key: string): string {
+  if (key.includes('data')) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="6" rx="9" ry="3.5" stroke="#64748b" stroke-width="1.5"/><path d="M3 6v6c0 1.93 4 3.5 9 3.5s9-1.57 9-3.5V6" stroke="#64748b" stroke-width="1.5"/><path d="M3 12v6c0 1.93 4 3.5 9 3.5s9-1.57 9-3.5v-6" stroke="#64748b" stroke-width="1.5"/></svg>`
+  return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="#64748b" stroke-width="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/></svg>`
 }
 </script>
 
@@ -197,60 +192,55 @@ function moduleIcon(key: string): string {
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: 24px 20px;
+  padding: 20px;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(59,130,246,.07) 0%, transparent 60%),
-    radial-gradient(ellipse at 20% 100%, rgba(16,185,129,.05) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 0%, rgba(59,130,246,.05) 0%, transparent 55%),
+    radial-gradient(ellipse at 15% 100%, rgba(16,185,129,.04) 0%, transparent 45%),
     #f8fafc;
   border-radius: 20px;
   border: 1px solid rgba(15,17,23,.06);
   overflow: hidden;
-  min-height: 680px;
 }
 
-/* ── Layer wrapper ── */
-.iso-layer { transition: opacity .5s ease, transform .5s ease; }
-.iso-layer--dim { opacity: .35; }
-.iso-layer--glow .iso-platform--mid { box-shadow: 0 0 0 1px rgba(16,185,129,.25), 0 24px 60px rgba(16,185,129,.12); }
+/* ── Layer ── */
+.iso-layer { transition: opacity .5s ease; }
+.iso-layer--dim { opacity: .3; }
+.iso-layer--glow .iso-slab--mid .iso-slab__face { box-shadow: 0 0 0 1.5px rgba(16,185,129,.2), 0 20px 50px rgba(16,185,129,.1); }
 
-/* ── Platform (the "slab") ── */
-.iso-platform {
-  position: relative;
-  border-radius: 16px;
-  overflow: visible;
-}
+/* ── Slab (platform with thick edge) ── */
+.iso-slab { position: relative; margin-bottom: 2px; }
 
-.iso-platform__face {
-  position: relative;
-  background: rgba(255,255,255,.92);
+.iso-slab__face {
+  background: rgba(255,255,255,.94);
   border: 1px solid rgba(15,17,23,.07);
   border-radius: 14px;
   padding: 14px 18px 18px;
-  box-shadow: 0 2px 0 rgba(255,255,255,.9) inset, 0 16px 40px rgba(15,17,23,.06);
-  transform: perspective(900px) rotateX(5deg);
+  box-shadow: 0 2px 0 rgba(255,255,255,.9) inset, 0 12px 32px rgba(15,17,23,.06);
+  transform: perspective(1000px) rotateX(4deg);
   transform-origin: bottom center;
+  position: relative;
+  z-index: 1;
+}
+.iso-slab__face--mid {
+  transform: perspective(1000px) rotateX(2deg);
+  min-height: 340px;
 }
 
-.iso-platform__face--mid {
-  transform: perspective(900px) rotateX(3deg);
-  min-height: 300px;
-}
-
-/* Thick bottom edge — gives the "slab" illusion */
-.iso-platform__edge {
+/* Thick bottom edge — the "slab" illusion */
+.iso-slab__edge {
   position: absolute;
   bottom: -10px;
-  left: 6px;
-  right: 6px;
+  left: 8px;
+  right: 8px;
   height: 12px;
-  border-radius: 0 0 12px 12px;
-  z-index: -1;
+  border-radius: 0 0 10px 10px;
+  z-index: 0;
 }
-.iso-platform__edge--top { background: linear-gradient(180deg, #d4a017, #a07010); }
-.iso-platform__edge--mid { background: linear-gradient(180deg, #0d9488, #065f46); }
-.iso-platform__edge--bot { background: linear-gradient(180deg, #3b5bdb, #1e3a8a); }
+.iso-slab__edge--top { background: linear-gradient(180deg, #c8a020 0%, #8a6a00 100%); }
+.iso-slab__edge--mid { background: linear-gradient(180deg, #0d9488 0%, #065f46 100%); }
+.iso-slab__edge--bot { background: linear-gradient(180deg, #3b5bdb 0%, #1e3a8a 100%); }
 
-.iso-platform__label {
+.iso-slab__label {
   font-size: 9px;
   font-weight: 800;
   letter-spacing: .16em;
@@ -259,113 +249,81 @@ function moduleIcon(key: string): string {
   margin-bottom: 12px;
 }
 
-/* ── Top layer: app cards with mini screens ── */
-.iso-top-modules {
+/* ── Top: app cards ── */
+.iso-top-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 
 .iso-app-card {
-  background: #0d1117;
-  border: 1px solid #1e2535;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 0 0 10px;
+  overflow: hidden;
   cursor: pointer;
-  transition: transform .2s, box-shadow .2s;
-  text-align: center;
-  overflow: hidden;
+  background: #fff;
+  transition: transform .2s, box-shadow .2s, border-color .2s;
+  text-align: left;
 }
-.iso-app-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,.2); }
-.iso-app-card--sel { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.3); }
+.iso-app-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(15,17,23,.1); }
+.iso-app-card--sel { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.2); }
 
-.iso-app-card__screen {
-  width: 100%;
-  aspect-ratio: 16/10;
-  overflow: hidden;
-  border-radius: 8px 8px 0 0;
-}
-.iso-app-card__screen-inner { width: 100%; height: 100%; }
-.iso-app-card__label { font-size: 11px; font-weight: 700; color: #e2e8f0; margin-top: 8px; }
-.iso-app-card__metric { font-size: 10px; color: #475569; margin-top: 2px; }
+.iso-app-card__screen { width: 100%; aspect-ratio: 16/9; display: block; }
+.iso-app-card__foot { padding: 8px 10px; }
+.iso-app-card__name { display: block; font-size: 11px; font-weight: 700; color: #1e293b; }
+.iso-app-card__metric { display: block; font-size: 10px; color: #94a3b8; margin-top: 1px; }
 
-/* ── Bottom layer: data cards ── */
-.iso-bot-modules {
+/* ── Bottom: data cards ── */
+.iso-bot-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
 .iso-data-card {
-  background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  padding: 12px;
+  padding: 12px 14px;
+  background: #fff;
   cursor: pointer;
-  transition: transform .2s, box-shadow .2s;
   text-align: left;
+  transition: transform .2s, box-shadow .2s;
 }
 .iso-data-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,17,23,.08); }
 .iso-data-card--sel { border-color: #3b82f6; }
 .iso-data-card__icon { color: #64748b; margin-bottom: 6px; }
-.iso-data-card__label { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; }
-.iso-data-card__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; }
-.iso-data-card__cell { height: 6px; border-radius: 2px; background: #e2e8f0; }
-.cell--lit { background: #3b82f6; opacity: .7; }
+.iso-data-card__name { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; }
+.iso-data-card__dots { display: flex; gap: 3px; margin-bottom: 6px; }
+.iso-dot { width: 8px; height: 8px; border-radius: 2px; background: #e2e8f0; }
+.iso-dot--on { background: #3b82f6; opacity: .7; }
+.iso-data-card__bar { height: 4px; background: #f1f5f9; border-radius: 2px; overflow: hidden; }
+.iso-data-card__fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 2px; }
 
 /* ── Ontology wrap ── */
-.iso-ontology-wrap { position: relative; min-height: 280px; }
+.iso-onto-wrap { position: relative; min-height: 300px; }
 
 /* ── Flow zone ── */
 .iso-flow {
   position: relative;
-  height: 64px;
-  margin: -4px 0;
+  height: 60px;
+  margin: -2px 0;
   z-index: 2;
+  overflow: hidden;
 }
+.iso-flow__svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-.iso-flow__svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.flow-path {
+.fline {
   fill: none;
   stroke: #cbd5e1;
-  stroke-width: 1;
-  stroke-dasharray: 5 4;
-  opacity: .5;
+  stroke-width: .8;
+  stroke-dasharray: 4 4;
+  opacity: .4;
+  transition: stroke .4s, opacity .4s;
 }
-
-.flow-path--active {
+.fline--on {
   stroke: #10b981;
-  opacity: .7;
-  animation: dash-flow 1.4s linear infinite;
+  opacity: .65;
+  animation: dash-anim 1.6s linear infinite;
 }
-
-@keyframes dash-flow { to { stroke-dashoffset: -18; } }
-
-.flow-dot {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #10b981;
-  opacity: 0;
-  bottom: 0;
-  pointer-events: none;
-}
-
-.iso-flow--active .flow-dot--up {
-  animation: dot-rise 1.6s ease-in-out infinite;
-}
-
-@keyframes dot-rise {
-  0%   { bottom: 0;    opacity: 0; transform: scale(.5); }
-  15%  { opacity: .9;  transform: scale(1); }
-  85%  { opacity: .9;  transform: scale(1); }
-  100% { bottom: 100%; opacity: 0; transform: scale(.5); }
-}
+@keyframes dash-anim { to { stroke-dashoffset: -16; } }
 </style>
