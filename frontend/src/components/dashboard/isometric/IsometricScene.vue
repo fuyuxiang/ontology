@@ -1,41 +1,34 @@
 <template>
-  <div class="iso-scene">
-    <!-- 顶层：应用能力 -->
-    <div class="iso-layer" :class="{ 'iso-layer--dim': activeStage === 'hydrate' }">
-      <div class="iso-slab iso-slab--top">
-        <div class="iso-slab__face">
-          <div class="iso-slab__label">APPLICATION LAYER</div>
+  <div class="iso-scene" ref="sceneRef"
+    @mousedown="onDragStart"
+    @mousemove="onDragMove"
+    @mouseup="onDragEnd"
+    @mouseleave="onDragEnd"
+    @wheel.prevent="onWheel">
+
+    <div class="iso-world" :style="worldStyle">
+      <!-- 顶层平台 -->
+      <div class="iso-platform iso-platform--top" :style="platformStyle('top')">
+        <div class="iso-platform__surface">
+          <div class="iso-platform__label">APPLICATION LAYER</div>
           <div class="iso-top-grid">
             <button v-for="mod in topModules" :key="mod.key"
-              class="iso-app-card"
-              :class="[`iso-app-card--${mod.tone}`, { 'iso-app-card--sel': selectedKey === mod.key }]"
-              @click="$emit('selectTarget', mod.key)">
-              <div class="iso-app-card__screen" v-html="screenSvg(mod.key)"></div>
-              <div class="iso-app-card__foot">
-                <span class="iso-app-card__name">{{ mod.label }}</span>
-                <span class="iso-app-card__metric">{{ mod.metric }} {{ mod.metricLabel }}</span>
-              </div>
+              class="iso-card iso-card--app"
+              :class="{ 'iso-card--sel': selectedKey === mod.key }"
+              @click.stop="$emit('selectTarget', mod.key)">
+              <div class="iso-card__screen" v-html="screenSvg(mod.key)"></div>
+              <div class="iso-card__label">{{ mod.label }}</div>
             </button>
           </div>
         </div>
-        <div class="iso-slab__edge iso-slab__edge--top"></div>
+        <div class="iso-platform__front"></div>
+        <div class="iso-platform__side"></div>
       </div>
-    </div>
 
-    <!-- 流线：中→顶 -->
-    <div class="iso-flow" :class="{ 'iso-flow--active': activeStage === 'wield' }">
-      <svg class="iso-flow__svg" viewBox="0 0 800 72" preserveAspectRatio="none">
-        <path v-for="(p,i) in upperPaths" :key="'u'+i"
-          :d="p" class="fline" :class="{ 'fline--on': activeStage === 'wield' }"
-          :style="{ animationDelay: (i * 0.06) + 's' }"/>
-      </svg>
-    </div>
-
-    <!-- 中层：本体网络 -->
-    <div class="iso-layer" :class="{ 'iso-layer--glow': activeStage === 'activate' }">
-      <div class="iso-slab iso-slab--mid">
-        <div class="iso-slab__face iso-slab__face--mid">
-          <div class="iso-slab__label">ONTOLOGY</div>
+      <!-- 中层平台 -->
+      <div class="iso-platform iso-platform--mid" :style="platformStyle('mid')">
+        <div class="iso-platform__surface iso-platform__surface--mid">
+          <div class="iso-platform__label">ONTOLOGY</div>
           <div class="iso-onto-wrap">
             <OntologyNetwork
               :entities="entities"
@@ -44,56 +37,73 @@
               :selectedKey="selectedKey"
               @select="$emit('selectTarget', $event)"
             />
-            <AssetDetailCard
-              :entity="selectedEntity"
-              :visible="activeStage === 'activate' && !!selectedEntity"
-            />
           </div>
         </div>
-        <div class="iso-slab__edge iso-slab__edge--mid"></div>
+        <div class="iso-platform__front iso-platform__front--mid"></div>
+        <div class="iso-platform__side iso-platform__side--mid"></div>
       </div>
-    </div>
 
-    <!-- 流线：底→中 -->
-    <div class="iso-flow" :class="{ 'iso-flow--active': activeStage === 'hydrate' }">
-      <svg class="iso-flow__svg" viewBox="0 0 800 72" preserveAspectRatio="none">
-        <path v-for="(p,i) in lowerPaths" :key="'l'+i"
-          :d="p" class="fline" :class="{ 'fline--on': activeStage === 'hydrate' }"
-          :style="{ animationDelay: (i * 0.06) + 's' }"/>
-      </svg>
-    </div>
-
-    <!-- 底层：数据基座 -->
-    <div class="iso-layer" :class="{ 'iso-layer--dim': activeStage === 'wield' }">
-      <div class="iso-slab iso-slab--bot">
-        <div class="iso-slab__face">
-          <div class="iso-slab__label">FOUNDATION LAYER</div>
+      <!-- 底层平台 -->
+      <div class="iso-platform iso-platform--bot" :style="platformStyle('bot')">
+        <div class="iso-platform__surface">
+          <div class="iso-platform__label">FOUNDATION LAYER</div>
           <div class="iso-bot-grid">
             <button v-for="mod in bottomModules" :key="mod.key"
-              class="iso-data-card"
-              :class="[`iso-data-card--${mod.tone}`, { 'iso-data-card--sel': selectedKey === mod.key }]"
-              @click="$emit('selectTarget', mod.key)">
-              <div class="iso-data-card__icon" v-html="dsIcon(mod.key)"></div>
-              <div class="iso-data-card__name">{{ mod.label }}</div>
-              <div class="iso-data-card__dots">
-                <span v-for="j in 8" :key="j" class="iso-dot" :class="{ 'iso-dot--on': j <= 5 }"></span>
-              </div>
-              <div class="iso-data-card__bar">
-                <div class="iso-data-card__fill" :style="{ width: (55 + mod.key.length * 3) % 80 + 20 + '%' }"></div>
+              class="iso-card iso-card--data"
+              :class="{ 'iso-card--sel': selectedKey === mod.key }"
+              @click.stop="$emit('selectTarget', mod.key)">
+              <div class="iso-card__ds-icon" v-html="dsIcon(mod.key)"></div>
+              <div class="iso-card__label">{{ mod.label }}</div>
+              <div class="iso-card__bars">
+                <div v-for="j in 4" :key="j" class="iso-card__bar-seg"
+                  :style="{ height: (30 + j * 15) + '%', opacity: j <= 3 ? 1 : .3 }"></div>
               </div>
             </button>
           </div>
         </div>
-        <div class="iso-slab__edge iso-slab__edge--bot"></div>
+        <div class="iso-platform__front iso-platform__front--bot"></div>
+        <div class="iso-platform__side iso-platform__side--bot"></div>
       </div>
+
+      <!-- 层间连线 SVG（绝对定位，覆盖整个world） -->
+      <svg class="iso-connectors" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="lg-up" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#10b981" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#3b82f6" stop-opacity=".3"/>
+          </linearGradient>
+          <linearGradient id="lg-dn" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3b82f6" stop-opacity=".6"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity=".3"/>
+          </linearGradient>
+        </defs>
+        <!-- 中→顶 连线束 -->
+        <g :opacity="activeStage === 'wield' ? 0.7 : 0.15">
+          <path v-for="(p,i) in upperConnectors" :key="'uc'+i"
+            :d="p" fill="none" stroke="url(#lg-up)" stroke-width=".3"
+            :stroke-dasharray="activeStage === 'wield' ? '2 2' : '1 3'"
+            :class="{ 'conn-anim': activeStage === 'wield' }"
+            :style="{ animationDelay: (i * 0.05) + 's' }"/>
+        </g>
+        <!-- 底→中 连线束 -->
+        <g :opacity="activeStage === 'hydrate' ? 0.7 : 0.15">
+          <path v-for="(p,i) in lowerConnectors" :key="'lc'+i"
+            :d="p" fill="none" stroke="url(#lg-dn)" stroke-width=".3"
+            :stroke-dasharray="activeStage === 'hydrate' ? '2 2' : '1 3'"
+            :class="{ 'conn-anim': activeStage === 'hydrate' }"
+            :style="{ animationDelay: (i * 0.05) + 's' }"/>
+        </g>
+      </svg>
     </div>
+
+    <!-- 旋转提示 -->
+    <div class="iso-hint" v-if="!hasDragged">拖拽旋转 · 滚轮缩放</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, reactive } from 'vue'
 import OntologyNetwork from './OntologyNetwork.vue'
-import AssetDetailCard from './AssetDetailCard.vue'
 import type { EntityListItem } from '../../../types'
 import type { RelationData } from '../../../api/relations'
 
@@ -114,216 +124,269 @@ const props = defineProps<{
 }>()
 defineEmits<{ selectTarget: [key: string] }>()
 
-const selectedEntity = computed(() => {
-  if (!props.selectedKey.startsWith('entity:')) return null
-  const id = props.selectedKey.slice(7)
-  return props.entities.find(e => e.id === id) ?? null
-})
+// ── 3D 旋转状态 ──
+const rotX = ref(28)   // 初始俯仰角
+const rotY = ref(-20)  // 初始偏转角
+const scale = ref(1)
+const drag = reactive({ active: false, startX: 0, startY: 0, baseX: 28, baseY: -20 })
+const hasDragged = ref(false)
+const sceneRef = ref<HTMLElement | null>(null)
 
-// 扇形流线：底部均匀 → 顶部三个汇聚点
-function fanPaths(anchors: number[], n: number, fromY: number, toY: number) {
+function onDragStart(e: MouseEvent) {
+  drag.active = true
+  drag.startX = e.clientX
+  drag.startY = e.clientY
+  drag.baseX = rotX.value
+  drag.baseY = rotY.value
+}
+function onDragMove(e: MouseEvent) {
+  if (!drag.active) return
+  hasDragged.value = true
+  const dx = e.clientX - drag.startX
+  const dy = e.clientY - drag.startY
+  rotY.value = drag.baseY + dx * 0.4
+  rotX.value = Math.max(5, Math.min(60, drag.baseX + dy * 0.3))
+}
+function onDragEnd() { drag.active = false }
+function onWheel(e: WheelEvent) {
+  scale.value = Math.max(0.5, Math.min(1.8, scale.value - e.deltaY * 0.001))
+}
+
+const worldStyle = computed(() => ({
+  transform: `rotateX(${rotX.value}deg) rotateY(${rotY.value}deg) scale(${scale.value})`,
+  cursor: drag.active ? 'grabbing' : 'grab',
+}))
+
+// 平台垂直偏移
+function platformStyle(layer: 'top' | 'mid' | 'bot') {
+  const offsets = { top: -160, mid: 0, bot: 160 }
+  return { transform: `translateY(${offsets[layer]}px)` }
+}
+
+// 连线束（SVG viewBox 0-100）
+function buildConnectors(topAnchors: number[], n: number, y1: number, y2: number) {
   return Array.from({ length: n }, (_, i) => {
-    const bx = 30 + i * (740 / (n - 1))
-    const ax = anchors[i % anchors.length]
-    const my = (fromY + toY) / 2
-    return `M${bx},${fromY} C${bx},${my} ${ax},${my} ${ax},${toY}`
+    const bx = 5 + i * (90 / (n - 1))
+    const ax = topAnchors[i % topAnchors.length]
+    const my = (y1 + y2) / 2
+    return `M${bx},${y1} C${bx},${my} ${ax},${my} ${ax},${y2}`
   })
 }
-const upperPaths = computed(() => fanPaths([160, 400, 640], 20, 70, 2))
-const lowerPaths = computed(() => fanPaths([200, 400, 600], 20, 70, 2))
+const upperConnectors = computed(() => buildConnectors([25, 50, 75], 16, 62, 38))
+const lowerConnectors = computed(() => buildConnectors([25, 50, 75], 16, 88, 64))
 
 function screenSvg(key: string): string {
   const m: Record<string, string> = {
-    'module:analytics': `<svg width="100%" height="100%" viewBox="0 0 120 70" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="120" height="70" rx="4" fill="#0f172a"/>
-      <rect x="8" y="42" width="10" height="20" rx="1.5" fill="#3b82f6" opacity=".7"/>
-      <rect x="22" y="32" width="10" height="30" rx="1.5" fill="#3b82f6"/>
-      <rect x="36" y="22" width="10" height="40" rx="1.5" fill="#60a5fa"/>
-      <rect x="50" y="36" width="10" height="26" rx="1.5" fill="#3b82f6" opacity=".8"/>
-      <rect x="64" y="14" width="10" height="48" rx="1.5" fill="#3b82f6"/>
-      <rect x="78" y="28" width="10" height="34" rx="1.5" fill="#60a5fa" opacity=".9"/>
-      <polyline points="13,40 27,30 41,20 55,34 69,12 83,26 97,18" stroke="#10b981" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="13" cy="40" r="3" fill="#10b981"/>
-      <circle cx="69" cy="12" r="3" fill="#10b981"/>
+    'module:analytics': `<svg width="100%" height="100%" viewBox="0 0 120 68" fill="none">
+      <rect width="120" height="68" rx="3" fill="#0f172a"/>
+      <rect x="8" y="40" width="10" height="20" rx="1" fill="#3b82f6" opacity=".7"/>
+      <rect x="22" y="30" width="10" height="30" rx="1" fill="#3b82f6"/>
+      <rect x="36" y="20" width="10" height="40" rx="1" fill="#60a5fa"/>
+      <rect x="50" y="34" width="10" height="26" rx="1" fill="#3b82f6" opacity=".8"/>
+      <rect x="64" y="12" width="10" height="48" rx="1" fill="#3b82f6"/>
+      <polyline points="13,38 27,28 41,18 55,32 69,10 83,24" stroke="#10b981" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="13" cy="38" r="3" fill="#10b981"/>
+      <circle cx="69" cy="10" r="3" fill="#10b981"/>
     </svg>`,
-    'module:workflows': `<svg width="100%" height="100%" viewBox="0 0 120 70" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="120" height="70" rx="4" fill="#0f172a"/>
-      <rect x="40" y="6" width="40" height="14" rx="3" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
-      <text x="60" y="16" text-anchor="middle" font-size="7" fill="#60a5fa" font-family="monospace">TRIGGER</text>
-      <line x1="60" y1="20" x2="60" y2="28" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="3 2"/>
-      <rect x="14" y="28" width="36" height="14" rx="3" fill="#052e16" stroke="#10b981" stroke-width="1"/>
-      <text x="32" y="38" text-anchor="middle" font-size="7" fill="#10b981" font-family="monospace">RULE CHECK</text>
-      <rect x="70" y="28" width="36" height="14" rx="3" fill="#1e1b4b" stroke="#818cf8" stroke-width="1"/>
-      <text x="88" y="38" text-anchor="middle" font-size="7" fill="#818cf8" font-family="monospace">ACTION</text>
-      <line x1="32" y1="42" x2="60" y2="50" stroke="#10b981" stroke-width="1.2" stroke-dasharray="3 2"/>
-      <line x1="88" y1="42" x2="60" y2="50" stroke="#818cf8" stroke-width="1.2" stroke-dasharray="3 2"/>
-      <rect x="36" y="50" width="48" height="14" rx="3" fill="#2d1f00" stroke="#f59e0b" stroke-width="1"/>
-      <text x="60" y="60" text-anchor="middle" font-size="7" fill="#f59e0b" font-family="monospace">DISPATCH</text>
+    'module:workflows': `<svg width="100%" height="100%" viewBox="0 0 120 68" fill="none">
+      <rect width="120" height="68" rx="3" fill="#0f172a"/>
+      <rect x="40" y="5" width="40" height="13" rx="2.5" fill="#1e3a5f" stroke="#3b82f6" stroke-width="1"/>
+      <text x="60" y="14.5" text-anchor="middle" font-size="6.5" fill="#60a5fa" font-family="monospace">TRIGGER</text>
+      <line x1="60" y1="18" x2="60" y2="25" stroke="#3b82f6" stroke-width="1.2" stroke-dasharray="2 2"/>
+      <rect x="12" y="25" width="36" height="13" rx="2.5" fill="#052e16" stroke="#10b981" stroke-width="1"/>
+      <text x="30" y="34" text-anchor="middle" font-size="6" fill="#10b981" font-family="monospace">RULE CHECK</text>
+      <rect x="72" y="25" width="36" height="13" rx="2.5" fill="#1e1b4b" stroke="#818cf8" stroke-width="1"/>
+      <text x="90" y="34" text-anchor="middle" font-size="6.5" fill="#818cf8" font-family="monospace">ACTION</text>
+      <line x1="30" y1="38" x2="60" y2="48" stroke="#10b981" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="90" y1="38" x2="60" y2="48" stroke="#818cf8" stroke-width="1" stroke-dasharray="2 2"/>
+      <rect x="36" y="48" width="48" height="13" rx="2.5" fill="#2d1f00" stroke="#f59e0b" stroke-width="1"/>
+      <text x="60" y="57" text-anchor="middle" font-size="6.5" fill="#f59e0b" font-family="monospace">DISPATCH</text>
     </svg>`,
-    'module:integrations': `<svg width="100%" height="100%" viewBox="0 0 120 70" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="120" height="70" rx="4" fill="#0f172a"/>
-      <rect x="6" y="10" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="18" y="22" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
-      <rect x="6" y="42" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="18" y="54" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
-      <rect x="90" y="10" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="102" y="22" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
-      <rect x="90" y="42" width="24" height="18" rx="3" fill="#1e2535" stroke="#475569" stroke-width="1"/>
-      <text x="102" y="54" text-anchor="middle" font-size="7" fill="#94a3b8" font-family="monospace">API</text>
-      <circle cx="60" cy="35" r="14" fill="#0f1f3d" stroke="#3b82f6" stroke-width="1.5"/>
-      <text x="60" y="38" text-anchor="middle" font-size="8" fill="#60a5fa" font-family="monospace">HUB</text>
-      <line x1="30" y1="19" x2="46" y2="30" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
-      <line x1="30" y1="51" x2="46" y2="40" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
-      <line x1="90" y1="19" x2="74" y2="30" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
-      <line x1="90" y1="51" x2="74" y2="40" stroke="#3b82f6" stroke-width="1" stroke-dasharray="3 2"/>
+    'module:integrations': `<svg width="100%" height="100%" viewBox="0 0 120 68" fill="none">
+      <rect width="120" height="68" rx="3" fill="#0f172a"/>
+      <rect x="5" y="10" width="24" height="16" rx="2.5" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="17" y="21" text-anchor="middle" font-size="6.5" fill="#94a3b8" font-family="monospace">API</text>
+      <rect x="5" y="42" width="24" height="16" rx="2.5" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="17" y="53" text-anchor="middle" font-size="6.5" fill="#94a3b8" font-family="monospace">API</text>
+      <rect x="91" y="10" width="24" height="16" rx="2.5" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="103" y="21" text-anchor="middle" font-size="6.5" fill="#94a3b8" font-family="monospace">API</text>
+      <rect x="91" y="42" width="24" height="16" rx="2.5" fill="#1e2535" stroke="#475569" stroke-width="1"/>
+      <text x="103" y="53" text-anchor="middle" font-size="6.5" fill="#94a3b8" font-family="monospace">API</text>
+      <circle cx="60" cy="34" r="14" fill="#0f1f3d" stroke="#3b82f6" stroke-width="1.5"/>
+      <text x="60" y="37" text-anchor="middle" font-size="7.5" fill="#60a5fa" font-family="monospace">HUB</text>
+      <line x1="29" y1="18" x2="46" y2="28" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="29" y1="50" x2="46" y2="40" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="91" y1="18" x2="74" y2="28" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 2"/>
+      <line x1="91" y1="50" x2="74" y2="40" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 2"/>
     </svg>`,
   }
   return m[key] ?? m['module:analytics']
 }
 
 function dsIcon(key: string): string {
-  if (key.includes('data')) return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="6" rx="9" ry="3.5" stroke="#64748b" stroke-width="1.5"/><path d="M3 6v6c0 1.93 4 3.5 9 3.5s9-1.57 9-3.5V6" stroke="#64748b" stroke-width="1.5"/><path d="M3 12v6c0 1.93 4 3.5 9 3.5s9-1.57 9-3.5v-6" stroke="#64748b" stroke-width="1.5"/></svg>`
-  return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="#64748b" stroke-width="1.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5.64 5.64l2.12 2.12M16.24 16.24l2.12 2.12M5.64 18.36l2.12-2.12M16.24 7.76l2.12-2.12" stroke="#64748b" stroke-width="1.5" stroke-linecap="round"/></svg>`
+  if (key.includes('data')) return `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><ellipse cx="11" cy="5.5" rx="8" ry="3" stroke="#64748b" stroke-width="1.4"/><path d="M3 5.5v5c0 1.66 3.58 3 8 3s8-1.34 8-3v-5" stroke="#64748b" stroke-width="1.4"/><path d="M3 10.5v5c0 1.66 3.58 3 8 3s8-1.34 8-3v-5" stroke="#64748b" stroke-width="1.4"/></svg>`
+  return `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="3.5" stroke="#64748b" stroke-width="1.4"/><path d="M11 2v3M11 17v3M2 11h3M17 11h3M4.64 4.64l2.12 2.12M15.24 15.24l2.12 2.12M4.64 17.36l2.12-2.12M15.24 6.76l2.12-2.12" stroke="#64748b" stroke-width="1.4" stroke-linecap="round"/></svg>`
 }
 </script>
 
 <style scoped>
+/* ── Scene container ── */
 .iso-scene {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: 20px;
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(59,130,246,.05) 0%, transparent 55%),
-    radial-gradient(ellipse at 15% 100%, rgba(16,185,129,.04) 0%, transparent 45%),
-    #f8fafc;
-  border-radius: 20px;
-  border: 1px solid rgba(15,17,23,.06);
-  overflow: hidden;
-}
-
-/* ── Layer ── */
-.iso-layer { transition: opacity .5s ease; }
-.iso-layer--dim { opacity: .3; }
-.iso-layer--glow .iso-slab--mid .iso-slab__face { box-shadow: 0 0 0 1.5px rgba(16,185,129,.2), 0 20px 50px rgba(16,185,129,.1); }
-
-/* ── Slab (platform with thick edge) ── */
-.iso-slab { position: relative; margin-bottom: 2px; }
-
-.iso-slab__face {
-  background: rgba(255,255,255,.94);
-  border: 1px solid rgba(15,17,23,.07);
-  border-radius: 14px;
-  padding: 14px 18px 18px;
-  box-shadow: 0 2px 0 rgba(255,255,255,.9) inset, 0 12px 32px rgba(15,17,23,.06);
-  transform: perspective(1000px) rotateX(4deg);
-  transform-origin: bottom center;
   position: relative;
-  z-index: 1;
-}
-.iso-slab__face--mid {
-  transform: perspective(1000px) rotateX(2deg);
-  min-height: 340px;
+  width: 100%;
+  height: 680px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(59,130,246,.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 20% 80%, rgba(16,185,129,.04) 0%, transparent 50%),
+    #f0f4f8;
+  border-radius: 20px;
+  border: 1px solid rgba(15,17,23,.05);
+  user-select: none;
 }
 
-/* Thick bottom edge — the "slab" illusion */
-.iso-slab__edge {
+/* ── 3D world ── */
+.iso-world {
   position: absolute;
-  bottom: -10px;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-style: preserve-3d;
+  transition: transform .05s linear;
+  will-change: transform;
+}
+
+/* ── Platform ── */
+.iso-platform {
+  position: absolute;
+  width: 680px;
+  transform-style: preserve-3d;
+}
+
+/* Surface (top face) */
+.iso-platform__surface {
+  position: relative;
+  background: rgba(255,255,255,.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.7);
+  border-radius: 16px;
+  padding: 14px 18px 18px;
+  box-shadow: 0 2px 24px rgba(15,17,23,.06);
+}
+.iso-platform__surface--mid {
+  background: rgba(255,255,255,.6);
+  min-height: 300px;
+}
+
+/* Front face (bottom edge) */
+.iso-platform__front {
+  position: absolute;
+  bottom: -14px;
   left: 8px;
   right: 8px;
-  height: 12px;
+  height: 14px;
   border-radius: 0 0 10px 10px;
-  z-index: 0;
+  background: linear-gradient(180deg, rgba(200,210,230,.6) 0%, rgba(160,175,200,.4) 100%);
+  border: 1px solid rgba(255,255,255,.4);
+  border-top: none;
 }
-.iso-slab__edge--top { background: linear-gradient(180deg, #c8a020 0%, #8a6a00 100%); }
-.iso-slab__edge--mid { background: linear-gradient(180deg, #0d9488 0%, #065f46 100%); }
-.iso-slab__edge--bot { background: linear-gradient(180deg, #3b5bdb 0%, #1e3a8a 100%); }
+.iso-platform__front--mid { background: linear-gradient(180deg, rgba(16,185,129,.25) 0%, rgba(16,185,129,.1) 100%); }
+.iso-platform__front--bot { background: linear-gradient(180deg, rgba(59,130,246,.25) 0%, rgba(59,130,246,.1) 100%); }
 
-.iso-slab__label {
+/* Side face (right edge) */
+.iso-platform__side {
+  position: absolute;
+  top: 8px;
+  right: -14px;
+  bottom: -6px;
+  width: 14px;
+  border-radius: 0 10px 10px 0;
+  background: linear-gradient(90deg, rgba(200,210,230,.5) 0%, rgba(160,175,200,.3) 100%);
+  border: 1px solid rgba(255,255,255,.35);
+  border-left: none;
+}
+.iso-platform__side--mid { background: linear-gradient(90deg, rgba(16,185,129,.2) 0%, rgba(16,185,129,.08) 100%); }
+.iso-platform__side--bot { background: linear-gradient(90deg, rgba(59,130,246,.2) 0%, rgba(59,130,246,.08) 100%); }
+
+.iso-platform__label {
   font-size: 9px;
   font-weight: 800;
   letter-spacing: .16em;
   color: #94a3b8;
   text-transform: uppercase;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
-/* ── Top: app cards ── */
+/* ── App cards (top layer) ── */
 .iso-top-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
-.iso-app-card {
-  border: 1px solid #e2e8f0;
+.iso-card {
   border-radius: 10px;
-  overflow: hidden;
   cursor: pointer;
-  background: #fff;
-  transition: transform .2s, box-shadow .2s, border-color .2s;
+  transition: transform .2s, box-shadow .2s;
   text-align: left;
+  border: 1px solid rgba(15,17,23,.07);
+  background: rgba(255,255,255,.7);
+  backdrop-filter: blur(8px);
+  overflow: hidden;
 }
-.iso-app-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(15,17,23,.1); }
-.iso-app-card--sel { border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.2); }
+.iso-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(15,17,23,.1); }
+.iso-card--sel { border-color: rgba(59,130,246,.4); box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 
-.iso-app-card__screen { width: 100%; aspect-ratio: 16/9; display: block; }
-.iso-app-card__foot { padding: 8px 10px; }
-.iso-app-card__name { display: block; font-size: 11px; font-weight: 700; color: #1e293b; }
-.iso-app-card__metric { display: block; font-size: 10px; color: #94a3b8; margin-top: 1px; }
+.iso-card--app .iso-card__screen { width: 100%; aspect-ratio: 16/9; display: block; }
+.iso-card__label { font-size: 11px; font-weight: 700; color: #1e293b; padding: 6px 10px 8px; }
 
-/* ── Bottom: data cards ── */
+/* ── Data cards (bottom layer) ── */
 .iso-bot-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
-.iso-data-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: #fff;
-  cursor: pointer;
-  text-align: left;
-  transition: transform .2s, box-shadow .2s;
-}
-.iso-data-card:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,17,23,.08); }
-.iso-data-card--sel { border-color: #3b82f6; }
-.iso-data-card__icon { color: #64748b; margin-bottom: 6px; }
-.iso-data-card__name { font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 8px; }
-.iso-data-card__dots { display: flex; gap: 3px; margin-bottom: 6px; }
-.iso-dot { width: 8px; height: 8px; border-radius: 2px; background: #e2e8f0; }
-.iso-dot--on { background: #3b82f6; opacity: .7; }
-.iso-data-card__bar { height: 4px; background: #f1f5f9; border-radius: 2px; overflow: hidden; }
-.iso-data-card__fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 2px; }
+.iso-card--data { padding: 12px; }
+.iso-card__ds-icon { color: #64748b; margin-bottom: 6px; }
+.iso-card__bars { display: flex; align-items: flex-end; gap: 3px; height: 28px; margin-top: 8px; }
+.iso-card__bar-seg { width: 8px; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #3b82f6, #10b981); }
 
 /* ── Ontology wrap ── */
-.iso-onto-wrap { position: relative; min-height: 300px; }
+.iso-onto-wrap { position: relative; min-height: 260px; }
 
-/* ── Flow zone ── */
-.iso-flow {
-  position: relative;
-  height: 60px;
-  margin: -2px 0;
-  z-index: 2;
-  overflow: hidden;
+/* ── Connector SVG ── */
+.iso-connectors {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
 }
-.iso-flow__svg { position: absolute; inset: 0; width: 100%; height: 100%; }
 
-.fline {
-  fill: none;
-  stroke: #cbd5e1;
-  stroke-width: .8;
-  stroke-dasharray: 4 4;
-  opacity: .4;
-  transition: stroke .4s, opacity .4s;
+.conn-anim {
+  animation: dash-flow 1.8s linear infinite;
 }
-.fline--on {
-  stroke: #10b981;
-  opacity: .65;
-  animation: dash-anim 1.6s linear infinite;
+@keyframes dash-flow { to { stroke-dashoffset: -8; } }
+
+/* ── Hint ── */
+.iso-hint {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: #94a3b8;
+  background: rgba(255,255,255,.7);
+  backdrop-filter: blur(8px);
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(15,17,23,.06);
+  pointer-events: none;
+  animation: fadeOut 3s ease 2s forwards;
 }
-@keyframes dash-anim { to { stroke-dashoffset: -16; } }
+@keyframes fadeOut { to { opacity: 0; } }
 </style>
