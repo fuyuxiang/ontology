@@ -27,22 +27,18 @@
 
       <div class="ctrl-panel__divider"></div>
 
-      <!-- Modify label -->
+      <!-- Modify display name -->
       <div class="ctrl-panel__section">
-        <span class="ctrl-panel__label">修改标签</span>
-        <div class="ctrl-panel__input-row">
-          <input v-model="localLabel" class="ctrl-panel__input" placeholder="输入新标签..." />
-          <button class="ctrl-panel__apply" @click="applyLabel">应用</button>
-        </div>
+        <span class="ctrl-panel__label">显示名称</span>
+        <input v-model="localLabel" class="ctrl-panel__input" placeholder="输入新名称..." @input="onLabelInput" />
       </div>
 
       <!-- Modify color -->
       <div class="ctrl-panel__section">
         <span class="ctrl-panel__label">修改颜色</span>
         <div class="ctrl-panel__input-row">
-          <input v-model="localColor" type="color" class="ctrl-panel__color" />
+          <input v-model="localColor" type="color" class="ctrl-panel__color" @input="onColorInput" />
           <span class="ctrl-panel__color-hex">{{ localColor }}</span>
-          <button class="ctrl-panel__apply" @click="applyColor">应用</button>
         </div>
       </div>
     </template>
@@ -80,11 +76,11 @@ watch(() => props.data, (d) => {
   }
 })
 
-function applyLabel() {
+function onLabelInput() {
   if (localLabel.value) emit('override', 'label', localLabel.value)
 }
 
-function applyColor() {
+function onColorInput() {
   emit('override', 'color', localColor.value)
 }
 </script>
@@ -181,8 +177,8 @@ function applyColor() {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #f0fdf4;
-  color: #166534;
+  background: #eef2ff;
+  color: #3730a3;
   font-size: 11px;
   font-weight: 600;
   width: fit-content;
@@ -212,8 +208,8 @@ function applyColor() {
 }
 
 .ctrl-panel__input:focus {
-  border-color: #4ade80;
-  box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.15);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
 }
 
 .ctrl-panel__color {
@@ -229,22 +225,5 @@ function applyColor() {
   font-size: 11px;
   color: #71717a;
   font-family: 'JetBrains Mono', monospace;
-}
-
-.ctrl-panel__apply {
-  padding: 7px 12px;
-  border: none;
-  border-radius: 6px;
-  background: #1a1a1a;
-  color: #ffffff;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s;
-}
-
-.ctrl-panel__apply:hover {
-  background: #3f3f46;
 }
 </style>
