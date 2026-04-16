@@ -172,18 +172,18 @@ export interface FileImportResult {
 
 // ── 看板统计 ──
 export interface DashboardStats {
-  entityCount: number
-  relationCount: number
-  ruleCount: number
-  activeStrategyCount: number
-  tierDistribution: { tier: Tier; name: string; count: number; pct: number }[]
-  recentActivities: ActivityItem[]
-  healthStatus: { id: string; name: string; tier: Tier; status: EntityStatus }[]
+  entity_count: number
+  relation_count: number
+  rule_count: number
+  active_rule_count: number
+  tier_distribution: { tier: Tier; name: string; count: number; pct: number }[]
+  recent_activities: ActivityItem[]
+  health_status: { id: string; name: string; tier: Tier; status: EntityStatus }[]
 }
 
 export interface ActivityItem {
   id: string
-  type: 'create' | 'update' | 'execute' | 'warning'
+  type: 'create' | 'update' | 'execute' | 'warning' | 'delete' | 'rollback'
   title: string
   description: string
   time: string
