@@ -18,42 +18,60 @@
     </div>
 
     <div class="orch-timeline__track">
-      <div v-for="(step, i) in steps" :key="i"
-        class="orch-step"
-        :class="[
-          { 'orch-step--active': activeStep === i },
-          `orch-step--${stepStates[i] || 'pending'}`
-        ]"
-        :ref="el => { if (stepStates[i] === 'running') scrollToStep(el as HTMLElement) }"
-        @click="$emit('stepClick', i)"
-      >
-        <div class="orch-step__dot" :class="dotClass(i, step.color)">
-          <svg v-if="stepStates[i] === 'done'" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span v-else-if="stepStates[i] === 'running'" class="dot-pulse"></span>
-          <span v-else class="orch-step__num">{{ i + 1 }}</span>
-        </div>
-        <div class="orch-step__line" v-if="i < steps.length - 1" :class="{ 'line--done': stepStates[i] === 'done' }"></div>
-        <div class="orch-step__content">
-          <div class="orch-step__tag-row">
-            <div class="orch-step__tag" :class="`tag--${step.color}`">{{ step.tag }}</div>
-            <span v-if="stepStates[i] === 'done' && stepDurations[i]" class="orch-step__duration">{{ stepDurations[i] }}s</span>
-            <span v-if="stepStates[i] === 'running'" class="orch-step__status-badge status--running">执行中</span>
-            <span v-else-if="stepStates[i] === 'done'" class="orch-step__status-badge status--done">已完成</span>
+      <!-- 未执行时：显示占位列表 -->
+      <template v-if="!hasStarted">
+        <div v-for="(step, i) in steps" :key="'ph-'+i" class="orch-step orch-step--ghost">
+          <div class="orch-step__dot dot--ghost">
+            <span class="orch-step__num">{{ i + 1 }}</span>
           </div>
-          <div class="orch-step__entities">
-            <span class="orch-entity" v-for="e in step.inputEntities" :key="'in-'+e">{{ e }}</span>
-            <span class="orch-arrow" v-if="step.inputEntities.length && step.outputEntities.length">→</span>
-            <span class="orch-entity orch-entity--out" v-for="e in step.outputEntities" :key="'out-'+e">{{ e }}</span>
-          </div>
-          <div class="orch-step__desc">{{ step.desc }}</div>
-          <div class="orch-step__rules" v-if="step.rules.length">
-            <span class="rule-chip" v-for="r in step.rules" :key="r">{{ r }}</span>
-          </div>
-          <div class="orch-step__actions" v-if="step.actions.length">
-            <span class="action-chip" v-for="a in step.actions" :key="a">{{ a }}</span>
+          <div class="orch-step__line" v-if="i < steps.length - 1"></div>
+          <div class="orch-step__content">
+            <div class="orch-step__tag-row">
+              <div class="orch-step__tag" :class="`tag--${step.color}`" style="opacity:0.45">{{ step.tag }}</div>
+            </div>
           </div>
         </div>
-      </div>
+      </template>
+
+      <!-- 执行中/完成：节点逐个冒出 -->
+      <template v-else>
+        <div v-for="(step, i) in steps" :key="'step-'+i"
+          v-show="nodeVisible[i]"
+          class="orch-step"
+          :class="[
+            { 'orch-step--active': activeStep === i, 'orch-step--pop': nodeVisible[i] },
+            `orch-step--${stepStates[i] || 'pending'}`
+          ]"
+          @click="$emit('stepClick', i)"
+        >
+          <div class="orch-step__dot" :class="dotClass(i, step.color)">
+            <svg v-if="stepStates[i] === 'done'" width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7l3 3 5-5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span v-else-if="stepStates[i] === 'running'" class="dot-pulse"></span>
+            <span v-else class="orch-step__num">{{ i + 1 }}</span>
+          </div>
+          <div class="orch-step__line" v-if="i < steps.length - 1" :class="{ 'line--done': stepStates[i] === 'done' }"></div>
+          <div class="orch-step__content">
+            <div class="orch-step__tag-row">
+              <div class="orch-step__tag" :class="`tag--${step.color}`">{{ step.tag }}</div>
+              <span v-if="stepStates[i] === 'done' && stepDurations[i]" class="orch-step__duration">{{ stepDurations[i] }}s</span>
+              <span v-if="stepStates[i] === 'running'" class="orch-step__status-badge status--running">执行中</span>
+              <span v-else-if="stepStates[i] === 'done'" class="orch-step__status-badge status--done">已完成</span>
+            </div>
+            <div class="orch-step__desc">{{ step.desc }}</div>
+            <div class="orch-step__entities" v-if="step.inputEntities.length || step.outputEntities.length">
+              <span class="orch-entity" v-for="e in step.inputEntities" :key="'in-'+e">{{ e }}</span>
+              <span class="orch-arrow" v-if="step.inputEntities.length && step.outputEntities.length">→</span>
+              <span class="orch-entity orch-entity--out" v-for="e in step.outputEntities" :key="'out-'+e">{{ e }}</span>
+            </div>
+            <div class="orch-step__rules" v-if="step.rules.length">
+              <span class="rule-chip" v-for="r in step.rules" :key="r">{{ r }}</span>
+            </div>
+            <div class="orch-step__actions" v-if="step.actions.length">
+              <span class="action-chip" v-for="a in step.actions" :key="a">{{ a }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- 进度条 -->
@@ -67,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 export interface OrchStep {
   tag: string
@@ -94,14 +112,40 @@ const doneCount = computed(() => props.stepStates.filter(s => s === 'done').leng
 const allDone = computed(() => doneCount.value === props.steps.length && props.steps.length > 0)
 const progressPct = computed(() => Math.round((doneCount.value / props.steps.length) * 100))
 
+/* -------- NODE VISIBILITY -------- */
+const hasStarted = ref(false)
+const nodeVisible = ref<boolean[]>([])
+
+watch(() => props.steps.length, (n) => {
+  nodeVisible.value = Array(n).fill(false)
+}, { immediate: true })
+
+watch(
+  () => props.stepStates.map(s => s),
+  (states, oldStates) => {
+    states.forEach((state, i) => {
+      const prev = oldStates?.[i]
+      // Node pops in the moment it becomes running
+      if (state === 'running' && !nodeVisible.value[i]) {
+        hasStarted.value = true
+        nodeVisible.value[i] = true
+        nodeVisible.value = [...nodeVisible.value]
+      }
+      // On re-run: reset
+      if (state === 'pending' && prev !== 'pending') {
+        nodeVisible.value[i] = false
+        nodeVisible.value = [...nodeVisible.value]
+        if (i === 0) hasStarted.value = false
+      }
+    })
+  },
+  { deep: true }
+)
+
 function dotClass(i: number, color: string) {
   if (props.stepStates[i] === 'done') return 'dot--done'
   if (props.stepStates[i] === 'running') return 'dot--running'
   return `dot--${color}`
-}
-
-function scrollToStep(el: HTMLElement | null) {
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 </script>
 
@@ -117,7 +161,19 @@ function scrollToStep(el: HTMLElement | null) {
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .orch-timeline__track { flex: 1; }
-.orch-step { display: flex; gap: 12px; position: relative; padding-bottom: 18px; cursor: pointer; transition: opacity 0.3s; }
+
+/* Ghost placeholders */
+.orch-step--ghost { opacity: 0.35; pointer-events: none; }
+.dot--ghost { background: #dee2e6; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; z-index: 1; margin-top: 2px; }
+
+/* Pop-in animation */
+.orch-step--pop { animation: popIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+@keyframes popIn {
+  from { opacity: 0; transform: scale(0.82) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.orch-step { display: flex; gap: 12px; position: relative; padding-bottom: 18px; cursor: pointer; }
 .orch-step:last-child { padding-bottom: 0; }
 .orch-step--active .orch-step__content { background: #f0f4ff; border-color: #4c6ef5; }
 .orch-step--running .orch-step__content { background: #fff8e1; border-color: #f59f00; }
@@ -152,11 +208,11 @@ function scrollToStep(el: HTMLElement | null) {
 .status--done { background: #e6fcf5; color: #0ca678; }
 @keyframes fadeInOut { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
+.orch-step__desc { font-size: 12px; color: #495057; line-height: 1.5; margin-bottom: 4px; }
 .orch-step__entities { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 4px; }
 .orch-entity { font-size: 11px; padding: 1px 6px; border-radius: 3px; background: #e7f5ff; color: #1c7ed6; font-family: monospace; }
 .orch-entity--out { background: #e6fcf5; color: #0ca678; }
 .orch-arrow { color: #4c6ef5; font-weight: 700; font-size: 12px; }
-.orch-step__desc { font-size: 12px; color: #495057; line-height: 1.5; }
 .orch-step__rules, .orch-step__actions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .rule-chip { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: #fff8e1; color: #e67700; }
 .action-chip { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: #e6fcf5; color: #0ca678; }
