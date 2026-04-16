@@ -29,6 +29,20 @@
       <div class="kpi-card"><div class="kpi-val">85%</div><div class="kpi-lbl">自动化率</div></div>
     </div>
 
+    <!-- 流程层级带 -->
+    <div class="mnp-layers">
+      <div v-for="layer in layers" :key="layer.key" class="layer-band" :class="`layer-band--${layer.key}`">
+        <div class="layer-band__head"><strong>{{ layer.label }}</strong></div>
+        <div class="layer-band__stats">
+          <span>{{ layer.entityCount }} 个实体</span>
+          <span>{{ layer.attrCount }} 个属性</span>
+          <span>{{ layer.relationCount }} 条关系</span>
+          <span>{{ layer.ruleCount }} 条规则</span>
+          <span>{{ layer.actionCount }} 个动作</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 案例用户选择 -->
     <div class="mnp-user-bar">
       <div class="user-bar__label">案例用户</div>
@@ -49,20 +63,7 @@
         </div>
       </div>
       <div v-if="dataLoading" class="user-bar__loading">加载中...</div>
-    </div>
-
-    <!-- 流程层级带 -->
-    <div class="mnp-layers">
-      <div v-for="layer in layers" :key="layer.key" class="layer-band" :class="`layer-band--${layer.key}`">
-        <div class="layer-band__head"><strong>{{ layer.label }}</strong></div>
-        <div class="layer-band__stats">
-          <span>{{ layer.entityCount }} 个实体</span>
-          <span>{{ layer.attrCount }} 个属性</span>
-          <span>{{ layer.relationCount }} 条关系</span>
-          <span>{{ layer.ruleCount }} 条规则</span>
-          <span>{{ layer.actionCount }} 个动作</span>
-        </div>
-      </div>
+      <div v-if="loadError" class="user-bar__error">{{ loadError }}</div>
     </div>
 
     <!-- 主工作区: 左右分栏 -->
@@ -197,8 +198,8 @@ export interface ProcessStage {
   description: string
 }
 
-/* -------- MOCK USER INSTANCES -------- */
-interface MockUserInstance {
+/* -------- USER INSTANCE TYPE -------- */
+interface UserInstance {
   id: string; name: string; phone: string
   entities: Record<string, Record<string, string | number | boolean>>
   ruleResults: Array<{
@@ -212,111 +213,6 @@ interface MockUserInstance {
   assignedChannel: string
 }
 
-const mockUsers: MockUserInstance[] = [
-  {
-    id: 'U20240315001', name: '张明华', phone: '138****6721',
-    entities: {
-      MnpEligibilityQuery: { query_time: '2024-03-15 09:32', query_channel: '手厅APP', out_tag: '可携出', limit_remark: '无限制' },
-      CbssSubscriber: { user_id: 'U20240315001', device_number: '138****6721', user_status: '在网', innet_months: 8, is_5g: true, pay_mode: '后付费' },
-      SubscriberContract: { activity_type: '5G畅享套餐', end_date: '2024-05-20', protocal_month: 12 },
-      CustomerComplaint: { complaint_type: '网络质量', complaint_count_3m: 3 },
-      NetworkQuality: { avg_download_speed: 35.2, coverage_score: 72, fault_count_3m: 2 },
-      CompetitorActivity: { competitor_name: '中国电信', offer_type: '新用户优惠', price_advantage: '30%', query_count: 4 },
-      FamilyGroup: { member_count: 4, ported_member_count: 1, family_arpu: 186 },
-      MnpRiskUser: { signal_source: '手厅APP', signal_time: '2024-03-15 09:32', matched_rule_id: 'NP-RULE-H01', condition_pass_count: 5, risk_level: '高', risk_score: 92, risk_time: '2024-03-15 09:33', churn_reason_top3: '合约即将到期,网络体验差,家庭成员已携转', recommended_actions: '发送专属优惠,网络质量优化,一键外呼关怀', task_status: '已分发', assigned_channel: '专属坐席' },
-    },
-    ruleResults: [
-      { ruleName: 'NP-RULE-H01 高风险规则', riskLevel: 'high', conditions: [
-        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '12个月', actual: '8个月', matched: true },
-        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+3个月', actual: '2024-05-20', matched: true },
-        { condition: '近3月投诉多', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '2次', actual: '3次', matched: true },
-        { condition: '竞品查询频繁', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '3次', actual: '4次', matched: true },
-        { condition: '家庭已携转', sourceEntity: 'FamilyGroup', sourceAttribute: 'ported_member_count', operator: '≥', threshold: '1人', actual: '1人', matched: true },
-      ]},
-      { ruleName: 'NP-RULE-M01 中风险规则', riskLevel: 'medium', conditions: [
-        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '24个月', actual: '8个月', matched: true },
-        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+6个月', actual: '2024-05-20', matched: true },
-        { condition: '近3月投诉', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '1次', actual: '3次', matched: true },
-      ]},
-      { ruleName: 'NP-RULE-L01 低风险规则', riskLevel: 'low', conditions: [
-        { condition: '竞品查询', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '1次', actual: '4次', matched: true },
-      ]},
-    ],
-    finalRiskLevel: 'high', riskScore: 92,
-    churnReasonTop3: ['合约即将到期', '网络体验差', '家庭成员已携转'],
-    recommendedActions: ['发送专属优惠', '网络质量优化', '一键外呼关怀'],
-    assignedChannel: '专属坐席',
-  },
-  {
-    id: 'U20240315002', name: '李婷', phone: '156****3390',
-    entities: {
-      MnpEligibilityQuery: { query_time: '2024-03-15 14:18', query_channel: '10086热线', out_tag: '可携出', limit_remark: '无限制' },
-      CbssSubscriber: { user_id: 'U20240315002', device_number: '156****3390', user_status: '在网', innet_months: 18, is_5g: false, pay_mode: '后付费' },
-      SubscriberContract: { activity_type: '畅享套餐', end_date: '2024-06-30', protocal_month: 24 },
-      CustomerComplaint: { complaint_type: '资费争议', complaint_count_3m: 1 },
-      NetworkQuality: { avg_download_speed: 58.6, coverage_score: 88, fault_count_3m: 0 },
-      CompetitorActivity: { competitor_name: '中国联通', offer_type: '套餐折扣', price_advantage: '20%', query_count: 2 },
-      FamilyGroup: { member_count: 3, ported_member_count: 0, family_arpu: 142 },
-      MnpRiskUser: { signal_source: '10086热线', signal_time: '2024-03-15 14:18', matched_rule_id: 'NP-RULE-M01', condition_pass_count: 3, risk_level: '中', risk_score: 65, risk_time: '2024-03-15 14:19', churn_reason_top3: '合约即将到期,资费竞争力不足,无5G服务', recommended_actions: ['套餐升级推荐', '一键发送挽留短信'], task_status: '已分发', assigned_channel: '自动外呼' },
-    },
-    ruleResults: [
-      { ruleName: 'NP-RULE-H01 高风险规则', riskLevel: 'high', conditions: [
-        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '12个月', actual: '18个月', matched: false },
-        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+3个月', actual: '2024-06-30', matched: false },
-        { condition: '近3月投诉多', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '2次', actual: '1次', matched: false },
-        { condition: '竞品查询频繁', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '3次', actual: '2次', matched: false },
-        { condition: '家庭已携转', sourceEntity: 'FamilyGroup', sourceAttribute: 'ported_member_count', operator: '≥', threshold: '1人', actual: '0人', matched: false },
-      ]},
-      { ruleName: 'NP-RULE-M01 中风险规则', riskLevel: 'medium', conditions: [
-        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '24个月', actual: '18个月', matched: true },
-        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+6个月', actual: '2024-06-30', matched: true },
-        { condition: '近3月投诉', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '1次', actual: '1次', matched: true },
-      ]},
-      { ruleName: 'NP-RULE-L01 低风险规则', riskLevel: 'low', conditions: [
-        { condition: '竞品查询', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '1次', actual: '2次', matched: true },
-      ]},
-    ],
-    finalRiskLevel: 'medium', riskScore: 65,
-    churnReasonTop3: ['合约即将到期', '资费竞争力不足', '无5G服务'],
-    recommendedActions: ['套餐升级推荐', '一键发送挽留短信'],
-    assignedChannel: '自动外呼',
-  },
-  {
-    id: 'U20240315003', name: '王建国', phone: '189****8845',
-    entities: {
-      MnpEligibilityQuery: { query_time: '2024-03-15 16:45', query_channel: '营业厅', out_tag: '可携出', limit_remark: '合约期内' },
-      CbssSubscriber: { user_id: 'U20240315003', device_number: '189****8845', user_status: '在网', innet_months: 36, is_5g: true, pay_mode: '预付费' },
-      SubscriberContract: { activity_type: '5G融合套餐', end_date: '2025-01-15', protocal_month: 24 },
-      CustomerComplaint: { complaint_type: '信号覆盖', complaint_count_3m: 0 },
-      NetworkQuality: { avg_download_speed: 82.5, coverage_score: 91, fault_count_3m: 1 },
-      CompetitorActivity: { competitor_name: '-', offer_type: '-', price_advantage: '-', query_count: 0 },
-      FamilyGroup: { member_count: 5, ported_member_count: 0, family_arpu: 268 },
-      MnpRiskUser: { signal_source: '营业厅', signal_time: '2024-03-15 16:45', matched_rule_id: 'NP-RULE-L01', condition_pass_count: 1, risk_level: '低', risk_score: 28, risk_time: '2024-03-15 16:46', churn_reason_top3: '偶发网络故障,合约期内限制,无明显流失动因', recommended_actions: ['一键发送挽留短信'], task_status: '已分发', assigned_channel: '短信触达' },
-    },
-    ruleResults: [
-      { ruleName: 'NP-RULE-H01 高风险规则', riskLevel: 'high', conditions: [
-        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '12个月', actual: '36个月', matched: false },
-        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+3个月', actual: '2025-01-15', matched: false },
-        { condition: '近3月投诉多', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '2次', actual: '0次', matched: false },
-        { condition: '竞品查询频繁', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '3次', actual: '0次', matched: false },
-        { condition: '家庭已携转', sourceEntity: 'FamilyGroup', sourceAttribute: 'ported_member_count', operator: '≥', threshold: '1人', actual: '0人', matched: false },
-      ]},
-      { ruleName: 'NP-RULE-M01 中风险规则', riskLevel: 'medium', conditions: [
-        { condition: '在网时长短', sourceEntity: 'CbssSubscriber', sourceAttribute: 'innet_months', operator: '≤', threshold: '24个月', actual: '36个月', matched: false },
-        { condition: '合约即将到期', sourceEntity: 'SubscriberContract', sourceAttribute: 'end_date', operator: '≤', threshold: '当前+6个月', actual: '2025-01-15', matched: false },
-        { condition: '近3月投诉', sourceEntity: 'CustomerComplaint', sourceAttribute: 'complaint_count_3m', operator: '≥', threshold: '1次', actual: '0次', matched: false },
-      ]},
-      { ruleName: 'NP-RULE-L01 低风险规则', riskLevel: 'low', conditions: [
-        { condition: '竞品查询', sourceEntity: 'CompetitorActivity', sourceAttribute: 'query_count', operator: '≥', threshold: '1次', actual: '0次', matched: false },
-      ]},
-    ],
-    finalRiskLevel: 'low', riskScore: 28,
-    churnReasonTop3: ['偶发网络故障', '合约期内限制', '无明显流失动因'],
-    recommendedActions: ['一键发送挽留短信'],
-    assignedChannel: '短信触达',
-  },
-]
-
 /* -------- STATE -------- */
 const activeStep = ref(0)
 const execRunning = ref(false)
@@ -324,17 +220,17 @@ const stepStates = ref<StepState[]>(Array(7).fill('pending'))
 const stepDurations = ref<(string | null)[]>(Array(7).fill(null))
 const selectedUserIndex = ref(0)
 
-/* -------- LIVE DATA -------- */
-const liveUsers = ref<MockUserInstance[]>([])
-const liveDataMap = ref<Record<string, MnpExecuteResult>>({})
+/* -------- DATA -------- */
+const users = ref<UserInstance[]>([])
+const userDataMap = ref<Record<string, MnpExecuteResult>>({})
 const dataLoading = ref(false)
+const loadError = ref('')
 
-// 合并 mock + live：优先用 live 数据
-const userList = computed(() => liveUsers.value.length ? liveUsers.value : mockUsers)
-const selectedUser = computed(() => {
-  const user = userList.value[selectedUserIndex.value] || mockUsers[0]
-  // 如果有 live 执行结果，覆盖 mock 数据
-  const live = liveDataMap.value[user.id]
+const userList = computed(() => users.value)
+const selectedUser = computed<UserInstance>(() => {
+  const user = users.value[selectedUserIndex.value]
+  if (!user) return { id: '', name: '', phone: '', entities: {}, ruleResults: [], finalRiskLevel: 'low', riskScore: 0, churnReasonTop3: [], recommendedActions: [], assignedChannel: '' } as UserInstance
+  const live = userDataMap.value[user.id]
   if (live) {
     return {
       ...user,
@@ -469,48 +365,51 @@ onMounted(async () => {
   } catch (e) {
     console.warn('Failed to load layer stats', e)
   }
-  // 尝试从后端加载真实用户列表
+  // 从后端加载案例用户列表
+  dataLoading.value = true
   try {
-    const users = await sceneApi.mnpUsers(10)
-    if (users.length) {
-      liveUsers.value = users.map(u => ({
-        id: u.user_id,
-        name: u.name || u.user_id,
-        phone: u.phone || '',
-        entities: {},
-        ruleResults: [],
-        finalRiskLevel: 'low' as const,
-        riskScore: 0,
-        churnReasonTop3: [],
-        recommendedActions: [],
-        assignedChannel: '',
-      }))
-      // 自动加载第一个用户的执行数据
-      loadUserData(users[0].user_id)
+    const caseUsers = await sceneApi.mnpCaseUsers()
+    users.value = caseUsers.map(u => ({
+      id: u.user_id,
+      name: u.name || u.user_id,
+      phone: u.phone || '',
+      entities: {},
+      ruleResults: [],
+      finalRiskLevel: (u.finalRiskLevel || 'low') as 'high' | 'medium' | 'low',
+      riskScore: u.riskScore || 0,
+      churnReasonTop3: [],
+      recommendedActions: [],
+      assignedChannel: '',
+    }))
+    if (caseUsers.length) {
+      await loadUserData(caseUsers[0].user_id)
     }
-  } catch (e) {
-    console.warn('后端用户列表不可用，使用 mock 数据', e)
+  } catch (e: any) {
+    loadError.value = '加载案例用户失败: ' + (e?.message || e)
+    console.error('加载案例用户失败', e)
+  } finally {
+    dataLoading.value = false
   }
 })
 
 async function loadUserData(userId: string) {
-  if (liveDataMap.value[userId]) return
+  if (userDataMap.value[userId]) return
   dataLoading.value = true
   try {
     const result = await sceneApi.mnpExecute(userId)
-    liveDataMap.value = { ...liveDataMap.value, [userId]: result }
-    // 更新 liveUsers 中对应用户的风险信息
-    const idx = liveUsers.value.findIndex(u => u.id === userId)
+    userDataMap.value = { ...userDataMap.value, [userId]: result }
+    const idx = users.value.findIndex(u => u.id === userId)
     if (idx >= 0) {
-      liveUsers.value[idx] = {
-        ...liveUsers.value[idx],
+      users.value[idx] = {
+        ...users.value[idx],
         finalRiskLevel: result.finalRiskLevel as 'high' | 'medium' | 'low',
         riskScore: result.riskScore,
       }
-      liveUsers.value = [...liveUsers.value]
+      users.value = [...users.value]
     }
-  } catch (e) {
-    console.warn(`加载用户 ${userId} 数据失败`, e)
+  } catch (e: any) {
+    loadError.value = `加载用户 ${userId} 数据失败: ` + (e?.message || e)
+    console.error(`加载用户 ${userId} 数据失败`, e)
   } finally {
     dataLoading.value = false
   }
@@ -518,8 +417,8 @@ async function loadUserData(userId: string) {
 
 // 切换用户时自动加载数据
 watch(selectedUserIndex, (idx) => {
-  const user = userList.value[idx]
-  if (user && liveUsers.value.length) {
+  const user = users.value[idx]
+  if (user) {
     loadUserData(user.id)
   }
 })
@@ -735,6 +634,7 @@ const actionDrivers = computed<ActionDriver[]>(() => {
 .risk--low { background: #e7f5ff; color: #339af0; }
 .user-mini__score { font-size: 12px; font-weight: 700; color: #495057; white-space: nowrap; }
 .user-bar__loading { font-size: 11px; color: #4c6ef5; white-space: nowrap; animation: fadeInOut 1.2s ease-in-out infinite; }
+.user-bar__error { font-size: 11px; color: #fa5252; white-space: nowrap; }
 @keyframes fadeInOut { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
 /* 阶段执行结果摘要 */

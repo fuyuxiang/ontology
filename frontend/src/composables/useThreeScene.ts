@@ -18,41 +18,43 @@ export function createThreeScene(container: HTMLElement): ThreeContext {
 
   // Scene
   const scene = new THREE.Scene()
-  scene.background = new THREE.Color(0xf4f4f5)
+  scene.background = new THREE.Color(0xf1f5f9)
 
-  // Orthographic camera — isometric view
-  const frustum = 12
+  // Orthographic camera — isometric view, tighter framing
+  const frustum = 10
   const camera = new THREE.OrthographicCamera(
     -frustum * aspect, frustum * aspect,
     frustum, -frustum,
-    0.1, 100,
+    0.1, 200,
   )
-  // Isometric angles: ~35° elevation, ~45° azimuth
-  camera.position.set(12, 10, 12)
-  camera.lookAt(0, 2, 0)
-  camera.zoom = 1
+  camera.position.set(14, 12, 14)
+  camera.lookAt(0, 1.5, 0)
+  camera.zoom = 1.3
   camera.updateProjectionMatrix()
 
   // Renderer
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false })
   renderer.setSize(w, h)
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-  renderer.shadowMap.enabled = true
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.05
   container.appendChild(renderer.domElement)
 
-  // Lighting
-  const ambient = new THREE.AmbientLight(0xffffff, 0.7)
+  // Lighting — soft, even illumination
+  const ambient = new THREE.AmbientLight(0xffffff, 0.85)
   scene.add(ambient)
 
-  const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8)
-  dirLight1.position.set(8, 15, 10)
-  dirLight1.castShadow = true
+  const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.6)
+  dirLight1.position.set(10, 20, 12)
   scene.add(dirLight1)
 
-  const dirLight2 = new THREE.DirectionalLight(0xf0f0ff, 0.3)
-  dirLight2.position.set(-5, 8, -5)
+  const dirLight2 = new THREE.DirectionalLight(0xeef0ff, 0.25)
+  dirLight2.position.set(-8, 10, -6)
   scene.add(dirLight2)
+
+  // Subtle hemisphere light for fill
+  const hemiLight = new THREE.HemisphereLight(0xffffff, 0xe0e0e0, 0.3)
+  scene.add(hemiLight)
 
   // Orbit controls
   const controls = new OrbitControls(camera, renderer.domElement)
