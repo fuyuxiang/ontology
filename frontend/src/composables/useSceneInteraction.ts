@@ -19,8 +19,8 @@ export interface SceneInteraction {
 }
 
 const DEFAULT_EDGE = 0x1a1a1a
-const HIGHLIGHT_EDGE = 0x22c55e
-const HOVER_EDGE = 0x4ade80
+const HIGHLIGHT_EDGE = 0x6366f1
+const HOVER_EDGE = 0x818cf8
 
 function setEdgeColor(obj: THREE.Object3D, color: number) {
   obj.traverse((child) => {
@@ -159,6 +159,34 @@ export function createSceneInteraction(): SceneInteraction {
     } else if (field === 'label' && typeof value === 'string') {
       obj.userData.label = value
       if (selectedData.value) selectedData.value.label = value
+
+      // Update sprite text in 3D scene
+      if (obj instanceof THREE.Group || obj instanceof THREE.Object3D) {
+        const oldSprite = obj.children.find(c => c instanceof THREE.Sprite) as THREE.Sprite | undefined
+        if (oldSprite) {
+          // Recreate sprite with new text
+          const canvas = document.createElement('canvas')
+          const scale = 4
+          const ctxC = canvas.getContext('2d')!
+          const fontSize = Math.round(0.16 * 100 * scale)
+          ctxC.font = `700 ${fontSize}px Inter, system-ui, sans-serif`
+          const metrics = ctxC.measureText(value)
+          canvas.width = Math.ceil(metrics.width) + 8 * scale
+          canvas.height = fontSize * 1.4
+          ctxC.font = `700 ${fontSize}px Inter, system-ui, sans-serif`
+          ctxC.fillStyle = '#1a1a1a'
+          ctxC.textBaseline = 'middle'
+          ctxC.fillText(value, 4 * scale, canvas.height / 2)
+
+          const tex = new THREE.CanvasTexture(canvas)
+          tex.minFilter = THREE.LinearFilter
+          oldSprite.material.map?.dispose()
+          oldSprite.material.map = tex
+          oldSprite.material.needsUpdate = true
+          const aspect = canvas.width / canvas.height
+          oldSprite.scale.set(0.16 * aspect, 0.16, 1)
+        }
+      }
     } else if (field === 'positionY' && typeof value === 'number') {
       obj.position.y = value
       if (selectedData.value) selectedData.value.positionY = value

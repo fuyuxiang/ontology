@@ -166,6 +166,121 @@ def list_mnp_users(
     return users
 
 
+# ── 接口 1.5: 获取按风险分布筛选的案例用户 ──────────────
+
+class MnpCaseUser(BaseModel):
+    user_id: str
+    name: str | None = None
+    phone: str | None = None
+    innet_months: int | None = None
+    is_5g: bool | None = None
+    pay_mode: str | None = None
+    finalRiskLevel: str = "none"
+    riskScore: int = 0
+
+
+# ── 案例用户缓存 ──────────────────────────────────────
+_case_users_cache: list["MnpCaseUser"] | None = None
+_execute_cache: dict[str, dict] = {}
+
+
+@router.get("/mnp/case-users", response_model=list[MnpCaseUser])
+def list_mnp_case_users(db: Session = Depends(get_db)):
+    """
+    获取案例用户列表：首次调用时评估并缓存，后续直接返回缓存结果。
+    """
+    global _case_users_cache
+    if _case_users_cache is not None:
+        return _case_users_cache
+    # 1. 拉取足够多的候选用户
+    entity, ds = _get_entity_and_ds(db, "CbssSubscriber")
+    if not entity or not ds or not ds.table_name:
+        raise HTTPException(status_code=404, detail="CbssSubscriber 实体未关联可用数据源")
+
+    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
+    sql = f"SELECT * FROM {ds.table_name} LIMIT 50"
+    result = execute_readonly_sql(ds, sql, limit=50)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+
+    columns = result.get("columns", [])
+    rows = result.get("rows", [])
+
+    # 2. 对每个用户执行规则评估，收集分数
+    evaluator = RuleEvaluator(db)
+    all_users: list[MnpCaseUser] = []
+
+    for row in rows:
+        row_dict = {columns[i]: row[i] for i in range(len(columns))}
+        uid = str(row_dict.get(pk_field, ""))
+        if not uid:
+            continue
+
+        phone = str(row_dict.get("device_number", ""))
+        if len(phone) >= 7:
+            phone = phone[:3] + "****" + phone[-4:]
+
+        # 评估风险
+        try:
+            eval_result = evaluator.evaluate_all(uid)
+        except Exception:
+            eval_result = {"overall_risk": "none", "results": []}
+
+        risk_score = _calc_risk_score(eval_result)
+
+        user = MnpCaseUser(
+            user_id=uid,
+            name=row_dict.get("name") or uid,
+            phone=phone,
+            innet_months=row_dict.get("innet_months"),
+            is_5g=row_dict.get("is_5g") in (True, 1, "是", "true", "1"),
+            pay_mode=str(row_dict.get("pay_mode", "")),
+            finalRiskLevel="none",
+            riskScore=risk_score,
+        )
+        all_users.append(user)
+
+    # 3. 按分数降序排列，用相对排名分配风险等级
+    #    分数区间：>=65 高风险, 40-64 中风险, <40 低风险
+    all_users.sort(key=lambda u: -u.riskScore)
+    for u in all_users:
+        if u.riskScore >= 65:
+            u.finalRiskLevel = "high"
+        elif u.riskScore >= 40:
+            u.finalRiskLevel = "medium"
+        else:
+            u.finalRiskLevel = "low"
+
+    # 4. 按 1高 / 3中 / 2低 选取
+    buckets: dict[str, list[MnpCaseUser]] = {"high": [], "medium": [], "low": []}
+    for u in all_users:
+        buckets.setdefault(u.finalRiskLevel, []).append(u)
+
+    quota = {"high": 1, "medium": 3, "low": 2}
+    selected: list[MnpCaseUser] = []
+
+    for level, count in quota.items():
+        pool = buckets.get(level, [])
+        selected.extend(pool[:count])
+
+    # 如果某个桶不够，从其他桶补齐到 6 个
+    if len(selected) < 6:
+        used_ids = {u.user_id for u in selected}
+        for u in all_users:
+            if u.user_id not in used_ids:
+                selected.append(u)
+                used_ids.add(u.user_id)
+                if len(selected) >= 6:
+                    break
+
+    # 按风险分数降序排列（高风险在前）
+    risk_order = {"high": 0, "medium": 1, "low": 2, "none": 3}
+    selected.sort(key=lambda u: (risk_order.get(u.finalRiskLevel, 3), -u.riskScore))
+
+    _case_users_cache = selected[:6]
+    return _case_users_cache
+
+
 # ── 接口 2: 执行全流程编排 ──────────────────────────
 
 @router.get("/mnp/execute")
@@ -174,6 +289,9 @@ def execute_mnp_flow(
     db: Session = Depends(get_db),
 ):
     """对指定用户执行携号转网全流程编排，返回每个实体的实例数据和规则评估结果"""
+
+    if user_id in _execute_cache:
+        return _execute_cache[user_id]
 
     # 0. 先查 MobileSubscriber 获取 device_number，用于关联其他表
     subscriber_row = _query_user_row(db, "CbssSubscriber", user_id)
@@ -231,6 +349,14 @@ def execute_mnp_flow(
     final_risk = eval_result.get("overall_risk", "none")
     risk_score = _calc_risk_score(eval_result)
 
+    # 用分数区间重新定级，保证与 case-users 接口一致
+    if risk_score >= 65:
+        final_risk = "high"
+    elif risk_score >= 40:
+        final_risk = "medium"
+    elif risk_score > 0:
+        final_risk = "low"
+
     # 3. 根因分析（基于实例数据推断）
     churn_reasons = _analyze_churn_reasons(entities_data)
 
@@ -241,7 +367,7 @@ def execute_mnp_flow(
     channel_map = {"high": "专属坐席", "medium": "自动外呼", "low": "短信触达", "none": "短信触达"}
     assigned_channel = channel_map.get(final_risk, "短信触达")
 
-    return {
+    result = {
         "user_id": user_id,
         "entities": entities_data,
         "ruleResults": rule_results,
@@ -251,6 +377,8 @@ def execute_mnp_flow(
         "recommendedActions": recommended_actions,
         "assignedChannel": assigned_channel,
     }
+    _execute_cache[user_id] = result
+    return result
 
 
 # ── 辅助函数 ──────────────────────────────────────────
