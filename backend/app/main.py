@@ -73,6 +73,29 @@ async def lifespan(app: FastAPI):
     # 基础功能（实体CRUD、规则、看板）不依赖 Neo4j
     logger.info("服务启动完成（Neo4j 待配置）")
 
+    # 预热携号转网案例用户缓存（后台执行，不阻塞启动）
+    import asyncio
+
+    def _preheat_sync():
+        try:
+            from app.api.v1.scenes import list_mnp_case_users, execute_mnp_flow
+            db = SessionLocal()
+            try:
+                case_users = list_mnp_case_users(db)
+                logger.info(f"预热案例用户缓存完成，共 {len(case_users)} 个用户")
+                for u in case_users:
+                    try:
+                        execute_mnp_flow(user_id=u.user_id, db=db)
+                    except Exception:
+                        pass
+                logger.info("预热案例用户执行数据缓存完成")
+            finally:
+                db.close()
+        except Exception as e:
+            logger.warning(f"预热案例用户缓存失败: {e}")
+
+    asyncio.create_task(asyncio.to_thread(_preheat_sync))
+
     yield
 
 
