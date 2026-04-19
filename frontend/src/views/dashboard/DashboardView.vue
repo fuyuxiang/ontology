@@ -1,7 +1,7 @@
 <template>
   <div class="screen-wrapper" ref="wrapperRef">
     <!-- 背景 -->
-    <img class="screen-bg" src="/images/ontology/bg.jpg" alt="" />
+    <img class="screen-bg" src="/images/ontology/bg.png" alt="" />
     <img class="border-left" src="/images/ontology/left.png" alt="" />
     <img class="border-right" src="/images/ontology/right.png" alt="" />
     <img class="screen-title" src="/images/ontology/dh.png" alt="" />
@@ -16,7 +16,7 @@
 
       <!-- ═══ 中间本体层 ═══ -->
       <div class="onto-layer">
-        <img class="onto-layer__bg" src="/images/ontology/bg-本体层.jpg" alt="" />
+        <img class="onto-layer__bg" src="/images/ontology/bg-本体层.png" alt="" />
 
         <!-- SVG 连线层 -->
         <svg class="onto-layer__svg" :viewBox="`0 0 ${svgW} ${svgH}`" preserveAspectRatio="none">
