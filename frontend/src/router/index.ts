@@ -97,6 +97,12 @@ const router = createRouter({
       name: 'scene-mnp',
       component: () => import('../views/scene/MnpWorkbench.vue'),
       meta: { title: '携号转网预警' }
+    },
+    {
+      path: '/harness',
+      name: 'harness',
+      component: () => import('../views/harness/HarnessView.vue'),
+      meta: { title: '智能编排中心' }
     }
   ]
 })
