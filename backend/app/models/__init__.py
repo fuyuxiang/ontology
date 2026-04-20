@@ -4,9 +4,10 @@ from app.models.rule import BusinessRule, EntityAction
 from app.models.audit import AuditLog
 from app.models.user import User
 from app.models.datasource import DataSource
+from app.models.workflow import WorkflowApp, ApprovalTask
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
     "BusinessRule", "EntityAction", "AuditLog", "User",
-    "DataSource",
+    "DataSource", "WorkflowApp", "ApprovalTask",
 ]
