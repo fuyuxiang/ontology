@@ -22,6 +22,7 @@ def get_connection(ds: DataSource):
         return pymysql.connect(
             host=ds.host, port=ds.port, user=ds.username,
             password=ds.password, database=ds.database, connect_timeout=5,
+            charset='utf8mb4',
         )
     elif ds.type == "postgresql":
         import psycopg2
