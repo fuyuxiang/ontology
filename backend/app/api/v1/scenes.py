@@ -492,3 +492,160 @@ def _recommend_actions(db: Session, risk_level: str, reasons: list[str]) -> list
         actions.append("一键发送挽留短信")
 
     return actions[:5]
+
+
+# ══════════════════════════════════════════════════════════
+# 宽带退单稽核场景 API
+# ══════════════════════════════════════════════════════════
+
+_BB_NS = "s1"
+
+def _get_bb_conn(db: Session):
+    """获取 bb_churn_audit 数据库连接（复用已有数据源配置）"""
+    ds = db.query(DataSource).filter(
+        DataSource.name == "bb_install_churn",
+        DataSource.enabled == True,
+    ).first()
+    if not ds:
+        raise HTTPException(status_code=503, detail="bb_churn_audit 数据源未配置")
+    return ds
+
+
+def _bb_query(db: Session, sql: str, limit: int = 200) -> list[dict]:
+    ds = _get_bb_conn(db)
+    result = execute_readonly_sql(ds, sql, limit=limit)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+    cols = result.get("columns", [])
+    return [{cols[i]: (row[i].isoformat() if hasattr(row[i], 'isoformat') else row[i])
+             for i in range(len(cols))} for row in result.get("rows", [])]
+
+
+@router.get("/broadband/stats")
+def bb_stats(db: Session = Depends(get_db)):
+    """宽带退单稽核 — 总览统计"""
+    ds = _get_bb_conn(db)
+
+    def q(sql):
+        r = execute_readonly_sql(ds, sql, limit=1)
+        if r.get("rows"):
+            return r["rows"][0][0]
+        return 0
+
+    total_orders = q("SELECT COUNT(*) FROM bb_install_order")
+    total_churns = q("SELECT COUNT(*) FROM bb_install_churn")
+    archived = q("SELECT COUNT(*) FROM bb_install_churn WHERE audit_status='已归档'")
+    manual = q("SELECT COUNT(*) FROM bb_install_churn WHERE audit_status='人工审核中'")
+    pending_cb = q("SELECT COUNT(*) FROM bb_install_churn WHERE audit_status='待补全回访'")
+    avg_conf_r = execute_readonly_sql(ds, "SELECT AVG(root_cause_confidence) FROM bb_install_churn WHERE root_cause_confidence IS NOT NULL", limit=1)
+    avg_conf = round(float(avg_conf_r["rows"][0][0] or 0), 3) if avg_conf_r.get("rows") else 0
+
+    cause_r = execute_readonly_sql(ds, "SELECT root_cause_level_one, COUNT(*) cnt FROM bb_install_churn GROUP BY root_cause_level_one ORDER BY cnt DESC", limit=10)
+    cause_dist = {row[0]: row[1] for row in cause_r.get("rows", []) if row[0]}
+
+    return {
+        "total_orders": total_orders,
+        "total_churns": total_churns,
+        "archived": archived,
+        "manual_review": manual,
+        "pending_callback": pending_cb,
+        "avg_confidence": avg_conf,
+        "cause_distribution": cause_dist,
+    }
+
+
+@router.get("/broadband/churns")
+def bb_list_churns(
+    status: str = Query(default="", description="audit_status 过滤"),
+    cause_l1: str = Query(default="", description="一级原因过滤"),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=5, le=100),
+    db: Session = Depends(get_db),
+):
+    """宽带退单列表（分页）"""
+    ds = _get_bb_conn(db)
+    where_parts = []
+    if status:
+        where_parts.append(f"c.audit_status='{status}'")
+    if cause_l1:
+        where_parts.append(f"c.root_cause_level_one='{cause_l1}'")
+    where = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+    offset = (page - 1) * page_size
+
+    count_r = execute_readonly_sql(ds, f"SELECT COUNT(*) FROM bb_install_churn c {where}", limit=1)
+    total = count_r["rows"][0][0] if count_r.get("rows") else 0
+
+    sql = f"""
+        SELECT c.churn_id, c.related_order_no, c.churn_time, c.churn_phase,
+               c.audit_status, c.root_cause_level_one, c.root_cause_level_two,
+               c.root_cause_confidence, c.manual_review_status,
+               o.product_name, o.biz_type, o.channel_id, o.install_address,
+               o.cust_id, o.engineer_id
+        FROM bb_install_churn c
+        LEFT JOIN bb_install_order o ON c.related_order_no = o.order_no
+        {where}
+        ORDER BY c.churn_time DESC
+        LIMIT {page_size} OFFSET {offset}
+    """
+    result = execute_readonly_sql(ds, sql, limit=page_size)
+    cols = result.get("columns", [])
+    rows = []
+    for row in result.get("rows", []):
+        d = {cols[i]: (row[i].isoformat() if hasattr(row[i], 'isoformat') else row[i]) for i in range(len(cols))}
+        rows.append(d)
+
+    return {"total": total, "page": page, "page_size": page_size, "items": rows}
+
+
+@router.get("/broadband/churns/{churn_id}")
+def bb_churn_detail(churn_id: str, db: Session = Depends(get_db)):
+    """退单详情 + 证据链 + 审计轨迹"""
+    ds = _get_bb_conn(db)
+
+    def q(sql, lim=50):
+        r = execute_readonly_sql(ds, sql, limit=lim)
+        cols = r.get("columns", [])
+        return [{cols[i]: (row[i].isoformat() if hasattr(row[i], 'isoformat') else row[i])
+                 for i in range(len(cols))} for row in r.get("rows", [])]
+
+    churn = q(f"""
+        SELECT c.*, o.product_name, o.biz_type, o.channel_id, o.install_address,
+               o.accept_time, o.finish_time, o.speed_test_result, o.optical_power_db,
+               o.satisfaction_score, o.cust_id, o.engineer_id
+        FROM bb_install_churn c
+        LEFT JOIN bb_install_order o ON c.related_order_no = o.order_no
+        WHERE c.churn_id = '{churn_id}'
+    """, 1)
+    if not churn:
+        raise HTTPException(status_code=404, detail="退单记录不存在")
+
+    evidences = q(f"""
+        SELECT evidence_id, evidence_code, evidence_type, source_type,
+               content, hit, confidence, extracted_at
+        FROM bb_evidence WHERE churn_id = '{churn_id}'
+        ORDER BY hit DESC, confidence DESC
+    """, 100)
+
+    trails = q(f"""
+        SELECT action_type, operator_id, operator_name, action_time,
+               from_status, to_status, remark
+        FROM bb_audit_trail WHERE churn_id = '{churn_id}'
+        ORDER BY action_time ASC
+    """, 50)
+
+    dispatch = q(f"""
+        SELECT d.dispatch_id, d.appointed_time, d.actual_arrival_time,
+               d.late_minutes, d.exception_type, d.reschedule_count,
+               e.name as engineer_name, e.level as engineer_level, e.employment_type
+        FROM bb_dispatch_record d
+        LEFT JOIN bb_engineer e ON d.engineer_id = e.engineer_id
+        WHERE d.order_no = '{churn[0].get("related_order_no", "")}'
+        ORDER BY d.appointed_time DESC
+    """, 5)
+
+    return {
+        "churn": churn[0],
+        "evidences": evidences,
+        "trails": trails,
+        "dispatch": dispatch,
+    }
