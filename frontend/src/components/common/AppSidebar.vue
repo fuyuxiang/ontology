@@ -44,7 +44,7 @@
       </RouterLink>
 
       <div class="sidebar__divider"></div>
-      <div class="sidebar__section-label">AIP场景</div>
+      <div class="sidebar__section-label">场景模拟</div>
       <template v-for="item in sceneNav" :key="item.path">
         <RouterLink
           v-if="!item.disabled"
@@ -101,7 +101,7 @@ const isActive = (path: string) => route.path.startsWith(path)
 const dataNav = [
   {
     path: '/dashboard',
-    label: '数据看板',
+    label: '系统总揽',
     icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="8" width="3" height="6" rx="1" fill="currentColor" opacity="0.6"/><rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor" opacity="0.8"/><rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/></svg>`
   },
   {
