@@ -212,7 +212,7 @@ export interface WorkbenchQuery {
   status?: string
 }
 
-export type SSEStepKey = 'perception' | 'recognition' | 'reasoning' | 'attribution' | 'done' | 'error'
+export type SSEStepKey = 'perception' | 'recognition' | 'reasoning' | 'attribution' | 'todo' | 'done' | 'error'
 export type SSEStatus = 'start' | 'progress' | 'streaming' | 'complete' | 'skip' | 'error'
 
 export interface SSEEvent {
@@ -221,6 +221,27 @@ export interface SSEEvent {
   message?: string
   data?: unknown
 }
+
+export interface TodoAction {
+  action_id: string
+  churn_id: string
+  todo_type: string
+  action_type_code: string
+  action_name: string
+  description: string | null
+  priority: string
+  status: string
+  trigger_rule: string
+  expected_effect: string
+  support_evidences: { code: string; name: string; role: string }[]
+  display_data: Record<string, any>
+  related_info: string
+  feedback_data: Record<string, any> | null
+  feedback_time: string | null
+  assignee: string | null
+  params_json: Record<string, any> | null
+}
+
 
 export interface OntologyNode {
   id: string
@@ -260,6 +281,12 @@ export const broadbandApi = {
     post<{ ok: boolean }>(`/scenes/broadband/detail/${churnId}/actions/${actionId}/approve`, { approved_by: approvedBy || 'admin' }),
   rejectAction: (churnId: string, actionId: string, reason?: string, rejectedBy?: string) =>
     post<{ ok: boolean }>(`/scenes/broadband/detail/${churnId}/actions/${actionId}/reject`, { rejected_by: rejectedBy || 'admin', reason: reason || '' }),
+  confirmAction: (churnId: string, actionId: string) =>
+    post<{ ok: boolean }>(`/scenes/broadband/detail/${churnId}/actions/${actionId}/confirm`),
+  submitFeedback: (churnId: string, actionId: string, data: { feedback_type: string; feedback_value: string; feedback_text: string }) =>
+    post<{ ok: boolean; feedback_data: Record<string, any> }>(`/scenes/broadband/detail/${churnId}/actions/${actionId}/feedback`, data),
+  reAttribute: (churnId: string) =>
+    post<{ ok: boolean; updated_evidences: string[]; message: string }>(`/scenes/broadband/detail/${churnId}/re-attribute`),
   trail: (id: string) =>
     get<{ items: AuditTrailItem[]; total: number }>(`/scenes/broadband/detail/${id}/trail`),
 

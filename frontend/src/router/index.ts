@@ -5,7 +5,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/browser'
+      redirect: '/dashboard'
     },
     {
       path: '/browser',
@@ -42,7 +42,7 @@ const router = createRouter({
       path: '/dashboard',
       name: 'dashboard',
       component: () => import('../views/dashboard/DashboardView.vue'),
-      meta: { title: '系统总揽' }
+      meta: { title: '系统总览' }
     },
     {
       path: '/datasource',
@@ -51,10 +51,16 @@ const router = createRouter({
       meta: { title: '数据源管理' }
     },
     {
-      path: '/copilot',
+      path: '/copilot/:appId?',
       name: 'copilot',
       component: () => import('../views/copilot/CopilotView.vue'),
       meta: { title: '智能对话' }
+    },
+    {
+      path: '/scene',
+      name: 'scene-hub',
+      component: () => import('../views/scene/SceneHub.vue'),
+      meta: { title: '业务场景模拟' }
     },
     {
       path: '/scene/fttr',
@@ -99,6 +105,12 @@ const router = createRouter({
       meta: { title: '携号转网预警' }
     },
     {
+      path: '/aip/lowcode',
+      name: 'aip-lowcode',
+      component: () => import('../views/aip/LowCodeBuilder.vue'),
+      meta: { title: '低代码平台' }
+    },
+    {
       path: '/harness',
       name: 'harness',
       component: () => import('../views/harness/HarnessView.vue'),
@@ -108,7 +120,7 @@ const router = createRouter({
 })
 
 router.afterEach((to) => {
-  document.title = `${to.meta.title ?? '本体智能体平台'} — 本体智能体平台`
+  document.title = `${to.meta.title ?? '元枢Ontology'} — 元枢Ontology`
 })
 
 export default router
