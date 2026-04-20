@@ -3,20 +3,26 @@
     <!-- Logo -->
     <div class="sidebar__logo">
       <div class="sidebar__logo-icon">
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-          <path d="M10 2L18 6.5V13.5L10 18L2 13.5V6.5L10 2Z" fill="#4c6ef5" stroke="#4c6ef5" stroke-width="0.5"/>
-          <path d="M10 6L14 8.5V13L10 15.5L6 13V8.5L10 6Z" fill="#0f1117" stroke="#748ffc" stroke-width="0.5"/>
-        </svg>
+        <img src="/images/ontology/BONC.png" alt="BONC" class="sidebar__logo-img" />
       </div>
       <div class="sidebar__logo-info">
-        <span class="sidebar__logo-text">Bonc</span>
-        <span class="sidebar__logo-text">Agentic Ontology</span>
-        <span class="sidebar__logo-sub">Bonc本体智能体平台</span>
+        <span class="sidebar__logo-text">元枢</span>
+        <span class="sidebar__logo-text">Ontology</span>
       </div>
     </div>
 
     <!-- 主导航 -->
     <nav class="sidebar__nav">
+      <RouterLink
+        to="/dashboard"
+        class="sidebar__item"
+        :class="{ 'sidebar__item--active': isActive('/dashboard') }"
+      >
+        <span class="sidebar__item-icon" v-html="dashboardIcon"></span>
+        <span class="sidebar__item-label">系统总览</span>
+      </RouterLink>
+
+      <div class="sidebar__divider"></div>
       <div class="sidebar__section-label">数据基座</div>
       <RouterLink
         v-for="item in dataNav"
@@ -45,21 +51,27 @@
 
       <div class="sidebar__divider"></div>
       <div class="sidebar__section-label">场景模拟</div>
-      <template v-for="item in sceneNav" :key="item.path">
-        <RouterLink
-          v-if="!item.disabled"
-          :to="item.path"
-          class="sidebar__item"
-          :class="{ 'sidebar__item--active': isActive(item.path) }"
-        >
-          <span class="sidebar__item-icon" v-html="item.icon"></span>
-          <span class="sidebar__item-label">{{ item.label }}</span>
-        </RouterLink>
-        <div v-else class="sidebar__item sidebar__item--disabled">
-          <span class="sidebar__item-icon" v-html="item.icon"></span>
-          <span class="sidebar__item-label">{{ item.label }}</span>
-        </div>
-      </template>
+      <RouterLink
+        to="/scene"
+        class="sidebar__item"
+        :class="{ 'sidebar__item--active': isActive('/scene') }"
+      >
+        <span class="sidebar__item-icon" v-html="sceneNav.icon"></span>
+        <span class="sidebar__item-label">{{ sceneNav.label }}</span>
+      </RouterLink>
+
+      <div class="sidebar__divider"></div>
+      <div class="sidebar__section-label">AIP平台</div>
+      <RouterLink
+        v-for="item in aipNav"
+        :key="item.path"
+        :to="item.path"
+        class="sidebar__item"
+        :class="{ 'sidebar__item--active': isActive(item.path) }"
+      >
+        <span class="sidebar__item-icon" v-html="item.icon"></span>
+        <span class="sidebar__item-label">{{ item.label }}</span>
+      </RouterLink>
 
       <div class="sidebar__divider"></div>
       <div class="sidebar__section-label">智能交互</div>
@@ -98,12 +110,9 @@ const themeStore = useThemeStore()
 
 const isActive = (path: string) => route.path.startsWith(path)
 
+const dashboardIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="8" width="3" height="6" rx="1" fill="currentColor" opacity="0.6"/><rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor" opacity="0.8"/><rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/></svg>`
+
 const dataNav = [
-  {
-    path: '/dashboard',
-    label: '系统总揽',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="8" width="3" height="6" rx="1" fill="currentColor" opacity="0.6"/><rect x="6.5" y="5" width="3" height="9" rx="1" fill="currentColor" opacity="0.8"/><rect x="11" y="2" width="3" height="12" rx="1" fill="currentColor"/></svg>`
-  },
   {
     path: '/datasource',
     label: '数据工坊',
@@ -119,29 +128,17 @@ const mainNav = [
   },
 ]
 
-const sceneNav = [
+const sceneNav = {
+  path: '/scene',
+  label: '业务场景模拟',
+  icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/></svg>`,
+}
+
+const aipNav = [
   {
-    path: '/scene/fttr',
-    label: 'FTTR续约策划',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 13V7l4-4 4 4v6H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6.5 13v-3h3v3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
-    disabled: true,
-  },
-  {
-    path: '/scene/broadband',
-    label: '宽带退单原因稽核',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 8h4M6 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-  },
-  {
-    path: '/scene/enterprise',
-    label: '政企根因分析',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    disabled: true,
-  },
-  {
-    path: '/scene/mnp',
-    label: '携号转网预警',
-    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l5 3v6l-5 3-5-3V5l5-3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="13" r="0.8" fill="currentColor"/></svg>`,
-    disabled: false,
+    path: '/aip/lowcode',
+    label: '低代码平台',
+    icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M11.5 10v4M9.5 12h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`
   },
 ]
 
@@ -185,11 +182,15 @@ const sunIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ci
 }
 
 .sidebar__logo-icon {
-  width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.sidebar__logo-img {
+  height: 24px;
+  width: auto;
+  display: block;
 }
 
 .sidebar__logo-text {
@@ -203,6 +204,7 @@ const sunIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ci
 .sidebar__logo-info {
   display: flex;
   flex-direction: column;
+  align-items: center;
   min-width: 0;
 }
 
