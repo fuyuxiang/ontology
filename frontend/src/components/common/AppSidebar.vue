@@ -130,7 +130,6 @@ const sceneNav = [
     path: '/scene/broadband',
     label: '宽带退单原因稽核',
     icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9H3V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 8h4M6 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-    disabled: true,
   },
   {
     path: '/scene/enterprise',
