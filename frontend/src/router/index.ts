@@ -69,6 +69,24 @@ const router = createRouter({
       meta: { title: '宽带退单稽核' }
     },
     {
+      path: '/scene/broadband/stats',
+      name: 'scene-broadband-stats',
+      component: () => import('../views/scene/BroadbandStats.vue'),
+      meta: { title: '退单稽核统计' }
+    },
+    {
+      path: '/scene/broadband/inbox',
+      name: 'scene-broadband-inbox',
+      component: () => import('../views/scene/BroadbandInbox.vue'),
+      meta: { title: '智能收件箱' }
+    },
+    {
+      path: '/scene/broadband/:id',
+      name: 'scene-broadband-detail',
+      component: () => import('../views/scene/BroadbandDetail.vue'),
+      meta: { title: '退单详情' }
+    },
+    {
       path: '/scene/enterprise',
       name: 'scene-enterprise',
       component: () => import('../views/scene/EnterpriseScene.vue'),

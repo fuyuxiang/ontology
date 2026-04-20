@@ -1,463 +1,690 @@
 <template>
-  <div class="bb-scene">
-    <!-- Header -->
-    <div class="bb-header">
-      <div class="bb-header__left">
-        <div class="bb-header__icon">
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-            <path d="M9 11l2 2 4-4" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="11" cy="11" r="9" stroke="#fff" stroke-width="2"/>
-          </svg>
+  <div class="bb-split">
+    <!-- Left Panel: List -->
+    <div class="bb-left">
+      <div class="bb-left__header">
+        <h1 class="bb-left__title">宽带装机退单稽核</h1>
+        <p class="bb-left__desc">基于本体规则与大模型协同，自动判断退单原因合理性</p>
+      </div>
+
+      <!-- KPI row -->
+      <div class="bb-kpis" v-if="overview">
+        <div class="bb-kpi" v-for="kpi in kpis" :key="kpi.label" :class="kpi.cls">
+          <span class="bb-kpi__val">{{ kpi.value }}</span>
+          <span class="bb-kpi__lbl">{{ kpi.label }}</span>
         </div>
-        <div>
-          <h1 class="bb-header__title">宽带装机退单原因稽核</h1>
-          <p class="bb-header__desc">基于订单、派单、录音、地址库等多源数据，通过本体规则自动判断退单原因合理性</p>
+      </div>
+
+      <!-- Filters -->
+      <div class="bb-filters">
+        <input v-model="filters.keyword" class="bb-input" placeholder="搜索退单编号/工单号/客户..." @keyup.enter="doSearch" />
+        <div class="bb-filters__row">
+          <input v-model="filters.start_time" type="date" class="bb-input bb-input--date" />
+          <span class="bb-filters__sep">~</span>
+          <input v-model="filters.end_time" type="date" class="bb-input bb-input--date" />
         </div>
+        <div class="bb-filters__row">
+          <select v-model="filters.audit_status" class="bb-select">
+            <option value="">全部状态</option>
+            <option v-for="s in auditStatuses" :key="s" :value="s">{{ s }}</option>
+          </select>
+          <select v-model="filters.root_cause_level_one" class="bb-select">
+            <option value="">全部根因</option>
+            <option v-for="c in causeOptions" :key="c" :value="c">{{ c }}</option>
+          </select>
+        </div>
+        <button class="bb-btn bb-btn--primary bb-btn--block" @click="doSearch">查询</button>
       </div>
-      <div class="bb-header__badges">
-        <span class="bb-badge bb-badge--blue">本体驱动</span>
-        <span class="bb-badge bb-badge--green">实时稽核</span>
-      </div>
-    </div>
 
-    <!-- Stats -->
-    <div class="bb-stats" v-if="stats">
-      <div class="bb-stat-card">
-        <div class="bb-stat-card__value">{{ stats.total_orders }}</div>
-        <div class="bb-stat-card__label">总工单数</div>
-      </div>
-      <div class="bb-stat-card">
-        <div class="bb-stat-card__value bb-stat-card__value--warn">{{ stats.total_churns }}</div>
-        <div class="bb-stat-card__label">退单总数</div>
-        <div class="bb-stat-card__sub">占比 {{ churnRate }}%</div>
-      </div>
-      <div class="bb-stat-card">
-        <div class="bb-stat-card__value bb-stat-card__value--success">{{ stats.archived }}</div>
-        <div class="bb-stat-card__label">已归档</div>
-        <div class="bb-stat-card__sub">自动稽核通过</div>
-      </div>
-      <div class="bb-stat-card">
-        <div class="bb-stat-card__value bb-stat-card__value--orange">{{ stats.manual_review }}</div>
-        <div class="bb-stat-card__label">人工审核中</div>
-      </div>
-      <div class="bb-stat-card">
-        <div class="bb-stat-card__value bb-stat-card__value--gray">{{ stats.pending_callback }}</div>
-        <div class="bb-stat-card__label">待补全回访</div>
-      </div>
-      <div class="bb-stat-card">
-        <div class="bb-stat-card__value bb-stat-card__value--blue">{{ (stats.avg_confidence * 100).toFixed(1) }}%</div>
-        <div class="bb-stat-card__label">平均置信度</div>
-      </div>
-    </div>
-
-    <!-- Cause Distribution + Filter -->
-    <div class="bb-toolbar">
-      <div class="bb-cause-pills">
-        <button class="bb-pill" :class="{ 'bb-pill--active': filterCause === '' }" @click="filterCause = ''; loadList()">全部</button>
-        <button
-          v-for="(cnt, cause) in stats?.cause_distribution"
-          :key="cause"
-          class="bb-pill"
-          :class="['bb-pill--' + causeColor(String(cause)), { 'bb-pill--active': filterCause === String(cause) }]"
-          @click="filterCause = String(cause); loadList()"
-        >{{ cause }} <span class="bb-pill__cnt">{{ cnt }}</span></button>
-      </div>
-      <div class="bb-status-filter">
-        <select v-model="filterStatus" @change="loadList()" class="bb-select">
-          <option value="">全部状态</option>
-          <option value="已归档">已归档</option>
-          <option value="人工审核中">人工审核中</option>
-          <option value="待补全回访">待补全回访</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Main content: list + detail -->
-    <div class="bb-main">
-      <!-- List -->
+      <!-- Table -->
       <div class="bb-list">
-        <div v-if="listLoading" class="bb-loading">加载中...</div>
         <div
-          v-for="item in list"
-          :key="item.churn_id"
+          v-for="row in list" :key="row.churn_id"
           class="bb-list-item"
-          :class="{ 'bb-list-item--active': selectedId === item.churn_id }"
-          @click="selectChurn(item.churn_id)"
+          :class="{ 'bb-list-item--active': selectedId === row.churn_id }"
+          @click="selectOrder(row)"
         >
           <div class="bb-list-item__top">
-            <span class="bb-list-item__id">{{ item.churn_id }}</span>
-            <span class="bb-status-tag" :class="statusClass(item.audit_status)">{{ item.audit_status }}</span>
+            <span class="bb-list-item__id">{{ row.churn_id }}</span>
+            <span class="bb-status" :class="'bb-status--' + statusClass(row.audit_status)">{{ row.audit_status || '-' }}</span>
           </div>
-          <div class="bb-list-item__order">工单 {{ item.related_order_no }}</div>
-          <div class="bb-list-item__meta">
-            <span class="bb-cause-tag" :class="'bb-cause-tag--' + causeColor(item.root_cause_level_one)">{{ item.root_cause_level_one }}</span>
-            <span class="bb-list-item__l2">{{ item.root_cause_level_two }}</span>
+          <div class="bb-list-item__mid">
+            <span>{{ row.customer_name || '-' }}</span>
+            <span class="bb-list-item__sep">|</span>
+            <span>{{ row.engineer_name || '-' }}</span>
+            <span class="bb-list-item__sep">|</span>
+            <span>{{ formatTime(row.churn_time) }}</span>
           </div>
-          <div class="bb-list-item__bottom">
-            <span class="bb-conf-bar-wrap">
-              <span class="bb-conf-bar" :style="{ width: confPct(item.root_cause_confidence) + '%', background: confColor(item.root_cause_confidence) }"></span>
-            </span>
-            <span class="bb-conf-val">{{ confPct(item.root_cause_confidence) }}%</span>
-            <span class="bb-list-item__time">{{ fmtDate(item.churn_time) }}</span>
+          <div class="bb-list-item__bot">
+            <span v-if="row.root_cause_level_one" class="bb-cause-tag" :class="'bb-cause-tag--' + causeClass(row.root_cause_level_one)">{{ row.root_cause_level_one }}</span>
+            <span v-if="row.root_cause_confidence != null" class="bb-conf-sm">{{ (row.root_cause_confidence * 100).toFixed(0) }}%</span>
+            <span class="bb-list-item__phase" v-if="row.churn_phase">{{ row.churn_phase }}</span>
+          </div>
+          <div class="bb-list-item__actions">
+            <button v-if="row.audit_status === '待稽核'" class="bb-link bb-link--analyze" @click.stop="startAnalyze(row)">分析</button>
           </div>
         </div>
-        <!-- Pagination -->
-        <div class="bb-pagination">
-          <button class="bb-page-btn" :disabled="page <= 1" @click="page--; loadList()">‹</button>
-          <span class="bb-page-info">{{ page }} / {{ totalPages }}</span>
-          <button class="bb-page-btn" :disabled="page >= totalPages" @click="page++; loadList()">›</button>
-        </div>
+        <div v-if="!loading && list.length === 0" class="bb-empty">暂无退单数据</div>
+        <div v-if="loading" class="bb-loading"><span class="bb-spinner"></span></div>
       </div>
 
-      <!-- Detail -->
-      <div class="bb-detail" v-if="detail">
-        <div class="bb-detail__header">
-          <div>
-            <div class="bb-detail__id">{{ detail.churn.churn_id }}</div>
-            <div class="bb-detail__order">工单号：{{ detail.churn.related_order_no }}</div>
+      <!-- Pagination -->
+      <div class="bb-pagination" v-if="total > 0">
+        <span class="bb-pagination__info">共 {{ total }} 条</span>
+        <div class="bb-pagination__btns">
+          <button class="bb-btn bb-btn--sm" :disabled="page <= 1" @click="goPage(page - 1)">上一页</button>
+          <span class="bb-pagination__cur">{{ page }} / {{ totalPages }}</span>
+          <button class="bb-btn bb-btn--sm" :disabled="page >= totalPages" @click="goPage(page + 1)">下一页</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: Detail / Analysis -->
+    <div class="bb-right">
+      <template v-if="selected">
+        <!-- Order header -->
+        <div class="bb-detail-header">
+          <div class="bb-detail-header__top">
+            <h2 class="bb-detail-header__id">{{ selected.churn_id }}</h2>
+            <span class="bb-status" :class="'bb-status--' + statusClass(selected.audit_status)">{{ selected.audit_status }}</span>
+            <span v-if="selected.root_cause_level_one" class="bb-cause-tag" :class="'bb-cause-tag--' + causeClass(selected.root_cause_level_one)">{{ selected.root_cause_level_one }}</span>
           </div>
-          <span class="bb-status-tag bb-status-tag--lg" :class="statusClass(detail.churn.audit_status)">{{ detail.churn.audit_status }}</span>
+          <div class="bb-detail-header__info">
+            <span>客户: {{ detailData?.customer?.customer_name || selected.customer_name || '-' }}</span>
+            <span>工单: {{ selected.related_order_no }}</span>
+            <span>退单时间: {{ formatTime(selected.churn_time) }}</span>
+            <span>工程师: {{ selected.engineer_name || '-' }}</span>
+            <span v-if="selected.churn_category_l1">退单原因: {{ selected.churn_category_l1 }}</span>
+          </div>
         </div>
 
         <!-- Tabs -->
-        <div class="bb-detail__tabs">
-          <button v-for="t in detailTabs" :key="t" class="bb-detail__tab" :class="{ 'bb-detail__tab--active': detailTab === t }" @click="detailTab = t">{{ t }}</button>
+        <div class="bb-tabs">
+          <button v-for="t in panelTabs" :key="t.key" class="bb-tab" :class="{ 'bb-tab--active': activeTab === t.key }" @click="activeTab = t.key">{{ t.label }}</button>
         </div>
 
-        <!-- Tab: 稽核结论 -->
-        <div v-if="detailTab === '稽核结论'" class="bb-detail__body">
-          <div class="bb-conclusion">
-            <div class="bb-conclusion__cause">
-              <div class="bb-conclusion__label">根因判定</div>
-              <div class="bb-conclusion__l1" :class="'bb-cause-tag--' + causeColor(detail.churn.root_cause_level_one)">{{ detail.churn.root_cause_level_one }}</div>
-              <div class="bb-conclusion__arrow">›</div>
-              <div class="bb-conclusion__l2">{{ detail.churn.root_cause_level_two }}</div>
-            </div>
-            <div class="bb-conf-meter">
-              <div class="bb-conf-meter__label">置信度</div>
-              <div class="bb-conf-meter__bar-wrap">
-                <div class="bb-conf-meter__bar" :style="{ width: confPct(detail.churn.root_cause_confidence) + '%', background: confColor(detail.churn.root_cause_confidence) }"></div>
+        <!-- Tab: 分析过程 -->
+        <div v-if="activeTab === 'process'" class="bb-tab-content">
+          <div class="bb-analysis-header">
+            <button v-if="!analysisRunning && !analysisDone" class="bb-btn bb-btn--primary" @click="doStartAnalysis">开始分析</button>
+            <button v-if="analysisDone" class="bb-btn" @click="doStartAnalysis">重新分析</button>
+            <span v-if="analysisRunning" class="bb-analysis-running"><span class="bb-spinner bb-spinner--sm"></span> 分析中...</span>
+          </div>
+          <div v-if="analysisError" class="bb-analysis-error">{{ analysisError }}</div>
+
+          <!-- Steps -->
+          <div class="bb-steps">
+            <div v-for="(step, idx) in analysisSteps" :key="step.key" class="bb-step" :class="'bb-step--' + step.state">
+              <div class="bb-step__icon">
+                <span v-if="step.state === 'pending'" class="bb-step-num">{{ idx + 1 }}</span>
+                <span v-else-if="step.state === 'loading'" class="bb-spinner bb-spinner--sm"></span>
+                <svg v-else-if="step.state === 'done'" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg v-else-if="step.state === 'skip'" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 8h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                <svg v-else-if="step.state === 'error'" width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               </div>
-              <div class="bb-conf-meter__val">{{ confPct(detail.churn.root_cause_confidence) }}%</div>
-            </div>
-            <div class="bb-info-grid">
-              <div class="bb-info-row"><span class="bb-info-key">退单阶段</span><span class="bb-info-val">{{ detail.churn.churn_phase }}</span></div>
-              <div class="bb-info-row"><span class="bb-info-key">退单时间</span><span class="bb-info-val">{{ fmtDate(detail.churn.churn_time) }}</span></div>
-              <div class="bb-info-row"><span class="bb-info-key">产品</span><span class="bb-info-val">{{ detail.churn.product_name }}</span></div>
-              <div class="bb-info-row"><span class="bb-info-key">业务类型</span><span class="bb-info-val">{{ detail.churn.biz_type }}</span></div>
-              <div class="bb-info-row"><span class="bb-info-key">渠道</span><span class="bb-info-val">{{ detail.churn.channel_id }}</span></div>
-              <div class="bb-info-row"><span class="bb-info-key">安装地址</span><span class="bb-info-val bb-info-val--addr">{{ detail.churn.install_address }}</span></div>
-              <div class="bb-info-row" v-if="detail.churn.triggered_action_type"><span class="bb-info-key">触发动作</span><span class="bb-info-val bb-info-val--action">{{ detail.churn.triggered_action_type }}</span></div>
-            </div>
-            <div class="bb-evidence-summary" v-if="detail.churn.evidence_chain_summary">
-              <div class="bb-evidence-summary__label">证据链摘要</div>
-              <div class="bb-evidence-summary__text">{{ detail.churn.evidence_chain_summary }}</div>
+              <div class="bb-step__connector" v-if="idx < analysisSteps.length - 1"></div>
+              <div class="bb-step__body">
+                <div class="bb-step__title">{{ step.label }}</div>
+                <div class="bb-step__msg" v-if="step.message">{{ step.message }}</div>
+
+                <!-- Evidence cards -->
+                <div v-if="step.key === 'recognition' && step.evidences && step.evidences.length > 0" class="bb-ev-cards">
+                  <div class="bb-ev-cards__summary">
+                    共 {{ ALL_EVIDENCE_CODES.length }} 条证据，命中 <span class="bb-ev-cards__hit-num">{{ step.evidences.filter(e => e.hit).length }}</span> 条
+                  </div>
+                  <div v-for="ev in mergeAllEvidence(step.evidences)" :key="ev.evidence_code" class="bb-ev-card" :class="ev._active ? (ev.hit ? 'bb-ev-card--hit' : 'bb-ev-card--miss') : 'bb-ev-card--inactive'">
+                    <div class="bb-ev-card__badge" :class="ev._active ? (ev.hit ? 'bb-ev-card__badge--hit' : 'bb-ev-card__badge--miss') : 'bb-ev-card__badge--inactive'">{{ ev.evidence_code }}</div>
+                    <div class="bb-ev-card__body">
+                      <div class="bb-ev-card__top">
+                        <span class="bb-ev-card__name">{{ ev.content || ev.evidence_code }}</span>
+                        <template v-if="ev._active">
+                          <span :class="ev.hit ? 'bb-hit-yes' : 'bb-hit-no'">{{ ev.hit ? '命中' : '未命中' }}</span>
+                          <span class="bb-ev-type" :class="'bb-ev-type--' + ev.evidence_type">{{ ev.evidence_type }}</span>
+                          <span v-if="ev.confidence != null" class="bb-ev-card__conf">{{ (ev.confidence * 100).toFixed(1) }}%</span>
+                        </template>
+                        <span v-else class="bb-ev-type" :class="'bb-ev-type--' + ev.evidence_type">{{ ev.evidence_type }}</span>
+                      </div>
+                      <div class="bb-ev-card__reason" v-if="ev._active && ev.raw_text">{{ ev.raw_text }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Attribution streaming -->
+                <div v-if="step.key === 'attribution' && step.attributionText" class="bb-step__attribution">
+                  <pre class="bb-step__attr-text">{{ step.attributionText }}<span v-if="step.state === 'loading'" class="bb-cursor">|</span></pre>
+                </div>
+
+                <!-- Step data tags -->
+                <div v-if="step.state === 'done' && step.data" class="bb-step__detail">
+                  <template v-if="step.key === 'perception' && (step.data as any).source_types">
+                    <span v-for="(cnt, src) in (step.data as any).source_types" :key="src" class="bb-step-tag">{{ src }}: {{ cnt }}</span>
+                  </template>
+                  <template v-if="step.key === 'recognition'">
+                    <span class="bb-step-tag">NLP: {{ (step.data as any).nlp_count }}</span>
+                    <span class="bb-step-tag">规则: {{ (step.data as any).rule_count }}</span>
+                    <span class="bb-step-tag bb-step-tag--hit">命中: {{ (step.data as any).hit_count }}</span>
+                  </template>
+                  <template v-if="step.key === 'reasoning' && (step.data as any).logic_hits">
+                    <span class="bb-step-tag">规则命中: {{ (step.data as any).logic_hits.length }}</span>
+                  </template>
+                </div>
+              </div>
             </div>
           </div>
+          <div v-if="analysisDone" class="bb-analysis-done">分析完成</div>
         </div>
 
-        <!-- Tab: 证据链 -->
-        <div v-else-if="detailTab === '证据链'" class="bb-detail__body">
-          <div class="bb-evidence-list">
-            <div v-for="ev in detail.evidences" :key="ev.evidence_id" class="bb-ev-item" :class="{ 'bb-ev-item--hit': ev.hit }">
-              <div class="bb-ev-item__left">
-                <span class="bb-ev-hit" :class="ev.hit ? 'bb-ev-hit--yes' : 'bb-ev-hit--no'">{{ ev.hit ? '命中' : '未中' }}</span>
-                <span class="bb-ev-code">{{ ev.evidence_code }}</span>
-                <span class="bb-ev-type">{{ ev.evidence_type }}</span>
-              </div>
-              <div class="bb-ev-item__content">{{ ev.content }}</div>
-              <div class="bb-ev-item__right">
-                <span class="bb-ev-conf" :style="{ color: confColor(ev.confidence) }">{{ confPct(ev.confidence) }}%</span>
-                <span class="bb-ev-src">{{ ev.source_type }}</span>
-              </div>
+        <!-- Tab: 本体图谱 -->
+        <div v-if="activeTab === 'graph'" class="bb-tab-content">
+          <div v-if="graphLoading" class="bb-graph-loading"><span class="bb-spinner"></span> 加载图谱数据...</div>
+          <div v-else-if="!graphData || graphData.nodes.length === 0" class="bb-empty">暂无本体图谱数据，请先进行分析</div>
+          <template v-else>
+            <div class="bb-graph-legend">
+              <span v-for="(color, type) in graphNodeColors" :key="type" class="bb-graph-legend__item">
+                <span class="bb-graph-legend__dot" :style="{ background: color }"></span>
+                {{ graphTypeLabels[type] || type }}
+              </span>
             </div>
-            <div v-if="!detail.evidences.length" class="bb-empty">暂无证据记录</div>
-          </div>
-        </div>
-
-        <!-- Tab: 派单信息 -->
-        <div v-else-if="detailTab === '派单信息'" class="bb-detail__body">
-          <div v-if="detail.dispatch.length" class="bb-dispatch">
-            <div v-for="d in detail.dispatch" :key="d.dispatch_id" class="bb-dispatch-card">
-              <div class="bb-dispatch-card__eng">
-                <span class="bb-eng-name">{{ d.engineer_name }}</span>
-                <span class="bb-eng-level">{{ d.engineer_level }}</span>
-                <span class="bb-eng-type">{{ d.employment_type }}</span>
-              </div>
-              <div class="bb-info-grid">
-                <div class="bb-info-row"><span class="bb-info-key">预约时间</span><span class="bb-info-val">{{ fmtDate(d.appointed_time) }}</span></div>
-                <div class="bb-info-row"><span class="bb-info-key">实际到达</span><span class="bb-info-val">{{ fmtDate(d.actual_arrival_time) }}</span></div>
-                <div class="bb-info-row"><span class="bb-info-key">迟到分钟</span><span class="bb-info-val" :class="d.late_minutes > 30 ? 'bb-info-val--warn' : ''">{{ d.late_minutes }} 分钟</span></div>
-                <div class="bb-info-row"><span class="bb-info-key">改约次数</span><span class="bb-info-val">{{ d.reschedule_count }}</span></div>
-                <div class="bb-info-row" v-if="d.exception_type"><span class="bb-info-key">异常类型</span><span class="bb-info-val bb-info-val--warn">{{ d.exception_type }}</span></div>
-              </div>
+            <div class="bb-graph-svg-wrap">
+              <svg :width="graphWidth" :height="graphHeight" :viewBox="`0 0 ${graphWidth} ${graphHeight}`" class="bb-graph-svg">
+                <defs>
+                  <marker id="bb-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+                    <path d="M0,0 L0,6 L8,3 z" fill="var(--neutral-400)" />
+                  </marker>
+                </defs>
+                <g v-for="(edge, i) in graphEdges" :key="'e'+i">
+                  <line :x1="edge.x1" :y1="edge.y1" :x2="edge.x2" :y2="edge.y2" stroke="var(--neutral-300)" stroke-width="1.5" marker-end="url(#bb-arrow)" />
+                  <text :x="(edge.x1+edge.x2)/2" :y="(edge.y1+edge.y2)/2 - 5" text-anchor="middle" font-size="10" fill="var(--neutral-500)">{{ edge.relation }}</text>
+                </g>
+                <g v-for="node in graphNodes" :key="node.id">
+                  <circle :cx="node.x" :cy="node.y" :r="graphNodeR" :fill="graphNodeColors[node.type] || '#8c8c8c'" opacity="0.9" stroke="var(--neutral-0)" stroke-width="2" />
+                  <text :x="node.x" :y="node.y - 3" text-anchor="middle" font-size="10" fill="#fff" font-weight="bold">{{ graphTypeLabels[node.type] || node.type }}</text>
+                  <text :x="node.x" :y="node.y + 11" text-anchor="middle" font-size="9" fill="#fff">{{ node.name.length > 8 ? node.name.slice(0, 8) + '...' : node.name }}</text>
+                </g>
+              </svg>
             </div>
-          </div>
-          <div v-else class="bb-empty">暂无派单记录</div>
+            <div class="bb-graph-info">共 {{ graphData.nodes.length }} 个节点，{{ graphData.edges.length }} 条关系</div>
+          </template>
         </div>
 
-        <!-- Tab: 审计轨迹 -->
-        <div v-else-if="detailTab === '审计轨迹'" class="bb-detail__body">
-          <div class="bb-trail">
-            <div v-for="(t, i) in detail.trails" :key="i" class="bb-trail-item">
-              <div class="bb-trail-item__dot"></div>
-              <div class="bb-trail-item__body">
-                <div class="bb-trail-item__action">{{ t.action_type }}</div>
-                <div class="bb-trail-item__meta">{{ t.operator_name }} · {{ fmtDate(t.action_time) }}</div>
-                <div class="bb-trail-item__status">{{ t.from_status }} → {{ t.to_status }}</div>
-                <div class="bb-trail-item__remark" v-if="t.remark">{{ t.remark }}</div>
-              </div>
-            </div>
-            <div v-if="!detail.trails.length" class="bb-empty">暂无轨迹记录</div>
-          </div>
-        </div>
-      </div>
+      </template>
 
-      <!-- Empty detail -->
-      <div class="bb-detail bb-detail--empty" v-else>
-        <div class="bb-detail__placeholder">
-          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" opacity="0.3">
-            <path d="M12 8h24l6 6v26H6V8h6z" stroke="currentColor" stroke-width="2"/>
-            <path d="M16 20h16M16 26h12M16 32h8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          <p>选择左侧退单记录查看详情</p>
+      <!-- Empty state -->
+      <div v-else class="bb-right-empty">
+        <div class="bb-right-empty__icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect x="8" y="12" width="32" height="24" rx="3" stroke="var(--neutral-300)" stroke-width="2"/><path d="M8 18h32" stroke="var(--neutral-300)" stroke-width="2"/><circle cx="14" cy="15" r="1.5" fill="var(--neutral-300)"/><circle cx="19" cy="15" r="1.5" fill="var(--neutral-300)"/></svg>
         </div>
+        <p class="bb-right-empty__text">请从左侧列表选择退单工单</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
-import axios from 'axios'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { broadbandApi } from '../../api/broadband'
+import type {
+  BroadbandOverview, ChurnListItem, ChurnDetail,
+  EvidenceItem, SSEEvent, SSEStepKey, OntologyGraphData, OntologyNode,
+} from '../../api/broadband'
 
-const stats = ref<any>(null)
-const list = ref<any[]>([])
-const listLoading = ref(false)
+// ── List state ──
+const loading = ref(true)
+const overview = ref<BroadbandOverview | null>(null)
+const list = ref<ChurnListItem[]>([])
 const total = ref(0)
 const page = ref(1)
 const pageSize = 20
-const filterStatus = ref('')
-const filterCause = ref('')
-const selectedId = ref<string | null>(null)
-const detail = ref<any>(null)
-const detailTab = ref('稽核结论')
-const detailTabs = ['稽核结论', '证据链', '派单信息', '审计轨迹']
+const filters = reactive({ keyword: '', start_time: '', end_time: '', audit_status: '', root_cause_level_one: '' })
+const auditStatuses = ['待稽核', '推理中', '待补全回访', '强制回访待核实', '待人工审核', '已归档']
+const causeOptions = ['用户原因', '施工原因', '资源原因', '业务原因']
 
+const ALL_EVIDENCE_CODES: { code: string; name: string; type: 'nlp' | 'rule' }[] = [
+  { code: 'E1', name: '用户主动取消意愿', type: 'nlp' }, { code: 'E2', name: '用户搬家/不在本地', type: 'nlp' },
+  { code: 'E3', name: '用户装修中', type: 'nlp' }, { code: 'E4', name: '用户选择友商', type: 'nlp' },
+  { code: 'E5', name: '用户资费不满', type: 'nlp' }, { code: 'E6', name: '用户要求变更', type: 'nlp' },
+  { code: 'E7', name: '联系不上(ASR确认)', type: 'nlp' }, { code: 'E8', name: '实名问题(ASR提及)', type: 'nlp' },
+  { code: 'E9', name: '工程师态度问题', type: 'nlp' }, { code: 'E10', name: '工程师乱收费', type: 'nlp' },
+  { code: 'E11', name: '施工受阻(物业)', type: 'nlp' }, { code: 'E12', name: '入户线问题', type: 'nlp' },
+  { code: 'E13', name: '技术问题无法开通', type: 'nlp' }, { code: 'E14', name: '客户情绪愤怒', type: 'nlp' },
+  { code: 'E15', name: '客户情绪焦虑', type: 'nlp' }, { code: 'E16', name: '客户满意', type: 'nlp' },
+  { code: 'E17', name: '工程师推诿', type: 'nlp' }, { code: 'E18', name: '多次改约', type: 'nlp' },
+  { code: 'E19', name: '资源不足(ASR提及)', type: 'nlp' }, { code: 'E20', name: '建设时间长(ASR提及)', type: 'nlp' },
+  { code: 'E21', name: '回访确认用户取消', type: 'nlp' }, { code: 'E22', name: '回访确认施工问题', type: 'nlp' },
+  { code: 'E23', name: '回访确认资源问题', type: 'nlp' }, { code: 'E24', name: '回访无法联系', type: 'nlp' },
+  { code: 'E25', name: '回访挽回成功', type: 'nlp' },
+  { code: 'E26', name: '通话失败≥4次且≥2天', type: 'rule' }, { code: 'E27', name: '派单延迟>24h', type: 'rule' },
+  { code: 'E28', name: '工程师90日退单率>15%', type: 'rule' }, { code: 'E29', name: '地址待装库有积压', type: 'rule' },
+  { code: 'E30', name: '地址资源状态=不足', type: 'rule' }, { code: 'E31', name: '非无条件受理区域', type: 'rule' },
+  { code: 'E32', name: '客户黑灰名单', type: 'rule' }, { code: 'E33', name: '客户欠费', type: 'rule' },
+  { code: 'E34', name: '异网通话记录存在', type: 'rule' }, { code: 'E35', name: '人工资源核实结果', type: 'rule' },
+  { code: 'E36', name: '竞争对手通话频次高', type: 'rule' }, { code: 'E37', name: '回访补全信息', type: 'rule' },
+]
+
+function mergeAllEvidence(extracted: EvidenceItem[]): (EvidenceItem & { _active: boolean })[] {
+  const hitMap = new Map(extracted.map(e => [e.evidence_code, e]))
+  return ALL_EVIDENCE_CODES.map(def => {
+    const matched = hitMap.get(def.code)
+    if (matched) return { ...matched, _active: true }
+    return { evidence_id: def.code, evidence_code: def.code, content: def.name, evidence_type: def.type, hit: false, confidence: null, raw_text: null, _active: false } as any
+  })
+}
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
-const churnRate = computed(() => stats.value ? ((stats.value.total_churns / stats.value.total_orders) * 100).toFixed(1) : '0')
 
-const api = axios.create({ baseURL: '/api/v1' })
+// ── Selection state ──
+const selectedId = ref<string | null>(null)
+const selected = ref<ChurnListItem | null>(null)
+const detailData = ref<ChurnDetail | null>(null)
+const activeTab = ref('process')
+const autoAnalyze = ref(false)
 
-async function loadStats() {
-  const r = await api.get('/scenes/broadband/stats')
-  stats.value = r.data
+const panelTabs = [
+  { key: 'process', label: '分析过程' },
+  { key: 'graph', label: '本体图谱' },
+]
+
+// ── Analysis state ──
+type StepState = 'pending' | 'loading' | 'done' | 'skip' | 'error'
+interface AnalysisStep {
+  key: SSEStepKey; label: string; state: StepState
+  message?: string; data?: unknown; attributionText?: string
+  evidences?: EvidenceItem[]
+}
+const STEP_ORDER: SSEStepKey[] = ['perception', 'recognition', 'reasoning', 'attribution']
+const STEP_LABELS: Record<string, string> = {
+  perception: '感知 · 数据采集', recognition: '识别 · 证据提取',
+  reasoning: '推理 · 逻辑命中', attribution: '归因 · 结论输出',
+}
+function initSteps(): AnalysisStep[] {
+  return STEP_ORDER.map(key => ({ key, label: STEP_LABELS[key], state: 'pending' as StepState }))
+}
+const analysisSteps = ref<AnalysisStep[]>(initSteps())
+const analysisRunning = ref(false)
+const analysisDone = ref(false)
+const analysisError = ref<string | null>(null)
+let abortCtrl: AbortController | null = null
+
+// ── Graph state ──
+const graphData = ref<OntologyGraphData | null>(null)
+const graphLoading = ref(false)
+const graphNodeColors: Record<string, string> = {
+  refund: '#fa5252', order: '#339af0', customer: '#20c997', engineer: '#f59f00',
+  address: '#7950f2', channel: '#e64980', product: '#12b886', dispatch: '#868e96', call: '#fd7e14',
+}
+const graphTypeLabels: Record<string, string> = {
+  refund: '退单', order: '工单', customer: '客户', engineer: '工程师',
+  address: '地址', channel: '渠道', product: '产品', dispatch: '派单', call: '通话',
+}
+const graphWidth = 700
+const graphHeight = 420
+const graphNodeR = 28
+
+// ── Computed: KPIs ──
+const kpis = computed(() => {
+  const o = overview.value
+  if (!o) return []
+  return [
+    { label: '总退单', value: o.total, cls: '' },
+    { label: '待稽核', value: o.pending, cls: 'bb-kpi--warning' },
+    { label: '推理中', value: o.reasoning, cls: 'bb-kpi--info' },
+    { label: '已归档', value: o.archived, cls: 'bb-kpi--success' },
+    { label: '准确率', value: ((o.accuracy_rate || 0) * 100).toFixed(1) + '%', cls: 'bb-kpi--accent' },
+  ]
+})
+
+// ── Computed: Graph layout ──
+interface GraphNodePos { id: string; x: number; y: number; type: string; name: string }
+const graphNodes = computed<GraphNodePos[]>(() => {
+  const nodes = graphData.value?.nodes || []
+  if (!nodes.length) return []
+  const cx = graphWidth / 2, cy = graphHeight / 2
+  const r = Math.min(graphWidth, graphHeight) * 0.35
+  return nodes.map((n, i) => {
+    const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2
+    return { id: n.id, x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), type: n.type, name: n.name }
+  })
+})
+const graphEdges = computed(() => {
+  const nodeMap = new Map(graphNodes.value.map(n => [n.id, n]))
+  return (graphData.value?.edges || []).map(e => {
+    const src = nodeMap.get(e.source), tgt = nodeMap.get(e.target)
+    if (!src || !tgt) return null
+    const dx = tgt.x - src.x, dy = tgt.y - src.y
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1
+    return {
+      x1: src.x + (dx / dist) * graphNodeR, y1: src.y + (dy / dist) * graphNodeR,
+      x2: tgt.x - (dx / dist) * (graphNodeR + 8), y2: tgt.y - (dy / dist) * (graphNodeR + 8),
+      relation: e.relation,
+    }
+  }).filter(Boolean)
+})
+
+// ── Helpers ──
+function formatTime(t: string | null) { return t ? t.replace('T', ' ').slice(0, 16) : '-' }
+function statusClass(s: string | null) {
+  const m: Record<string, string> = { '待稽核': 'pending', '推理中': 'info', '待补全回访': 'warning', '强制回访待核实': 'warning', '待人工审核': 'error', '已归档': 'success' }
+  return m[s || ''] || 'default'
+}
+function causeClass(c: string | null) {
+  const m: Record<string, string> = { '用户原因': 'user', '施工原因': 'construct', '资源原因': 'resource', '业务原因': 'biz' }
+  return m[c || ''] || 'default'
 }
 
-async function loadList() {
-  listLoading.value = true
-  selectedId.value = null
-  detail.value = null
+// ── Data fetching ──
+async function fetchList() {
+  loading.value = true
   try {
-    const r = await api.get('/scenes/broadband/churns', {
-      params: { status: filterStatus.value, cause_l1: filterCause.value, page: page.value, page_size: pageSize }
-    })
-    list.value = r.data.items
-    total.value = r.data.total
+    const [ov, res] = await Promise.all([
+      broadbandApi.overview(),
+      broadbandApi.list({ page: page.value, page_size: pageSize, ...filters }),
+    ])
+    overview.value = ov
+    list.value = res.items as ChurnListItem[]
+    total.value = res.total
   } finally {
-    listLoading.value = false
+    loading.value = false
   }
 }
 
-async function selectChurn(id: string) {
-  selectedId.value = id
-  detailTab.value = '稽核结论'
-  const r = await api.get(`/scenes/broadband/churns/${id}`)
-  detail.value = r.data
+function doSearch() { page.value = 1; fetchList() }
+function goPage(p: number) { page.value = p; fetchList() }
+
+// ── Selection & detail loading ──
+async function selectOrder(row: ChurnListItem) {
+  selectedId.value = row.churn_id
+  selected.value = row
+  autoAnalyze.value = false
+  activeTab.value = 'process'
+  resetAnalysis()
+  graphData.value = null
+  detailData.value = null
+  try {
+    detailData.value = await broadbandApi.detail(row.churn_id)
+  } catch { /* silent */ }
 }
 
-function causeColor(cause: string) {
-  const map: Record<string, string> = { '施工原因': 'red', '用户原因': 'blue', '资源原因': 'orange', '业务原因': 'purple' }
-  return map[cause] || 'gray'
+function startAnalyze(row: ChurnListItem) {
+  selectedId.value = row.churn_id
+  selected.value = row
+  autoAnalyze.value = true
+  activeTab.value = 'process'
+  resetAnalysis()
+  graphData.value = null
+  detailData.value = null
+  broadbandApi.detail(row.churn_id).then(d => { detailData.value = d }).catch(() => {})
+  doStartAnalysis()
 }
 
-function statusClass(s: string) {
-  if (s === '已归档') return 'bb-status-tag--green'
-  if (s === '人工审核中') return 'bb-status-tag--orange'
-  if (s === '待补全回访') return 'bb-status-tag--gray'
-  return ''
+
+// ── Analysis SSE ──
+function resetAnalysis() {
+  abortCtrl?.abort()
+  abortCtrl = null
+  analysisSteps.value = initSteps()
+  analysisRunning.value = false
+  analysisDone.value = false
+  analysisError.value = null
 }
 
-function confPct(v: any) {
-  return v ? Math.round(Number(v) * 100) : 0
+function updateStep(key: SSEStepKey, patch: Partial<AnalysisStep>) {
+  analysisSteps.value = analysisSteps.value.map(s => s.key === key ? { ...s, ...patch } : s)
 }
 
-function confColor(v: any) {
-  const p = confPct(v)
-  if (p >= 85) return '#10b981'
-  if (p >= 60) return '#f59e0b'
-  return '#ef4444'
+function doStartAnalysis() {
+  if (!selected.value) return
+  resetAnalysis()
+  analysisRunning.value = true
+  const churnId = selected.value.churn_id
+
+  abortCtrl = broadbandApi.startAnalysis(
+    churnId,
+    (event: SSEEvent) => handleSSE(event, churnId),
+    (err: Error) => {
+      analysisError.value = err.message
+      analysisRunning.value = false
+    },
+  )
 }
 
-function fmtDate(s: string) {
-  if (!s) return '-'
-  return s.replace('T', ' ').slice(0, 16)
+function handleSSE(event: SSEEvent, churnId: string) {
+  const { step, status, data, message: msg } = event
+
+  if (step === 'done') {
+    analysisRunning.value = false
+    analysisDone.value = true
+    fetchList()
+    loadGraph()
+    return
+  }
+  if (step === 'error') {
+    analysisError.value = msg ?? '分析出错'
+    analysisRunning.value = false
+    return
+  }
+  if (status === 'start') { updateStep(step, { state: 'loading', message: msg }); return }
+  if (status === 'skip') { updateStep(step, { state: 'skip', message: msg }); return }
+  if (status === 'complete') {
+    if (step === 'recognition') {
+      const obj = data as Record<string, unknown> | null
+      const evs = Array.isArray(obj?.evidences) ? (obj.evidences as EvidenceItem[]) : []
+      updateStep(step, { state: 'done', evidences: evs, data, message: msg })
+    } else if (step === 'attribution') {
+      analysisSteps.value = analysisSteps.value.map(s =>
+        s.key === 'attribution' ? { ...s, state: 'done' } : s
+      )
+    } else {
+      updateStep(step, { state: 'done', data, message: msg })
+    }
+    return
+  }
+  if (step === 'attribution' && status === 'streaming') {
+    const token = String(data ?? '')
+    analysisSteps.value = analysisSteps.value.map(s =>
+      s.key === 'attribution'
+        ? { ...s, state: 'loading', attributionText: (s.attributionText ?? '') + token }
+        : s
+    )
+    return
+  }
+  if (status === 'progress') { updateStep(step, { state: 'loading', message: msg, data }); return }
 }
 
-onMounted(async () => {
-  await Promise.all([loadStats(), loadList()])
+// ── Graph loading ──
+async function loadGraph() {
+  if (!selected.value) return
+  graphLoading.value = true
+  try {
+    graphData.value = await broadbandApi.ontologyGraph(selected.value.churn_id)
+  } catch { graphData.value = null }
+  finally { graphLoading.value = false }
+}
+
+// ── Tab watchers ──
+watch(activeTab, (tab) => {
+  if (tab === 'graph' && !graphData.value && !graphLoading.value && selected.value) loadGraph()
 })
+
+// Auto-start analysis if autoAnalyze
+watch(autoAnalyze, (v) => {
+  if (v && !analysisRunning.value && !analysisDone.value) doStartAnalysis()
+})
+
+onMounted(fetchList)
+onUnmounted(() => { abortCtrl?.abort() })
 </script>
 
 <style scoped>
-.bb-scene { display: flex; flex-direction: column; height: 100%; padding: 20px; gap: 16px; overflow: hidden; }
+/* ── Layout ── */
+.bb-split { display: flex; height: calc(100vh - 56px); overflow: hidden; }
+.bb-left { width: 420px; min-width: 420px; display: flex; flex-direction: column; border-right: 1px solid var(--neutral-200); background: var(--neutral-0); overflow: hidden; }
+.bb-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--neutral-25, #fafafa); }
 
-/* Header */
-.bb-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.bb-header__left { display: flex; align-items: center; gap: 14px; }
-.bb-header__icon { width: 44px; height: 44px; border-radius: 10px; background: var(--kinetic-600); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.bb-header__title { font-size: 18px; font-weight: 700; color: var(--neutral-900); margin: 0; }
-.bb-header__desc { font-size: 12px; color: var(--neutral-500); margin: 3px 0 0; }
-.bb-header__badges { display: flex; gap: 8px; }
-.bb-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
-.bb-badge--blue { background: var(--semantic-100); color: var(--semantic-700); }
-.bb-badge--green { background: var(--dynamic-100); color: var(--dynamic-700); }
+/* ── Left header ── */
+.bb-left__header { padding: 16px 16px 12px; border-bottom: 1px solid var(--neutral-200); }
+.bb-left__title { font-size: 18px; font-weight: 700; color: var(--neutral-900); margin: 0; }
+.bb-left__desc { font-size: 12px; color: var(--neutral-500); margin: 4px 0 0; }
 
-/* Stats */
-.bb-stats { display: flex; gap: 10px; flex-shrink: 0; }
-.bb-stat-card { flex: 1; padding: 14px 16px; background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); }
-.bb-stat-card__value { font-size: 26px; font-weight: 700; color: var(--neutral-900); line-height: 1; }
-.bb-stat-card__value--warn { color: var(--kinetic-600); }
-.bb-stat-card__value--success { color: var(--dynamic-600); }
-.bb-stat-card__value--orange { color: #f59e0b; }
-.bb-stat-card__value--gray { color: var(--neutral-500); }
-.bb-stat-card__value--blue { color: var(--semantic-600); }
-.bb-stat-card__label { font-size: 12px; color: var(--neutral-500); margin-top: 4px; }
-.bb-stat-card__sub { font-size: 11px; color: var(--neutral-400); margin-top: 2px; }
+/* ── KPIs ── */
+.bb-kpis { display: flex; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--neutral-100); }
+.bb-kpi { flex: 1; text-align: center; padding: 6px 4px; background: var(--neutral-50); border-radius: var(--radius-md); }
+.bb-kpi__val { font-size: 18px; font-weight: 700; color: var(--neutral-900); display: block; }
+.bb-kpi__lbl { font-size: 10px; color: var(--neutral-500); }
+.bb-kpi--warning .bb-kpi__val { color: var(--kinetic-600); }
+.bb-kpi--info .bb-kpi__val { color: var(--status-info); }
+.bb-kpi--success .bb-kpi__val { color: var(--status-success); }
+.bb-kpi--accent .bb-kpi__val { color: var(--semantic-600); }
 
-/* Toolbar */
-.bb-toolbar { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.bb-cause-pills { display: flex; gap: 6px; flex-wrap: wrap; }
-.bb-pill { padding: 4px 12px; border-radius: 20px; border: 1px solid var(--neutral-200); background: var(--neutral-0); font-size: 12px; font-weight: 500; cursor: pointer; color: var(--neutral-700); transition: all 0.15s; }
-.bb-pill:hover { border-color: var(--neutral-400); }
-.bb-pill--active { background: var(--neutral-900); color: #fff; border-color: var(--neutral-900); }
-.bb-pill__cnt { font-size: 11px; opacity: 0.7; margin-left: 3px; }
-.bb-pill--red { border-color: #fca5a5; color: #dc2626; }
-.bb-pill--red.bb-pill--active { background: #dc2626; color: #fff; border-color: #dc2626; }
-.bb-pill--blue { border-color: #93c5fd; color: #2563eb; }
-.bb-pill--blue.bb-pill--active { background: #2563eb; color: #fff; border-color: #2563eb; }
-.bb-pill--orange { border-color: #fcd34d; color: #d97706; }
-.bb-pill--orange.bb-pill--active { background: #d97706; color: #fff; border-color: #d97706; }
-.bb-pill--purple { border-color: #c4b5fd; color: #7c3aed; }
-.bb-pill--purple.bb-pill--active { background: #7c3aed; color: #fff; border-color: #7c3aed; }
-.bb-select { padding: 5px 10px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 12px; background: var(--neutral-0); color: var(--neutral-700); cursor: pointer; }
+/* ── Filters ── */
+.bb-filters { padding: 10px 16px; display: flex; flex-direction: column; gap: 6px; border-bottom: 1px solid var(--neutral-100); }
+.bb-filters__row { display: flex; gap: 6px; align-items: center; }
+.bb-filters__sep { color: var(--neutral-400); font-size: 12px; }
+.bb-input { height: 32px; padding: 0 10px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 12px; background: var(--neutral-0); color: var(--neutral-800); outline: none; width: 100%; }
+.bb-input:focus { border-color: var(--semantic-400); }
+.bb-input--date { width: auto; flex: 1; }
+.bb-select { height: 32px; padding: 0 8px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 12px; background: var(--neutral-0); color: var(--neutral-800); flex: 1; }
 
-/* Main layout */
-.bb-main { display: flex; gap: 12px; flex: 1; min-height: 0; }
+/* ── Buttons ── */
+.bb-btn { height: 32px; padding: 0 14px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 12px; background: var(--neutral-0); color: var(--neutral-700); cursor: pointer; transition: var(--transition-fast); }
+.bb-btn:hover { background: var(--neutral-50); }
+.bb-btn--primary { background: var(--semantic-500); color: #fff; border-color: var(--semantic-500); }
+.bb-btn--primary:hover { background: var(--semantic-600); }
+.bb-btn--block { width: 100%; }
+.bb-btn--sm { height: 28px; padding: 0 10px; font-size: 11px; }
+.bb-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* List */
-.bb-list { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 0; overflow-y: auto; border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); background: var(--neutral-0); }
-.bb-loading { padding: 40px; text-align: center; color: var(--neutral-400); font-size: 13px; }
-.bb-list-item { padding: 12px 14px; border-bottom: 1px solid var(--neutral-100); cursor: pointer; transition: background 0.1s; }
+/* ── List items ── */
+.bb-list { flex: 1; overflow-y: auto; padding: 4px 0; }
+.bb-list-item { padding: 10px 16px; cursor: pointer; border-bottom: 1px solid var(--neutral-100); transition: var(--transition-fast); position: relative; }
 .bb-list-item:hover { background: var(--neutral-50); }
 .bb-list-item--active { background: var(--semantic-50); border-left: 3px solid var(--semantic-500); }
-.bb-list-item__top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
-.bb-list-item__id { font-size: 12px; font-weight: 600; color: var(--neutral-800); font-family: var(--font-mono); }
-.bb-list-item__order { font-size: 11px; color: var(--neutral-500); margin-bottom: 5px; }
-.bb-list-item__meta { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
-.bb-list-item__l2 { font-size: 11px; color: var(--neutral-600); }
-.bb-list-item__bottom { display: flex; align-items: center; gap: 6px; }
-.bb-conf-bar-wrap { flex: 1; height: 4px; background: var(--neutral-100); border-radius: 2px; overflow: hidden; }
-.bb-conf-bar { height: 100%; border-radius: 2px; transition: width 0.3s; }
-.bb-conf-val { font-size: 11px; color: var(--neutral-500); width: 32px; text-align: right; }
-.bb-list-item__time { font-size: 10px; color: var(--neutral-400); }
-.bb-pagination { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px; border-top: 1px solid var(--neutral-100); }
-.bb-page-btn { padding: 3px 10px; border: 1px solid var(--neutral-200); border-radius: var(--radius-sm); background: var(--neutral-0); cursor: pointer; font-size: 14px; color: var(--neutral-700); }
-.bb-page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.bb-page-info { font-size: 12px; color: var(--neutral-500); }
+.bb-list-item__top { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.bb-list-item__id { font-size: 13px; font-weight: 600; color: var(--neutral-800); font-family: 'SF Mono', monospace; }
+.bb-list-item__mid { font-size: 12px; color: var(--neutral-500); display: flex; align-items: center; gap: 4px; }
+.bb-list-item__sep { color: var(--neutral-300); }
+.bb-list-item__bot { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
+.bb-list-item__phase { font-size: 11px; color: var(--neutral-500); background: var(--neutral-100); padding: 1px 6px; border-radius: var(--radius-sm); }
+.bb-list-item__actions { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); }
 
-/* Status tags */
-.bb-status-tag { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
-.bb-status-tag--lg { font-size: 12px; padding: 4px 12px; }
-.bb-status-tag--green { background: var(--dynamic-100); color: var(--dynamic-700); }
-.bb-status-tag--orange { background: #fef3c7; color: #d97706; }
-.bb-status-tag--gray { background: var(--neutral-100); color: var(--neutral-600); }
+/* ── Status / Tags ── */
+.bb-status { display: inline-block; padding: 2px 8px; border-radius: var(--radius-full); font-size: 11px; font-weight: 500; }
+.bb-status--pending { background: #fff8e1; color: #e67700; }
+.bb-status--info { background: var(--status-info-bg, #e7f5ff); color: var(--status-info); }
+.bb-status--warning { background: var(--status-warning-bg, #fff3bf); color: #e67700; }
+.bb-status--error { background: var(--status-error-bg, #ffe3e3); color: var(--status-error); }
+.bb-status--success { background: var(--status-success-bg, #e6fcf5); color: var(--status-success); }
+.bb-status--default { background: var(--neutral-100); color: var(--neutral-600); }
 
-/* Cause tags */
-.bb-cause-tag { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
-.bb-cause-tag--red { background: #fee2e2; color: #dc2626; }
-.bb-cause-tag--blue { background: #dbeafe; color: #2563eb; }
-.bb-cause-tag--orange { background: #fef3c7; color: #d97706; }
-.bb-cause-tag--purple { background: #ede9fe; color: #7c3aed; }
-.bb-cause-tag--gray { background: var(--neutral-100); color: var(--neutral-600); }
+.bb-cause-tag { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 500; }
+.bb-cause-tag--user { background: #e7f5ff; color: #1971c2; }
+.bb-cause-tag--construct { background: #fff3bf; color: #e67700; }
+.bb-cause-tag--resource { background: #ffe3e3; color: #c92a2a; }
+.bb-cause-tag--biz { background: #e6fcf5; color: #087f5b; }
+.bb-cause-tag--default { background: var(--neutral-100); color: var(--neutral-600); }
+.bb-cause-sub { font-size: 11px; color: var(--neutral-500); margin-left: 4px; }
+.bb-conf-sm { font-size: 11px; font-weight: 600; color: var(--semantic-600); background: var(--semantic-50); padding: 1px 6px; border-radius: var(--radius-sm); }
 
-/* Detail panel */
-.bb-detail { flex: 1; min-width: 0; border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); background: var(--neutral-0); display: flex; flex-direction: column; overflow: hidden; }
-.bb-detail--empty { align-items: center; justify-content: center; }
-.bb-detail__placeholder { text-align: center; color: var(--neutral-400); }
-.bb-detail__placeholder p { margin-top: 12px; font-size: 13px; }
-.bb-detail__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 16px 20px 12px; border-bottom: 1px solid var(--neutral-100); flex-shrink: 0; }
-.bb-detail__id { font-size: 15px; font-weight: 700; color: var(--neutral-900); font-family: var(--font-mono); }
-.bb-detail__order { font-size: 12px; color: var(--neutral-500); margin-top: 3px; }
-.bb-detail__tabs { display: flex; gap: 0; border-bottom: 1px solid var(--neutral-100); flex-shrink: 0; }
-.bb-detail__tab { padding: 9px 18px; font-size: 13px; font-weight: 500; color: var(--neutral-500); background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.15s; }
-.bb-detail__tab:hover { color: var(--neutral-800); }
-.bb-detail__tab--active { color: var(--semantic-600); border-bottom-color: var(--semantic-500); }
-.bb-detail__body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+/* ── Pagination ── */
+.bb-pagination { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-top: 1px solid var(--neutral-100); }
+.bb-pagination__info { font-size: 11px; color: var(--neutral-500); }
+.bb-pagination__btns { display: flex; align-items: center; gap: 8px; }
+.bb-pagination__cur { font-size: 11px; color: var(--neutral-600); font-weight: 500; }
 
-/* Conclusion */
-.bb-conclusion__cause { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; padding: 14px; background: var(--neutral-50); border-radius: var(--radius-lg); }
-.bb-conclusion__label { font-size: 11px; color: var(--neutral-500); font-weight: 600; }
-.bb-conclusion__l1 { font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
-.bb-conclusion__arrow { font-size: 18px; color: var(--neutral-400); }
-.bb-conclusion__l2 { font-size: 13px; color: var(--neutral-700); font-weight: 500; }
-.bb-conf-meter { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
-.bb-conf-meter__label { font-size: 12px; color: var(--neutral-500); width: 48px; flex-shrink: 0; }
-.bb-conf-meter__bar-wrap { flex: 1; height: 8px; background: var(--neutral-100); border-radius: 4px; overflow: hidden; }
-.bb-conf-meter__bar { height: 100%; border-radius: 4px; transition: width 0.4s; }
-.bb-conf-meter__val { font-size: 14px; font-weight: 700; width: 44px; text-align: right; }
-.bb-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-.bb-info-row { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; background: var(--neutral-50); border-radius: var(--radius-md); }
-.bb-info-key { font-size: 10px; color: var(--neutral-400); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
-.bb-info-val { font-size: 13px; color: var(--neutral-800); font-weight: 500; }
-.bb-info-val--addr { font-size: 11px; }
-.bb-info-val--warn { color: #d97706; }
-.bb-info-val--action { color: var(--dynamic-600); font-weight: 600; }
-.bb-evidence-summary { padding: 12px; background: var(--semantic-50); border-radius: var(--radius-md); border-left: 3px solid var(--semantic-400); }
-.bb-evidence-summary__label { font-size: 11px; font-weight: 600; color: var(--semantic-600); margin-bottom: 6px; }
-.bb-evidence-summary__text { font-size: 12px; color: var(--neutral-700); line-height: 1.6; }
+/* ── Links ── */
+.bb-link { color: var(--semantic-500); text-decoration: none; font-size: 12px; font-weight: 500; background: none; border: none; cursor: pointer; }
+.bb-link:hover { text-decoration: underline; }
+.bb-link--analyze { color: var(--kinetic-500); }
 
-/* Evidence list */
-.bb-evidence-list { display: flex; flex-direction: column; gap: 6px; }
-.bb-ev-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--neutral-100); border-radius: var(--radius-md); background: var(--neutral-50); }
-.bb-ev-item--hit { background: var(--dynamic-50); border-color: var(--dynamic-200); }
-.bb-ev-item__left { display: flex; align-items: center; gap: 6px; flex-shrink: 0; width: 140px; }
-.bb-ev-hit { font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 8px; }
-.bb-ev-hit--yes { background: var(--dynamic-100); color: var(--dynamic-700); }
-.bb-ev-hit--no { background: var(--neutral-100); color: var(--neutral-500); }
-.bb-ev-code { font-size: 11px; font-family: var(--font-mono); color: var(--neutral-600); }
-.bb-ev-type { font-size: 10px; color: var(--neutral-400); }
-.bb-ev-item__content { flex: 1; font-size: 12px; color: var(--neutral-700); }
-.bb-ev-item__right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
-.bb-ev-conf { font-size: 13px; font-weight: 700; }
-.bb-ev-src { font-size: 10px; color: var(--neutral-400); }
+/* ── Empty / Loading ── */
+.bb-empty { text-align: center; padding: 40px 16px; color: var(--neutral-400); font-size: 13px; }
+.bb-loading { text-align: center; padding: 20px; }
 
-/* Dispatch */
-.bb-dispatch-card { padding: 14px; border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); margin-bottom: 10px; }
-.bb-dispatch-card__eng { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-.bb-eng-name { font-size: 14px; font-weight: 700; color: var(--neutral-900); }
-.bb-eng-level { font-size: 11px; padding: 2px 8px; background: var(--semantic-100); color: var(--semantic-700); border-radius: 10px; }
-.bb-eng-type { font-size: 11px; color: var(--neutral-500); }
+/* ── Right panel ── */
+.bb-right-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--neutral-400); }
+.bb-right-empty__icon { margin-bottom: 12px; }
+.bb-right-empty__text { font-size: 14px; }
 
-/* Trail */
-.bb-trail { display: flex; flex-direction: column; gap: 0; position: relative; padding-left: 20px; }
-.bb-trail::before { content: ''; position: absolute; left: 6px; top: 8px; bottom: 8px; width: 2px; background: var(--neutral-200); }
-.bb-trail-item { position: relative; padding: 0 0 16px 16px; }
-.bb-trail-item__dot { position: absolute; left: -14px; top: 4px; width: 10px; height: 10px; border-radius: 50%; background: var(--semantic-400); border: 2px solid var(--neutral-0); }
-.bb-trail-item__action { font-size: 13px; font-weight: 600; color: var(--neutral-900); }
-.bb-trail-item__meta { font-size: 11px; color: var(--neutral-400); margin-top: 2px; }
-.bb-trail-item__status { font-size: 11px; color: var(--neutral-600); margin-top: 3px; }
-.bb-trail-item__remark { font-size: 11px; color: var(--neutral-500); margin-top: 4px; padding: 6px 8px; background: var(--neutral-50); border-radius: var(--radius-sm); }
+/* ── Detail header ── */
+.bb-detail-header { padding: 16px 20px; border-bottom: 1px solid var(--neutral-200); background: var(--neutral-0); }
+.bb-detail-header__top { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.bb-detail-header__id { font-size: 16px; font-weight: 700; color: var(--neutral-900); margin: 0; }
+.bb-detail-header__info { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--neutral-500); }
 
-.bb-empty { padding: 40px; text-align: center; color: var(--neutral-400); font-size: 13px; }
+/* ── Tabs ── */
+.bb-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--neutral-200); background: var(--neutral-0); padding: 0 20px; position: sticky; top: 0; z-index: 1; }
+.bb-tab { padding: 10px 18px; font-size: 13px; font-weight: 500; color: var(--neutral-500); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: var(--transition-fast); }
+.bb-tab:hover { color: var(--neutral-700); }
+.bb-tab--active { color: var(--semantic-600); border-bottom-color: var(--semantic-500); }
+
+/* ── Tab content ── */
+.bb-tab-content { flex: 1; overflow-y: auto; padding: 16px 20px; }
+
+/* ── Analysis process ── */
+.bb-analysis-header { margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+.bb-analysis-running { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--semantic-500); }
+.bb-analysis-error { padding: 8px 12px; background: var(--status-error-bg, #ffe3e3); color: var(--status-error); border-radius: var(--radius-md); font-size: 12px; margin-bottom: 12px; }
+.bb-analysis-done { padding: 8px 12px; background: var(--status-success-bg, #e6fcf5); color: var(--status-success); border-radius: var(--radius-md); font-size: 12px; margin-top: 12px; text-align: center; }
+
+/* ── Steps ── */
+.bb-steps { display: flex; flex-direction: column; gap: 0; }
+.bb-step { display: flex; gap: 12px; position: relative; padding-bottom: 20px; }
+.bb-step__icon { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; z-index: 1; }
+.bb-step--pending .bb-step__icon { background: var(--neutral-100); color: var(--neutral-500); }
+.bb-step--loading .bb-step__icon { background: var(--semantic-50); color: var(--semantic-500); }
+.bb-step--done .bb-step__icon { background: var(--status-success-bg, #e6fcf5); color: var(--status-success); }
+.bb-step--skip .bb-step__icon { background: var(--neutral-100); color: var(--neutral-400); }
+.bb-step--error .bb-step__icon { background: var(--status-error-bg, #ffe3e3); color: var(--status-error); }
+.bb-step__connector { position: absolute; left: 13px; top: 28px; bottom: 0; width: 2px; background: var(--neutral-200); }
+.bb-step--done .bb-step__connector { background: var(--status-success); }
+.bb-step--loading .bb-step__connector { background: var(--semantic-300); }
+.bb-step__body { flex: 1; min-width: 0; }
+.bb-step__title { font-size: 13px; font-weight: 600; color: var(--neutral-800); line-height: 28px; }
+.bb-step__msg { font-size: 12px; color: var(--neutral-500); margin-top: 4px; }
+.bb-step__detail { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.bb-step-tag { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: 11px; background: var(--neutral-100); color: var(--neutral-600); }
+.bb-step-tag--hit { background: var(--semantic-50); color: var(--semantic-600); font-weight: 600; }
+.bb-step-num { font-size: 12px; }
+.bb-step__attribution { margin-top: 8px; }
+.bb-step__attr-text { font-family: inherit; font-size: 13px; color: var(--neutral-800); white-space: pre-wrap; margin: 0; padding: 12px; background: var(--semantic-50); border: 1px solid var(--semantic-200); border-radius: var(--radius-md); }
+.bb-cursor { animation: bb-blink 0.8s infinite; color: var(--semantic-500); }
+@keyframes bb-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+/* ── Evidence cards (in analysis) ── */
+.bb-ev-cards { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; max-height: 600px; overflow-y: auto; }
+.bb-ev-cards__summary { font-size: 12px; color: var(--neutral-600); padding: 4px 0; font-weight: 500; position: sticky; top: 0; background: var(--neutral-50); z-index: 1; }
+.bb-ev-cards__hit-num { color: #40c057; font-weight: 700; }
+.bb-ev-card { display: flex; gap: 8px; padding: 8px 10px; border: 1.5px solid var(--neutral-200); border-radius: var(--radius-md); background: var(--neutral-0); }
+.bb-ev-card--hit { border-color: #b2f2bb; background: #f8fff9; }
+.bb-ev-card--miss { border-color: #ffc9c9; background: #fff8f8; }
+.bb-ev-card__badge { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; flex-shrink: 0; }
+.bb-ev-card__badge--hit { background: #40c057; }
+.bb-ev-card__badge--miss { background: #fa5252; }
+.bb-ev-card--inactive { border-color: var(--neutral-200); background: var(--neutral-50); opacity: 0.5; }
+.bb-ev-card__badge--inactive { background: var(--neutral-300); }
+.bb-ev-card__body { flex: 1; min-width: 0; }
+.bb-ev-card__top { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bb-ev-card__name { font-size: 12px; font-weight: 500; color: var(--neutral-800); }
+.bb-ev-card__conf { font-size: 11px; color: var(--neutral-400); font-family: 'SF Mono', monospace; }
+.bb-ev-card__reason { font-size: 11px; color: var(--neutral-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Evidence type tags ── */
+.bb-ev-type { display: inline-block; padding: 1px 6px; border-radius: var(--radius-sm); font-size: 10px; font-weight: 500; }
+.bb-ev-type--nlp { background: #e7f5ff; color: #1971c2; }
+.bb-ev-type--rule { background: var(--neutral-100); color: var(--neutral-600); }
+.bb-ev-type--manual { background: #fff3bf; color: #e67700; }
+.bb-hit-yes { font-size: 11px; color: #40c057; font-weight: 500; }
+.bb-hit-no { font-size: 11px; color: #fa5252; font-weight: 500; }
+
+/* ── Graph ── */
+.bb-graph-loading { display: flex; align-items: center; gap: 8px; justify-content: center; padding: 40px; color: var(--neutral-500); font-size: 13px; }
+.bb-graph-legend { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+.bb-graph-legend__item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--neutral-600); }
+.bb-graph-legend__dot { width: 10px; height: 10px; border-radius: 50%; }
+.bb-graph-svg-wrap { border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); background: var(--neutral-0); overflow: auto; }
+.bb-graph-svg { display: block; width: 100%; min-width: 400px; }
+.bb-graph-info { font-size: 11px; color: var(--neutral-400); margin-top: 8px; }
+
+/* ── Spinner ── */
+.bb-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--neutral-200); border-top-color: var(--semantic-500); border-radius: 50%; animation: bb-spin 0.6s linear infinite; }
+.bb-spinner--sm { width: 14px; height: 14px; }
+@keyframes bb-spin { to { transform: rotate(360deg); } }
 </style>
