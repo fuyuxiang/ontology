@@ -187,6 +187,7 @@ if __name__ == "__main__":
         r"E:\工作\国信\AI数据集项目\本体\材料\scenario4_ge_kpi_ontology_v5(1).json",
         r"E:\工作\国信\AI数据集项目\本体\材料\fttr_renewal_ontology.json",
         r"E:\工作\国信\AI数据集项目\本体\材料\mnp_ontology.json",
+        r"E:\工作\国信\AI数据集项目\本体\材料\宽带退单\场景1-宽带装机退单稽核_本体Schema_v5.json",
     ]
 
     for jf in json_files:
