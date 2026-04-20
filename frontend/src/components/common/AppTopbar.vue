@@ -36,7 +36,7 @@ const breadcrumbs = computed(() => {
     '/ontology': [{ label: '本体管理' }],
     '/dataflow': [{ label: '数据流' }],
     '/logic': [{ label: '业务逻辑' }],
-    '/dashboard': [{ label: '数据看板' }],
+    '/dashboard': [{ label: '系统总揽' }],
     '/copilot': [{ label: '智能对话' }],
     '/scene/fttr': [{ label: 'FTTR续约策划' }],
     '/scene/broadband': [{ label: '宽带正式单退单原因稽核' }],
