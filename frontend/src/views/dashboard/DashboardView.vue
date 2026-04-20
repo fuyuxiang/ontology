@@ -47,15 +47,6 @@
                 <div v-for="node in row" :key="node.id" class="platform-item"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon" :src="node.icon" :alt="node.label" />
-                  <div class="platform-label">{{ node.label }}</div>
-                  <!-- Tooltip -->
-                  <div class="platform-tooltip" v-if="hoveredNode?.id === node.id">
-                    <div class="platform-tooltip-name">{{ node.label }}</div>
-                    <div class="platform-tooltip-desc">{{ node.desc }}</div>
-                    <div class="platform-tooltip-row">Tier {{ node.tier }} · {{ node.status }}</div>
-                    <div class="platform-tooltip-row">{{ node.relationCount }} 关系 · {{ node.ruleCount }} 规则</div>
-                    <div class="platform-tooltip-row">{{ node.attrCount }} 属性 · {{ node.actionCount }} 动作</div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -68,13 +59,6 @@
                 <div v-for="node in coreNodes" :key="node.id" class="platform-item platform-item--core"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon platform-icon--core" :src="node.icon" :alt="node.label" />
-                  <div class="platform-label">{{ node.label }}</div>
-                  <div class="platform-tooltip" v-if="hoveredNode?.id === node.id">
-                    <div class="platform-tooltip-name">{{ node.label }}</div>
-                    <div class="platform-tooltip-desc">{{ node.desc }}</div>
-                    <div class="platform-tooltip-row">Tier {{ node.tier }} · {{ node.status }}</div>
-                    <div class="platform-tooltip-row">{{ node.relationCount }} 关系 · {{ node.ruleCount }} 规则</div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -93,8 +77,6 @@
       <button class="bottom-btn" @click="resetView"><img src="/images/ontology/btn-重置视角.png" alt="重置" /></button>
     </div>
 
-    <!-- 节点详情面板 -->
-    <NodeDetailPanel v-if="selectedNode" :node="selectedNode" :relations="nodeRelations" @close="selectedNode = null" />
   </div>
 </template>
 
@@ -326,67 +308,47 @@ function onNodeClick(node: OntologyNode) {
 /* ── Top & Bottom cards ── */
 const topCards = computed(() => [
   {
-    title: 'ANALYTICS & WORKFLOWS',
+    title: '',
     bg: '/images/ontology/bg-ANALYTICS &WORKFLOWS.png',
     flex: 479,
-    items: stats.value ? [
-      `${stats.value.entity_count} 个实体`,
-      `${stats.value.relation_count} 条关系`,
-      `${stats.value.rule_count} 条规则`,
-      `${stats.value.active_rule_count} 条活跃规则`,
-    ] : ['加载中...'],
+    items: [],
   },
   {
-    title: 'AUTOMATIONS',
+    title: '',
     bg: '/images/ontology/bg-AUTOMATIONS.png',
     flex: 537,
-    items: stats.value ? [
-      ...stats.value.top_rules.slice(0, 4).map(r => r.name),
-      ...(stats.value.top_rules.length === 0 ? ['暂无规则'] : []),
-    ] : ['加载中...'],
+    items: [],
   },
   {
-    title: 'PRODUCTS & SDKs',
+    title: '',
     bg: '/images/ontology/bg-PRODUCTS & SDKs.png',
     flex: 470,
-    items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway'],
+    items: [],
   },
 ])
 
 const bottomCards = computed(() => {
-  const dsList = stats.value?.datasources ?? []
-  const bbSources = dsList.filter(d => d.name.startsWith('bb_')).map(d => d.name.replace('bb_', ''))
-  const otherSources = dsList.filter(d => !d.name.startsWith('bb_')).map(d => d.name)
-  const dsItems = [
-    ...(bbSources.length ? [`宽带退单(${bbSources.length}表)`, ...bbSources.slice(0, 4)] : []),
-    ...(otherSources.length ? [`携号转网(${otherSources.length}表)`, ...otherSources.slice(0, 3)] : []),
-    ...(!dsList.length ? ['暂无数据源'] : []),
-  ]
   return [
     {
-      title: 'DATA SOURCES',
+      title: '',
       bg: '/images/ontology/bg-DATA SOURCES.png',
       icon: '/images/ontology/icon-DATA SOURCES.png',
       flex: 514,
-      items: dsItems.slice(0, 8),
+      items: [],
     },
     {
-      title: 'LOGIC SOURCES',
+      title: '',
       bg: '/images/ontology/bg-LOGIC SOURCES.png',
       icon: '/images/ontology/icon-LOGIC SOURCES.png',
       flex: 514,
-      items: stats.value?.rule_priority?.length
-        ? stats.value.rule_priority.map(r => `${r.priority} 优先级: ${r.count}`)
-        : ['暂无规则'],
+      items: [],
     },
     {
-      title: 'SYSTEMS OF ACTION',
+      title: '',
       bg: '/images/ontology/bg-SYSTEMS OF ACTION.png',
       icon: '/images/ontology/icon-SYSTEMS OF ACTION.png',
       flex: 441,
-      items: stats.value?.recent_activities?.length
-        ? stats.value.recent_activities.slice(0, 6).map(a => a.target_name)
-        : ['暂无活动'],
+      items: [],
     },
   ]
 })

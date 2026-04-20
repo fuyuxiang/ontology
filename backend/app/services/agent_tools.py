@@ -14,6 +14,7 @@ class AgentToolSpec:
     description: str
     parameters: dict[str, Any] = field(default_factory=dict)
     required: tuple[str, ...] = ()
+    sensitive: bool = False
 
     def openai_tool(self) -> dict[str, Any]:
         return {
@@ -127,6 +128,7 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
             "dry_run": {"type": "boolean", "description": "是否模拟执行，默认 true"},
         },
         required=("action_name",),
+        sensitive=True,
     ),
 )
 
