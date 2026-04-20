@@ -13,7 +13,7 @@
             </svg>
           </div>
           <div>
-            <p class="text-body-medium">智能对话</p>
+            <p class="text-body-medium">{{ appTitle }}</p>
             <p class="text-caption">本体驱动 · 实时推理</p>
           </div>
         </div>
@@ -160,21 +160,44 @@
       <div v-if="relatedObjects.length > 0" class="copilot__related">
         <p class="text-caption-upper" style="margin-bottom: 8px;">关联本体对象</p>
         <div class="related-tags">
-          <span
-            v-for="obj in relatedObjects"
-            :key="obj.name"
-            class="related-tag"
-            :class="`related-tag--tier${obj.tier}`"
-          >{{ obj.name }}</span>
+          <span v-for="obj in relatedObjects" :key="obj.name" class="related-tag" :class="`related-tag--tier${obj.tier}`">{{ obj.name }}</span>
         </div>
+      </div>
+
+      <!-- HITL 审批收件箱 -->
+      <div v-if="pendingApprovals.length > 0" class="copilot__approvals">
+        <p class="text-caption-upper" style="margin-bottom: 8px;">待审批任务 ({{ pendingApprovals.length }})</p>
+        <div v-for="task in pendingApprovals" :key="task.id" class="approval-card">
+          <div class="approval-card__header">
+            <span class="approval-card__tool">{{ task.tool_name }}</span>
+            <span class="approval-card__status">待审批</span>
+          </div>
+          <div v-if="task.tool_args" class="approval-card__args">
+            <code>{{ JSON.stringify(task.tool_args, null, 2) }}</code>
+          </div>
+          <div class="approval-card__actions">
+            <button class="approval-card__btn approval-card__btn--approve" @click="handleApprove(task.id)">批准</button>
+            <button class="approval-card__btn approval-card__btn--reject" @click="handleReject(task.id)">拒绝</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Published App Info -->
+      <div v-if="publishedApp" class="copilot__app-info">
+        <p class="text-caption-upper" style="margin-bottom: 4px;">当前应用</p>
+        <p class="text-caption">{{ publishedApp.appName }} v{{ publishedApp.version }}</p>
+        <p v-if="publishedApp.defaultAgent" class="text-caption" style="color: var(--text-muted);">Agent: {{ publishedApp.defaultAgent.boundTools.length }} 工具</p>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { marked } from 'marked'
+import { workflowApi } from '../../api/workflow'
+import type { PublishedApp, ApprovalTask } from '../../types/workflow'
 
 // marked 配置：同步解析，禁用异步
 marked.setOptions({ async: false })
@@ -230,6 +253,24 @@ const messagesEl = ref<HTMLElement>()
 const inputEl = ref<HTMLTextAreaElement>()
 let msgId = 0
 
+// ── Published App + HITL ──
+const route = useRoute()
+const publishedApp = ref<PublishedApp | null>(null)
+const sessionId = ref(`s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`)
+const pendingApprovals = ref<ApprovalTask[]>([])
+const approvalPolling = ref<ReturnType<typeof setInterval> | null>(null)
+const appTitle = computed(() => publishedApp.value?.appName || '智能对话')
+
+onMounted(async () => {
+  const appId = route.params.appId as string | undefined
+  if (appId) {
+    try {
+      const app = await workflowApi.getApp(appId)
+      if (app.published_json) publishedApp.value = app.published_json as PublishedApp
+    } catch { /* ignore */ }
+  }
+})
+
 const suggestions = [
   '携号转网场景有哪些预警规则？',
   '用户 U00001 的携转风险等级是什么？',
@@ -266,7 +307,11 @@ async function sendMessage(text?: string) {
     const response = await fetch('/api/v1/copilot/agent-chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: content }),
+      body: JSON.stringify({
+        question: content,
+        app_id: publishedApp.value?.appId || undefined,
+        session_id: sessionId.value,
+      }),
     })
 
     if (!response.ok) {
@@ -411,6 +456,17 @@ function handleSSEEvent(event: Record<string, unknown>, aiMsg: Message) {
     })
   } else if (type === 'tool_summary') {
     // 工具链汇总（可选展示）
+  } else if (type === 'approval_required') {
+    const taskId = event.taskId as string
+    const toolName = event.tool as string
+    reasoningSteps.value.push({
+      type: 'output',
+      typeLabel: '需要审批',
+      result: `工具 "${toolName}" 需要人工审批`,
+      source: taskId,
+    })
+    aiMsg.content += `\n\n⏳ 操作 **${toolName}** 需要人工审批，请在右侧审批面板中处理。`
+    startApprovalPolling()
   } else if (type === 'answer') {
     // 兼容旧格式
     aiMsg.content = (event.content as string) || ''
@@ -447,6 +503,33 @@ function autoResize(e: Event) {
   const el = e.target as HTMLTextAreaElement
   el.style.height = 'auto'
   el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+}
+
+// ── HITL Approval ──
+function startApprovalPolling() {
+  if (approvalPolling.value) return
+  loadApprovals()
+  approvalPolling.value = setInterval(loadApprovals, 5000)
+}
+
+async function loadApprovals() {
+  try {
+    pendingApprovals.value = await workflowApi.listApprovals({ status: 'pending', session_id: sessionId.value })
+  } catch { /* ignore */ }
+}
+
+async function handleApprove(taskId: string) {
+  try {
+    await workflowApi.approve(taskId)
+    await loadApprovals()
+  } catch { /* ignore */ }
+}
+
+async function handleReject(taskId: string) {
+  try {
+    await workflowApi.reject(taskId)
+    await loadApprovals()
+  } catch { /* ignore */ }
 }
 </script>
 
@@ -864,4 +947,22 @@ function autoResize(e: Event) {
 .markdown-body :deep(code) { background: var(--neutral-100); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
 .markdown-body :deep(pre) { background: var(--neutral-100); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
 .markdown-body :deep(pre code) { background: none; padding: 0; }
+
+/* HITL Approval Cards */
+.copilot__approvals { padding: 16px 20px; border-top: 1px solid var(--neutral-200); }
+.approval-card { background: var(--neutral-50); border: 1px solid var(--neutral-200); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+.approval-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.approval-card__tool { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+.approval-card__status { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: #fef3c7; color: #92400e; }
+.approval-card__args { font-size: 11px; background: var(--neutral-100); padding: 6px 8px; border-radius: 4px; margin-bottom: 8px; overflow-x: auto; }
+.approval-card__args code { font-size: 11px; white-space: pre-wrap; color: var(--text-secondary); }
+.approval-card__actions { display: flex; gap: 8px; }
+.approval-card__btn { font-size: 12px; padding: 4px 14px; border-radius: 6px; border: none; cursor: pointer; font-weight: 600; transition: all 0.15s; }
+.approval-card__btn--approve { background: #10b981; color: #fff; }
+.approval-card__btn--approve:hover { background: #059669; }
+.approval-card__btn--reject { background: #ef4444; color: #fff; }
+.approval-card__btn--reject:hover { background: #dc2626; }
+
+/* Published App Info */
+.copilot__app-info { padding: 12px 20px; border-top: 1px solid var(--neutral-200); }
 </style>

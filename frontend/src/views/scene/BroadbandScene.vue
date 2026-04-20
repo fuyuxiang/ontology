@@ -171,6 +171,95 @@
               </div>
             </div>
           </div>
+
+          <!-- 原因对比 -->
+          <div v-if="analysisDone && attributionData" class="bb-reason-compare">
+            <div class="bb-reason-compare__title">原因对比</div>
+            <div class="bb-reason-compare__cards">
+              <div class="bb-reason-card bb-reason-card--original">
+                <div class="bb-reason-card__label">退单原因</div>
+                <div class="bb-reason-card__value">{{ attributionData.churn_reason_text || selected?.churn_category_l1 || '未填写' }}</div>
+                <div class="bb-reason-card__sub" v-if="attributionData.churn_category_l1">{{ attributionData.churn_category_l1 }}<span v-if="attributionData.churn_category_l2"> / {{ attributionData.churn_category_l2 }}</span></div>
+              </div>
+              <div class="bb-reason-compare__arrow">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class="bb-reason-card bb-reason-card--audit">
+                <div class="bb-reason-card__label">稽核后原因</div>
+                <div class="bb-reason-card__value">{{ attributionData.root_cause_level_one || '未确定' }}</div>
+                <div class="bb-reason-card__sub" v-if="attributionData.root_cause_level_two">{{ attributionData.root_cause_level_two }}</div>
+                <div class="bb-reason-card__conf" v-if="attributionData.root_cause_confidence != null">置信度 {{ (attributionData.root_cause_confidence * 100).toFixed(1) }}%</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 推荐动作 -->
+          <div v-if="analysisTodos.length > 0" class="bb-todos">
+            <div class="bb-todos__title">推荐动作 ({{ analysisTodos.length }})</div>
+            <div v-for="todo in analysisTodos" :key="todo.action_id" class="bb-todo-card">
+              <div class="bb-todo-card__header">
+                <span class="bb-todo-card__name">{{ todo.action_name }}</span>
+                <span class="bb-todo-card__priority" :class="'bb-todo-card__priority--' + todo.priority">{{ todo.priority === 'high' ? '高' : todo.priority === 'medium' ? '中' : '低' }}</span>
+                <span class="bb-todo-card__status" :class="'bb-todo-card__status--' + todo.status">{{ todoStatusLabel(todo.status) }}</span>
+              </div>
+              <div class="bb-todo-card__desc">{{ todo.description }}</div>
+              <div class="bb-todo-card__meta">
+                <div class="bb-todo-card__rule"><span class="bb-todo-card__meta-label">触发规则:</span> {{ todo.trigger_rule }}</div>
+                <div class="bb-todo-card__effect"><span class="bb-todo-card__meta-label">预期效果:</span> {{ todo.expected_effect }}</div>
+              </div>
+              <div v-if="todo.support_evidences?.length" class="bb-todo-card__evidences">
+                <span v-for="ev in todo.support_evidences" :key="ev.code" class="bb-todo-card__ev" :class="'bb-todo-card__ev--' + ev.role">{{ ev.code }} {{ ev.name }}</span>
+              </div>
+
+              <!-- 动作操作区 -->
+              <div class="bb-todo-card__actions">
+                <template v-if="todo.status === 'pending_approval'">
+                  <button class="bb-btn bb-btn--primary bb-btn--sm" @click="confirmTodo(todo)">执行</button>
+                  <button class="bb-btn bb-btn--sm" @click="rejectTodo(todo)">驳回</button>
+                </template>
+                <template v-else-if="todo.status === 'executing'">
+                  <!-- resource_check 反馈 -->
+                  <div v-if="todo.todo_type === 'resource_check'" class="bb-todo-feedback">
+                    <select v-model="todo._feedbackValue" class="bb-select bb-select--sm">
+                      <option value="">选择核实结果</option>
+                      <option value="有资源">有资源</option>
+                      <option value="无资源">无资源</option>
+                    </select>
+                    <input v-model="todo._feedbackText" class="bb-input bb-input--sm" placeholder="备注说明..." />
+                    <button class="bb-btn bb-btn--primary bb-btn--sm" :disabled="!todo._feedbackValue" @click="submitTodoFeedback(todo)">提交反馈</button>
+                  </div>
+                  <!-- followup_call 反馈 -->
+                  <div v-else-if="todo.todo_type === 'followup_call'" class="bb-todo-feedback">
+                    <select v-model="todo._feedbackValue" class="bb-select bb-select--sm">
+                      <option value="">选择回访结果</option>
+                      <option value="确认用户原因">确认用户原因</option>
+                      <option value="实际为施工原因">实际为施工原因</option>
+                      <option value="实际为资源原因">实际为资源原因</option>
+                      <option value="其他">其他</option>
+                    </select>
+                    <input v-model="todo._feedbackText" class="bb-input bb-input--sm" placeholder="回访记录..." />
+                    <button class="bb-btn bb-btn--primary bb-btn--sm" :disabled="!todo._feedbackValue" @click="submitTodoFeedback(todo)">提交反馈</button>
+                  </div>
+                  <div v-else class="bb-todo-feedback">
+                    <span class="bb-todo-card__status bb-todo-card__status--executing">执行中</span>
+                  </div>
+                </template>
+                <template v-else-if="todo.status === 'completed'">
+                  <span class="bb-todo-card__status bb-todo-card__status--completed">已完成</span>
+                </template>
+              </div>
+            </div>
+
+            <!-- 二次归因按钮 -->
+            <div v-if="hasCompletedTodos" class="bb-todos__reattr">
+              <button class="bb-btn bb-btn--primary" @click="doReAttribute" :disabled="reAttributing">
+                <span v-if="reAttributing" class="bb-spinner bb-spinner--sm"></span>
+                {{ reAttributing ? '重新归因中...' : '基于反馈重新归因' }}
+              </button>
+              <span v-if="reAttrResult" class="bb-todos__reattr-msg">{{ reAttrResult }}</span>
+            </div>
+          </div>
+
           <div v-if="analysisDone" class="bb-analysis-done">分析完成</div>
         </div>
 
@@ -225,7 +314,7 @@ import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { broadbandApi } from '../../api/broadband'
 import type {
   BroadbandOverview, ChurnListItem, ChurnDetail,
-  EvidenceItem, SSEEvent, SSEStepKey, OntologyGraphData, OntologyNode,
+  EvidenceItem, SSEEvent, SSEStepKey, OntologyGraphData, OntologyNode, TodoAction,
 } from '../../api/broadband'
 
 // ── List state ──
@@ -290,10 +379,11 @@ interface AnalysisStep {
   message?: string; data?: unknown; attributionText?: string
   evidences?: EvidenceItem[]
 }
-const STEP_ORDER: SSEStepKey[] = ['perception', 'recognition', 'reasoning', 'attribution']
+const STEP_ORDER: SSEStepKey[] = ['perception', 'recognition', 'reasoning', 'attribution', 'todo']
 const STEP_LABELS: Record<string, string> = {
   perception: '感知 · 数据采集', recognition: '识别 · 证据提取',
   reasoning: '推理 · 逻辑命中', attribution: '归因 · 结论输出',
+  todo: '动作 · 推荐生成',
 }
 function initSteps(): AnalysisStep[] {
   return STEP_ORDER.map(key => ({ key, label: STEP_LABELS[key], state: 'pending' as StepState }))
@@ -303,6 +393,68 @@ const analysisRunning = ref(false)
 const analysisDone = ref(false)
 const analysisError = ref<string | null>(null)
 let abortCtrl: AbortController | null = null
+
+// ── Todo / Action state ──
+interface TodoWithUI extends TodoAction { _feedbackValue?: string; _feedbackText?: string }
+const analysisTodos = ref<TodoWithUI[]>([])
+const attributionData = ref<{
+  root_cause_code?: string; root_cause_level_one?: string; root_cause_level_two?: string
+  root_cause_confidence?: number; churn_reason_text?: string; churn_category_l1?: string; churn_category_l2?: string
+} | null>(null)
+const reAttributing = ref(false)
+const reAttrResult = ref<string | null>(null)
+const hasCompletedTodos = computed(() => analysisTodos.value.some(t => t.status === 'completed'))
+
+function todoStatusLabel(status: string) {
+  const m: Record<string, string> = {
+    pending_approval: '待确认', approved: '已批准', executing: '执行中',
+    completed: '已完成', failed: '失败', rejected: '已驳回',
+  }
+  return m[status] || status
+}
+
+async function confirmTodo(todo: TodoWithUI) {
+  if (!selected.value) return
+  try {
+    await broadbandApi.confirmAction(selected.value.churn_id, todo.action_id)
+    todo.status = 'executing'
+  } catch { /* silent */ }
+}
+
+async function rejectTodo(todo: TodoWithUI) {
+  if (!selected.value) return
+  try {
+    await broadbandApi.rejectAction(selected.value.churn_id, todo.action_id)
+    todo.status = 'rejected'
+  } catch { /* silent */ }
+}
+
+async function submitTodoFeedback(todo: TodoWithUI) {
+  if (!selected.value || !todo._feedbackValue) return
+  try {
+    await broadbandApi.submitFeedback(selected.value.churn_id, todo.action_id, {
+      feedback_type: todo.todo_type,
+      feedback_value: todo._feedbackValue,
+      feedback_text: todo._feedbackText || '',
+    })
+    todo.status = 'completed'
+  } catch { /* silent */ }
+}
+
+async function doReAttribute() {
+  if (!selected.value) return
+  reAttributing.value = true
+  reAttrResult.value = null
+  try {
+    const res = await broadbandApi.reAttribute(selected.value.churn_id)
+    reAttrResult.value = res.message
+    fetchList()
+  } catch (e: any) {
+    reAttrResult.value = e?.message || '二次归因失败'
+  } finally {
+    reAttributing.value = false
+  }
+}
 
 // ── Graph state ──
 const graphData = ref<OntologyGraphData | null>(null)
@@ -424,6 +576,9 @@ function resetAnalysis() {
   analysisRunning.value = false
   analysisDone.value = false
   analysisError.value = null
+  analysisTodos.value = []
+  attributionData.value = null
+  reAttrResult.value = null
 }
 
 function updateStep(key: SSEStepKey, patch: Partial<AnalysisStep>) {
@@ -469,9 +624,27 @@ function handleSSE(event: SSEEvent, churnId: string) {
       const evs = Array.isArray(obj?.evidences) ? (obj.evidences as EvidenceItem[]) : []
       updateStep(step, { state: 'done', evidences: evs, data, message: msg })
     } else if (step === 'attribution') {
+      const obj = data as Record<string, any> | null
+      if (obj) {
+        attributionData.value = {
+          root_cause_code: obj.root_cause_code,
+          root_cause_level_one: obj.root_cause_level_one,
+          root_cause_level_two: obj.root_cause_level_two,
+          root_cause_confidence: obj.root_cause_confidence,
+          churn_reason_text: obj.churn_reason_text,
+          churn_category_l1: obj.churn_category_l1,
+          churn_category_l2: obj.churn_category_l2,
+        }
+      }
       analysisSteps.value = analysisSteps.value.map(s =>
         s.key === 'attribution' ? { ...s, state: 'done' } : s
       )
+    } else if (step === 'todo') {
+      const obj = data as Record<string, any> | null
+      if (obj?.todos) {
+        analysisTodos.value = (obj.todos as TodoAction[]).map(t => ({ ...t, _feedbackValue: '', _feedbackText: '' }))
+      }
+      updateStep(step, { state: 'done', data, message: msg })
     } else {
       updateStep(step, { state: 'done', data, message: msg })
     }
@@ -687,4 +860,47 @@ onUnmounted(() => { abortCtrl?.abort() })
 .bb-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--neutral-200); border-top-color: var(--semantic-500); border-radius: 50%; animation: bb-spin 0.6s linear infinite; }
 .bb-spinner--sm { width: 14px; height: 14px; }
 @keyframes bb-spin { to { transform: rotate(360deg); } }
+
+/* ── Reason comparison ── */
+.bb-reason-compare { margin-top: 16px; padding: 16px; background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); }
+.bb-reason-compare__title { font-size: 13px; font-weight: 600; color: var(--neutral-800); margin-bottom: 12px; }
+.bb-reason-compare__cards { display: flex; align-items: stretch; gap: 12px; }
+.bb-reason-compare__arrow { display: flex; align-items: center; color: var(--neutral-400); flex-shrink: 0; }
+.bb-reason-card { flex: 1; padding: 12px; border-radius: var(--radius-md); }
+.bb-reason-card--original { background: #fff8e1; border: 1px solid #ffe082; }
+.bb-reason-card--audit { background: #e8f5e9; border: 1px solid #a5d6a7; }
+.bb-reason-card__label { font-size: 11px; font-weight: 600; color: var(--neutral-500); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.bb-reason-card__value { font-size: 14px; font-weight: 600; color: var(--neutral-900); }
+.bb-reason-card__sub { font-size: 12px; color: var(--neutral-600); margin-top: 4px; }
+.bb-reason-card__conf { font-size: 11px; font-weight: 600; color: var(--status-success); margin-top: 4px; }
+
+/* ── Todo / Action cards ── */
+.bb-todos { margin-top: 16px; }
+.bb-todos__title { font-size: 13px; font-weight: 600; color: var(--neutral-800); margin-bottom: 10px; }
+.bb-todo-card { padding: 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); background: var(--neutral-0); margin-bottom: 10px; }
+.bb-todo-card__header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.bb-todo-card__name { font-size: 13px; font-weight: 600; color: var(--neutral-900); flex: 1; }
+.bb-todo-card__priority { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: var(--radius-sm); }
+.bb-todo-card__priority--high { background: #ffe3e3; color: #c92a2a; }
+.bb-todo-card__priority--medium { background: #fff3bf; color: #e67700; }
+.bb-todo-card__priority--low { background: #e7f5ff; color: #1971c2; }
+.bb-todo-card__status { font-size: 10px; font-weight: 500; padding: 2px 6px; border-radius: var(--radius-sm); background: var(--neutral-100); color: var(--neutral-600); }
+.bb-todo-card__status--executing { background: #e7f5ff; color: #1971c2; }
+.bb-todo-card__status--completed { background: #e6fcf5; color: #087f5b; }
+.bb-todo-card__status--rejected { background: #ffe3e3; color: #c92a2a; }
+.bb-todo-card__desc { font-size: 12px; color: var(--neutral-600); line-height: 1.5; margin-bottom: 8px; }
+.bb-todo-card__meta { font-size: 11px; color: var(--neutral-500); margin-bottom: 8px; }
+.bb-todo-card__meta-label { font-weight: 600; color: var(--neutral-600); }
+.bb-todo-card__rule, .bb-todo-card__effect { margin-bottom: 2px; }
+.bb-todo-card__evidences { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.bb-todo-card__ev { font-size: 10px; padding: 2px 6px; border-radius: var(--radius-sm); background: var(--neutral-100); color: var(--neutral-600); }
+.bb-todo-card__ev--support { background: #e6fcf5; color: #087f5b; }
+.bb-todo-card__ev--refute { background: #ffe3e3; color: #c92a2a; }
+.bb-todo-card__actions { display: flex; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid var(--neutral-100); }
+.bb-todo-feedback { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bb-btn--sm { height: 28px; padding: 0 10px; font-size: 11px; }
+.bb-select--sm { height: 28px; font-size: 11px; padding: 0 6px; }
+.bb-input--sm { height: 28px; font-size: 11px; padding: 0 8px; flex: 1; min-width: 120px; }
+.bb-todos__reattr { margin-top: 12px; display: flex; align-items: center; gap: 10px; }
+.bb-todos__reattr-msg { font-size: 12px; color: var(--status-success); }
 </style>

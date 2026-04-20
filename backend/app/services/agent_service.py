@@ -20,13 +20,43 @@ from app.services.rule_engine import RuleEvaluator, ActionExecutor, RuleScreener
 
 logger = logging.getLogger(__name__)
 
+SENSITIVE_TOOL_SET: set[str] = {s.name for s in __import__('app.services.agent_tools', fromlist=['AGENT_TOOL_SPECS']).AGENT_TOOL_SPECS if s.sensitive}
+
 
 class AgentService:
     MAX_TOOL_ROUNDS = 8
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, *, app_id: str | None = None, session_id: str | None = None):
         self.db = db
         self.client = get_llm_client()
+        self.app_id = app_id
+        self.session_id = session_id or ""
+        self._published_config: dict | None = None
+        self._approval_policy: dict | None = None
+        if app_id:
+            self._load_app_config()
+
+    def _load_app_config(self):
+        from app.models.workflow import WorkflowApp
+        app = self.db.query(WorkflowApp).filter(WorkflowApp.id == self.app_id).first()
+        if app and app.published_json:
+            self._published_config = app.published_json
+            self._approval_policy = app.published_json.get("approvalPolicy")
+
+    def _get_allowed_tools(self) -> list[str] | None:
+        if not self._published_config:
+            return None
+        agent_cfg = self._published_config.get("defaultAgent")
+        if agent_cfg and agent_cfg.get("boundTools"):
+            return agent_cfg["boundTools"]
+        return None
+
+    def _is_sensitive(self, tool_name: str) -> bool:
+        if self._approval_policy and self._approval_policy.get("requireApproval"):
+            sensitive_list = self._approval_policy.get("sensitiveTools", [])
+            if sensitive_list and tool_name in sensitive_list:
+                return True
+        return tool_name in SENSITIVE_TOOL_SET and self._approval_policy is not None
 
     # ── public ──────────────────────────────────────────────
 
@@ -44,12 +74,17 @@ class AgentService:
         ]
         tool_runs: list[dict[str, Any]] = []
 
+        allowed_tools = self._get_allowed_tools()
+        tool_defs = agent_tool_definitions()
+        if allowed_tools is not None:
+            tool_defs = [t for t in tool_defs if t["function"]["name"] in allowed_tools]
+
         for _round in range(self.MAX_TOOL_ROUNDS):
             try:
                 response = self.client.chat.completions.create(
                     model=settings.LLM_MODEL,
                     messages=messages,
-                    tools=agent_tool_definitions(),
+                    tools=tool_defs if tool_defs else agent_tool_definitions(),
                     tool_choice="auto",
                     temperature=0,
                     max_tokens=4096,
@@ -88,6 +123,29 @@ class AgentService:
                     tool_args = {}
 
                 yield {"type": "tool_start", "tool": tool_name, "arguments": tool_args}
+
+                # HITL: 敏感工具需要审批
+                if self._is_sensitive(tool_name) and self.app_id:
+                    from app.services.workflow_service import create_approval_task
+                    task = create_approval_task(
+                        self.db,
+                        app_id=self.app_id,
+                        session_id=self.session_id,
+                        tool_name=tool_name,
+                        tool_args=tool_args,
+                    )
+                    yield {
+                        "type": "approval_required",
+                        "taskId": task.id,
+                        "tool": tool_name,
+                        "arguments": tool_args,
+                    }
+                    messages.append({
+                        "role": "tool",
+                        "tool_call_id": tool_call.id,
+                        "content": json.dumps({"status": "pending_approval", "taskId": task.id, "message": "此操作需要人工审批，已提交审批请求。"}, ensure_ascii=False),
+                    })
+                    continue
 
                 result, summary, result_count = self._execute_tool(tool_name, tool_args)
 
@@ -132,7 +190,17 @@ class AgentService:
             ds_lines.append(f"- {ds.name} (类型: {ds.type}, 表: {ds.table_name}, 记录数: {ds.record_count})")
         ds_summary = "\n".join(ds_lines) if ds_lines else "暂无已启用的数据源"
 
+        # 如果有已发布 App 配置，注入 persona / objective
+        app_prefix = ""
+        if self._published_config:
+            agent_cfg = self._published_config.get("defaultAgent") or {}
+            persona = agent_cfg.get("persona", "")
+            objective = agent_cfg.get("objective", "")
+            if persona or objective:
+                app_prefix = f"## 角色设定\n{persona}\n\n## 目标\n{objective}\n\n"
+
         return (
+            f"{app_prefix}"
             "你是本体驱动的智能问答助手。你必须严格基于本体模型进行推理和回答。\n"
             "\n"
             "## 核心原则（必须遵守）\n"
