@@ -147,10 +147,13 @@ const iconMap: Record<string, string> = {
   Channel: '/images/ontology/icon-渠道.png',
   Staff: '/images/ontology/icon-员工.png',
   Organization: '/images/ontology/icon-组织.png',
+  InstallOrder: '/images/ontology/icon-订单.png',
+  InstallChurn: '/images/ontology/icon-域本体.png',
+  Engineer: '/images/ontology/icon-员工.png',
 }
 
 function toNode(e: EntityListItem): OntologyNode {
-  const isCore = coreNames.has(e.name) || e.tier === 1
+  const isCore = coreNames.has(e.name) || e.tier === 1 || e.tier === 2
   return {
     id: e.id,
     label: e.name_cn || e.name,
@@ -350,35 +353,43 @@ const topCards = computed(() => [
   },
 ])
 
-const bottomCards = computed(() => [
-  {
-    title: 'DATA SOURCES',
-    bg: '/images/ontology/bg-DATA SOURCES.png',
-    icon: '/images/ontology/icon-DATA SOURCES.png',
-    flex: 514,
-    items: stats.value?.datasources?.length
-      ? stats.value.datasources.map(d => d.name)
-      : ['暂无数据源'],
-  },
-  {
-    title: 'LOGIC SOURCES',
-    bg: '/images/ontology/bg-LOGIC SOURCES.png',
-    icon: '/images/ontology/icon-LOGIC SOURCES.png',
-    flex: 514,
-    items: stats.value?.rule_priority?.length
-      ? stats.value.rule_priority.map(r => `${r.priority} 优先级: ${r.count}`)
-      : ['暂无规则'],
-  },
-  {
-    title: 'SYSTEMS OF ACTION',
-    bg: '/images/ontology/bg-SYSTEMS OF ACTION.png',
-    icon: '/images/ontology/icon-SYSTEMS OF ACTION.png',
-    flex: 441,
-    items: stats.value?.recent_activities?.length
-      ? stats.value.recent_activities.slice(0, 6).map(a => a.target_name)
-      : ['暂无活动'],
-  },
-])
+const bottomCards = computed(() => {
+  const dsList = stats.value?.datasources ?? []
+  const bbSources = dsList.filter(d => d.name.startsWith('bb_')).map(d => d.name.replace('bb_', ''))
+  const otherSources = dsList.filter(d => !d.name.startsWith('bb_')).map(d => d.name)
+  const dsItems = [
+    ...(bbSources.length ? [`宽带退单(${bbSources.length}表)`, ...bbSources.slice(0, 4)] : []),
+    ...(otherSources.length ? [`携号转网(${otherSources.length}表)`, ...otherSources.slice(0, 3)] : []),
+    ...(!dsList.length ? ['暂无数据源'] : []),
+  ]
+  return [
+    {
+      title: 'DATA SOURCES',
+      bg: '/images/ontology/bg-DATA SOURCES.png',
+      icon: '/images/ontology/icon-DATA SOURCES.png',
+      flex: 514,
+      items: dsItems.slice(0, 8),
+    },
+    {
+      title: 'LOGIC SOURCES',
+      bg: '/images/ontology/bg-LOGIC SOURCES.png',
+      icon: '/images/ontology/icon-LOGIC SOURCES.png',
+      flex: 514,
+      items: stats.value?.rule_priority?.length
+        ? stats.value.rule_priority.map(r => `${r.priority} 优先级: ${r.count}`)
+        : ['暂无规则'],
+    },
+    {
+      title: 'SYSTEMS OF ACTION',
+      bg: '/images/ontology/bg-SYSTEMS OF ACTION.png',
+      icon: '/images/ontology/icon-SYSTEMS OF ACTION.png',
+      flex: 441,
+      items: stats.value?.recent_activities?.length
+        ? stats.value.recent_activities.slice(0, 6).map(a => a.target_name)
+        : ['暂无活动'],
+    },
+  ]
+})
 </script>
 
 <style scoped>
