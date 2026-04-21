@@ -300,7 +300,7 @@ function handleExecute() {
   store.startExecution(store.current.id)
 }
 
-function onNodeClick(_: any, node: any) {
+function onNodeClick({ node }: { node: any }) {
   store.selectNode(node.id)
 }
 
