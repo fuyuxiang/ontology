@@ -29,7 +29,6 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 
 const menuItems = [
-  { path: '/governance/versions', label: '版本管理', icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 6v4" stroke="currentColor" stroke-width="1.5"/></svg>' },
   { path: '/governance/permissions', label: '权限控制', icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="4" y="7" width="8" height="6" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M6 7V5a2 2 0 014 0v2" stroke="currentColor" stroke-width="1.5"/></svg>' },
   { path: '/governance/audit', label: '审计日志', icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' },
   { path: '/governance/glossary', label: '帮助文档', icon: '<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 2h7a3 3 0 010 6H3V2z" stroke="currentColor" stroke-width="1.5"/><path d="M3 8h8a3 3 0 010 6H3V8z" stroke="currentColor" stroke-width="1.5"/></svg>' },
