@@ -108,9 +108,31 @@ const stateClass = computed(() => {
 
 <style scoped>
 .wf-node {
+  --wf-bg: #fff;
+  --wf-border: #e2e8f0;
+  --wf-header-border: #e2e8f0;
+  --wf-title: #94a3b8;
+  --wf-name: #1e293b;
+  --wf-desc: #64748b;
+  --wf-handle-bg: #fff;
+  --wf-handle-border: #cbd5e1;
+  --wf-dot-bg: #e2e8f0;
+}
+:global([data-theme='dark']) .wf-node {
+  --wf-bg: #1e293b;
+  --wf-border: #334155;
+  --wf-header-border: #334155;
+  --wf-title: #64748b;
+  --wf-name: #e2e8f0;
+  --wf-desc: #475569;
+  --wf-handle-bg: #1e293b;
+  --wf-handle-border: #475569;
+  --wf-dot-bg: #334155;
+}
+.wf-node {
   min-width: 160px; max-width: 200px;
-  background: #1e293b;
-  border: 1.5px solid #334155;
+  background: var(--wf-bg);
+  border: 1.5px solid var(--wf-border);
   border-radius: 10px;
   box-shadow: 0 2px 12px rgba(0,0,0,.4);
   cursor: pointer;
@@ -131,18 +153,18 @@ const stateClass = computed(() => {
 .wf-node__header {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 10px 6px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--wf-header-border);
 }
 .wf-node__icon { width: 14px; height: 14px; flex-shrink: 0; color: v-bind('meta.color'); display: flex; }
-.wf-node__title { font-size: 10px; font-weight: 600; color: #64748b; flex: 1; text-transform: uppercase; letter-spacing: .04em; }
-.wf-node__state-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: #334155; }
+.wf-node__title { font-size: 10px; font-weight: 600; color: var(--wf-title); flex: 1; text-transform: uppercase; letter-spacing: .04em; }
+.wf-node__state-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; background: var(--wf-dot-bg); }
 .wf-node__state-dot--running { background: #f59e0b; }
 .wf-node__state-dot--done { background: #10b981; }
 .wf-node__state-dot--error { background: #ef4444; }
 
 .wf-node__body { padding: 6px 10px 8px; }
-.wf-node__name { font-size: 12px; font-weight: 600; color: #e2e8f0; }
-.wf-node__desc { font-size: 10px; color: #475569; margin-top: 2px; }
+.wf-node__name { font-size: 12px; font-weight: 600; color: var(--wf-name); }
+.wf-node__desc { font-size: 10px; color: var(--wf-desc); margin-top: 2px; }
 .wf-node__result {
   font-size: 10px; color: #4ade80; margin-top: 4px;
   padding: 3px 6px; background: #052e16; border-radius: 4px;
@@ -150,7 +172,7 @@ const stateClass = computed(() => {
 
 .wf-handle {
   width: 10px; height: 10px;
-  background: #1e293b; border: 2px solid #475569; border-radius: 50%;
+  background: var(--wf-handle-bg); border: 2px solid var(--wf-handle-border); border-radius: 50%;
   transition: border-color .15s;
 }
 .wf-handle:hover { border-color: #6366f1; }
