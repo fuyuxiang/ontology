@@ -17,12 +17,23 @@
             <p class="text-caption">本体驱动 · 实时推理</p>
           </div>
         </div>
+        <div class="copilot__agent-select">
+          <select v-model="selectedAgentId" class="copilot__agent-dropdown">
+            <option value="">默认知识问答</option>
+            <option v-for="a in publishedAgents" :key="a.id" :value="a.id">{{ a.name }}</option>
+          </select>
+        </div>
         <button class="copilot__new-chat" @click="clearChat">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
           新对话
         </button>
+      </div>
+      <div v-if="selectedAgent" class="copilot__agent-banner">
+        <span>智能体：{{ selectedAgent.name }}</span>
+        <span v-if="selectedAgent.kb_ids?.length" class="copilot__agent-tag">知识库 ×{{ selectedAgent.kb_ids.length }}</span>
+        <span v-if="selectedAgent.entity_ids?.length" class="copilot__agent-tag">实体 ×{{ selectedAgent.entity_ids.length }}</span>
       </div>
 
       <!-- 消息列表 -->
@@ -168,8 +179,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, computed } from 'vue'
+import { ref, nextTick, computed, onMounted } from 'vue'
 import { marked } from 'marked'
+import { agentsApi, type AgentItem } from '../../api/agents'
 
 // marked 配置：同步解析，禁用异步
 marked.setOptions({ async: false })
@@ -225,6 +237,15 @@ const messagesEl = ref<HTMLElement>()
 const inputEl = ref<HTMLTextAreaElement>()
 let msgId = 0
 
+const allAgents = ref<AgentItem[]>([])
+const selectedAgentId = ref('')
+const publishedAgents = computed(() => allAgents.value.filter(a => a.status === 'published'))
+const selectedAgent = computed(() => publishedAgents.value.find(a => a.id === selectedAgentId.value) || null)
+
+onMounted(async () => {
+  try { allAgents.value = await agentsApi.list() } catch {}
+})
+
 const appTitle = computed(() => '智能对话')
 
 const suggestions = [
@@ -260,12 +281,18 @@ async function sendMessage(text?: string) {
   const aiMsgRef = messages.value[messages.value.length - 1]
 
   try {
-    const response = await fetch('/api/v1/copilot/agent-chat', {
+    // Route to agent chat if an agent is selected
+    const url = selectedAgentId.value
+      ? `/api/v1/agents/${selectedAgentId.value}/chat`
+      : '/api/v1/copilot/agent-chat'
+    const body = selectedAgentId.value
+      ? JSON.stringify({ messages: messages.value.filter(m => m.role !== 'ai' || m.content).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })) })
+      : JSON.stringify({ question: content })
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        question: content,
-      }),
+      body,
     })
 
     if (!response.ok) {
@@ -290,12 +317,18 @@ async function sendMessage(text?: string) {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6).trim()
           if (data === '[DONE]') break
-          try {
-            const event = JSON.parse(data)
-            handleSSEEvent(event, aiMsgRef)
+          if (selectedAgentId.value) {
+            // Agent chat: plain text streaming
+            if (!data.startsWith('[ERROR]')) aiMsgRef.content += data
             await scrollToBottom()
-          } catch {
-            // 非 JSON，忽略
+          } else {
+            try {
+              const event = JSON.parse(data)
+              handleSSEEvent(event, aiMsgRef)
+              await scrollToBottom()
+            } catch {
+              // 非 JSON，忽略
+            }
           }
         }
       }
@@ -848,6 +881,10 @@ function autoResize(e: Event) {
   background: var(--semantic-100);
   border-color: var(--semantic-400);
 }
+.copilot__agent-select { flex: 1; }
+.copilot__agent-dropdown { padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; background: var(--surface-1); color: var(--text); cursor: pointer; max-width: 220px; }
+.copilot__agent-banner { display: flex; align-items: center; gap: 8px; padding: 6px 20px; background: var(--semantic-50, #eff6ff); border-bottom: 1px solid var(--semantic-200, #bfdbfe); font-size: 13px; color: var(--semantic-700, #1d4ed8); }
+.copilot__agent-tag { background: var(--semantic-100, #dbeafe); padding: 2px 8px; border-radius: 4px; font-size: 11px; }
 
 /* Markdown 渲染 */
 .markdown-body { font-size: var(--text-body-size); line-height: 1.6; word-break: break-word; }
