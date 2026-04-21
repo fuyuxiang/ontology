@@ -51,6 +51,12 @@ function Start-Services {
     Write-Host "  ========================================" -ForegroundColor Cyan
 }
 
+function Kill-Tree($procId) {
+    $children = Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $procId }
+    foreach ($child in $children) { Kill-Tree $child.ProcessId }
+    Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+}
+
 function Stop-Services {
     Write-Host "[STOP] Ontology Platform" -ForegroundColor Cyan
     Write-Host ""
@@ -58,7 +64,7 @@ function Stop-Services {
     $bpid = Get-PortPID $BACKEND_PORT
     if ($bpid) {
         Write-Host "  Stopping backend (PID: $bpid)..."
-        Stop-Process -Id $bpid -Force -ErrorAction SilentlyContinue
+        Kill-Tree $bpid
     } else {
         Write-Host "  Backend not running." -ForegroundColor Gray
     }
@@ -66,7 +72,7 @@ function Stop-Services {
     $fpid = Get-PortPID $FRONTEND_PORT
     if ($fpid) {
         Write-Host "  Stopping frontend (PID: $fpid)..."
-        Stop-Process -Id $fpid -Force -ErrorAction SilentlyContinue
+        Kill-Tree $fpid
     } else {
         Write-Host "  Frontend not running." -ForegroundColor Gray
     }
