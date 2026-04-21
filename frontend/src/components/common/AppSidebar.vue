@@ -11,20 +11,51 @@
     </div>
 
     <nav class="sidebar__nav">
-      <template v-for="(group, gi) in navGroups" :key="gi">
-        <div v-if="gi > 0" class="sidebar__divider"></div>
-        <div class="sidebar__section-label">{{ group.label }}</div>
-        <RouterLink
-          v-for="item in group.items"
-          :key="item.path"
-          :to="item.path"
-          class="sidebar__item"
-          :class="{ 'sidebar__item--active': isActive(item.path, item.exact) }"
-        >
-          <span class="sidebar__item-icon" v-html="item.icon"></span>
-          <span class="sidebar__item-label">{{ item.label }}</span>
-        </RouterLink>
-      </template>
+      <div v-for="(group, gi) in navGroups" :key="gi" class="sidebar__group">
+        <button class="sidebar__group-header" @click="toggleGroup(gi)">
+          <span class="sidebar__group-label">{{ group.label }}</span>
+          <svg class="sidebar__group-arrow" :class="{ 'sidebar__group-arrow--open': expandedGroups[gi] }" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 3l4 3-4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div v-show="expandedGroups[gi]" class="sidebar__group-items">
+          <template v-for="item in group.items" :key="item.path">
+            <!-- 有子菜单 -->
+            <template v-if="item.children">
+              <div class="sidebar__submenu">
+                <button
+                  class="sidebar__item sidebar__item--parent"
+                  :class="{ 'sidebar__item--active': isActive(item.path, item.exact) }"
+                  @click="toggleSubmenu(item.path)"
+                >
+                  <span class="sidebar__item-icon" v-html="item.icon"></span>
+                  <span class="sidebar__item-label">{{ item.label }}</span>
+                  <svg class="sidebar__sub-arrow" :class="{ 'sidebar__sub-arrow--open': expandedSubmenus[item.path] }" width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M4 3l4 3-4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div v-show="expandedSubmenus[item.path]" class="sidebar__submenu-items">
+                  <RouterLink
+                    v-for="child in item.children"
+                    :key="child.path"
+                    :to="child.path"
+                    class="sidebar__item sidebar__item--child"
+                    :class="{ 'sidebar__item--active': isActive(child.path, child.exact) }"
+                  >
+                    <span class="sidebar__item-label">{{ child.label }}</span>
+                  </RouterLink>
+                </div>
+              </div>
+            </template>
+            <!-- 普通菜单项 -->
+            <RouterLink
+              v-else
+              :to="item.path"
+              class="sidebar__item"
+              :class="{ 'sidebar__item--active': isActive(item.path, item.exact) }"
+            >
+              <span class="sidebar__item-icon" v-html="item.icon"></span>
+              <span class="sidebar__item-label">{{ item.label }}</span>
+            </RouterLink>
+          </template>
+        </div>
+      </div>
     </nav>
 
     <div class="sidebar__footer">
@@ -39,7 +70,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
 import SettingsDialog from './SettingsDialog.vue'
@@ -53,6 +84,21 @@ const initial = computed(() => userName.value.charAt(0).toUpperCase())
 
 function isActive(path: string, exact?: boolean) {
   return exact ? route.path === path : route.path.startsWith(path)
+}
+
+const expandedGroups = reactive<Record<number, boolean>>({})
+// 默认全部展开
+for (let i = 0; i < 5; i++) expandedGroups[i] = true
+
+const expandedSubmenus = reactive<Record<string, boolean>>({})
+expandedSubmenus['/browser'] = true
+
+function toggleGroup(index: number) {
+  expandedGroups[index] = !expandedGroups[index]
+}
+
+function toggleSubmenu(path: string) {
+  expandedSubmenus[path] = !expandedSubmenus[path]
 }
 
 const ico = {
@@ -96,42 +142,26 @@ const navGroups = [
     { path: '/todo', label: '我的待办', icon: ico.todo },
     { path: '/changes', label: '最近变更', icon: ico.changes },
   ]},
-  { label: '本体资产', items: [
-    { path: '/browser', label: '本体目录', icon: ico.catalog, exact: true },
-    { path: '/search', label: '对象检索', icon: ico.search },
-    { path: '/browser/graph', label: '关系图谱', icon: ico.graph },
-  ]},
-  { label: '本体建模', items: [
-    { path: '/browser', label: '对象', icon: ico.object, exact: true },
-    { path: '/modeling/attributes', label: '属性', icon: ico.attr },
-    { path: '/browser/graph', label: '关系', icon: ico.graph },
-    { path: '/browser/rules', label: '规则', icon: ico.rule },
-    { path: '/modeling/actions', label: '动作', icon: ico.action },
-    { path: '/modeling/import-export', label: '模型导入导出', icon: ico.importExport },
+  { label: '本体管理', items: [
+    { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true, children: [
+      { path: '/browser/build/auto', label: '自动化构建' },
+      { path: '/browser/build/manual', label: '手工构建' },
+    ]},
+    { path: '/browser/graph', label: '本体图谱', icon: ico.graph },
   ]},
   { label: '数据接入', items: [
     { path: '/datasource', label: '数据源', icon: ico.datasource },
-    { path: '/knowledge', label: '多模态知识库', icon: ico.knowledge },
     { path: '/data/mapping', label: '本体映射', icon: ico.mapping },
-    { path: '/data/sync', label: '同步任务', icon: ico.sync },
     { path: '/data/lineage', label: '血缘分析', icon: ico.lineage },
-    { path: '/data/quality', label: '质量监控', icon: ico.quality },
   ]},
   { label: '智能编排', items: [
     { path: '/harness', label: '智能体编排', icon: ico.harness },
-    { path: '/agents', label: '智能体管理', icon: ico.harness },
     { path: '/orchestration/models', label: '模型管理', icon: ico.model },
   ]},
   { label: '智能应用', items: [
     { path: '/copilot', label: '知识问答', icon: ico.copilot },
     { path: '/scene', label: '场景验证', icon: ico.scene, exact: true },
     { path: '/app/api', label: 'API开放', icon: ico.api },
-  ]},
-  { label: '治理中心', items: [
-    { path: '/governance/versions', label: '版本管理', icon: ico.version },
-    { path: '/governance/permissions', label: '权限控制', icon: ico.permission },
-    { path: '/governance/audit', label: '审计日志', icon: ico.audit },
-    { path: '/governance/glossary', label: '帮助文档', icon: ico.glossary },
   ]},
 ]
 </script>
@@ -155,20 +185,49 @@ const navGroups = [
   flex-shrink: 0;
 }
 .sidebar__logo-img { width: 80px; height: 28px; border-radius: 6px; object-fit: contain; }
-.sidebar__logo-info { display: flex; flex-direction: column; line-height: 1.2; }
-.sidebar__logo-text { font-size: var(--text-body-size); font-weight: 700; color: var(--sidebar-text-active); }
+.sidebar__logo-info { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.sidebar__logo-text { font-size: 16px; font-weight: 700; color: var(--sidebar-text-active); }
 .sidebar__nav {
   flex: 1;
   overflow-y: auto;
   padding: 0 8px 8px;
 }
-.sidebar__section-label {
-  font-size: var(--text-caption-upper-size);
+.sidebar__group { margin-bottom: 2px; }
+.sidebar__group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 10px 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--sidebar-text-muted);
+  color: var(--sidebar-text);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  padding: 8px 10px 4px;
+}
+.sidebar__group-header:hover { color: var(--sidebar-text-active); }
+.sidebar__group-arrow {
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+.sidebar__group-arrow--open { transform: rotate(90deg); }
+.sidebar__group-items { padding-bottom: 4px; }
+.sidebar__item--parent {
+  justify-content: flex-start;
+}
+.sidebar__sub-arrow {
+  margin-left: auto;
+  transition: transform var(--transition-fast);
+  flex-shrink: 0;
+}
+.sidebar__sub-arrow--open { transform: rotate(90deg); }
+.sidebar__submenu-items { padding-left: 26px; }
+.sidebar__item--child {
+  font-size: 14px;
+  padding: 5px 10px;
 }
 .sidebar__item {
   display: flex;
@@ -178,7 +237,7 @@ const navGroups = [
   border-radius: var(--radius-md);
   color: var(--sidebar-text);
   text-decoration: none;
-  font-size: var(--text-body-size);
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -202,11 +261,6 @@ const navGroups = [
   display: flex; align-items: center; justify-content: center;
 }
 .sidebar__item-label { flex: 1; }
-.sidebar__divider {
-  height: 1px;
-  background: var(--sidebar-border);
-  margin: 6px 0;
-}
 .sidebar__footer {
   padding: 8px;
   border-top: 1px solid var(--sidebar-border);
