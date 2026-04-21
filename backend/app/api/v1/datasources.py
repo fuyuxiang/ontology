@@ -10,6 +10,7 @@ from app.schemas.datasource import (
     DataSourceListItem, TestConnectionResult,
     TableListResult, TablePreviewResult, TableSchemaResult,
 )
+from app.repositories import DataSourceRepository
 from app.services.datasource_utils import (
     get_connection as _get_connection,
     list_tables as _list_tables,
@@ -29,19 +30,14 @@ def list_datasources(
     q: str | None = None,
     db: Session = Depends(get_db),
 ):
-    query = db.query(DataSource)
-    if type:
-        query = query.filter(DataSource.type == type)
-    if status:
-        query = query.filter(DataSource.status == status)
-    if q:
-        query = query.filter(DataSource.name.ilike(f"%{q}%"))
-    return query.order_by(DataSource.created_at.desc()).all()
+    repo = DataSourceRepository(db)
+    return repo.list_with_filters(type=type, status=status, q=q)
 
 
 @router.get("/{ds_id}", response_model=DataSourceDetail)
 def get_datasource(ds_id: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     return ds
@@ -50,7 +46,7 @@ def get_datasource(ds_id: str, db: Session = Depends(get_db)):
 @router.post("", response_model=list[DataSourceDetail], status_code=201)
 def create_datasource(body: DataSourceCreate, db: Session = Depends(get_db)):
     """连接数据库，获取所有表，为每张表创建一条数据源记录"""
-    # 先用连接信息获取表列表
+    repo = DataSourceRepository(db)
     tmp_ds = DataSource(**body.model_dump(), name="_tmp")
     try:
         tables = _list_tables(tmp_ds)
@@ -61,8 +57,7 @@ def create_datasource(body: DataSourceCreate, db: Session = Depends(get_db)):
 
     created = []
     for tbl in tables:
-        # 跳过已存在的同名记录
-        if db.query(DataSource).filter(DataSource.name == tbl).first():
+        if repo.find_by_name(tbl):
             continue
         ds = DataSource(
             **body.model_dump(),
@@ -70,37 +65,40 @@ def create_datasource(body: DataSourceCreate, db: Session = Depends(get_db)):
             table_name=tbl,
             enabled=True,
         )
-        db.add(ds)
-        db.commit()
-        db.refresh(ds)
+        repo.create(ds)
+        repo.commit()
+        repo.refresh(ds)
         created.append(ds)
     return created
 
 
 @router.put("/{ds_id}", response_model=DataSourceDetail)
 def update_datasource(ds_id: str, body: DataSourceUpdate, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(ds, k, v)
-    db.commit()
-    db.refresh(ds)
+    repo.commit()
+    repo.refresh(ds)
     return ds
 
 
 @router.delete("/{ds_id}", status_code=204)
 def delete_datasource(ds_id: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
-    db.delete(ds)
-    db.commit()
+    repo.delete(ds)
+    repo.commit()
 
 
 @router.post("/{ds_id}/test", response_model=TestConnectionResult)
 def test_connection(ds_id: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     return _test_conn(ds.host, ds.port)
@@ -133,18 +131,20 @@ def _test_conn(host: str, port: int) -> dict:
 
 @router.post("/{ds_id}/toggle", response_model=DataSourceDetail)
 def toggle_datasource(ds_id: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     ds.enabled = not ds.enabled
-    db.commit()
-    db.refresh(ds)
+    repo.commit()
+    repo.refresh(ds)
     return ds
 
 
 @router.post("/{ds_id}/refresh-tables", response_model=DataSourceDetail)
 def refresh_tables(ds_id: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     if not ds.enabled:
@@ -155,13 +155,13 @@ def refresh_tables(ds_id: str, db: Session = Depends(get_db)):
     if err:
         raise HTTPException(400, f"同步失败: {err}")
     ds.record_count = count
-    db.commit()
-    db.refresh(ds)
+    repo.commit()
+    repo.refresh(ds)
     return ds
 
 
 def _count_records(ds: DataSource) -> tuple[int, str | None]:
-    """连接数据库并查询当前数据表的记录条数，返回 (count, error_msg)"""
+    """连接数据库并查询当前数据表的记录条数"""
     try:
         conn = _get_connection(ds)
         if not conn:
@@ -174,26 +174,14 @@ def _count_records(ds: DataSource) -> tuple[int, str | None]:
         conn.close()
         return count, None
     except Exception as e:
-        logger.warning(f"获取记录条数失败 [{ds.name}]: {e}")
         return 0, str(e)
-
-
-@router.get("/{ds_id}/tables", response_model=TableListResult)
-def get_tables(ds_id: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
-    if not ds:
-        raise HTTPException(404, "数据源不存在")
-    try:
-        tables = _list_tables(ds)
-        return {"tables": tables}
-    except Exception as e:
-        raise HTTPException(400, f"获取表列表失败: {e}")
 
 
 @router.get("/{ds_id}/preview", response_model=TablePreviewResult)
 def preview_datasource(ds_id: str, db: Session = Depends(get_db)):
     """直接预览该数据源关联表的前20条数据"""
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     if not ds.enabled:
@@ -210,7 +198,8 @@ def preview_datasource(ds_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{ds_id}/tables/{table_name}/preview", response_model=TablePreviewResult)
 def preview_table(ds_id: str, table_name: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     if not ds.enabled:
@@ -225,7 +214,8 @@ def preview_table(ds_id: str, table_name: str, db: Session = Depends(get_db)):
 
 @router.get("/{ds_id}/tables/{table_name}/schema", response_model=TableSchemaResult)
 def get_table_schema(ds_id: str, table_name: str, db: Session = Depends(get_db)):
-    ds = db.get(DataSource, ds_id)
+    repo = DataSourceRepository(db)
+    ds = repo.get_by_id(ds_id)
     if not ds:
         raise HTTPException(404, "数据源不存在")
     try:
