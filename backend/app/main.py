@@ -20,6 +20,7 @@ from app.api.v1.scenes import router as scenes_router
 from app.api.v1.broadband import router as broadband_router
 from app.api.v1.workflow import router as workflow_router
 from app.api.v1.workflows import router as workflows_router
+from app.api.v1.knowledge import router as knowledge_router
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ app.include_router(scenes_router, prefix="/api/v1")
 app.include_router(broadband_router, prefix="/api/v1")
 app.include_router(workflow_router, prefix="/api/v1")
 app.include_router(workflows_router, prefix="/api/v1")
+app.include_router(knowledge_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
