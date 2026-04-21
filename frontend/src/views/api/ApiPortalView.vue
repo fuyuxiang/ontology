@@ -71,7 +71,6 @@
             <div class="detail-hero__tags">
               <a-tag v-for="t in (selected.tags || [])" :key="t" size="small">{{ t }}</a-tag>
               <a-tag color="blue" size="small" v-if="selected.model_name">{{ selected.model_name }}</a-tag>
-              <a-tag color="purple" size="small" v-if="selected.kb_ids?.length">知识库 {{ selected.kb_ids.length }}</a-tag>
             </div>
           </div>
           <div class="detail-hero__actions">
