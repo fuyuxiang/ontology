@@ -1,8 +1,11 @@
 <template>
-  <div class="app-shell">
+  <div v-if="isLoginPage" class="app-shell--login">
+    <RouterView />
+  </div>
+  <div v-else class="app-shell">
     <AppSidebar />
     <div class="app-main">
-      <AppTopbar @search="searchRef?.open()" />
+      <AppTopbar />
       <main class="app-content">
         <RouterView v-slot="{ Component }">
           <Transition name="page" mode="out-in">
@@ -10,7 +13,6 @@
           </Transition>
         </RouterView>
       </main>
-      <!-- 底部状态栏 -->
       <footer class="app-statusbar">
         <span>{{ statsText }}</span>
         <span class="app-statusbar__dot app-statusbar__dot--success"></span>
@@ -18,23 +20,22 @@
       </footer>
     </div>
   </div>
-
-  <!-- 全局组件 -->
-  <SearchCommand ref="searchRef" />
   <ToastContainer />
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useThemeStore } from './store/theme'
 import { get } from './api/client'
 import AppSidebar from './components/common/AppSidebar.vue'
 import AppTopbar from './components/common/AppTopbar.vue'
-import SearchCommand from './components/common/SearchCommand.vue'
 import ToastContainer from './components/common/ToastContainer.vue'
 
+const route = useRoute()
 const themeStore = useThemeStore()
-const searchRef = ref<InstanceType<typeof SearchCommand>>()
+
+const isLoginPage = computed(() => route.path === '/login')
 
 const stats = ref<{ entity_count: number; relation_count: number; rule_count: number }>({ entity_count: 0, relation_count: 0, rule_count: 0 })
 const statsText = computed(() => `${stats.value.entity_count} 对象类型 · ${stats.value.relation_count} 关系 · ${stats.value.rule_count} 规则`)
@@ -59,27 +60,24 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.app-shell--login { height: 100vh; }
 .app-shell {
   display: flex;
   height: 100vh;
   overflow: hidden;
   background: var(--neutral-0);
 }
-
 .app-main {
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-
 .app-content {
   flex: 1;
   overflow-y: auto;
   background: var(--neutral-50);
 }
-
-/* 底部状态栏 — Layout A 规格：28px */
 .app-statusbar {
   height: 28px;
   display: flex;
@@ -93,12 +91,7 @@ onMounted(() => {
   flex-shrink: 0;
 }
 .app-statusbar__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-full);
-  flex-shrink: 0;
+  width: 6px; height: 6px; border-radius: var(--radius-full); flex-shrink: 0;
 }
 .app-statusbar__dot--success { background: var(--status-success); }
-.app-statusbar__dot--warning { background: var(--status-warning); }
-.app-statusbar__dot--error   { background: var(--status-error); }
 </style>

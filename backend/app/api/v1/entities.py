@@ -10,6 +10,7 @@ from app.schemas.entity import (
     GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
     FileImportResult,
 )
+from app.repositories import EntityRepository
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.services.audit import write_audit
@@ -25,25 +26,12 @@ def list_entities(
     namespace: str | None = None,
     db: Session = Depends(get_db),
 ):
-    q = db.query(OntologyEntity)
-    if tier:
-        q = q.filter(OntologyEntity.tier == tier)
-    if status:
-        q = q.filter(OntologyEntity.status == status)
-    if namespace:
-        q = q.filter(OntologyEntity.id.like(f"{namespace}_%"))
-    if search:
-        pattern = f"%{search}%"
-        q = q.filter(
-            OntologyEntity.name.ilike(pattern) | OntologyEntity.name_cn.ilike(pattern)
-        )
-    entities = q.order_by(OntologyEntity.tier, OntologyEntity.name).all()
+    repo = EntityRepository(db)
+    entities = repo.list_with_filters(tier=tier, status=status, search=search, namespace=namespace)
 
     result = []
     for e in entities:
-        rel_count = db.query(func.count(EntityRelation.id)).filter(
-            (EntityRelation.from_entity_id == e.id) | (EntityRelation.to_entity_id == e.id)
-        ).scalar() or 0
+        rel_count = repo.get_relation_count(e.id)
         result.append(EntityListItem(
             id=e.id, name=e.name, name_cn=e.name_cn,
             tier=e.tier, status=e.status,
@@ -78,35 +66,20 @@ def get_scene_layer_stats(
     if not layer_map:
         raise HTTPException(status_code=404, detail=f"未找到命名空间 {namespace} 的层级映射")
 
+    repo = EntityRepository(db)
     layer_labels = {"signal": "语义层", "aggregate": "动力层", "decision": "动态层"}
     result = []
 
     for layer_key in ("signal", "aggregate", "decision"):
         entity_names = layer_map.get(layer_key, [])
         entity_ids = [f"{namespace}_{n}" for n in entity_names]
-
         entity_count = len(entity_ids)
-        attr_count = db.query(func.count(EntityAttribute.id)).filter(
-            EntityAttribute.entity_id.in_(entity_ids)
-        ).scalar() or 0
-        rel_count = db.query(func.count(EntityRelation.id)).filter(
-            EntityRelation.from_entity_id.in_(entity_ids) | EntityRelation.to_entity_id.in_(entity_ids)
-        ).scalar() or 0
-        rule_count = db.query(func.count(BusinessRule.id)).filter(
-            BusinessRule.entity_id.in_(entity_ids)
-        ).scalar() or 0
-        action_count = db.query(func.count(EntityAction.id)).filter(
-            EntityAction.entity_id.in_(entity_ids)
-        ).scalar() or 0
-
+        counts = repo.get_scene_layer_counts(entity_ids)
         result.append({
             "key": layer_key,
             "label": layer_labels.get(layer_key, layer_key),
             "entityCount": entity_count,
-            "attrCount": attr_count,
-            "relationCount": rel_count,
-            "ruleCount": rule_count,
-            "actionCount": action_count,
+            **counts,
         })
 
     return result
@@ -114,8 +87,9 @@ def get_scene_layer_stats(
 
 @router.get("/graph", response_model=GraphData)
 def get_full_graph(db: Session = Depends(get_db)):
-    entities = db.query(OntologyEntity).all()
-    relations = db.query(EntityRelation).all()
+    repo = EntityRepository(db)
+    entities = repo.list_with_filters()
+    relations = repo.get_all_relations()
 
     nodes = []
     for e in entities:
@@ -147,7 +121,8 @@ def get_entity_lineage(
     db: Session = Depends(get_db),
 ):
     """BFS traversal to get N-hop neighborhood of an entity."""
-    entity = db.get(OntologyEntity, entity_id)
+    repo = EntityRepository(db)
+    entity = repo.get_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
 
@@ -225,7 +200,7 @@ def create_from_datasource(
     user: User | None = Depends(get_current_user),
 ):
     from app.models.datasource import DataSource
-    from app.api.v1.datasources import _get_table_schema
+    from app.services.datasource_utils import get_table_schema as _get_table_schema
 
     ds = db.get(DataSource, body.datasource_id)
     if not ds:
@@ -235,14 +210,13 @@ def create_from_datasource(
     if not columns:
         raise HTTPException(status_code=400, detail="表无列信息")
 
-    # 生成实体 ID
     table_pascal = body.table_name.replace("_", " ").title().replace(" ", "")
     eid = f"{body.namespace}_{table_pascal}" if body.namespace else table_pascal
 
-    if db.get(OntologyEntity, eid):
+    repo = EntityRepository(db)
+    if repo.get_by_id(eid):
         raise HTTPException(status_code=409, detail=f"实体 {eid} 已存在")
 
-    # 识别主键
     pk_cols = [c["name"] for c in columns if c.get("is_pk")]
     primary_key = pk_cols[0] if pk_cols else None
 
@@ -310,7 +284,7 @@ async def create_from_file(
             result = parse_json_ontology(data, namespace, db)
         elif file_type == "owl":
             result = parse_owl_ontology(content, "xml", db)
-        else:  # ttl
+        else:
             result = parse_owl_ontology(content, "turtle", db)
     except Exception as e:
         db.rollback()
@@ -343,7 +317,8 @@ async def create_from_file(
 
 @router.get("/{entity_id}", response_model=EntityDetail)
 def get_entity(entity_id: str, db: Session = Depends(get_db)):
-    entity = db.get(OntologyEntity, entity_id)
+    repo = EntityRepository(db)
+    entity = repo.get_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
 
@@ -415,7 +390,8 @@ def update_entity(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    entity = db.get(OntologyEntity, entity_id)
+    repo = EntityRepository(db)
+    entity = repo.get_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
 
@@ -435,7 +411,7 @@ def update_entity(
             target_id=entity.id, target_name=entity.name,
             changes=changes,
         )
-    db.commit()
+    repo.commit()
     return get_entity(entity.id, db)
 
 
@@ -445,7 +421,8 @@ def delete_entity(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    entity = db.get(OntologyEntity, entity_id)
+    repo = EntityRepository(db)
+    entity = repo.get_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
 
@@ -456,5 +433,5 @@ def delete_entity(
         target_id=entity.id, target_name=entity.name,
         snapshot_before={"name": entity.name, "tier": entity.tier},
     )
-    db.delete(entity)
-    db.commit()
+    repo.delete(entity)
+    repo.commit()
