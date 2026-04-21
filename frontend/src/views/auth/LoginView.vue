@@ -60,14 +60,14 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0f1117;
+  background: var(--sidebar-bg);
 }
 .login__card {
   width: 380px;
   padding: 48px 40px;
-  background: #1a1d27;
+  background: var(--neutral-950);
   border-radius: 16px;
-  border: 1px solid #2a2d37;
+  border: 1px solid var(--neutral-800);
 }
 .login__logo {
   display: flex;
@@ -85,19 +85,19 @@ async function handleLogin() {
   flex-direction: column;
 }
 .login__brand {
-  font-size: 20px;
+  font-size: var(--text-h2-size);
   font-weight: 700;
-  color: #fff;
+  color: var(--neutral-0);
   line-height: 1.2;
 }
 .login__brand-sub {
-  font-size: 12px;
-  color: #6b7280;
+  font-size: var(--text-code-size);
+  color: var(--neutral-600);
   font-weight: 500;
 }
 .login__desc {
-  font-size: 13px;
-  color: #6b7280;
+  font-size: var(--text-body-size);
+  color: var(--neutral-600);
   margin-bottom: 32px;
 }
 .login__form {
@@ -111,46 +111,46 @@ async function handleLogin() {
   gap: 6px;
 }
 .login__label {
-  font-size: 12px;
+  font-size: var(--text-code-size);
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--neutral-500);
 }
 .login__input {
   height: 40px;
   padding: 0 12px;
   border-radius: 8px;
-  border: 1px solid #374151;
-  background: #111318;
-  color: #fff;
-  font-size: 14px;
+  border: 1px solid var(--neutral-800);
+  background: var(--neutral-950);
+  color: var(--neutral-0);
+  font-size: var(--text-body-size);
   outline: none;
   transition: border-color 0.15s;
 }
 .login__input:focus {
-  border-color: #6366f1;
+  border-color: var(--semantic-600);
 }
 .login__input::placeholder {
-  color: #4b5563;
+  color: var(--neutral-700);
 }
 .login__error {
-  font-size: 12px;
-  color: #ef4444;
+  font-size: var(--text-code-size);
+  color: var(--status-error);
   margin: -8px 0 0;
 }
 .login__btn {
   height: 42px;
   border-radius: 8px;
   border: none;
-  background: #6366f1;
-  color: #fff;
-  font-size: 14px;
+  background: var(--semantic-600);
+  color: var(--neutral-0);
+  font-size: var(--text-body-size);
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
   margin-top: 4px;
 }
 .login__btn:hover:not(:disabled) {
-  background: #4f46e5;
+  background: var(--semantic-600);
 }
 .login__btn:disabled {
   opacity: 0.6;

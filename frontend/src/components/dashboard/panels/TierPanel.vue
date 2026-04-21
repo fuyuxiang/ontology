@@ -70,7 +70,7 @@ const nsList = computed(() => props.stats?.ns_distribution ?? [])
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 12px;
-  color: #E2E8F0;
+  color: var(--neutral-300);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 14px;
   pointer-events: auto;
@@ -82,19 +82,19 @@ const nsList = computed(() => props.stats?.ns_distribution ?? [])
   width: 200px;
 }
 .tier-panel__title {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 800;
   letter-spacing: .12em;
-  color: #64748B;
+  color: var(--neutral-700);
   margin-bottom: 8px;
 }
 .tier-donut { width: 80px; height: 80px; display: block; margin: 0 auto 8px; }
 .tier-legend { display: flex; flex-direction: column; gap: 4px; }
-.tier-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+.tier-row { display: flex; align-items: center; gap: 6px; font-size: var(--text-caption-size); }
 .tier-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.tier-name { color: #CBD5E1; flex: 1; }
-.tier-count { color: #E2E8F0; font-weight: 700; }
-.ns-row { display: flex; justify-content: space-between; font-size: 10px; padding: 2px 0; }
-.ns-name { color: #94A3B8; }
-.ns-count { color: #CBD5E1; font-weight: 600; }
+.tier-name { color: var(--neutral-400); flex: 1; }
+.tier-count { color: var(--neutral-300); font-weight: 700; }
+.ns-row { display: flex; justify-content: space-between; font-size: var(--text-caption-upper-size); padding: 2px 0; }
+.ns-name { color: var(--neutral-500); }
+.ns-count { color: var(--neutral-400); font-weight: 600; }
 </style>

@@ -48,7 +48,7 @@ const metrics = computed(() => {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 12px;
-  color: #E2E8F0;
+  color: var(--neutral-300);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 14px;
   pointer-events: auto;
@@ -60,10 +60,10 @@ const metrics = computed(() => {
   width: 220px;
 }
 .stats-panel__title {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 800;
   letter-spacing: .12em;
-  color: #64748B;
+  color: var(--neutral-700);
   margin-bottom: 10px;
 }
 .stats-grid {
@@ -80,14 +80,14 @@ const metrics = computed(() => {
   overflow: hidden;
 }
 .stat-card__val {
-  font-size: 20px;
+  font-size: var(--text-h2-size);
   font-weight: 800;
-  color: #E2E8F0;
+  color: var(--neutral-300);
   line-height: 1;
 }
 .stat-card__lbl {
-  font-size: 10px;
-  color: #94A3B8;
+  font-size: var(--text-caption-upper-size);
+  color: var(--neutral-500);
   margin-top: 2px;
 }
 .stat-card__spark {
