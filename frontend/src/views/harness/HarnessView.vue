@@ -123,7 +123,7 @@
           @pane-click="onPaneClick"
           @drop="onDrop"
           @dragover.prevent>
-          <Background variant="lines" pattern-color="#e2e8f0" :gap="24" :size="1" />
+          <Background variant="lines" pattern-color="#e8edf2" :gap="24" :size="1" />
           <Controls />
           <MiniMap :node-color="miniMapColor" node-stroke-color="transparent" mask-color="rgba(15,23,42,0.6)" />
         </VueFlow>

@@ -193,8 +193,10 @@ const navGroups = [
 .sidebar__item--active {
   background: var(--sidebar-bg-active);
   color: var(--sidebar-text-active);
+  border-left: 3px solid var(--semantic-500, #4c6ef5);
+  padding-left: 7px;
 }
-.sidebar__item--active .sidebar__item-icon { color: var(--semantic-400); }
+.sidebar__item--active .sidebar__item-icon { color: var(--semantic-500, #4c6ef5); }
 .sidebar__item-icon {
   width: 16px; height: 16px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
