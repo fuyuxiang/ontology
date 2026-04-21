@@ -10,13 +10,13 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Any
 
-from app.database import get_db, Base, engine
-from app.models.workflow import Workflow, WorkflowExecution, gen_uuid
+from app.database import get_db
+from app.models.workflow import Workflow, WorkflowExecution
+from app.utils.identifiers import gen_uuid
+from app.repositories import WorkflowRepository, WorkflowExecutionRepository
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
-# 确保表存在
-Base.metadata.create_all(bind=engine)
 
 
 # ── Pydantic 模型 ─────────────────────────────────────────
@@ -84,16 +84,17 @@ def list_workflows(
     group: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    q = db.query(Workflow)
-    if status:
-        q = q.filter(Workflow.status == status)
-    if group:
-        q = q.filter(Workflow.group_name == group)
-    return [_brief(w) for w in q.order_by(Workflow.updated_at.desc()).all()]
+    repo = WorkflowRepository(db)
+    workflows = repo.list_with_filters(
+        status=status or None,
+        group=group or None,
+    )
+    return [_brief(w) for w in workflows]
 
 
 @router.post("")
 def create_workflow(body: WorkflowCreate, db: Session = Depends(get_db)):
+    repo = WorkflowRepository(db)
     w = Workflow(
         id=gen_uuid(),
         name=body.name,
@@ -105,15 +106,16 @@ def create_workflow(body: WorkflowCreate, db: Session = Depends(get_db)):
         trigger_config={},
         status="draft",
     )
-    db.add(w)
-    db.commit()
-    db.refresh(w)
+    repo.create(w)
+    repo.commit()
+    repo.refresh(w)
     return _full(w)
 
 
 @router.get("/{wid}")
 def get_workflow(wid: str, db: Session = Depends(get_db)):
-    w = db.get(Workflow, wid)
+    repo = WorkflowRepository(db)
+    w = repo.get_by_id(wid)
     if not w:
         raise HTTPException(404, "工作流不存在")
     return _full(w)
@@ -121,35 +123,38 @@ def get_workflow(wid: str, db: Session = Depends(get_db)):
 
 @router.put("/{wid}")
 def update_workflow(wid: str, body: WorkflowUpdate, db: Session = Depends(get_db)):
-    w = db.get(Workflow, wid)
+    repo = WorkflowRepository(db)
+    w = repo.get_by_id(wid)
     if not w:
         raise HTTPException(404, "工作流不存在")
     for field, val in body.model_dump(exclude_none=True).items():
         setattr(w, field, val)
     w.updated_at = datetime.utcnow()
-    db.commit()
-    db.refresh(w)
+    repo.commit()
+    repo.refresh(w)
     return _full(w)
 
 
 @router.delete("/{wid}")
 def delete_workflow(wid: str, db: Session = Depends(get_db)):
-    w = db.get(Workflow, wid)
+    repo = WorkflowRepository(db)
+    w = repo.get_by_id(wid)
     if not w:
         raise HTTPException(404, "工作流不存在")
-    db.delete(w)
-    db.commit()
+    repo.delete(w)
+    repo.commit()
     return {"ok": True}
 
 
 @router.post("/{wid}/publish")
 def publish_workflow(wid: str, db: Session = Depends(get_db)):
-    w = db.get(Workflow, wid)
+    repo = WorkflowRepository(db)
+    w = repo.get_by_id(wid)
     if not w:
         raise HTTPException(404, "工作流不存在")
     w.status = "published"
     w.updated_at = datetime.utcnow()
-    db.commit()
+    repo.commit()
     return {"ok": True, "status": "published"}
 
 
@@ -157,9 +162,8 @@ def publish_workflow(wid: str, db: Session = Depends(get_db)):
 
 @router.get("/{wid}/executions")
 def list_executions(wid: str, db: Session = Depends(get_db)):
-    execs = db.query(WorkflowExecution).filter(
-        WorkflowExecution.workflow_id == wid
-    ).order_by(WorkflowExecution.started_at.desc()).limit(50).all()
+    repo = WorkflowExecutionRepository(db)
+    execs = repo.list_by_workflow(wid)
     return [{
         "id": e.id,
         "status": e.status,
@@ -173,7 +177,8 @@ def list_executions(wid: str, db: Session = Depends(get_db)):
 
 @router.get("/{wid}/executions/{eid}")
 def get_execution(wid: str, eid: str, db: Session = Depends(get_db)):
-    e = db.get(WorkflowExecution, eid)
+    repo = WorkflowExecutionRepository(db)
+    e = repo.get_by_id(eid)
     if not e or e.workflow_id != wid:
         raise HTTPException(404, "执行记录不存在")
     return {
@@ -294,7 +299,8 @@ async def execute_workflow(
     body: ExecuteRequest = ExecuteRequest(),
     db: Session = Depends(get_db),
 ):
-    w = db.get(Workflow, wid)
+    repo = WorkflowRepository(db)
+    w = repo.get_by_id(wid)
     if not w:
         raise HTTPException(404, "工作流不存在")
     if not w.nodes_json:

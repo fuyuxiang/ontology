@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import OntologyEntity, EntityRelation, BusinessRule
+from app.models.rule import EntityAction
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,6 @@ def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
             ctx_parts.append(f"- {e.name} ({e.name_cn}) → 数据源: {ds_ref}, 主键: {pk}")
 
     # 动作类型
-    from app.models.rule import EntityAction
     actions = db.query(EntityAction).filter(EntityAction.status == "active").all()
     if actions:
         ctx_parts.append(f"\n### 可执行动作 ({len(actions)} 个)")
