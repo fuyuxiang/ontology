@@ -29,24 +29,24 @@ const tierColor = computed(() => tierColors[props.data.tier] || '#4c6ef5')
 .ontology-node {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 14px; min-width: 160px;
-  background: #fff; border: 1.5px solid var(--neutral-200, #e9ecef);
+  background: var(--neutral-0); border: 1.5px solid var(--neutral-200, #e9ecef);
   border-radius: 10px; cursor: grab; transition: all 0.15s ease;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 .ontology-node:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-.ontology-node--selected { border-color: #4c6ef5; box-shadow: 0 0 0 2px rgba(76,110,245,0.2); }
-.ontology-node--tier2.ontology-node--selected { border-color: #7950f2; box-shadow: 0 0 0 2px rgba(121,80,242,0.2); }
-.ontology-node--tier3.ontology-node--selected { border-color: #20c997; box-shadow: 0 0 0 2px rgba(32,201,151,0.2); }
+.ontology-node--selected { border-color: var(--semantic-600); box-shadow: 0 0 0 2px rgba(76,110,245,0.2); }
+.ontology-node--tier2.ontology-node--selected { border-color: var(--tier2-primary); box-shadow: 0 0 0 2px rgba(121,80,242,0.2); }
+.ontology-node--tier3.ontology-node--selected { border-color: var(--dynamic-500); box-shadow: 0 0 0 2px rgba(32,201,151,0.2); }
 .ontology-node__badge {
   width: 28px; height: 28px; border-radius: 6px; display: flex;
-  align-items: center; justify-content: center; color: #fff;
-  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  align-items: center; justify-content: center; color: var(--neutral-0);
+  font-size: var(--text-caption-upper-size); font-weight: 700; flex-shrink: 0;
 }
 .ontology-node__body { flex: 1; min-width: 0; }
-.ontology-node__name { font-size: 13px; font-weight: 600; color: #343a40; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ontology-node__cn { font-size: 11px; color: #868e96; margin-top: 1px; }
+.ontology-node__name { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ontology-node__cn { font-size: var(--text-caption-size); color: var(--neutral-600); margin-top: 1px; }
 .ontology-node__count {
-  font-size: 10px; color: #adb5bd; background: #f8f9fa;
+  font-size: var(--text-caption-upper-size); color: var(--neutral-500); background: var(--neutral-50);
   padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
 }
 </style>

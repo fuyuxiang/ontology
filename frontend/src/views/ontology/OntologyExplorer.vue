@@ -458,21 +458,21 @@ const selectedActions = computed(() =>
   display: flex; align-items: center; gap: 6px; width: calc(100% - 24px);
   margin: 0 12px 8px; padding: 7px 12px; border-radius: var(--radius-md);
   border: 1px dashed var(--semantic-400); background: transparent;
-  color: var(--semantic-600); font-size: 12px; font-weight: 500; cursor: pointer;
+  color: var(--semantic-600); font-size: var(--text-code-size); font-weight: 500; cursor: pointer;
   transition: all var(--transition-fast);
 }
 .explorer__add-btn:hover { background: var(--semantic-50); border-style: solid; }
 .explorer__edit-btn {
   display: flex; align-items: center; gap: 4px; margin-left: auto;
   padding: 5px 12px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300);
-  background: var(--neutral-0); color: var(--neutral-600); font-size: 12px; cursor: pointer;
+  background: var(--neutral-0); color: var(--neutral-600); font-size: var(--text-code-size); cursor: pointer;
   transition: all var(--transition-fast);
 }
 .explorer__edit-btn:hover { border-color: var(--semantic-400); color: var(--semantic-600); background: var(--semantic-50); }
 
 .btn-sm-add {
   padding: 4px 10px; border-radius: var(--radius-md); border: 1px solid var(--semantic-400);
-  background: transparent; color: var(--semantic-600); font-size: 11px; cursor: pointer;
+  background: transparent; color: var(--semantic-600); font-size: var(--text-caption-size); cursor: pointer;
 }
 .btn-sm-add:hover { background: var(--semantic-50); }
 .btn-icon-del {
@@ -483,12 +483,12 @@ const selectedActions = computed(() =>
 .rel-form { display: flex; flex-direction: column; gap: 14px; }
 .form-row { display: flex; flex-direction: column; gap: 4px; }
 .form-row-inline { display: flex; gap: 12px; }
-.form-label { font-size: 12px; font-weight: 500; color: var(--neutral-600); }
-.form-input { padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 13px; color: var(--neutral-800); background: var(--neutral-0); outline: none; }
+.form-label { font-size: var(--text-code-size); font-weight: 500; color: var(--neutral-600); }
+.form-input { padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: var(--text-body-size); color: var(--neutral-800); background: var(--neutral-0); outline: none; }
 .form-input:focus { border-color: var(--semantic-500); }
-.btn-primary { padding: 8px 20px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-primary { padding: 8px 20px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500; cursor: pointer; }
 .btn-primary:hover { background: var(--semantic-700); }
-.btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; cursor: pointer; }
+.btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: var(--text-body-size); cursor: pointer; }
 .btn-secondary:hover { background: var(--neutral-50); }
 
 .explorer__panel-loading, .explorer__panel-empty {
@@ -507,7 +507,7 @@ const selectedActions = computed(() =>
   border-radius: var(--radius-md);
   border: 1px solid var(--neutral-200);
   background: var(--neutral-50);
-  font-size: 13px;
+  font-size: var(--text-body-size);
   color: var(--neutral-800);
   outline: none;
   transition: border-color var(--transition-fast);
@@ -534,14 +534,14 @@ const selectedActions = computed(() =>
 }
 .explorer__tier-label {
   flex: 1;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 600;
   color: var(--neutral-600);
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
 .explorer__tier-count {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-500);
   background: var(--neutral-100);
   padding: 1px 6px;
@@ -570,7 +570,7 @@ const selectedActions = computed(() =>
 .explorer__detail-title .tier-badge {
   width: 40px;
   height: 40px;
-  font-size: 14px;
+  font-size: var(--text-body-size);
   border-radius: var(--radius-lg);
 }
 
@@ -592,13 +592,13 @@ const selectedActions = computed(() =>
   box-shadow: var(--shadow-xs);
 }
 .metric-card__value {
-  font-size: 28px;
+  font-size: var(--text-display-size);
   font-weight: 700;
   color: var(--neutral-900);
   line-height: 1;
 }
 .metric-card__label {
-  font-size: 12px;
+  font-size: var(--text-code-size);
   color: var(--neutral-500);
 }
 
@@ -611,7 +611,7 @@ const selectedActions = computed(() =>
 }
 .explorer__tab {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   color: var(--neutral-600);
   background: transparent;
@@ -631,12 +631,12 @@ const selectedActions = computed(() =>
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--text-body-size);
 }
 .data-table th {
   text-align: left;
   padding: 8px 12px;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -655,7 +655,7 @@ const selectedActions = computed(() =>
   display: inline-block;
   padding: 1px 7px;
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 500;
   background: var(--neutral-100);
   color: var(--neutral-700);
@@ -682,10 +682,10 @@ const selectedActions = computed(() =>
 }
 .action-item:hover { border-color: var(--kinetic-400); }
 .action-item__info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.action-item__name { font-size: 13px; }
-.action-item__type { font-size: 11px; color: var(--neutral-500); }
+.action-item__name { font-size: var(--text-body-size); }
+.action-item__type { font-size: var(--text-caption-size); color: var(--neutral-500); }
 .action-status {
-  font-size: 11px; font-weight: 500; padding: 2px 8px;
+  font-size: var(--text-caption-size); font-weight: 500; padding: 2px 8px;
   border-radius: var(--radius-full);
 }
 .action-status--active { background: var(--status-success-bg); color: var(--status-success); }
@@ -694,7 +694,7 @@ const selectedActions = computed(() =>
 .action-exec-btn {
   display: inline-flex; align-items: center; gap: 4px;
   padding: 5px 12px; border-radius: var(--radius-md); border: none;
-  background: var(--kinetic-500); color: #fff; font-size: 12px;
+  background: var(--kinetic-500); color: var(--neutral-0); font-size: var(--text-code-size);
   font-weight: 500; cursor: pointer; transition: background var(--transition-fast);
 }
 .action-exec-btn:hover { background: var(--kinetic-600); }
@@ -714,7 +714,7 @@ const selectedActions = computed(() =>
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   color: var(--neutral-800);
 }
@@ -726,7 +726,7 @@ const selectedActions = computed(() =>
   gap: 2px;
 }
 .relation-item__type {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;

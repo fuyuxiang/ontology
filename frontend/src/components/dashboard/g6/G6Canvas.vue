@@ -223,7 +223,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: #0F172A;
+  background: var(--neutral-950);
 }
 .g6-container {
   width: 100%;
