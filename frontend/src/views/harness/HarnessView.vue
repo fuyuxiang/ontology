@@ -78,17 +78,19 @@
             <span class="harness__section-hint">拖入或点击添加</span>
           </div>
           <div class="harness__node-lib">
-            <div v-for="nt in nodeTypes" :key="nt.type"
-              class="harness__node-item"
-              draggable="true"
-              @dragstart="onDragStart($event, nt.type)"
-              @click="addNodeToCenter(nt.type)"
-              :title="`点击添加 ${nt.label}`">
-              <span class="harness__node-item-dot" :style="{ background: nt.color }"></span>
-              <span class="harness__node-item-icon" :style="{ color: nt.color }" v-html="nt.icon"></span>
-              <span class="harness__node-item-label">{{ nt.label }}</span>
-              <svg class="harness__node-item-add" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            </div>
+            <template v-for="group in nodeGroups" :key="group.label">
+              <div class="harness__node-group-label">{{ group.label }}</div>
+              <div v-for="nt in group.nodes" :key="nt.type"
+                class="harness__node-item"
+                draggable="true"
+                @dragstart="onDragStart($event, nt.type)"
+                @click="addNodeToCenter(nt.type)"
+                :title="`点击添加 ${nt.label}`">
+                <span class="harness__node-item-icon" :style="{ color: nt.color }" v-html="nt.icon"></span>
+                <span class="harness__node-item-label">{{ nt.label }}</span>
+                <svg class="harness__node-item-add" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              </div>
+            </template>
           </div>
         </div>
       </div>
@@ -293,11 +295,15 @@ const flowNodes = ref<any[]>([])
 const flowEdges = ref<any[]>([])
 
 const nodeTypes_: Record<string, any> = {
-  'ontology-query': markRaw(WorkflowNode), 'datasource': markRaw(WorkflowNode),
-  'rule-engine': markRaw(WorkflowNode), 'llm-inference': markRaw(WorkflowNode),
-  'ml-model': markRaw(WorkflowNode), 'write-back': markRaw(WorkflowNode),
+  'ontology-query': markRaw(WorkflowNode), 'ontology-relation': markRaw(WorkflowNode),
+  'rule-evaluate': markRaw(WorkflowNode), 'datasource': markRaw(WorkflowNode),
+  'variable-assign': markRaw(WorkflowNode), 'parallel': markRaw(WorkflowNode),
+  'llm-inference': markRaw(WorkflowNode), 'ml-model': markRaw(WorkflowNode),
+  'knowledge-retrieval': markRaw(WorkflowNode), 'voice-audit': markRaw(WorkflowNode),
+  'condition': markRaw(WorkflowNode), 'loop': markRaw(WorkflowNode),
+  'merge': markRaw(WorkflowNode), 'rule-engine': markRaw(WorkflowNode),
   'notification': markRaw(WorkflowNode), 'human-approval': markRaw(WorkflowNode),
-  'condition': markRaw(WorkflowNode), 'loop': markRaw(WorkflowNode), 'merge': markRaw(WorkflowNode),
+  'write-back': markRaw(WorkflowNode), 'api-response': markRaw(WorkflowNode),
 }
 
 const defaultEdgeOptions = {
@@ -306,18 +312,32 @@ const defaultEdgeOptions = {
 }
 
 const nodeTypes = [
-  { type: 'ontology-query', label: '本体查询', color: '#3b82f6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'ontology-query', label: '本体实体查询', color: '#3b82f6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'ontology-relation', label: '关系图遍历', color: '#6366f1', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="3" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h3l3-4M5 8h3l3 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>` },
+  { type: 'rule-evaluate', label: '规则评估', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="13" cy="10" r="2" stroke="currentColor" stroke-width="1.5"/></svg>` },
   { type: 'datasource', label: '数据源连接', color: '#8b5cf6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="currentColor" stroke-width="1.5"/><path d="M3 8v4c0 1.1 2.24 2 5 2s5-.9 5-2V8" stroke="currentColor" stroke-width="1.5"/></svg>` },
-  { type: 'knowledge-retrieval', label: '知识库检索', color: '#0d9488', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>` },
-  { type: 'rule-engine', label: '规则引擎', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'variable-assign', label: '变量赋值', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 5h8M4 8h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M10 10l3 2-3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+  { type: 'parallel', label: '并行分支', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8h3M10 5h3M10 11h3M6 8l4-3M6 8l4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'llm-inference', label: '大模型推理', color: '#10b981', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
   { type: 'ml-model', label: '预测模型', color: '#06b6d4', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12L6 7l3 3 2-4 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
-  { type: 'write-back', label: '结果写回', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
-  { type: 'notification', label: '通知触达', color: '#ec4899', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a5 5 0 015 5v2l1 2H2l1-2V7a5 5 0 015-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
-  { type: 'human-approval', label: '人工审批', color: '#f97316', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'knowledge-retrieval', label: '知识库检索', color: '#0d9488', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>` },
+  { type: 'voice-audit', label: '语音质检', color: '#7c3aed', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="2" width="6" height="8" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 9a5 5 0 0010 0M8 14v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'condition', label: '条件判断', color: '#a855f7', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 6-6 6-6-6 6-6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
   { type: 'loop', label: '遍历列表', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 019.9-1M13 8a5 5 0 01-9.9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'merge', label: '合并分支', color: '#84cc16', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 3v4l4 3 4-3V3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+  { type: 'rule-engine', label: '规则引擎', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'notification', label: '通知触达', color: '#ec4899', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a5 5 0 015 5v2l1 2H2l1-2V7a5 5 0 015-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
+  { type: 'human-approval', label: '人工审批', color: '#f97316', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'write-back', label: '结果写回', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+  { type: 'api-response', label: 'API 响应', color: '#2e5bff', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+]
+
+const nodeGroups = [
+  { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
+  { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
+  { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','knowledge-retrieval','voice-audit'].includes(n.type)) },
+  { label: '流程控制', nodes: nodeTypes.filter(n => ['condition','loop','merge','rule-engine'].includes(n.type)) },
+  { label: '触达输出', nodes: nodeTypes.filter(n => ['notification','human-approval','write-back','api-response'].includes(n.type)) },
 ]
 
 const selectedNode = computed(() => flowNodes.value.find(n => n.id === store.selectedNodeId) ?? null)
@@ -516,6 +536,8 @@ function logMsg(entry: any) {
 .harness__scene-status--disabled { background: var(--neutral-900); color: var(--neutral-800); }
 .harness__empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 20px 12px; color: var(--h-border-2); font-size: var(--text-caption-size); }
 .harness__node-lib { overflow-y: auto; flex: 1; padding: 4px 8px; display: flex; flex-direction: column; gap: 1px; }
+.harness__node-group-label { font-size: 10px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.6px; padding: 8px 4px 4px; margin-top: 4px; border-top: 1px solid #f1f5f9; }
+.harness__node-group-label:first-child { border-top: none; margin-top: 0; }
 .harness__node-item {
   display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px;
   cursor: pointer; border: 1px solid transparent; transition: all .12s; position: relative;
