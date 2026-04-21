@@ -16,9 +16,9 @@ defineProps<{ tier: 1 | 2 | 3 }>()
   width: 24px;
   height: 24px;
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 700;
-  color: #ffffff;
+  color: var(--neutral-0);
   flex-shrink: 0;
 }
 .tier-badge--tier1 { background: var(--tier1-primary); }

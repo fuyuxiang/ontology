@@ -80,7 +80,7 @@ defineEmits<{ click: [entity: Entity] }>()
 }
 
 .entity-card__name {
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   color: var(--neutral-800);
   white-space: nowrap;
@@ -89,7 +89,7 @@ defineEmits<{ click: [entity: Entity] }>()
 }
 
 .entity-card__name-cn {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-500);
   white-space: nowrap;
 }
@@ -97,7 +97,7 @@ defineEmits<{ click: [entity: Entity] }>()
 .entity-card__meta {
   display: flex;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-600);
 }
 
@@ -113,7 +113,7 @@ defineEmits<{ click: [entity: Entity] }>()
 
 .entity-card__ds {
   display: inline-flex; align-items: center; gap: 2px;
-  color: #1971c2; font-size: 10px; font-weight: 500;
+  color: var(--status-info); font-size: var(--text-caption-upper-size); font-weight: 500;
   max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 </style>
