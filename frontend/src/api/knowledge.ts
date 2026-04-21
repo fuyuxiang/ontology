@@ -32,6 +32,20 @@ export interface SearchResult {
   snippet: string
 }
 
+export interface VoiceAuditDimension {
+  name: string
+  result: 'pass' | 'fail' | 'na'
+  comment: string
+}
+
+export interface VoiceAuditResult {
+  overall: 'pass' | 'fail' | 'warning' | 'error'
+  score: number
+  summary: string
+  dimensions: VoiceAuditDimension[]
+  risk_flags: string[]
+}
+
 export const knowledgeApi = {
   list(q?: string) {
     return get<KnowledgeBase[]>('/knowledge', { params: q ? { q } : {} })
@@ -66,6 +80,12 @@ export const knowledgeApi = {
   },
   getFileContent(kbId: string, fid: string) {
     return get<{ content: string; file_type: string; name: string }>(`/knowledge/${kbId}/files/${fid}/content`)
+  },
+  updateAsr(kbId: string, fid: string, asr_text: string) {
+    return client.put<{ ok: boolean }>(`/api/v1/knowledge/${kbId}/files/${fid}/asr`, { asr_text }).then(r => r.data)
+  },
+  voiceAudit(kbId: string, fid: string, asr_text: string, scenario = 'broadband') {
+    return client.post<VoiceAuditResult>(`/api/v1/knowledge/${kbId}/files/${fid}/voice-audit`, { asr_text, scenario }).then(r => r.data)
   },
   search(q: string) {
     return get<SearchResult[]>('/knowledge/search', { params: { q } })
