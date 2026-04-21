@@ -33,6 +33,10 @@
             </div>
           </div>
           <div class="settings-dialog__footer">
+            <button class="settings-dialog__governance" @click="goGovernance">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.3 2.6 2.9.4-2.1 2 .5 2.9L8 7.9l-2.6 1.5.5-2.9-2.1-2 2.9-.4L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4 11.5h8M5 13.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              <span>系统设置</span>
+            </button>
             <button class="settings-dialog__logout" @click="handleLogout">退出登录</button>
           </div>
         </div>
@@ -60,6 +64,11 @@ function handleLogout() {
   authStore.logout()
   emit('close')
   router.push('/login')
+}
+
+function goGovernance() {
+  emit('close')
+  router.push('/governance')
 }
 </script>
 
@@ -117,7 +126,16 @@ function handleLogout() {
 .settings-dialog__toggle--on .settings-dialog__toggle-dot { transform: translateX(18px); }
 .settings-dialog__footer {
   padding: 12px 20px; border-top: 1px solid var(--neutral-200);
+  display: flex; flex-direction: column; gap: 8px;
 }
+.settings-dialog__governance {
+  width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--neutral-200);
+  background: transparent; color: var(--neutral-700);
+  font-size: var(--text-body-size); font-weight: 500; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  transition: all 0.15s;
+}
+.settings-dialog__governance:hover { background: var(--neutral-50); border-color: var(--semantic-500); color: var(--semantic-600); }
 .settings-dialog__logout {
   width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--neutral-200);
   background: transparent; color: var(--neutral-600);
