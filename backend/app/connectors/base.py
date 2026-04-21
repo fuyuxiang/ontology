@@ -1,0 +1,23 @@
+from __future__ import annotations
+
+from typing import Any, Protocol, runtime_checkable
+
+
+@runtime_checkable
+class DataSourceConnector(Protocol):
+    """异构数据源连接器协议"""
+
+    def connect(self, *, host: str, port: int, username: str,
+                password: str, database: str) -> Any: ...
+
+    def close(self, conn: Any) -> None: ...
+
+    def list_tables(self, conn: Any, database: str) -> list[str]: ...
+
+    def preview_table(self, conn: Any, table_name: str, limit: int = 20) -> dict: ...
+
+    def get_table_schema(self, conn: Any, table_name: str, database: str) -> list[dict]: ...
+
+    def execute_sql(self, conn: Any, sql: str) -> dict: ...
+
+    def quote_identifier(self) -> str: ...
