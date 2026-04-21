@@ -44,7 +44,7 @@ const router = createRouter({
     // 智能编排
     { path: '/orchestration/semantic', name: 'orch-semantic', component: Placeholder, meta: { title: '语义封装' } },
     { path: '/orchestration/prompts', name: 'orch-prompts', component: Placeholder, meta: { title: 'Prompt模板' } },
-    { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '场景编排' } },
+    { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '智能体编排' } },
     { path: '/orchestration/models', name: 'orch-models', component: Placeholder, meta: { title: '模型管理' } },
     { path: '/aip/lowcode', name: 'aip-lowcode', component: Placeholder, meta: { title: '低代码平台' } },
 
