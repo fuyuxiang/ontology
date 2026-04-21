@@ -4,7 +4,7 @@ from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-from app.models.entity import gen_uuid
+from app.utils.identifiers import gen_uuid
 
 
 class BusinessRule(Base):

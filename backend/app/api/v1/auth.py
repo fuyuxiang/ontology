@@ -35,11 +35,14 @@ def get_me(user: User = Depends(require_user)):
 
 def seed_admin(db: Session):
     """初始化管理员账号"""
-    if db.query(User).filter(User.username == "admin").first():
+    existing = db.query(User).filter(User.username == "admin").first()
+    if existing:
+        existing.password_hash = hash_password("bonc")
+        db.commit()
         return
     admin = User(
         username="admin",
-        password_hash=hash_password("admin123"),
+        password_hash=hash_password("bonc"),
         name="系统管理员",
         role="admin",
     )
