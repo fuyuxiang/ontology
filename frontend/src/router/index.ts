@@ -115,6 +115,12 @@ const router = createRouter({
       name: 'harness',
       component: () => import('../views/harness/HarnessView.vue'),
       meta: { title: '智能编排中心' }
+    },
+    {
+      path: '/knowledge',
+      name: 'knowledge',
+      component: () => import('../views/knowledge/KnowledgeView.vue'),
+      meta: { title: '多模态知识库' }
     }
   ]
 })
