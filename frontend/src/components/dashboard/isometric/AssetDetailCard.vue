@@ -141,7 +141,7 @@ onUnmounted(() => {
 }
 
 .asset-card__tag {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 700;
   letter-spacing: 0.1em;
   color: var(--neutral-500);
@@ -149,7 +149,7 @@ onUnmounted(() => {
 }
 
 .asset-card__status {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 999px;
@@ -173,12 +173,12 @@ onUnmounted(() => {
 }
 
 .asset-card__label {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-500);
 }
 
 .asset-card__value {
-  font-size: 12px;
+  font-size: var(--text-code-size);
   font-weight: 600;
   color: var(--neutral-800);
 }
@@ -190,7 +190,7 @@ onUnmounted(() => {
 
 .asset-card__health-label {
   display: block;
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--neutral-500);
@@ -200,7 +200,7 @@ onUnmounted(() => {
 
 .asset-card__health-value {
   display: block;
-  font-size: 24px;
+  font-size: var(--text-h1-size);
   font-weight: 700;
   line-height: 1;
   margin-bottom: 6px;

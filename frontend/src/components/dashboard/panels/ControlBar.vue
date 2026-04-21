@@ -48,7 +48,7 @@ function setLayout(id: string) {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 12px;
-  color: #E2E8F0;
+  color: var(--neutral-300);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 14px;
   pointer-events: auto;
@@ -71,11 +71,11 @@ function setLayout(id: string) {
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #94A3B8;
+  color: var(--neutral-500);
   cursor: pointer;
   transition: background .15s, color .15s;
 }
-.ctrl-btn:hover { background: rgba(148,163,184,.12); color: #E2E8F0; }
-.ctrl-btn--active { background: rgba(16,185,129,.15); color: #10B981; }
+.ctrl-btn:hover { background: rgba(148,163,184,.12); color: var(--neutral-300); }
+.ctrl-btn--active { background: rgba(16,185,129,.15); color: var(--status-success); }
 .ctrl-sep { width: 1px; height: 18px; background: rgba(148,163,184,.15); margin: 0 4px; }
 </style>
