@@ -123,7 +123,7 @@
           @pane-click="onPaneClick"
           @drop="onDrop"
           @dragover.prevent>
-          <Background variant="dots" pattern-color="#334155" :gap="16" :size="1.2" />
+          <Background variant="lines" pattern-color="#e2e8f0" :gap="24" :size="1" />
           <Controls />
           <MiniMap :node-color="miniMapColor" node-stroke-color="transparent" mask-color="rgba(15,23,42,0.6)" />
         </VueFlow>
@@ -302,7 +302,7 @@ const nodeTypes_: Record<string, any> = {
 
 const defaultEdgeOptions = {
   type: 'smoothstep', markerEnd: MarkerType.ArrowClosed,
-  style: { stroke: '#475569', strokeWidth: 1.5 },
+  style: { stroke: '#94a3b8', strokeWidth: 1.5 },
 }
 
 const nodeTypes = [
@@ -422,8 +422,8 @@ function logMsg(entry: any) {
   --h-node-border: #e2e8f0;
   --h-accent: #4f46e5;
   --h-accent-hover: #4338ca;
-  --h-canvas-bg: #f8fafc;
-  --h-canvas-dot: #cbd5e1;
+  --h-canvas-bg: #ffffff;
+  --h-canvas-dot: #e2e8f0;
   --h-log-bg: #1e293b;
 }
 :global([data-theme='dark']) .harness {
