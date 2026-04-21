@@ -62,6 +62,46 @@ def save_config(body: ConfigBody, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+class DashboardRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_stats(self):
+        db = self.db
+        entity_count = db.query(func.count(OntologyEntity.id)).scalar() or 0
+        relation_count = db.query(func.count(EntityRelation.id)).scalar() or 0
+        rule_count = db.query(func.count(BusinessRule.id)).scalar() or 0
+        active_rule_count = db.query(func.count(BusinessRule.id)).filter(BusinessRule.status == 'active').scalar() or 0
+        action_count = db.query(func.count(EntityAction.id)).scalar() or 0
+        datasource_count = db.query(func.count(DataSource.id)).scalar() or 0
+
+        top_rules = db.query(BusinessRule).order_by(BusinessRule.priority.desc()).limit(4).all()
+        datasources = db.query(DataSource).limit(8).all()
+        recent_logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(5).all()
+
+        return {
+            "entity_count": entity_count,
+            "relation_count": relation_count,
+            "rule_count": rule_count,
+            "active_rule_count": active_rule_count,
+            "action_count": action_count,
+            "datasource_count": datasource_count,
+            "top_rules": [
+                {"id": r.id, "name": r.name, "priority": r.priority, "status": r.status}
+                for r in top_rules
+            ],
+            "datasources": [
+                {"id": d.id, "name": d.name, "type": d.type, "status": d.status}
+                for d in datasources
+            ],
+            "recent_activities": [
+                {"id": l.id, "action": l.action, "entity_type": l.target_type,
+                 "created_at": l.timestamp.isoformat() if l.timestamp else None}
+                for l in recent_logs
+            ],
+        }
+
+
 @router.get("/stats")
 def get_stats(db: Session = Depends(get_db)):
     repo = DashboardRepository(db)
