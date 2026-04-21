@@ -37,13 +37,13 @@ const title = computed(() => (route.meta.title as string) || '功能开发中')
   opacity: 0.5;
 }
 .placeholder__title {
-  font-size: 18px;
+  font-size: var(--text-h2-size);
   font-weight: 600;
   color: var(--neutral-600);
   margin-bottom: 8px;
 }
 .placeholder__desc {
-  font-size: 13px;
+  font-size: var(--text-body-size);
   color: var(--neutral-400);
 }
 </style>
