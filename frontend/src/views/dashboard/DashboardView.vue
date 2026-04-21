@@ -308,47 +308,67 @@ function onNodeClick(node: OntologyNode) {
 /* ── Top & Bottom cards ── */
 const topCards = computed(() => [
   {
-    title: '',
+    title: 'ANALYTICS & WORKFLOWS',
     bg: '/images/ontology/bg-ANALYTICS &WORKFLOWS.png',
     flex: 479,
-    items: [],
+    items: stats.value ? [
+      `${stats.value.entity_count} 个实体`,
+      `${stats.value.relation_count} 条关系`,
+      `${stats.value.rule_count} 条规则`,
+      `${stats.value.active_rule_count} 条活跃规则`,
+    ] : ['加载中...'],
   },
   {
-    title: '',
+    title: 'AUTOMATIONS',
     bg: '/images/ontology/bg-AUTOMATIONS.png',
     flex: 537,
-    items: [],
+    items: stats.value ? [
+      ...stats.value.top_rules.slice(0, 4).map((r: any) => r.name),
+      ...(stats.value.top_rules.length === 0 ? ['暂无规则'] : []),
+    ] : ['加载中...'],
   },
   {
-    title: '',
+    title: 'PRODUCTS & SDKs',
     bg: '/images/ontology/bg-PRODUCTS & SDKs.png',
     flex: 470,
-    items: [],
+    items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway'],
   },
 ])
 
 const bottomCards = computed(() => {
+  const dsList = (stats.value as any)?.datasources ?? []
+  const bbSources = dsList.filter((d: any) => d.name.startsWith('bb_')).map((d: any) => d.name.replace('bb_', ''))
+  const otherSources = dsList.filter((d: any) => !d.name.startsWith('bb_')).map((d: any) => d.name)
+  const dsItems = [
+    ...(bbSources.length ? [`宽带退单(${bbSources.length}表)`, ...bbSources.slice(0, 4)] : []),
+    ...(otherSources.length ? [`携号转网(${otherSources.length}表)`, ...otherSources.slice(0, 3)] : []),
+    ...(!dsList.length ? ['暂无数据源'] : []),
+  ]
   return [
     {
-      title: '',
+      title: 'DATA SOURCES',
       bg: '/images/ontology/bg-DATA SOURCES.png',
       icon: '/images/ontology/icon-DATA SOURCES.png',
       flex: 514,
-      items: [],
+      items: dsItems.slice(0, 8),
     },
     {
-      title: '',
+      title: 'LOGIC SOURCES',
       bg: '/images/ontology/bg-LOGIC SOURCES.png',
       icon: '/images/ontology/icon-LOGIC SOURCES.png',
       flex: 514,
-      items: [],
+      items: (stats.value as any)?.rule_priority?.length
+        ? (stats.value as any).rule_priority.map((r: any) => `${r.priority} 优先级: ${r.count}`)
+        : ['暂无规则'],
     },
     {
-      title: '',
+      title: 'SYSTEMS OF ACTION',
       bg: '/images/ontology/bg-SYSTEMS OF ACTION.png',
       icon: '/images/ontology/icon-SYSTEMS OF ACTION.png',
       flex: 441,
-      items: [],
+      items: (stats.value as any)?.recent_activities?.length
+        ? (stats.value as any).recent_activities.slice(0, 5).map((a: any) => a.description || a.name)
+        : ['暂无动态'],
     },
   ]
 })
