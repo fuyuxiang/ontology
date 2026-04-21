@@ -141,17 +141,17 @@ const selectedEntity = computed(() => {
 .layer-label--bottom { padding-bottom: 20px; }
 
 .layer-label__text {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 700;
   letter-spacing: 0.18em;
-  color: #a1a1aa;
+  color: var(--neutral-500);
   text-transform: uppercase;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .layer-label__text--large {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   letter-spacing: 0.25em;
-  color: #71717a;
+  color: var(--neutral-600);
 }
 </style>

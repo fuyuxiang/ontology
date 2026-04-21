@@ -92,7 +92,7 @@ defineEmits<{
 }
 
 .detail-panel__title {
-  font-size: 22px;
+  font-size: var(--text-h1-size);
   line-height: 1.2;
   color: var(--neutral-900);
 }
@@ -100,7 +100,7 @@ defineEmits<{
 .detail-badge {
   padding: 6px 10px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 700;
   white-space: nowrap;
 }
@@ -110,7 +110,7 @@ defineEmits<{
 .detail-badge--kinetic { background: var(--kinetic-50); color: var(--kinetic-800); }
 
 .detail-panel__summary {
-  font-size: 13px;
+  font-size: var(--text-body-size);
   line-height: 1.8;
   color: var(--neutral-600);
 }
@@ -131,8 +131,8 @@ defineEmits<{
   border: 1px solid var(--neutral-200);
 }
 
-.detail-fact__label { font-size: 11px; color: var(--neutral-500); }
-.detail-fact__value { font-size: 15px; color: var(--neutral-800); }
+.detail-fact__label { font-size: var(--text-caption-size); color: var(--neutral-500); }
+.detail-fact__value { font-size: var(--text-h3-size); color: var(--neutral-800); }
 
 .detail-panel__section {
   display: flex;
@@ -141,7 +141,7 @@ defineEmits<{
 }
 
 .detail-panel__section-label {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--neutral-500);
@@ -160,7 +160,7 @@ defineEmits<{
   border: 1px solid rgba(76, 110, 245, 0.14);
   background: rgba(76, 110, 245, 0.07);
   color: var(--semantic-700);
-  font-size: 12px;
+  font-size: var(--text-code-size);
   cursor: pointer;
   transition: background var(--transition-fast), transform var(--transition-fast), border-color var(--transition-fast);
 }
@@ -191,7 +191,7 @@ defineEmits<{
   padding: 11px 14px;
   border-radius: 14px;
   border: 1px solid transparent;
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 600;
   cursor: pointer;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
@@ -201,7 +201,7 @@ defineEmits<{
 
 .detail-btn--primary {
   background: linear-gradient(135deg, var(--dynamic-700), var(--semantic-600));
-  color: #fff;
+  color: var(--neutral-0);
   box-shadow: 0 12px 24px rgba(18, 184, 134, 0.2);
 }
 

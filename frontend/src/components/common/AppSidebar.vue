@@ -113,28 +113,22 @@ const navGroups = [
     { path: '/datasource', label: '数据源', icon: ico.datasource },
     { path: '/knowledge', label: '多模态知识库', icon: ico.knowledge },
     { path: '/data/mapping', label: '本体映射', icon: ico.mapping },
-    { path: '/data/resolution', label: '实体解析', icon: ico.resolve },
     { path: '/data/sync', label: '同步任务', icon: ico.sync },
     { path: '/data/lineage', label: '血缘分析', icon: ico.lineage },
     { path: '/data/quality', label: '质量监控', icon: ico.quality },
   ]},
   { label: '智能编排', items: [
-    { path: '/orchestration/semantic', label: '语义封装', icon: ico.semantic },
-    { path: '/orchestration/prompts', label: 'Prompt模板', icon: ico.prompt },
-    { path: '/harness', label: '场景编排', icon: ico.harness },
+    { path: '/harness', label: '智能体编排', icon: ico.harness },
     { path: '/orchestration/models', label: '模型管理', icon: ico.model },
   ]},
   { label: '智能应用', items: [
     { path: '/copilot', label: '知识问答', icon: ico.copilot },
     { path: '/scene', label: '场景验证', icon: ico.scene, exact: true },
-    { path: '/app/alerts', label: '订阅预警', icon: ico.alert },
     { path: '/app/api', label: 'API开放', icon: ico.api },
   ]},
   { label: '治理中心', items: [
     { path: '/governance/versions', label: '版本管理', icon: ico.version },
     { path: '/governance/permissions', label: '权限控制', icon: ico.permission },
-    { path: '/governance/reviews', label: '变更评审', icon: ico.review },
-    { path: '/governance/releases', label: '发布中心', icon: ico.release },
     { path: '/governance/audit', label: '审计日志', icon: ico.audit },
     { path: '/governance/glossary', label: '术语标准', icon: ico.glossary },
   ]},
@@ -161,14 +155,14 @@ const navGroups = [
 }
 .sidebar__logo-img { width: 28px; height: 28px; border-radius: 6px; }
 .sidebar__logo-info { display: flex; flex-direction: column; line-height: 1.2; }
-.sidebar__logo-text { font-size: 13px; font-weight: 700; color: var(--sidebar-text-active); }
+.sidebar__logo-text { font-size: var(--text-body-size); font-weight: 700; color: var(--sidebar-text-active); }
 .sidebar__nav {
   flex: 1;
   overflow-y: auto;
   padding: 0 8px 8px;
 }
 .sidebar__section-label {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 600;
   color: var(--sidebar-text-muted);
   text-transform: uppercase;
@@ -183,7 +177,7 @@ const navGroups = [
   border-radius: var(--radius-md);
   color: var(--sidebar-text);
   text-decoration: none;
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   cursor: pointer;
   border: none;
@@ -218,8 +212,8 @@ const navGroups = [
 .sidebar__item--footer { color: var(--sidebar-text-muted); }
 .sidebar__avatar {
   width: 24px; height: 24px; border-radius: var(--radius-full);
-  background: var(--semantic-600); color: #fff;
-  font-size: 11px; font-weight: 700;
+  background: var(--semantic-600); color: var(--neutral-0);
+  font-size: var(--text-caption-size); font-weight: 700;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 </style>
