@@ -19,7 +19,6 @@ from app.api.v1.mnp import router as mnp_router
 from app.api.v1.scenes import router as scenes_router
 from app.api.v1.broadband import router as broadband_router
 from app.api.v1.workflows import router as workflows_router
-from app.api.v1.knowledge import router as knowledge_router
 from app.api.v1.models import router as models_router
 from app.api.v1.agents import router as agents_router, open_router as agents_open_router
 
@@ -129,7 +128,6 @@ app.include_router(mnp_router, prefix="/api/v1")
 app.include_router(scenes_router, prefix="/api/v1")
 app.include_router(broadband_router, prefix="/api/v1")
 app.include_router(workflows_router, prefix="/api/v1")
-app.include_router(knowledge_router, prefix="/api/v1")
 app.include_router(models_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 app.include_router(agents_open_router, prefix="/api/v1")
