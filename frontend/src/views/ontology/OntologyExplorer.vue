@@ -20,7 +20,7 @@
       <div v-else-if="allEntities.length === 0" class="explorer__panel-empty">
         <p class="text-caption">暂无对象类型</p>
       </div>
-      <template v-else>
+      <div v-else class="explorer__tier-list">
       <div class="explorer__tier-group" v-for="group in filteredGroups" :key="group.tier">
         <div class="explorer__tier-header">
           <TierBadge :tier="group.tier" />
@@ -35,7 +35,7 @@
           @click="selectEntity"
         />
       </div>
-      </template>
+      </div>
     </aside>
 
     <!-- 右侧详情区 -->
@@ -518,12 +518,19 @@ const selectedActions = computed(() =>
 }
 .explorer__search-input::placeholder { color: var(--neutral-400); }
 
-.explorer__tier-group {
-  padding: 8px 8px 4px;
+.explorer__tier-list {
+  flex: 1;
   overflow-y: auto;
+  min-height: 0;
+}
+
+.explorer__tier-group {
+  padding: 12px 8px 8px;
 }
 .explorer__tier-group + .explorer__tier-group {
+  margin-top: 8px;
   border-top: 1px solid var(--neutral-100);
+  padding-top: 16px;
 }
 
 .explorer__tier-header {

@@ -9,11 +9,21 @@ class AttributeBase(BaseModel):
     required: bool = False
     example: str | None = None
     constraints_json: dict | None = None
+    source_table: str | None = None
+    source_field: str | None = None
+    data_status: str = "未确认来源"
 
 
 class AttributeOut(AttributeBase):
     id: str
     model_config = {"from_attributes": True}
+
+
+class AttributeMappingUpdate(BaseModel):
+    attribute_id: str
+    source_table: str | None = None
+    source_field: str | None = None
+    data_status: str = "未确认来源"
 
 
 class EntityBase(BaseModel):

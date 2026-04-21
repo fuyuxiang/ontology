@@ -27,6 +27,9 @@ export interface EntityAttribute {
   required: boolean
   example?: string
   constraints?: AttributeConstraint
+  source_table?: string | null
+  source_field?: string | null
+  data_status?: string
 }
 
 export interface EntityRelation {
