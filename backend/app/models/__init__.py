@@ -6,9 +6,11 @@ from app.models.user import User
 from app.models.datasource import DataSource
 from app.models.workflow import WorkflowApp, ApprovalTask
 from app.models.dashboard_config import DashboardConfig
+from app.models.knowledge import KnowledgeBase, KnowledgeFile
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
     "BusinessRule", "EntityAction", "AuditLog", "User",
     "DataSource", "WorkflowApp", "ApprovalTask", "DashboardConfig",
+    "KnowledgeBase", "KnowledgeFile",
 ]
