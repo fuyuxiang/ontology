@@ -9,8 +9,6 @@
       @direction="onDirection"
     />
     <div class="canvas-page__body">
-      <CanvasNodePalette :grouped="store.grouped" />
-
       <div class="canvas-page__canvas" @drop="onDrop" @dragover.prevent>
         <VueFlow
           ref="vueFlowRef"
@@ -20,12 +18,10 @@
           :edge-types="edgeTypes"
           :default-edge-options="defaultEdgeOptions"
           :fit-view-on-init="true"
-          :snap-to-grid="true"
-          :snap-grid="[20, 20]"
           @node-click="onNodeClick"
           @pane-click="onPaneClick"
         >
-          <Background :gap="20" pattern-color="#dee2e6" :size="1" />
+          <Background :gap="24" pattern-color="#e8ecf1" :size="0.8" />
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" :node-color="miniMapNodeColor" />
         </VueFlow>
@@ -56,7 +52,6 @@ import { useRouter } from 'vue-router'
 import { useOntologyStore } from '../../store/ontology'
 import { useGraphLayout } from '../../composables/useGraphLayout'
 import CanvasToolbar from '../../components/canvas/CanvasToolbar.vue'
-import CanvasNodePalette from '../../components/canvas/CanvasNodePalette.vue'
 import CanvasConfigPanel from '../../components/canvas/CanvasConfigPanel.vue'
 import OntologyNode from '../../components/canvas/OntologyNode.vue'
 import CanvasEdgeLabel from '../../components/canvas/CanvasEdgeLabel.vue'
@@ -160,7 +155,7 @@ function goDetail(id: string) { router.push(`/ontology/${id}`) }
 </script>
 
 <style scoped>
-.canvas-page { display: flex; flex-direction: column; height: 100%; background: var(--neutral-50); }
+.canvas-page { display: flex; flex-direction: column; height: 100%; background: linear-gradient(135deg, #f8f9fc 0%, #eef1f8 100%); }
 .canvas-page__body { display: flex; flex: 1; overflow: hidden; }
 .canvas-page__canvas { flex: 1; position: relative; }
 .canvas-loading {

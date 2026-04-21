@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction
 from app.schemas.entity import (
     EntityCreate, EntityUpdate, EntityDetail, EntityListItem,
-    AttributeOut, RelationOut, RuleOut, ActionOut,
+    AttributeOut, AttributeMappingUpdate, RelationOut, RuleOut, ActionOut,
     GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
     FileImportResult,
 )
@@ -411,6 +411,30 @@ def update_entity(
             target_id=entity.id, target_name=entity.name,
             changes=changes,
         )
+    repo.commit()
+    return get_entity(entity.id, db)
+
+
+@router.put("/{entity_id}/attribute-mappings", response_model=EntityDetail)
+def update_attribute_mappings(
+    entity_id: str,
+    items: list[AttributeMappingUpdate],
+    db: Session = Depends(get_db),
+):
+    repo = EntityRepository(db)
+    entity = repo.get_by_id(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="实体不存在")
+
+    attr_map = {a.id: a for a in entity.attributes}
+    for item in items:
+        attr = attr_map.get(item.attribute_id)
+        if not attr:
+            continue
+        attr.source_table = item.source_table
+        attr.source_field = item.source_field
+        attr.data_status = item.data_status
+
     repo.commit()
     return get_entity(entity.id, db)
 

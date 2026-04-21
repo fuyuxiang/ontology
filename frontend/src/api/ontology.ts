@@ -62,4 +62,8 @@ export const entityApi = {
     if (namespace) formData.append('namespace', namespace)
     return post<FileImportResult>('/entities/from-file', formData)
   },
+
+  updateAttributeMappings(entityId: string, items: { attribute_id: string; source_table: string | null; source_field: string | null; data_status: string }[]) {
+    return put<OntologyEntity>(`/entities/${entityId}/attribute-mappings`, items)
+  },
 }

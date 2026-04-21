@@ -37,5 +37,8 @@ class EntityAttribute(Base):
     required: Mapped[bool] = mapped_column(Boolean, default=False)
     example: Mapped[str | None] = mapped_column(String(200))
     constraints_json: Mapped[dict | None] = mapped_column(JSON)
+    source_table: Mapped[str | None] = mapped_column(String(200))
+    source_field: Mapped[str | None] = mapped_column(String(200))
+    data_status: Mapped[str] = mapped_column(String(20), default="未确认来源")
 
     entity: Mapped["OntologyEntity"] = relationship(back_populates="attributes")

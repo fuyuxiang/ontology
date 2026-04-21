@@ -1,9 +1,93 @@
 <template>
-  <ModalDialog :visible="visible" title="新建本体对象" width="680px" @close="$emit('close')">
+  <ModalDialog :visible="visible" title="新建本体对象" width="720px" @close="$emit('close')">
     <!-- 模式切换 -->
     <div class="mode-tabs">
+      <button class="mode-tab" :class="{ 'mode-tab--active': mode === 'ai' }" @click="mode = 'ai'">AI 智能创建</button>
       <button class="mode-tab" :class="{ 'mode-tab--active': mode === 'manual' }" @click="mode = 'manual'">手动创建</button>
       <button class="mode-tab" :class="{ 'mode-tab--active': mode === 'import' }" @click="mode = 'import'">从文件导入</button>
+    </div>
+
+    <!-- AI 智能创建 -->
+    <div v-if="mode === 'ai'" class="entity-form">
+      <!-- 步骤一：输入 -->
+      <template v-if="!aiResult">
+        <div class="ai-input-toggle">
+          <button class="ai-toggle-btn" :class="{ 'ai-toggle-btn--active': aiInputMode === 'text' }" @click="aiInputMode = 'text'">文本输入</button>
+          <button class="ai-toggle-btn" :class="{ 'ai-toggle-btn--active': aiInputMode === 'file' }" @click="aiInputMode = 'file'">文件上传</button>
+        </div>
+        <div v-if="aiInputMode === 'text'" class="form-row">
+          <label class="form-label">业务描述</label>
+          <textarea v-model="aiText" class="form-input form-textarea" rows="6"
+            placeholder="描述业务场景，AI 将自动提取实体、属性和关系。&#10;例如：客户是核心实体，包含姓名、手机号、等级属性。每个客户可有多个订单，订单包含订单号、金额、状态。" />
+          <span class="form-hint">{{ aiText.length }} / 8000 字符</span>
+        </div>
+        <div v-else class="form-row">
+          <label class="form-label">上传文档</label>
+          <div class="file-picker">
+            <input ref="aiFileRef" type="file" accept=".txt,.md,.doc,.docx,.pdf" class="file-input" @change="onAiFileChange" />
+            <span v-if="aiFile" class="file-name">{{ aiFile.name }}</span>
+          </div>
+          <span class="form-hint">支持 txt、md、doc、docx、pdf</span>
+        </div>
+      </template>
+
+      <!-- 步骤二：提取结果预览与审批 -->
+      <template v-if="aiResult">
+        <div class="ai-result-summary">
+          <span class="ai-tag ai-tag--blue">{{ aiResult.entities.length }} 个实体</span>
+          <span class="ai-tag ai-tag--green">{{ aiTotalAttrs }} 个属性</span>
+          <span class="ai-tag ai-tag--amber">{{ aiResult.relations.length }} 个关系</span>
+          <button class="btn-sm ai-reset-btn" @click="aiResult = null">重新提取</button>
+        </div>
+
+        <div v-for="(entity, ei) in aiResult.entities" :key="ei" class="ai-entity-card">
+          <div class="ai-entity-header">
+            <label class="ai-entity-check">
+              <input type="checkbox" v-model="entity.selected" />
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <rect x="1" y="1" width="12" height="12" rx="3" :stroke="entity.selected ? 'var(--semantic-600)' : 'var(--neutral-300)'" stroke-width="1.5" :fill="entity.selected ? 'var(--semantic-600)' : 'none'" />
+                <path v-if="entity.selected" d="M4 7l2 2 4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </label>
+            <span class="ai-entity-name">{{ entity.name_cn }}</span>
+            <span class="ai-entity-en">{{ entity.name }}</span>
+            <span class="ai-tier-badge" :style="{ background: tierBg(entity.tier), color: tierFg(entity.tier) }">T{{ entity.tier }}</span>
+          </div>
+          <div v-if="entity.selected" class="ai-entity-body">
+            <div class="ai-entity-desc">
+              <input v-model="entity.description" class="form-input form-input--sm" placeholder="描述" style="width:100%" />
+            </div>
+            <div v-if="entity.attributes.length" class="ai-attr-list">
+              <div class="ai-attr-row ai-attr-row--header">
+                <span>属性名</span><span>类型</span><span>说明</span>
+              </div>
+              <div v-for="(attr, ai) in entity.attributes" :key="ai" class="ai-attr-row">
+                <input v-model="attr.name" class="form-input form-input--sm" />
+                <select v-model="attr.type" class="form-input form-input--sm">
+                  <option v-for="t in attrTypes" :key="t" :value="t">{{ t }}</option>
+                </select>
+                <input v-model="attr.description" class="form-input form-input--sm" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="aiResult.relations.length" class="ai-relations">
+          <div class="form-label" style="margin-bottom:6px">关系列表</div>
+          <div class="ai-rel-list">
+            <div class="ai-rel-row ai-rel-row--header">
+              <span>源实体</span><span>目标实体</span><span>关系名</span><span>类型</span><span>基数</span>
+            </div>
+            <div v-for="(rel, ri) in aiResult.relations" :key="ri" class="ai-rel-row">
+              <span>{{ rel.from_entity }}</span>
+              <span>{{ rel.to_entity }}</span>
+              <span>{{ rel.name }}</span>
+              <span class="ai-rel-type">{{ rel.rel_type }}</span>
+              <span class="ai-rel-card">{{ rel.cardinality }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- 手动创建 -->
@@ -120,7 +204,15 @@
 
     <template #footer>
       <button class="btn-secondary" @click="$emit('close')">取消</button>
-      <button v-if="mode === 'manual'" class="btn-primary" @click="handleSubmit" :disabled="submitting">
+      <template v-if="mode === 'ai'">
+        <button v-if="!aiResult" class="btn-primary" @click="handleAiExtract" :disabled="aiExtracting || (!aiText && !aiFile)">
+          {{ aiExtracting ? 'AI 提取中...' : 'AI 提取本体' }}
+        </button>
+        <button v-else class="btn-primary" @click="handleAiCreate" :disabled="aiCreating || aiSelectedCount === 0">
+          {{ aiCreating ? '创建中...' : `确认创建 (${aiSelectedCount} 个)` }}
+        </button>
+      </template>
+      <button v-else-if="mode === 'manual'" class="btn-primary" @click="handleSubmit" :disabled="submitting">
         {{ submitting ? '创建中...' : '创建对象' }}
       </button>
       <button v-else class="btn-primary" @click="handleFileImport" :disabled="submitting || !selectedFile">
@@ -134,6 +226,8 @@
 import { reactive, ref, computed } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { entityApi } from '../../api/ontology'
+import { relationApi } from '../../api/relations'
+import { post } from '../../api/client'
 import { useToast } from '../../composables/useToast'
 import type { FileImportResult } from '../../types'
 
@@ -141,7 +235,7 @@ defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; created: [] }>()
 const toast = useToast()
 
-const mode = ref<'manual' | 'import'>('manual')
+const mode = ref<'ai' | 'manual' | 'import'>('ai')
 const tierNames: Record<number, string> = { 1: '核心', 2: '领域', 3: '场景' }
 const attrTypes = ['string', 'number', 'boolean', 'date', 'ref', 'computed', 'enum', 'json']
 const submitting = ref(false)
@@ -222,6 +316,88 @@ async function handleFileImport() {
   } catch (e) { toast.error(`导入失败: ${(e as Error).message}`) }
   finally { submitting.value = false }
 }
+
+// ── AI 智能创建 ──
+interface AiAttr { name: string; type: string; description: string }
+interface AiEntity { name: string; name_cn: string; tier: number; description: string; attributes: AiAttr[]; selected: boolean }
+interface AiRelation { from_entity: string; to_entity: string; name: string; rel_type: string; cardinality: string }
+interface AiResult { entities: AiEntity[]; relations: AiRelation[] }
+
+const aiInputMode = ref<'text' | 'file'>('text')
+const aiText = ref('')
+const aiFile = ref<File | null>(null)
+const aiFileRef = ref<HTMLInputElement | null>(null)
+const aiExtracting = ref(false)
+const aiCreating = ref(false)
+const aiResult = ref<AiResult | null>(null)
+
+const aiTotalAttrs = computed(() => aiResult.value?.entities.reduce((s, e) => s + e.attributes.length, 0) ?? 0)
+const aiSelectedCount = computed(() => aiResult.value?.entities.filter(e => e.selected).length ?? 0)
+
+const tierColors: Record<number, { bg: string; fg: string }> = {
+  1: { bg: '#dbe4ff', fg: '#4c6ef5' },
+  2: { bg: '#e5dbff', fg: '#7950f2' },
+  3: { bg: '#c3fae8', fg: '#20c997' },
+}
+function tierBg(t: number) { return tierColors[t]?.bg || '#dbe4ff' }
+function tierFg(t: number) { return tierColors[t]?.fg || '#4c6ef5' }
+
+function onAiFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  aiFile.value = input.files?.[0] || null
+}
+
+async function handleAiExtract() {
+  aiExtracting.value = true
+  try {
+    let data: AiResult
+    if (aiInputMode.value === 'text') {
+      if (!aiText.value.trim()) { toast.error('请输入业务描述'); return }
+      data = await post<AiResult>('/entities/ai-extract', (() => { const fd = new FormData(); fd.append('text', aiText.value); return fd })(), { timeout: 60000 })
+    } else {
+      if (!aiFile.value) { toast.error('请选择文件'); return }
+      const fd = new FormData()
+      fd.append('file', aiFile.value)
+      data = await post<AiResult>('/entities/ai-extract', fd, { timeout: 60000 })
+    }
+    data.entities.forEach(e => { e.selected = true })
+    aiResult.value = data
+    toast.success(`AI 提取完成：${data.entities.length} 个实体`)
+  } catch (e) { toast.error(`提取失败: ${(e as Error).message}`) }
+  finally { aiExtracting.value = false }
+}
+
+async function handleAiCreate() {
+  if (!aiResult.value) return
+  aiCreating.value = true
+  try {
+    const selected = aiResult.value.entities.filter(e => e.selected)
+    const created: Record<string, string> = {}
+    for (const entity of selected) {
+      const res = await entityApi.create({
+        name: entity.name,
+        name_cn: entity.name_cn,
+        tier: entity.tier as any,
+        description: entity.description,
+        attributes: entity.attributes.map(a => ({ id: '', name: a.name, type: a.type as any, description: a.description, required: false })),
+      } as any)
+      created[entity.name] = res.id
+    }
+    for (const rel of aiResult.value.relations) {
+      const fromId = created[rel.from_entity]
+      const toId = created[rel.to_entity]
+      if (fromId && toId) {
+        await relationApi.create({ from_entity_id: fromId, to_entity_id: toId, name: rel.name, rel_type: rel.rel_type, cardinality: rel.cardinality })
+      }
+    }
+    toast.success(`成功创建 ${Object.keys(created).length} 个本体对象`)
+    aiResult.value = null
+    aiText.value = ''
+    aiFile.value = null
+    emit('created'); emit('close')
+  } catch (e) { toast.error(`创建失败: ${(e as Error).message}`) }
+  finally { aiCreating.value = false }
+}
 </script>
 
 <style scoped>
@@ -283,4 +459,50 @@ async function handleFileImport() {
 .preview-label { font-weight: 500; color: var(--neutral-500); }
 .preview-errors { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--neutral-200); }
 .preview-error { font-size: var(--text-caption-size); color: var(--status-error); margin-bottom: 2px; }
+
+/* AI 智能创建 */
+.ai-input-toggle { display: flex; gap: 4px; margin-bottom: 8px; }
+.ai-toggle-btn {
+  padding: 5px 14px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
+  font-size: var(--text-caption-size); font-weight: 500; background: var(--neutral-0);
+  color: var(--neutral-500); cursor: pointer; transition: all 0.15s;
+}
+.ai-toggle-btn--active { border-color: var(--semantic-500); color: var(--semantic-600); background: var(--semantic-50); }
+.form-hint { font-size: var(--text-caption-size); color: var(--neutral-400); margin-top: 2px; }
+
+.ai-result-summary { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.ai-tag {
+  padding: 2px 10px; border-radius: 10px; font-size: var(--text-caption-size); font-weight: 600;
+}
+.ai-tag--blue { background: #dbe4ff; color: #4c6ef5; }
+.ai-tag--green { background: #c3fae8; color: #0ca678; }
+.ai-tag--amber { background: #fff3bf; color: #e67700; }
+.ai-reset-btn { margin-left: auto; }
+
+.ai-entity-card {
+  border: 1px solid var(--neutral-200); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;
+  transition: border-color 0.15s;
+}
+.ai-entity-card:hover { border-color: var(--neutral-300); }
+.ai-entity-header { display: flex; align-items: center; gap: 8px; }
+.ai-entity-check { cursor: pointer; display: flex; align-items: center; }
+.ai-entity-check input { display: none; }
+.ai-entity-name { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); }
+.ai-entity-en { font-size: var(--text-caption-size); color: var(--neutral-400); }
+.ai-tier-badge {
+  padding: 1px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+}
+.ai-entity-body { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--neutral-100); }
+.ai-entity-desc { margin-bottom: 8px; }
+
+.ai-attr-list { font-size: var(--text-code-size); }
+.ai-attr-row { display: grid; grid-template-columns: 1fr 100px 1.5fr; gap: 6px; margin-bottom: 4px; align-items: center; }
+.ai-attr-row--header { font-weight: 500; color: var(--neutral-500); font-size: var(--text-caption-size); margin-bottom: 2px; }
+
+.ai-relations { margin-top: 8px; }
+.ai-rel-list { font-size: var(--text-code-size); }
+.ai-rel-row { display: grid; grid-template-columns: 1fr 1fr 1fr 90px 60px; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--neutral-50); align-items: center; }
+.ai-rel-row--header { font-weight: 500; color: var(--neutral-500); font-size: var(--text-caption-size); border-bottom-color: var(--neutral-200); }
+.ai-rel-type { color: var(--semantic-600); font-size: var(--text-caption-size); }
+.ai-rel-card { color: var(--neutral-500); font-size: var(--text-caption-size); }
 </style>
