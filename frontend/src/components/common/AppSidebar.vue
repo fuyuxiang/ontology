@@ -17,17 +17,18 @@
         <template v-for="item in group.items" :key="item.path">
           <!-- 有子菜单 -->
           <template v-if="item.children">
-            <button
+            <RouterLink
+              :to="item.path"
               class="sidebar__item sidebar__item--parent"
-              :class="{ 'sidebar__item--active': isActive(item.path, item.exact) }"
-              @click="toggleSubmenu(item.path)"
+              :class="{ 'sidebar__item--active': route.path.startsWith(item.path) }"
+              @click.prevent="toggleSubmenu(item.path)"
             >
               <span class="sidebar__item-icon" v-html="item.icon"></span>
               <span class="sidebar__item-label">{{ item.label }}</span>
               <svg class="sidebar__sub-arrow" :class="{ 'sidebar__sub-arrow--open': expandedSubmenus[item.path] }" width="10" height="10" viewBox="0 0 12 12" fill="none">
                 <path d="M4 3l4 3-4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-            </button>
+            </RouterLink>
             <div v-show="expandedSubmenus[item.path]" class="sidebar__submenu-items">
               <RouterLink
                 v-for="child in item.children"
