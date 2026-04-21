@@ -96,7 +96,11 @@
     </div>
 
     <!-- 节点详情面板 -->
-    <NodeDetailPanel v-if="selectedNode" :node="selectedNode" :relations="nodeRelations" @close="selectedNode = null" />
+    <NodeDetailPanel v-if="selectedNode" :node="selectedNode" :relations="nodeRelations"
+      @close="selectedNode = null"
+      @updated="onNodeMutated"
+      @created="onNodeMutated"
+      @deleted="onNodeMutated" />
 
     <!-- 仪表盘配置抽屉 -->
     <DashboardConfigDrawer v-if="dashConfig" :visible="showConfig" :config="dashConfig"
@@ -352,6 +356,17 @@ onBeforeUnmount(() => {
 
 function onNodeClick(node: OntologyNode) {
   selectedNode.value = node
+}
+
+async function onNodeMutated() {
+  selectedNode.value = null
+  const [e, r] = await Promise.all([
+    entityApi.list().catch(() => entities.value),
+    relationApi.list().catch(() => relations.value),
+  ])
+  entities.value = e as EntityListItem[]
+  relations.value = r as any
+  stats.value = await dashboardApi.stats().catch(() => stats.value) as any
 }
 
 /* ── Top & Bottom cards ── */
