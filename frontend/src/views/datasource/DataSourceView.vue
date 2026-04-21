@@ -2,95 +2,114 @@
   <div class="ds-page">
     <div class="ds-page__header">
       <div>
-        <h1 class="text-display">数据源管理</h1>
-        <p class="text-caption" style="margin-top: 4px;">连接配置 · 状态监控 · 数据接入</p>
+        <h1 class="ds-page__title">数据源管理</h1>
+        <p class="ds-page__subtitle">连接配置 · 状态监控 · 数据接入</p>
       </div>
-      <div class="ds-page__actions">
-        <button class="btn-primary" @click="openCreate">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+      <a-space>
+        <a-button @click="handleSyncAll" :loading="syncingAll" :disabled="store.items.length === 0">
+          <template #icon><SyncOutlined /></template>
+          全部同步
+        </a-button>
+        <a-popconfirm title="确认删除全部数据源？此操作不可恢复！" @confirm="handleDeleteAll" :disabled="store.items.length === 0">
+          <a-button danger :disabled="store.items.length === 0">
+            <template #icon><DeleteOutlined /></template>
+            全部删除
+          </a-button>
+        </a-popconfirm>
+        <a-button type="primary" @click="openCreate">
+          <template #icon><PlusOutlined /></template>
           新建数据源
-        </button>
-      </div>
+        </a-button>
+      </a-space>
     </div>
 
     <!-- 统计卡片 -->
     <div class="ds-page__stats">
       <div class="stat-card stat-card--semantic">
-        <div class="stat-card__value">{{ store.stats.total }}</div>
-        <div class="stat-card__label">总数据源</div>
+        <div class="stat-card__icon">
+          <DatabaseOutlined />
+        </div>
+        <a-statistic title="总数据源" :value="store.stats.total" />
       </div>
       <div class="stat-card stat-card--dynamic">
-        <div class="stat-card__value">{{ store.stats.enabled }}</div>
-        <div class="stat-card__label">运行中</div>
+        <div class="stat-card__icon">
+          <ThunderboltOutlined />
+        </div>
+        <a-statistic title="运行中" :value="store.stats.enabled" />
       </div>
       <div class="stat-card stat-card--kinetic">
-        <div class="stat-card__value">{{ store.stats.stopped }}</div>
-        <div class="stat-card__label">已停止</div>
+        <div class="stat-card__icon">
+          <PauseCircleOutlined />
+        </div>
+        <a-statistic title="已停止" :value="store.stats.stopped" />
       </div>
       <div class="stat-card stat-card--error">
-        <div class="stat-card__value">{{ store.stats.error }}</div>
-        <div class="stat-card__label">异常</div>
+        <div class="stat-card__icon">
+          <ExclamationCircleOutlined />
+        </div>
+        <a-statistic title="异常" :value="store.stats.error" />
       </div>
     </div>
 
     <!-- 筛选栏 -->
     <div class="ds-page__filter">
-      <input v-model="search" class="ds-search" placeholder="搜索数据源名称..." @input="onSearch" />
-      <div class="ds-filter-tags">
-        <button v-for="f in typeFilters" :key="f.value" class="filter-tag" :class="{ 'filter-tag--active': activeType === f.value }" @click="setTypeFilter(f.value)">{{ f.label }}</button>
-      </div>
+      <a-input-search v-model:value="search" placeholder="搜索数据源名称..." style="width: 280px" allow-clear @search="onSearch" @change="onSearch" />
+      <a-segmented v-model:value="activeType" :options="typeFilters" @change="onTypeChange" />
     </div>
 
     <!-- 数据表格 -->
-    <div class="ds-page__table-wrap">
-      <table class="ds-table">
-        <thead>
-          <tr>
-            <th>数据源名称</th>
-            <th>类别</th>
-            <th>类型</th>
-            <th>连接地址</th>
-            <th>数据库</th>
-            <th>记录条数</th>
-            <th>管道状态</th>
-            <th>创建时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="ds in store.items" :key="ds.id">
-            <td class="text-body-medium">{{ TABLE_NAME_MAP[ds.table_name] || ds.name }}</td>
-            <td><span class="ds-cat-badge" :class="`ds-cat-badge--${(ds as any).source_category || 'database'}`">{{ catLabel((ds as any).source_category) }}</span></td>
-            <td><span class="ds-type-badge">{{ ds.type }}</span></td>
-            <td class="text-code">{{ ds.host }}:{{ ds.port }}</td>
-            <td>{{ ds.database || '-' }}</td>
-            <td>{{ ds.record_count }}</td>
-            <td>
-              <button class="ds-toggle" :class="ds.enabled ? 'ds-toggle--on' : 'ds-toggle--off'" @click="handleToggle(ds)" :disabled="toggling === ds.id">
-                <span class="ds-toggle__dot"></span>
-                <span class="ds-toggle__label">{{ ds.enabled ? '运行中' : '已停止' }}</span>
-              </button>
-            </td>
-            <td class="text-caption">{{ formatTime(ds.created_at) }}</td>
-            <td class="ds-table__actions">
-              <button class="btn-sm-sync" @click="handleRefresh(ds)" :disabled="refreshing === ds.id">
-                {{ refreshing === ds.id ? '同步中...' : '同步' }}
-              </button>
-              <button class="btn-sm-detail" @click="openDetail(ds)">详情</button>
-              <button class="btn-sm-del" @click="handleDelete(ds)">删除</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-if="store.items.length === 0 && !store.loading" class="ds-empty">
-        <p class="text-caption">暂无数据源，点击「新建数据源」添加</p>
-      </div>
-    </div>
+    <a-table
+      :columns="columns"
+      :data-source="store.items"
+      :loading="store.loading"
+      :pagination="false"
+      row-key="id"
+      size="middle"
+      :scroll="{ x: 1100 }"
+      @resizeColumn="onResizeColumn"
+    >
+      <template #bodyCell="{ column, record }">
+        <template v-if="column.key === 'name'">
+          <span class="ds-cell-name">{{ TABLE_NAME_MAP[record.table_name] || record.name }}</span>
+        </template>
+        <template v-else-if="column.key === 'category'">
+          <a-tag :color="catColor((record as any).source_category)">{{ catLabel((record as any).source_category) }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'type'">
+          <a-tag color="blue">{{ record.type.toUpperCase() }}</a-tag>
+        </template>
+        <template v-else-if="column.key === 'host'">
+          <span class="ds-cell-code">{{ record.host }}:{{ record.port }}</span>
+        </template>
+        <template v-else-if="column.key === 'database'">
+          {{ record.database || '-' }}
+        </template>
+        <template v-else-if="column.key === 'record_count'">
+          {{ record.record_count }}
+        </template>
+        <template v-else-if="column.key === 'enabled'">
+          <a-switch :checked="record.enabled" :loading="toggling === record.id" @change="handleToggle(record)" size="small" checked-children="运行" un-checked-children="停止" />
+        </template>
+        <template v-else-if="column.key === 'created_at'">
+          {{ formatTime(record.created_at) }}
+        </template>
+        <template v-else-if="column.key === 'actions'">
+          <a-space :size="4">
+            <a-button type="link" size="small" @click="handleRefresh(record)" :loading="refreshing === record.id">同步</a-button>
+            <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+            <a-popconfirm :title="`确认删除「${TABLE_NAME_MAP[record.table_name] || record.name}」？`" @confirm="handleDelete(record)">
+              <a-button type="link" size="small" danger>删除</a-button>
+            </a-popconfirm>
+          </a-space>
+        </template>
+      </template>
+      <template #emptyText>
+        <a-empty description="暂无数据源，点击「新建数据源」添加" />
+      </template>
+    </a-table>
 
-    <!-- 新建弹窗 -->
-    <ModalDialog :visible="showModal" title="新建数据源" width="580px" @close="showModal = false">
+    <!-- 新建数据源弹窗 -->
+    <a-modal v-model:open="showModal" title="新建数据源" :width="580" :footer="null" destroy-on-close>
       <!-- Step 1: 选择类别 -->
       <div v-if="createStep === 1" class="ds-category-grid">
         <div v-for="cat in categories" :key="cat.value" class="ds-category-card" @click="selectCategory(cat.value)">
@@ -101,59 +120,76 @@
       </div>
 
       <!-- Step 2: 数据库 -->
-      <form v-else-if="createStep === 2 && createCategory === 'database'" class="ds-form" @submit.prevent="handleSave">
-        <div class="ds-form__back" @click="createStep = 1">← 返回</div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1">
-            <label class="form-label">类型</label>
-            <select v-model="form.type" class="form-input" required>
-              <option v-for="t in dsTypes" :key="t" :value="t">{{ t }}</option>
-            </select>
-          </div>
-          <div class="form-row" style="flex:1">
-            <label class="form-label">端口</label>
-            <input v-model.number="form.port" class="form-input" type="number" required />
-          </div>
-        </div>
-        <div class="form-row">
-          <label class="form-label">主机地址</label>
-          <input v-model="form.host" class="form-input form-input--code" placeholder="如：192.168.1.100" required />
-        </div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1">
-            <label class="form-label">数据库名</label>
-            <input v-model="form.database" class="form-input" placeholder="可选" />
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1">
-            <label class="form-label">用户名</label>
-            <input v-model="form.username" class="form-input" />
-          </div>
-          <div class="form-row" style="flex:1">
-            <label class="form-label">密码</label>
-            <input v-model="form.password" class="form-input" type="password" />
-          </div>
-        </div>
-        <div class="form-row">
-          <label class="form-label">描述</label>
-          <input v-model="form.description" class="form-input" placeholder="可选" />
-        </div>
+      <a-form v-else-if="createStep === 2 && createCategory === 'database'" layout="vertical" @finish="handleSave">
+        <a-button type="link" size="small" @click="createStep = 1" style="padding:0;margin-bottom:12px">← 返回</a-button>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="类型">
+              <a-select v-model:value="form.type" :options="dsTypes.map(t => ({ value: t, label: t }))" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="端口">
+              <a-input-number v-model:value="form.port" style="width:100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="主机地址">
+          <a-input v-model:value="form.host" placeholder="如：192.168.1.100" class="input-mono" />
+        </a-form-item>
+        <a-form-item label="数据库名">
+          <a-input v-model:value="form.database" placeholder="可选" />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="用户名">
+              <a-input v-model:value="form.username" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="密码">
+              <a-input-password v-model:value="form.password" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="描述">
+          <a-input v-model:value="form.description" placeholder="可选" />
+        </a-form-item>
         <div class="ds-form__footer">
-          <button type="button" class="btn-secondary" @click="showModal = false">取消</button>
-          <button type="submit" class="btn-primary" :disabled="saving">{{ saving ? '连接中...' : '保存' }}</button>
+          <a-button @click="showModal = false">取消</a-button>
+          <a-button type="primary" html-type="submit" :loading="saving">保存</a-button>
         </div>
-      </form>
+      </a-form>
 
-      <!-- Step 2: 文件上传 -->
-      <div v-else-if="createStep === 2 && createCategory === 'file'" class="ds-form">
-        <div class="ds-form__back" @click="createStep = 1">← 返回</div>
-        <div class="form-row">
-          <label class="form-label">数据源名称</label>
-          <input v-model="fileForm.name" class="form-input" placeholder="如：产品手册" required />
+      <!-- Step 2: 多模态数据 - 子类型选择 -->
+      <div v-else-if="createStep === 2 && createCategory === 'file' && !fileSubType">
+        <a-button type="link" size="small" @click="createStep = 1" style="padding:0;margin-bottom:12px">← 返回</a-button>
+        <div class="ds-category-grid ds-category-grid--3">
+          <div class="ds-category-card" @click="fileSubType = 'upload'">
+            <span class="ds-category-icon"><UploadOutlined style="font-size:28px" /></span>
+            <div class="ds-category-name">上传文件</div>
+            <div class="ds-category-desc">PDF / Word / Excel / 图片 / 视频</div>
+          </div>
+          <div class="ds-category-card" @click="fileSubType = 'oss'">
+            <span class="ds-category-icon"><CloudServerOutlined style="font-size:28px" /></span>
+            <div class="ds-category-name">OSS 存储</div>
+            <div class="ds-category-desc">S3 / MinIO / 阿里云 OSS</div>
+          </div>
+          <div class="ds-category-card" @click="fileSubType = 'directory'">
+            <span class="ds-category-icon"><FolderOpenOutlined style="font-size:28px" /></span>
+            <div class="ds-category-name">本地目录</div>
+            <div class="ds-category-desc">扫描服务器本地文件目录</div>
+          </div>
         </div>
-        <div class="form-row">
-          <label class="form-label">上传文件</label>
+      </div>
+
+      <!-- Step 2: 多模态 - 上传文件 -->
+      <a-form v-else-if="createStep === 2 && createCategory === 'file' && fileSubType === 'upload'" layout="vertical">
+        <a-button type="link" size="small" @click="fileSubType = null" style="padding:0;margin-bottom:12px">← 返回</a-button>
+        <a-form-item label="数据源名称">
+          <a-input v-model:value="fileForm.name" placeholder="如：产品手册" />
+        </a-form-item>
+        <a-form-item label="上传文件">
           <div class="ds-upload-zone" :class="{ 'ds-upload-zone--active': dragOver }"
             @dragover.prevent="dragOver = true" @dragleave="dragOver = false"
             @drop.prevent="onFileDrop" @click="fileInputRef?.click()">
@@ -161,155 +197,235 @@
               accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.mp4,.avi,.mov"
               @change="onFileChange" />
             <div v-if="!selectedFile" class="ds-upload-hint">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M12 16V8M8 12l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/></svg>
+              <UploadOutlined style="font-size:32px;color:var(--neutral-400)" />
               <p>点击或拖拽文件到此处</p>
               <p class="ds-upload-types">支持 PDF / Word / Excel / 图片 / 视频</p>
             </div>
             <div v-else class="ds-upload-selected">
-              <span class="ds-file-icon">{{ fileTypeIcon(selectedFile.name) }}</span>
+              <FileOutlined style="font-size:22px" />
               <span>{{ selectedFile.name }}</span>
               <span class="ds-file-size">{{ (selectedFile.size / 1024).toFixed(1) }} KB</span>
             </div>
           </div>
-        </div>
-        <div class="form-row">
-          <label class="form-label">描述</label>
-          <input v-model="fileForm.description" class="form-input" placeholder="可选" />
-        </div>
+        </a-form-item>
+        <a-form-item label="描述">
+          <a-input v-model:value="fileForm.description" placeholder="可选" />
+        </a-form-item>
         <div class="ds-form__footer">
-          <button type="button" class="btn-secondary" @click="showModal = false">取消</button>
-          <button class="btn-primary" :disabled="saving || !selectedFile" @click="handleFileUpload">{{ saving ? '上传中...' : '上传' }}</button>
+          <a-button @click="showModal = false">取消</a-button>
+          <a-button type="primary" :loading="saving" :disabled="!selectedFile" @click="handleFileUpload">上传</a-button>
         </div>
-      </div>
+      </a-form>
+
+      <!-- Step 2: 多模态 - OSS 存储 -->
+      <a-form v-else-if="createStep === 2 && createCategory === 'file' && fileSubType === 'oss'" layout="vertical">
+        <a-button type="link" size="small" @click="fileSubType = null" style="padding:0;margin-bottom:12px">← 返回</a-button>
+        <a-form-item label="数据源名称">
+          <a-input v-model:value="ossForm.name" placeholder="如：产品图片库" />
+        </a-form-item>
+        <a-form-item label="Endpoint">
+          <a-input v-model:value="ossForm.endpoint" placeholder="https://oss-cn-hangzhou.aliyuncs.com" class="input-mono" />
+        </a-form-item>
+        <a-form-item label="Bucket">
+          <a-input v-model:value="ossForm.bucket" placeholder="my-bucket" />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="Access Key">
+              <a-input v-model:value="ossForm.access_key" class="input-mono" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="Secret Key">
+              <a-input-password v-model:value="ossForm.secret_key" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="路径前缀">
+          <a-input v-model:value="ossForm.prefix" placeholder="可选，如：data/images/" />
+        </a-form-item>
+        <a-form-item label="描述">
+          <a-input v-model:value="ossForm.description" placeholder="可选" />
+        </a-form-item>
+        <div class="ds-form__footer">
+          <a-button @click="showModal = false">取消</a-button>
+          <a-button type="primary" :loading="saving" @click="handleOssSource">保存</a-button>
+        </div>
+      </a-form>
+
+      <!-- Step 2: 多模态 - 本地目录 -->
+      <a-form v-else-if="createStep === 2 && createCategory === 'file' && fileSubType === 'directory'" layout="vertical">
+        <a-button type="link" size="small" @click="fileSubType = null" style="padding:0;margin-bottom:12px">← 返回</a-button>
+        <a-form-item label="数据源名称">
+          <a-input v-model:value="dirForm.name" placeholder="如：合同文档库" />
+        </a-form-item>
+        <a-form-item label="目录路径">
+          <a-input v-model:value="dirForm.directory_path" placeholder="/data/documents" class="input-mono" />
+        </a-form-item>
+        <a-form-item label="文件类型过滤">
+          <a-input v-model:value="dirForm.file_extensions" placeholder="可选，如：pdf,docx,xlsx（留空扫描全部）" />
+        </a-form-item>
+        <a-form-item label="描述">
+          <a-input v-model:value="dirForm.description" placeholder="可选" />
+        </a-form-item>
+        <div class="ds-form__footer">
+          <a-button @click="showModal = false">取消</a-button>
+          <a-button type="primary" :loading="saving" @click="handleDirSource">保存</a-button>
+        </div>
+      </a-form>
 
       <!-- Step 2: REST API -->
-      <div v-else-if="createStep === 2 && createCategory === 'api'" class="ds-form">
-        <div class="ds-form__back" @click="createStep = 1">← 返回</div>
-        <div class="form-row">
-          <label class="form-label">数据源名称</label>
-          <input v-model="apiForm.name" class="form-input" required />
-        </div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:0 0 90px">
-            <label class="form-label">方法</label>
-            <select v-model="apiForm.api_method" class="form-input">
-              <option>GET</option><option>POST</option>
-            </select>
-          </div>
-          <div class="form-row" style="flex:1">
-            <label class="form-label">API URL</label>
-            <input v-model="apiForm.api_url" class="form-input form-input--code" placeholder="https://..." required />
-          </div>
-        </div>
-        <div class="form-row">
-          <label class="form-label">请求头（JSON）</label>
-          <textarea v-model="apiForm.api_headers_str" class="form-input form-input--ta" placeholder='{"Authorization": "Bearer ..."}' rows="2"></textarea>
-        </div>
-        <div class="form-row">
-          <label class="form-label">轮询间隔（秒）</label>
-          <input v-model.number="apiForm.poll_interval" class="form-input" type="number" min="10" />
-        </div>
-        <div class="form-row">
-          <label class="form-label">描述</label>
-          <input v-model="apiForm.description" class="form-input" placeholder="可选" />
-        </div>
+      <a-form v-else-if="createStep === 2 && createCategory === 'api'" layout="vertical">
+        <a-button type="link" size="small" @click="createStep = 1" style="padding:0;margin-bottom:12px">← 返回</a-button>
+        <a-form-item label="数据源名称">
+          <a-input v-model:value="apiForm.name" />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="6">
+            <a-form-item label="方法">
+              <a-select v-model:value="apiForm.api_method" :options="[{value:'GET',label:'GET'},{value:'POST',label:'POST'}]" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="18">
+            <a-form-item label="API URL">
+              <a-input v-model:value="apiForm.api_url" placeholder="https://..." class="input-mono" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-form-item label="请求头（JSON）">
+          <a-textarea v-model:value="apiForm.api_headers_str" :rows="2" placeholder='{"Authorization": "Bearer ..."}' />
+        </a-form-item>
+        <a-form-item label="轮询间隔（秒）">
+          <a-input-number v-model:value="apiForm.poll_interval" :min="10" style="width:100%" />
+        </a-form-item>
+        <a-form-item label="描述">
+          <a-input v-model:value="apiForm.description" placeholder="可选" />
+        </a-form-item>
         <div class="ds-form__footer">
-          <button type="button" class="btn-secondary" @click="showModal = false">取消</button>
-          <button class="btn-primary" :disabled="saving" @click="handleApiSource">{{ saving ? '连接中...' : '保存' }}</button>
+          <a-button @click="showModal = false">取消</a-button>
+          <a-button type="primary" :loading="saving" @click="handleApiSource">保存</a-button>
         </div>
-      </div>
+      </a-form>
 
       <!-- Step 2: 消息队列 -->
-      <div v-else-if="createStep === 2 && createCategory === 'mq'" class="ds-form">
-        <div class="ds-form__back" @click="createStep = 1">← 返回</div>
-        <div class="form-row">
-          <label class="form-label">数据源名称</label>
-          <input v-model="mqForm.name" class="form-input" required />
-        </div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1">
-            <label class="form-label">Broker 地址</label>
-            <input v-model="mqForm.host" class="form-input form-input--code" placeholder="如：192.168.1.100" required />
-          </div>
-          <div class="form-row" style="flex:0 0 100px">
-            <label class="form-label">端口</label>
-            <input v-model.number="mqForm.port" class="form-input" type="number" />
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1">
-            <label class="form-label">Topic</label>
-            <input v-model="mqForm.mq_topic" class="form-input" required />
-          </div>
-          <div class="form-row" style="flex:1">
-            <label class="form-label">Consumer Group</label>
-            <input v-model="mqForm.mq_group" class="form-input" />
-          </div>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1">
-            <label class="form-label">用户名</label>
-            <input v-model="mqForm.username" class="form-input" />
-          </div>
-          <div class="form-row" style="flex:1">
-            <label class="form-label">密码</label>
-            <input v-model="mqForm.password" class="form-input" type="password" />
-          </div>
-        </div>
+      <a-form v-else-if="createStep === 2 && createCategory === 'mq'" layout="vertical">
+        <a-button type="link" size="small" @click="createStep = 1" style="padding:0;margin-bottom:12px">← 返回</a-button>
+        <a-form-item label="数据源名称">
+          <a-input v-model:value="mqForm.name" />
+        </a-form-item>
+        <a-row :gutter="16">
+          <a-col :span="16">
+            <a-form-item label="Broker 地址">
+              <a-input v-model:value="mqForm.host" placeholder="如：192.168.1.100" class="input-mono" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="8">
+            <a-form-item label="端口">
+              <a-input-number v-model:value="mqForm.port" style="width:100%" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="Topic">
+              <a-input v-model:value="mqForm.mq_topic" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="Consumer Group">
+              <a-input v-model:value="mqForm.mq_group" />
+            </a-form-item>
+          </a-col>
+        </a-row>
+        <a-row :gutter="16">
+          <a-col :span="12">
+            <a-form-item label="用户名">
+              <a-input v-model:value="mqForm.username" />
+            </a-form-item>
+          </a-col>
+          <a-col :span="12">
+            <a-form-item label="密码">
+              <a-input-password v-model:value="mqForm.password" />
+            </a-form-item>
+          </a-col>
+        </a-row>
         <div class="ds-form__footer">
-          <button type="button" class="btn-secondary" @click="showModal = false">取消</button>
-          <button class="btn-primary" :disabled="saving" @click="handleMqSource">{{ saving ? '保存中...' : '保存' }}</button>
+          <a-button @click="showModal = false">取消</a-button>
+          <a-button type="primary" :loading="saving" @click="handleMqSource">保存</a-button>
         </div>
-      </div>
-    </ModalDialog>
+      </a-form>
+    </a-modal>
 
     <!-- 详情弹窗 -->
-    <ModalDialog :visible="showDetail" :title="detailName + ' — 数据预览'" width="800px" @close="showDetail = false">
-      <div>
-        <div v-if="detailLoading" class="ds-detail-loading">加载中...</div>
-        <div v-else-if="detailParsed" class="ds-parsed-content">
-          <p class="text-caption" style="margin-bottom: 8px;">解析内容预览</p>
-          <pre class="ds-parsed-pre">{{ detailParsed.slice(0, 3000) }}{{ detailParsed.length > 3000 ? '\n...(内容已截断)' : '' }}</pre>
-        </div>
-        <div v-else class="ds-preview-table-wrap">
-          <p class="text-caption" style="margin-bottom: 8px;">前 20 条数据</p>
-          <table class="ds-table ds-preview-table">
-            <thead>
-              <tr>
-                <th v-for="col in previewColumns" :key="col">{{ col }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in previewRows" :key="i">
-                <td v-for="(cell, j) in row" :key="j">{{ cell ?? '-' }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="previewRows.length === 0 && previewColumns.length === 0" class="ds-detail-empty">
-            <p class="text-caption">查询失败或该表暂无数据</p>
-          </div>
-        </div>
+    <a-modal v-model:open="showDetail" :title="detailName + ' — 数据预览'" :width="800" :footer="null" destroy-on-close>
+      <a-spin v-if="detailLoading" tip="加载中..." style="display:block;text-align:center;padding:40px" />
+      <div v-else-if="detailParsed" class="ds-parsed-content">
+        <p style="margin-bottom:8px;color:var(--neutral-500);font-size:12px">解析内容预览</p>
+        <pre class="ds-parsed-pre">{{ detailParsed.slice(0, 3000) }}{{ detailParsed.length > 3000 ? '\n...(内容已截断)' : '' }}</pre>
       </div>
-    </ModalDialog>
+      <div v-else>
+        <p style="margin-bottom:8px;color:var(--neutral-500);font-size:12px">前 20 条数据</p>
+        <a-table
+          :columns="previewColumns.map(c => ({ title: c, dataIndex: c, key: c, ellipsis: true }))"
+          :data-source="previewTableData"
+          :pagination="false"
+          size="small"
+          :scroll="{ x: true, y: 360 }"
+          bordered
+        />
+        <a-empty v-if="previewRows.length === 0 && previewColumns.length === 0" description="查询失败或该表暂无数据" />
+      </div>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useDataSourceStore } from '../../store/datasource'
-import ModalDialog from '../../components/common/ModalDialog.vue'
 import * as api from '../../api/datasource'
 import type { DataSource, DataSourceCreate } from '../../types/datasource'
 import client from '../../api/client'
+import {
+  SyncOutlined, DeleteOutlined, PlusOutlined,
+  DatabaseOutlined, ThunderboltOutlined, PauseCircleOutlined, ExclamationCircleOutlined,
+  UploadOutlined, CloudServerOutlined, FolderOpenOutlined, FileOutlined,
+} from '@ant-design/icons-vue'
 
 const store = useDataSourceStore()
 
 const search = ref('')
-const activeType = ref('')
+const activeType = ref('全部')
 const showModal = ref(false)
 const saving = ref(false)
 const toggling = ref<string | null>(null)
 const refreshing = ref<string | null>(null)
+const syncingAll = ref(false)
+
+const columns = ref([
+  { title: '数据源名称', key: 'name', width: 180, resizable: true, ellipsis: true },
+  { title: '类别', key: 'category', width: 90, resizable: true },
+  { title: '类型', key: 'type', width: 100, resizable: true },
+  { title: '连接地址', key: 'host', width: 160, resizable: true, ellipsis: true },
+  { title: '数据库', key: 'database', width: 110, resizable: true, ellipsis: true },
+  { title: '记录条数', key: 'record_count', width: 90, resizable: true },
+  { title: '管道状态', key: 'enabled', width: 110, resizable: true },
+  { title: '创建时间', key: 'created_at', width: 150, resizable: true },
+  { title: '操作', key: 'actions', width: 160, fixed: 'right' as const },
+])
+
+function onResizeColumn(w: number, col: any) {
+  col.width = w
+}
+
+const typeFilters = [
+  { value: '全部', label: '全部' },
+  { value: 'mysql', label: 'MySQL' },
+  { value: 'postgresql', label: 'PostgreSQL' },
+  { value: 'oracle', label: 'Oracle' },
+  { value: 'clickhouse', label: 'ClickHouse' },
+  { value: 'file', label: '文件' },
+  { value: 'api', label: 'API' },
+]
 
 // 多步骤新建
 const createStep = ref(1)
@@ -320,6 +436,13 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const dragOver = ref(false)
 const fileForm = ref({ name: '', description: '' })
+const fileSubType = ref<'upload' | 'oss' | 'directory' | null>(null)
+
+// OSS 数据源
+const ossForm = ref({ name: '', endpoint: '', bucket: '', access_key: '', secret_key: '', prefix: '', description: '' })
+
+// 本地目录数据源
+const dirForm = ref({ name: '', directory_path: '', file_extensions: '', description: '' })
 
 // API 数据源
 const apiForm = ref({ name: '', api_url: '', api_method: 'GET', api_headers_str: '', poll_interval: 60, description: '' })
@@ -334,6 +457,14 @@ const detailLoading = ref(false)
 const previewColumns = ref<string[]>([])
 const previewRows = ref<unknown[][]>([])
 const detailParsed = ref('')
+
+const previewTableData = computed(() =>
+  previewRows.value.map((row, i) => {
+    const obj: Record<string, unknown> = { _key: i }
+    previewColumns.value.forEach((col, j) => { obj[col] = row[j] ?? '-' })
+    return obj
+  })
+)
 
 const dsTypes = ['mysql', 'postgresql', 'oracle', 'sqlserver', 'clickhouse', 'hive', 'kafka', 'elasticsearch', 'api']
 
@@ -352,35 +483,19 @@ const TABLE_NAME_MAP: Record<string, string> = {
 
 const categories = [
   { value: 'database', label: '关系型数据库', desc: 'MySQL / PostgreSQL / Oracle 等', icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="6" rx="8" ry="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6" stroke="currentColor" stroke-width="1.5"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6" stroke="currentColor" stroke-width="1.5"/></svg>` },
-  { value: 'file', label: '文档 / 文件', desc: 'PDF / Word / Excel / 图片 / 视频', icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" stroke-width="1.5"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { value: 'file', label: '多模态数据', desc: 'PDF / Word / Excel / 图片 / 视频', icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z" stroke="currentColor" stroke-width="1.5"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { value: 'api', label: 'REST API', desc: 'HTTP 接口定时拉取', icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="currentColor" stroke-width="1.5"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20" stroke="currentColor" stroke-width="1.5"/></svg>` },
-  { value: 'mq', label: '消息队列', desc: 'Kafka / RabbitMQ 等', icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 12h12M2 10h20M2 14h20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { value: 'mq', label: '消息队列', desc: 'Kafka / RabbitMQ 等', icon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none"><rect x="2" y="7" width="20" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 12h12M2 10h20M2 14h20" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
 ]
 
-const typeFilters = [
-  { label: '全部', value: '' },
-  { label: '数据库', value: 'database' },
-  { label: '文件', value: 'file' },
-  { label: 'API', value: 'api' },
-  { label: 'MQ', value: 'mq' },
-  { label: 'MySQL', value: 'mysql' },
-  { label: 'PostgreSQL', value: 'postgresql' },
-  { label: 'Kafka', value: 'kafka' },
-]
-
-function catLabel(cat: string) {
-  const m: Record<string, string> = { database: '数据库', file: '文件', api: 'API', mq: 'MQ' }
-  return m[cat] || '数据库'
+function catLabel(cat?: string) {
+  const m: Record<string, string> = { database: '数据库', file: '文件', api: 'API', mq: '消息队列' }
+  return m[cat || 'database'] || '数据库'
 }
 
-function fileTypeIcon(name: string) {
-  const ext = name.split('.').pop()?.toLowerCase() || ''
-  if (['pdf'].includes(ext)) return '📄'
-  if (['doc', 'docx'].includes(ext)) return '📝'
-  if (['xls', 'xlsx'].includes(ext)) return '📊'
-  if (['png', 'jpg', 'jpeg', 'gif'].includes(ext)) return '🖼'
-  if (['mp4', 'avi', 'mov'].includes(ext)) return '🎬'
-  return '📁'
+function catColor(cat?: string) {
+  const m: Record<string, string> = { database: 'blue', file: 'green', api: 'orange', mq: 'red' }
+  return m[cat || 'database'] || 'blue'
 }
 
 onMounted(() => store.fetchList())
@@ -389,19 +504,23 @@ function formatTime(t: string) {
   return new Date(t).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function setTypeFilter(v: string) {
-  activeType.value = v
-  store.fetchList({ type: v || undefined, q: search.value || undefined })
+function onTypeChange(v: string) {
+  const type = v === '全部' ? undefined : v
+  store.fetchList({ type, q: search.value || undefined })
 }
 
 function onSearch() {
-  store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
+  const type = activeType.value === '全部' ? undefined : activeType.value
+  store.fetchList({ type, q: search.value || undefined })
 }
 
 function openCreate() {
   createStep.value = 1
+  fileSubType.value = null
   selectedFile.value = null
   fileForm.value = { name: '', description: '' }
+  ossForm.value = { name: '', endpoint: '', bucket: '', access_key: '', secret_key: '', prefix: '', description: '' }
+  dirForm.value = { name: '', directory_path: '', file_extensions: '', description: '' }
   apiForm.value = { name: '', api_url: '', api_method: 'GET', api_headers_str: '', poll_interval: 60, description: '' }
   mqForm.value = { name: '', host: '', port: 9092, mq_topic: '', mq_group: 'ontology-consumer', username: '', password: '', description: '' }
   showModal.value = true
@@ -423,7 +542,7 @@ async function handleSave() {
   try {
     await api.createDataSource(form.value)
     showModal.value = false
-    store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
+    onSearch()
   } catch (e: any) {
     alert(e.response?.data?.detail || '操作失败')
   } finally {
@@ -455,6 +574,39 @@ async function handleFileUpload() {
     store.fetchList()
   } catch (e: any) {
     alert(e.response?.data?.detail || '上传失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleOssSource() {
+  saving.value = true
+  try {
+    await client.post('/datasources/oss-source', ossForm.value)
+    showModal.value = false
+    store.fetchList()
+  } catch (e: any) {
+    alert(e.response?.data?.detail || 'OSS 连接失败')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleDirSource() {
+  saving.value = true
+  try {
+    const extensions = dirForm.value.file_extensions
+      .split(',').map((s: string) => s.trim()).filter(Boolean)
+    await client.post('/datasources/dir-source', {
+      name: dirForm.value.name,
+      directory_path: dirForm.value.directory_path,
+      file_extensions: extensions,
+      description: dirForm.value.description,
+    })
+    showModal.value = false
+    store.fetchList()
+  } catch (e: any) {
+    alert(e.response?.data?.detail || '目录连接失败')
   } finally {
     saving.value = false
   }
@@ -494,7 +646,7 @@ async function handleToggle(ds: DataSource) {
   toggling.value = ds.id
   try {
     await api.toggleDataSource(ds.id)
-    store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
+    onSearch()
   } catch {
     alert('操作失败')
   } finally {
@@ -503,10 +655,9 @@ async function handleToggle(ds: DataSource) {
 }
 
 async function handleDelete(ds: DataSource) {
-  if (!confirm(`确认删除数据源「${TABLE_NAME_MAP[ds.table_name] || ds.name}」？`)) return
   try {
     await api.deleteDataSource(ds.id)
-    store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
+    onSearch()
   } catch {
     alert('删除失败')
   }
@@ -517,12 +668,44 @@ async function handleRefresh(ds: DataSource) {
   try {
     const res = await api.refreshTables(ds.id)
     alert(`同步完成，共 ${res.record_count} 条记录`)
-    store.fetchList({ type: activeType.value || undefined, q: search.value || undefined })
+    onSearch()
   } catch (e: any) {
     alert(e.response?.data?.detail || '同步失败')
   } finally {
     refreshing.value = null
   }
+}
+
+async function handleSyncAll() {
+  syncingAll.value = true
+  let success = 0
+  let fail = 0
+  for (const ds of store.items) {
+    try {
+      await api.refreshTables(ds.id)
+      success++
+    } catch {
+      fail++
+    }
+  }
+  syncingAll.value = false
+  alert(`同步完成：成功 ${success} 个${fail ? `，失败 ${fail} 个` : ''}`)
+  onSearch()
+}
+
+async function handleDeleteAll() {
+  let success = 0
+  let fail = 0
+  for (const ds of store.items) {
+    try {
+      await api.deleteDataSource(ds.id)
+      success++
+    } catch {
+      fail++
+    }
+  }
+  alert(`删除完成：成功 ${success} 个${fail ? `，失败 ${fail} 个` : ''}`)
+  onSearch()
 }
 
 async function openDetail(ds: DataSource) {
@@ -546,128 +729,122 @@ async function openDetail(ds: DataSource) {
 </script>
 
 <style scoped>
-.ds-page { padding: 28px 32px; max-width: 1200px; }
-.ds-page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
-.ds-page__actions { display: flex; gap: 8px; }
+.ds-page { padding: var(--space-8) var(--space-8); max-width: 1280px; }
 
-.ds-page__stats { display: flex; gap: 12px; margin-bottom: 20px; }
-.stat-card { flex: 1; padding: 16px; border-radius: var(--radius-lg); border: 1px solid var(--neutral-100); background: var(--neutral-0); }
-.stat-card__value { font-size: var(--text-h1-size); font-weight: 700; }
-.stat-card__label { font-size: var(--text-code-size); color: var(--neutral-500); margin-top: 2px; }
-.stat-card--semantic .stat-card__value { color: var(--semantic-600); }
-.stat-card--dynamic .stat-card__value { color: var(--dynamic-600); }
-.stat-card--kinetic .stat-card__value { color: var(--kinetic-600); }
-.stat-card--error .stat-card__value { color: var(--status-error); }
+.ds-page__header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  margin-bottom: var(--space-6);
+}
+.ds-page__title {
+  font-size: var(--text-display-size); font-weight: var(--text-display-weight);
+  line-height: var(--text-display-leading); letter-spacing: var(--text-display-tracking);
+  color: var(--neutral-900); margin: 0;
+}
+.ds-page__subtitle {
+  font-size: var(--text-caption-size); color: var(--neutral-500); margin-top: 4px;
+}
 
-.ds-page__filter { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.ds-search { padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: var(--text-body-size); width: 240px; color: var(--neutral-800); background: var(--neutral-0); outline: none; }
-.ds-search:focus { border-color: var(--semantic-500); }
-.ds-filter-tags { display: flex; gap: 6px; }
-.filter-tag { padding: 4px 12px; border-radius: var(--radius-full); border: 1px solid var(--neutral-200); background: var(--neutral-0); font-size: var(--text-code-size); color: var(--neutral-600); cursor: pointer; }
-.filter-tag--active { background: var(--semantic-600); color: var(--neutral-0); border-color: var(--semantic-600); }
+/* 统计卡片 */
+.ds-page__stats {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-4); margin-bottom: var(--space-6);
+}
+.stat-card {
+  display: flex; align-items: center; gap: var(--space-4);
+  padding: var(--space-5) var(--space-5); border-radius: var(--radius-xl);
+  border: 1px solid var(--neutral-100); background: var(--neutral-0);
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.stat-card:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
+.stat-card__icon {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: var(--radius-lg); flex-shrink: 0;
+  font-size: 22px;
+}
+.stat-card--semantic .stat-card__icon { background: var(--semantic-50); color: var(--semantic-500); }
+.stat-card--dynamic .stat-card__icon { background: var(--dynamic-50); color: var(--dynamic-500); }
+.stat-card--kinetic .stat-card__icon { background: var(--kinetic-50); color: var(--kinetic-500); }
+.stat-card--error .stat-card__icon { background: var(--status-error-bg); color: var(--status-error); }
 
-.ds-page__table-wrap { border: 1px solid var(--neutral-100); border-radius: var(--radius-lg); overflow: hidden; background: var(--neutral-0); }
-.ds-table { width: 100%; border-collapse: collapse; font-size: var(--text-body-size); }
-.ds-table th { text-align: left; padding: 10px 14px; font-size: var(--text-code-size); font-weight: 600; color: var(--neutral-500); background: var(--neutral-50); border-bottom: 1px solid var(--neutral-100); }
-.ds-table td { padding: 12px 14px; border-bottom: 1px solid var(--neutral-50); color: var(--neutral-800); }
-.ds-table tbody tr:hover { background: var(--neutral-25, var(--neutral-50)); }
-.ds-table tbody tr:last-child td { border-bottom: none; }
+.stat-card--semantic :deep(.ant-statistic-content-value) { color: var(--semantic-600); }
+.stat-card--dynamic :deep(.ant-statistic-content-value) { color: var(--dynamic-600); }
+.stat-card--kinetic :deep(.ant-statistic-content-value) { color: var(--kinetic-600); }
+.stat-card--error :deep(.ant-statistic-content-value) { color: var(--status-error); }
 
-.ds-type-badge { display: inline-block; padding: 2px 8px; border-radius: var(--radius-full); font-size: var(--text-caption-size); font-weight: 600; background: var(--semantic-50); color: var(--semantic-600); text-transform: uppercase; }
-.ds-status { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-code-size); font-weight: 500; }
-.ds-status::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
-.ds-status--active { color: var(--dynamic-600); }
-.ds-status--active::before { background: var(--dynamic-500); }
-.ds-status--inactive { color: var(--neutral-500); }
-.ds-status--inactive::before { background: var(--neutral-400); }
-.ds-status--error { color: var(--status-error); }
-.ds-status--error::before { background: var(--status-error); }
+:deep(.ant-statistic-title) { font-size: var(--text-caption-size); color: var(--neutral-500); }
+:deep(.ant-statistic-content) { font-size: var(--text-h1-size); font-weight: 700; }
 
-.ds-table__actions { display: flex; gap: 6px; }
-.btn-sm-sync, .btn-sm-detail, .btn-sm-edit, .btn-sm-del { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: var(--radius-md); font-size: var(--text-caption-size); font-weight: 500; cursor: pointer; border: 1px solid; }
-.btn-sm-sync { border-color: var(--kinetic-400); background: var(--kinetic-50); color: var(--kinetic-700); }
-.btn-sm-sync:hover { background: var(--kinetic-500); color: var(--neutral-0); }
-.btn-sm-sync:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-sm-detail { border-color: var(--semantic-400); background: var(--semantic-50); color: var(--semantic-600); }
-.btn-sm-detail:hover { background: var(--semantic-500); color: var(--neutral-0); }
-.btn-sm-edit { border-color: var(--semantic-400); background: var(--semantic-50); color: var(--semantic-600); }
-.btn-sm-edit:hover { background: var(--semantic-500); color: var(--neutral-0); }
-.btn-sm-del { border-color: var(--status-error); background: var(--status-error-bg); color: var(--status-error); }
-.btn-sm-del:hover { background: var(--status-error); color: var(--neutral-0); }
+/* 筛选栏 */
+.ds-page__filter {
+  display: flex; align-items: center; gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
 
-.ds-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: var(--radius-full); font-size: var(--text-code-size); font-weight: 500; cursor: pointer; border: none; transition: all var(--transition-fast); }
-.ds-toggle:disabled { opacity: 0.6; cursor: not-allowed; }
-.ds-toggle__dot { width: 8px; height: 8px; border-radius: 50%; transition: background var(--transition-fast); }
-.ds-toggle--on { background: var(--dynamic-50); color: var(--dynamic-700); }
-.ds-toggle--on .ds-toggle__dot { background: var(--dynamic-500); }
-.ds-toggle--on:hover { background: var(--dynamic-100); }
-.ds-toggle--off { background: var(--neutral-100); color: var(--neutral-500); }
-.ds-toggle--off .ds-toggle__dot { background: var(--neutral-400); }
-.ds-toggle--off:hover { background: var(--neutral-200); }
+/* 表格 */
+.ds-cell-name { font-weight: 500; color: var(--neutral-900); }
+.ds-cell-code { font-family: var(--font-mono); font-size: var(--text-code-size); color: var(--neutral-600); }
 
-.ds-empty { padding: 48px; text-align: center; }
+:deep(.ant-table) { font-size: var(--text-body-size); }
+:deep(.ant-table-thead > tr > th) {
+  font-size: var(--text-caption-size); font-weight: 600;
+  letter-spacing: 0.3px; color: var(--neutral-500);
+  background: var(--neutral-50) !important;
+}
+:deep(.ant-table-tbody > tr:hover > td) { background: var(--semantic-50) !important; }
+:deep(.ant-table-wrapper) {
+  border: 1px solid var(--neutral-100); border-radius: var(--radius-xl);
+  overflow: hidden; box-shadow: var(--shadow-xs);
+}
 
-.ds-form { display: flex; flex-direction: column; gap: 14px; }
-.ds-form__footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; }
-.form-row { display: flex; flex-direction: column; gap: 4px; }
-.form-row-inline { display: flex; gap: 12px; }
-.form-label { font-size: var(--text-code-size); font-weight: 500; color: var(--neutral-600); }
-.form-input { padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: var(--text-body-size); color: var(--neutral-800); background: var(--neutral-0); outline: none; }
-.form-input:focus { border-color: var(--semantic-500); }
-.form-input--code { font-family: var(--font-mono); font-size: var(--text-code-size); }
+/* 表单弹窗 */
+.ds-form__footer {
+  display: flex; justify-content: flex-end; gap: var(--space-2);
+  padding-top: var(--space-3); border-top: 1px solid var(--neutral-100); margin-top: var(--space-1);
+}
+.input-mono { font-family: var(--font-mono); font-size: var(--text-code-size); }
 
-.btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500; cursor: pointer; }
-.btn-primary:hover { background: var(--semantic-700); }
-.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-200); background: var(--neutral-0); color: var(--neutral-700); font-size: var(--text-body-size); font-weight: 500; cursor: pointer; }
-.btn-secondary:hover { background: var(--neutral-50); }
-
-.ds-detail-loading { padding: 32px; text-align: center; color: var(--neutral-500); font-size: var(--text-body-size); }
-.ds-detail-empty { padding: 32px; text-align: center; }
-.ds-detail-tables { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
-.ds-detail-table-item { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--neutral-100); border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-body-size); color: var(--neutral-700); transition: all var(--transition-fast); }
-.ds-detail-table-item:hover { background: var(--semantic-50); border-color: var(--semantic-300); color: var(--semantic-700); }
-.ds-detail-table-item svg { color: var(--neutral-400); flex-shrink: 0; }
-.ds-detail-table-item:hover svg { color: var(--semantic-500); }
-
-.ds-preview-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.btn-sm-back { font-size: var(--text-code-size); padding: 4px 12px; }
-.ds-preview-table-wrap { overflow-x: auto; max-height: 400px; overflow-y: auto; }
-.ds-preview-table { font-size: var(--text-code-size); }
-.ds-preview-table th { white-space: nowrap; position: sticky; top: 0; z-index: 1; }
-.ds-preview-table td { white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-
-/* 多模态新建 */
-.ds-category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 4px 0 8px; }
+/* 类别选择卡片 */
+.ds-category-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); padding: var(--space-1) 0 var(--space-2); }
+.ds-category-grid--3 { grid-template-columns: repeat(3, 1fr); }
 .ds-category-card {
-  display: flex; flex-direction: column; align-items: center; gap: 8px;
-  padding: 20px 16px; border: 1.5px solid var(--neutral-100); border-radius: var(--radius-lg);
-  cursor: pointer; transition: all .15s; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: var(--space-2);
+  padding: var(--space-5) var(--space-3); border-radius: var(--radius-xl);
+  border: 1px solid var(--neutral-100); background: var(--neutral-0);
+  cursor: pointer; transition: all var(--transition-fast); text-align: center;
 }
-.ds-category-card:hover { border-color: var(--semantic-400); background: var(--semantic-50, #f0f4ff); }
-.ds-category-icon { color: var(--semantic-500); }
+.ds-category-card:hover {
+  border-color: var(--semantic-300); background: var(--semantic-50);
+  box-shadow: var(--shadow-sm); transform: translateY(-2px);
+}
+.ds-category-icon { color: var(--semantic-500); display: flex; }
 .ds-category-name { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); }
-.ds-category-desc { font-size: var(--text-caption-size); color: var(--neutral-500); }
-.ds-form__back { font-size: var(--text-code-size); color: var(--semantic-500); cursor: pointer; margin-bottom: 12px; display: inline-block; }
-.ds-form__back:hover { text-decoration: underline; }
+.ds-category-desc { font-size: var(--text-caption-size); color: var(--neutral-500); line-height: 1.4; }
+
+/* 文件上传 */
 .ds-upload-zone {
-  border: 2px dashed var(--neutral-200); border-radius: var(--radius-lg);
-  padding: 28px 16px; text-align: center; cursor: pointer; transition: all .15s;
-  color: var(--neutral-500);
+  border: 2px dashed var(--neutral-200); border-radius: var(--radius-xl);
+  padding: var(--space-8) var(--space-4); text-align: center; cursor: pointer;
+  transition: all var(--transition-fast); color: var(--neutral-500); background: var(--neutral-50);
 }
-.ds-upload-zone--active { border-color: var(--semantic-400); background: var(--semantic-50, #f0f4ff); }
-.ds-upload-zone:hover { border-color: var(--semantic-300); }
+.ds-upload-zone--active { border-color: var(--semantic-400); background: var(--semantic-50); }
+.ds-upload-zone:hover { border-color: var(--semantic-300); background: var(--semantic-50); }
 .ds-upload-hint p { margin: 6px 0 0; font-size: var(--text-body-size); }
 .ds-upload-types { font-size: var(--text-caption-size); color: var(--neutral-400); }
-.ds-upload-selected { display: flex; align-items: center; gap: 10px; justify-content: center; font-size: var(--text-body-size); }
-.ds-file-icon { font-size: var(--text-h1-size); }
+.ds-upload-selected { display: flex; align-items: center; gap: var(--space-2); justify-content: center; font-size: var(--text-body-size); }
 .ds-file-size { font-size: var(--text-caption-size); color: var(--neutral-400); }
-.ds-cat-badge { font-size: var(--text-caption-upper-size); font-weight: 600; padding: 2px 7px; border-radius: 4px; }
-.ds-cat-badge--database { background: var(--semantic-100); color: var(--semantic-700); }
-.ds-cat-badge--file { background: var(--dynamic-100); color: var(--dynamic-800); }
-.ds-cat-badge--api { background: var(--kinetic-100); color: var(--kinetic-800); }
-.ds-cat-badge--mq { background: var(--status-error-bg); color: var(--kinetic-900); }
+
+/* 解析内容预览 */
 .ds-parsed-content { max-height: 400px; overflow-y: auto; }
-.ds-parsed-pre { font-size: var(--text-caption-size); font-family: var(--font-mono); white-space: pre-wrap; word-break: break-all; background: var(--neutral-50, #f8fafc); border: 1px solid var(--neutral-100); border-radius: var(--radius-md); padding: 12px; color: var(--neutral-700); line-height: 1.6; }
-.form-input--ta { resize: vertical; min-height: 60px; }
+.ds-parsed-pre {
+  font-size: var(--text-caption-size); font-family: var(--font-mono);
+  white-space: pre-wrap; word-break: break-all;
+  background: var(--neutral-50); border: 1px solid var(--neutral-100);
+  border-radius: var(--radius-lg); padding: var(--space-3); color: var(--neutral-700); line-height: 1.6;
+}
+
+/* Ant Design 覆盖 */
+:deep(.ant-modal-header) { border-bottom: 1px solid var(--neutral-100); padding-bottom: var(--space-3); }
+:deep(.ant-segmented) { background: var(--neutral-100); }
+:deep(.ant-segmented-item-selected) { background: var(--neutral-0); }
 </style>
