@@ -7,7 +7,6 @@ from typing import Optional
 
 from app.database import get_db
 from app.models.agent import Agent, ModelRegistry
-from app.models.knowledge import KnowledgeBase, KnowledgeFile
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 open_router = APIRouter(prefix="/open/agents", tags=["open-api"])
@@ -153,37 +152,11 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
     if entity_ids:
         ontology_ctx = build_ontology_context(db, entity_ids[0] if entity_ids else None)
 
-    # Retrieve knowledge base snippets
-    kb_ctx = ""
-    kb_ids = a.kb_ids or []
-    if kb_ids:
-        user_text = " ".join(
-            m.get("content", "") for m in body.messages if m.get("role") == "user"
-        )
-        snippets = []
-        for kb_id in kb_ids:
-            files = (
-                db.query(KnowledgeFile)
-                .filter(
-                    KnowledgeFile.kb_id == kb_id,
-                    KnowledgeFile.parsed_content.ilike(f"%{user_text[:30]}%"),
-                )
-                .limit(3)
-                .all()
-            )
-            for f in files:
-                if f.parsed_content:
-                    snippets.append(f.parsed_content[:500])
-        if snippets:
-            kb_ctx = "\n\n## 知识库参考\n" + "\n---\n".join(snippets)
-
     system_parts = []
     if a.system_prompt:
         system_parts.append(a.system_prompt)
     if ontology_ctx:
         system_parts.append(ontology_ctx)
-    if kb_ctx:
-        system_parts.append(kb_ctx)
     system_content = "\n\n".join(system_parts) or "你是一个智能助手。"
 
     messages = [{"role": "system", "content": system_content}] + list(body.messages)
