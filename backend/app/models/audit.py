@@ -4,7 +4,7 @@ from sqlalchemy import String, Text, DateTime, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
-from app.models.entity import gen_uuid
+from app.utils.identifiers import gen_uuid
 
 
 class AuditLog(Base):
