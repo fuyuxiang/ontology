@@ -311,10 +311,10 @@ function dsIcon(key: string): string {
 .iso-platform__side--bot { background: linear-gradient(90deg, rgba(59,130,246,.2) 0%, rgba(59,130,246,.08) 100%); }
 
 .iso-platform__label {
-  font-size: 9px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 800;
   letter-spacing: .16em;
-  color: #94a3b8;
+  color: var(--neutral-500);
   text-transform: uppercase;
   margin-bottom: 10px;
 }
@@ -340,7 +340,7 @@ function dsIcon(key: string): string {
 .iso-card--sel { border-color: rgba(59,130,246,.4); box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
 
 .iso-card--app .iso-card__screen { width: 100%; aspect-ratio: 16/9; display: block; }
-.iso-card__label { font-size: 11px; font-weight: 700; color: #1e293b; padding: 6px 10px 8px; }
+.iso-card__label { font-size: var(--text-caption-size); font-weight: 700; color: var(--neutral-900); padding: 6px 10px 8px; }
 
 /* ── Data cards (bottom layer) ── */
 .iso-bot-grid {
@@ -350,7 +350,7 @@ function dsIcon(key: string): string {
 }
 
 .iso-card--data { padding: 12px; }
-.iso-card__ds-icon { color: #64748b; margin-bottom: 6px; }
+.iso-card__ds-icon { color: var(--neutral-700); margin-bottom: 6px; }
 .iso-card__bars { display: flex; align-items: flex-end; gap: 3px; height: 28px; margin-top: 8px; }
 .iso-card__bar-seg { width: 8px; border-radius: 2px 2px 0 0; background: linear-gradient(180deg, #3b82f6, #10b981); }
 
@@ -378,8 +378,8 @@ function dsIcon(key: string): string {
   bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: var(--text-caption-size);
+  color: var(--neutral-500);
   background: rgba(255,255,255,.7);
   backdrop-filter: blur(8px);
   padding: 4px 12px;

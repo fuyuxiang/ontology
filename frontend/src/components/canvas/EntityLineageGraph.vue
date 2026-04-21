@@ -98,31 +98,31 @@ watch(() => props.entityId, loadLineage)
 .lineage-graph__toolbar {
   display: flex; align-items: center; gap: 10px; padding: 10px 0; flex-shrink: 0;
 }
-.lineage-label { font-size: 12px; color: #868e96; }
+.lineage-label { font-size: var(--text-code-size); color: var(--neutral-600); }
 .lineage-select {
-  padding: 4px 8px; border: 1px solid #dee2e6; border-radius: 6px;
-  font-size: 12px; background: #fff; outline: none;
+  padding: 4px 8px; border: 1px solid var(--neutral-300); border-radius: 6px;
+  font-size: var(--text-code-size); background: var(--neutral-0); outline: none;
 }
 .lineage-btn {
-  padding: 4px 12px; border: 1px solid #dee2e6; border-radius: 6px;
-  font-size: 12px; background: #f8f9fa; cursor: pointer; color: #495057;
+  padding: 4px 12px; border: 1px solid var(--neutral-300); border-radius: 6px;
+  font-size: var(--text-code-size); background: var(--neutral-50); cursor: pointer; color: var(--neutral-700);
 }
-.lineage-btn:hover { background: #e9ecef; }
-.lineage-stats { margin-left: auto; font-size: 11px; color: #adb5bd; }
+.lineage-btn:hover { background: var(--neutral-200); }
+.lineage-stats { margin-left: auto; font-size: var(--text-caption-size); color: var(--neutral-500); }
 .lineage-graph__canvas {
-  flex: 1; border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden; background: #f8f9fa;
+  flex: 1; border: 1px solid var(--neutral-200); border-radius: 8px; overflow: hidden; background: var(--neutral-50);
 }
 .lineage-graph__loading, .lineage-graph__empty {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 12px; color: #adb5bd; font-size: 13px;
+  justify-content: center; gap: 12px; color: var(--neutral-500); font-size: var(--text-body-size);
 }
 .lineage-spinner {
-  width: 24px; height: 24px; border: 2.5px solid #e9ecef;
-  border-top-color: #4c6ef5; border-radius: 50%;
+  width: 24px; height: 24px; border: 2.5px solid var(--neutral-200);
+  border-top-color: var(--semantic-600); border-radius: 50%;
   animation: lspin 0.8s linear infinite;
 }
 @keyframes lspin { to { transform: rotate(360deg); } }
 :deep(.lineage-highlight .ontology-node) {
-  border-color: #4c6ef5; box-shadow: 0 0 0 3px rgba(76,110,245,0.2);
+  border-color: var(--semantic-600); box-shadow: 0 0 0 3px rgba(76,110,245,0.2);
 }
 </style>

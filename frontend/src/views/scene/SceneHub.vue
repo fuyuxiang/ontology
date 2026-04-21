@@ -76,14 +76,14 @@ const scenes = [
 }
 
 .scene-hub__title {
-  font-size: 22px;
+  font-size: var(--text-h1-size);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
 }
 
 .scene-hub__desc {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   color: var(--text-secondary);
   margin: 6px 0 0;
 }
@@ -135,14 +135,14 @@ const scenes = [
 }
 
 .scene-card__name {
-  font-size: 15px;
+  font-size: var(--text-h3-size);
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 6px;
 }
 
 .scene-card__desc {
-  font-size: 13px;
+  font-size: var(--text-body-size);
   color: var(--text-secondary);
   margin: 0;
   line-height: 1.5;
@@ -152,7 +152,7 @@ const scenes = [
   position: absolute;
   top: 12px;
   right: 12px;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   padding: 2px 8px;
   border-radius: var(--radius-full, 999px);
   background: var(--bg-secondary, #f3f4f6);

@@ -56,14 +56,14 @@ const formattedValue = computed(() => {
 }
 
 .metric-card__value {
-  font-size: 28px;
+  font-size: var(--text-display-size);
   font-weight: 700;
   line-height: 1;
   color: var(--neutral-900);
 }
 
 .metric-card__label {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 400;
   color: var(--neutral-600);
   text-transform: uppercase;
@@ -75,7 +75,7 @@ const formattedValue = computed(() => {
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  font-size: 12px;
+  font-size: var(--text-code-size);
   font-weight: 500;
   margin-top: 4px;
 }
@@ -83,7 +83,7 @@ const formattedValue = computed(() => {
 .metric-card__trend--down { color: var(--status-error); }
 
 .metric-card__trend-label {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 400;
   color: var(--neutral-500);
   margin-left: 2px;

@@ -228,26 +228,26 @@ async function handleFileImport() {
 /* 模式切换 */
 .mode-tabs { display: flex; gap: 4px; margin-bottom: 16px; padding: 3px; background: var(--neutral-100); border-radius: 8px; }
 .mode-tab {
-  flex: 1; padding: 7px 0; border: none; border-radius: 6px; font-size: 13px; font-weight: 500;
+  flex: 1; padding: 7px 0; border: none; border-radius: 6px; font-size: var(--text-body-size); font-weight: 500;
   background: transparent; color: var(--neutral-500); cursor: pointer; transition: all 0.15s;
 }
-.mode-tab--active { background: #fff; color: var(--semantic-600); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+.mode-tab--active { background: var(--neutral-0); color: var(--semantic-600); box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
 
 .entity-form { display: flex; flex-direction: column; gap: 14px; }
 .form-row { display: flex; flex-direction: column; gap: 4px; }
-.form-label { font-size: 12px; font-weight: 500; color: var(--neutral-600); }
+.form-label { font-size: var(--text-code-size); font-weight: 500; color: var(--neutral-600); }
 .form-input {
   padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
-  font-size: 13px; color: var(--neutral-800); background: var(--neutral-0); outline: none;
+  font-size: var(--text-body-size); color: var(--neutral-800); background: var(--neutral-0); outline: none;
 }
 .form-input:focus { border-color: var(--semantic-500); }
-.form-input--sm { padding: 6px 8px; font-size: 12px; }
+.form-input--sm { padding: 6px 8px; font-size: var(--text-code-size); }
 .form-textarea { resize: vertical; font-family: inherit; }
 .form-radio-group { display: flex; gap: 12px; }
 .form-radio {
   display: flex; align-items: center; gap: 6px; padding: 6px 12px;
   border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
-  font-size: 12px; cursor: pointer; transition: all var(--transition-fast);
+  font-size: var(--text-code-size); cursor: pointer; transition: all var(--transition-fast);
 }
 .form-radio input { display: none; }
 .form-radio--active { border-color: var(--semantic-500); background: var(--semantic-50); }
@@ -256,31 +256,31 @@ async function handleFileImport() {
 .form-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .attr-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
 .attr-row .form-input { flex: 1; }
-.form-checkbox { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--neutral-600); white-space: nowrap; }
-.btn-sm { padding: 4px 10px; border-radius: var(--radius-md); border: 1px solid var(--semantic-400); background: transparent; color: var(--semantic-600); font-size: 11px; cursor: pointer; }
+.form-checkbox { display: flex; align-items: center; gap: 4px; font-size: var(--text-caption-size); color: var(--neutral-600); white-space: nowrap; }
+.btn-sm { padding: 4px 10px; border-radius: var(--radius-md); border: 1px solid var(--semantic-400); background: transparent; color: var(--semantic-600); font-size: var(--text-caption-size); cursor: pointer; }
 .btn-sm:hover { background: var(--semantic-50); }
 .btn-icon { width: 24px; height: 24px; border: none; background: transparent; color: var(--neutral-400); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .btn-icon:hover { color: var(--status-error); }
-.btn-primary { padding: 8px 20px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-primary { padding: 8px 20px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500; cursor: pointer; }
 .btn-primary:hover { background: var(--semantic-700); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; cursor: pointer; }
+.btn-secondary { padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: var(--text-body-size); cursor: pointer; }
 .btn-secondary:hover { background: var(--neutral-50); }
 
 /* 文件导入 */
 .file-picker { position: relative; }
 .file-input {
   width: 100%; padding: 8px 12px; border: 1px dashed var(--neutral-300); border-radius: var(--radius-md);
-  font-size: 13px; color: var(--neutral-600); background: var(--neutral-0); cursor: pointer;
+  font-size: var(--text-body-size); color: var(--neutral-600); background: var(--neutral-0); cursor: pointer;
 }
 .file-input:hover { border-color: var(--semantic-500); }
-.file-name { display: block; margin-top: 4px; font-size: 12px; color: var(--semantic-600); }
+.file-name { display: block; margin-top: 4px; font-size: var(--text-code-size); color: var(--semantic-600); }
 .import-preview {
   border: 1px solid var(--neutral-200); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 6px;
 }
 .import-result { background: var(--semantic-50); border-color: var(--semantic-200); }
-.preview-item { display: flex; justify-content: space-between; font-size: 12px; color: var(--neutral-700); }
+.preview-item { display: flex; justify-content: space-between; font-size: var(--text-code-size); color: var(--neutral-700); }
 .preview-label { font-weight: 500; color: var(--neutral-500); }
 .preview-errors { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--neutral-200); }
-.preview-error { font-size: 11px; color: var(--status-error); margin-bottom: 2px; }
+.preview-error { font-size: var(--text-caption-size); color: var(--status-error); margin-bottom: 2px; }
 </style>

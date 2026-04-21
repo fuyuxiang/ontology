@@ -499,7 +499,7 @@ function autoResize(e: Event) {
   border-radius: var(--radius-md);
   border: 1px solid var(--neutral-200);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--text-code-size);
   color: var(--neutral-600);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -595,7 +595,7 @@ function autoResize(e: Event) {
   border-radius: var(--radius-full);
   border: 1px solid var(--neutral-200);
   background: var(--neutral-50);
-  font-size: 12px;
+  font-size: var(--text-code-size);
   color: var(--neutral-700);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -621,7 +621,7 @@ function autoResize(e: Event) {
   border-radius: var(--radius-lg);
   border: 1px solid var(--neutral-200);
   background: var(--neutral-50);
-  font-size: 13px;
+  font-size: var(--text-body-size);
   color: var(--neutral-800);
   resize: none;
   outline: none;
@@ -643,7 +643,7 @@ function autoResize(e: Event) {
   border-radius: var(--radius-md);
   border: none;
   background: var(--semantic-600);
-  color: #fff;
+  color: var(--neutral-0);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -705,9 +705,9 @@ function autoResize(e: Event) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 700;
-  color: #fff;
+  color: var(--neutral-0);
   flex-shrink: 0;
 }
 .reasoning-step__index--ontology { background: var(--semantic-600); }
@@ -723,7 +723,7 @@ function autoResize(e: Event) {
   border: 1px solid var(--neutral-200);
 }
 .reasoning-step__type {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -736,7 +736,7 @@ function autoResize(e: Event) {
 
 .reasoning-step__source {
   font-family: var(--font-mono);
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-600);
   background: var(--neutral-100);
   padding: 2px 6px;
@@ -745,7 +745,7 @@ function autoResize(e: Event) {
   margin-top: 4px;
 }
 .reasoning-step__result {
-  font-size: 12px;
+  font-size: var(--text-code-size);
   color: var(--neutral-700);
   margin-top: 2px;
 }
@@ -757,7 +757,7 @@ function autoResize(e: Event) {
   border-left: 2px solid var(--semantic-300, #93b8e6);
 }
 .reasoning-step__detail-item {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-600);
   line-height: 1.6;
   white-space: pre-wrap;
@@ -778,7 +778,7 @@ function autoResize(e: Event) {
 .related-tag {
   padding: 3px 10px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-size: var(--text-code-size);
   font-weight: 500;
 }
 .related-tag--tier1 { background: var(--tier1-bg); color: var(--tier1-text); }
@@ -810,7 +810,7 @@ function autoResize(e: Event) {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-code-size);
   padding: 6px 14px;
   border-radius: var(--radius-md, 6px);
   border: 1px solid var(--semantic-400, #4a90d9);
@@ -830,12 +830,12 @@ function autoResize(e: Event) {
   cursor: not-allowed;
 }
 .action-btn__loading {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--semantic-500);
   margin-left: 4px;
 }
 .suggestion-chip--inline {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   padding: 3px 10px;
   border-radius: var(--radius-full);
   border: 1px solid var(--semantic-200);
@@ -850,18 +850,18 @@ function autoResize(e: Event) {
 }
 
 /* Markdown 渲染 */
-.markdown-body { font-size: 13px; line-height: 1.6; word-break: break-word; }
+.markdown-body { font-size: var(--text-body-size); line-height: 1.6; word-break: break-word; }
 .markdown-body :deep(p) { margin: 4px 0; }
-.markdown-body :deep(h3) { font-size: 14px; font-weight: 600; margin: 10px 0 4px; }
-.markdown-body :deep(h4) { font-size: 13px; font-weight: 600; margin: 8px 0 4px; }
-.markdown-body :deep(table) { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: 12px; }
+.markdown-body :deep(h3) { font-size: var(--text-body-size); font-weight: 600; margin: 10px 0 4px; }
+.markdown-body :deep(h4) { font-size: var(--text-body-size); font-weight: 600; margin: 8px 0 4px; }
+.markdown-body :deep(table) { border-collapse: collapse; width: 100%; margin: 6px 0; font-size: var(--text-code-size); }
 .markdown-body :deep(th),
 .markdown-body :deep(td) { border: 1px solid var(--neutral-200); padding: 4px 8px; text-align: left; }
 .markdown-body :deep(th) { background: var(--neutral-100); font-weight: 600; }
 .markdown-body :deep(ul),
 .markdown-body :deep(ol) { padding-left: 18px; margin: 4px 0; }
 .markdown-body :deep(li) { margin: 2px 0; }
-.markdown-body :deep(code) { background: var(--neutral-100); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.markdown-body :deep(code) { background: var(--neutral-100); padding: 1px 4px; border-radius: 3px; font-size: var(--text-code-size); }
 .markdown-body :deep(pre) { background: var(--neutral-100); padding: 8px; border-radius: 6px; overflow-x: auto; margin: 6px 0; }
 .markdown-body :deep(pre code) { background: none; padding: 0; }
 

@@ -128,7 +128,7 @@ defineExpose({ state, reset, setFailed: () => { state.value = 'failed' } })
   gap: 8px;
   padding: 8px 16px;
   border-radius: var(--radius-md);
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -139,7 +139,7 @@ defineExpose({ state, reset, setFailed: () => { state.value = 'failed' } })
 
 .action-button--default {
   background: var(--kinetic-500);
-  color: #ffffff;
+  color: var(--neutral-0);
 }
 .action-button--default:hover:not(:disabled) {
   background: var(--kinetic-600);
@@ -172,7 +172,7 @@ defineExpose({ state, reset, setFailed: () => { state.value = 'failed' } })
   border-radius: var(--radius-sm);
   border: 1px solid var(--neutral-300);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--text-code-size);
   color: var(--neutral-600);
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -183,8 +183,8 @@ defineExpose({ state, reset, setFailed: () => { state.value = 'failed' } })
   border-radius: var(--radius-sm);
   border: none;
   background: var(--kinetic-600);
-  color: #fff;
-  font-size: 12px;
+  color: var(--neutral-0);
+  font-size: var(--text-code-size);
   font-weight: 600;
   cursor: pointer;
   transition: background var(--transition-fast);
