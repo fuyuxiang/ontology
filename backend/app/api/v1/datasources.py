@@ -387,3 +387,85 @@ def create_mq_source(body: MqSourceBody, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(ds)
     return {"id": ds.id, "name": ds.name, "status": "active"}
+
+
+class OssSourceBody(_BM):
+    name: str
+    endpoint: str
+    bucket: str
+    access_key: str
+    secret_key: str
+    prefix: str = ""
+    description: str = ""
+
+
+@router.post("/oss-source", status_code=201)
+def create_oss_source(body: OssSourceBody, db: Session = Depends(get_db)):
+    try:
+        import boto3
+        from botocore.config import Config as BotoConfig
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=body.endpoint,
+            aws_access_key_id=body.access_key,
+            aws_secret_access_key=body.secret_key,
+            config=BotoConfig(connect_timeout=5, retries={"max_attempts": 1}),
+        )
+        s3.head_bucket(Bucket=body.bucket)
+    except Exception as e:
+        raise HTTPException(400, f"OSS 连接失败: {e}")
+
+    ds = DataSource(
+        name=body.name,
+        type="oss",
+        host=body.endpoint,
+        port=443,
+        source_category="file",
+        file_type="oss",
+        params={
+            "endpoint": body.endpoint,
+            "bucket": body.bucket,
+            "access_key": body.access_key,
+            "secret_key": body.secret_key,
+            "prefix": body.prefix,
+        },
+        description=body.description,
+        status="active",
+        enabled=True,
+    )
+    db.add(ds)
+    db.commit()
+    db.refresh(ds)
+    return {"id": ds.id, "name": ds.name, "status": "active"}
+
+
+class DirSourceBody(_BM):
+    name: str
+    directory_path: str
+    file_extensions: list[str] = []
+    description: str = ""
+
+
+@router.post("/dir-source", status_code=201)
+def create_dir_source(body: DirSourceBody, db: Session = Depends(get_db)):
+    import os
+    if not os.path.isdir(body.directory_path):
+        raise HTTPException(400, f"目录不存在或无法访问: {body.directory_path}")
+
+    ds = DataSource(
+        name=body.name,
+        type="directory",
+        host="local",
+        port=0,
+        source_category="file",
+        file_type="directory",
+        file_path=body.directory_path,
+        params={"file_extensions": body.file_extensions},
+        description=body.description,
+        status="active",
+        enabled=True,
+    )
+    db.add(ds)
+    db.commit()
+    db.refresh(ds)
+    return {"id": ds.id, "name": ds.name, "status": "active"}
