@@ -32,7 +32,6 @@
       </div>
       <div v-if="selectedAgent" class="copilot__agent-banner">
         <span>智能体：{{ selectedAgent.name }}</span>
-        <span v-if="selectedAgent.kb_ids?.length" class="copilot__agent-tag">知识库 ×{{ selectedAgent.kb_ids.length }}</span>
         <span v-if="selectedAgent.entity_ids?.length" class="copilot__agent-tag">实体 ×{{ selectedAgent.entity_ids.length }}</span>
       </div>
 
