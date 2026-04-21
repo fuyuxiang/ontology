@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from app.models.agent import Agent, ModelRegistry
 from app.models.knowledge import KnowledgeBase, KnowledgeFile
 
 router = APIRouter(prefix="/agents", tags=["agents"])
+open_router = APIRouter(prefix="/open/agents", tags=["open-api"])
 
 
 class AgentCreate(BaseModel):
@@ -224,3 +225,45 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
+
+
+# ── 公开 API（外部调用，X-Agent-Key 鉴权）──────────────────────────────────
+
+@open_router.post("/{aid}/chat")
+async def open_chat(
+    aid: str,
+    body: ChatRequest,
+    x_agent_key: Optional[str] = Header(None, alias="X-Agent-Key"),
+    db: Session = Depends(get_db),
+):
+    a = db.get(Agent, aid)
+    if not a:
+        raise HTTPException(404, "Agent not found")
+    if a.status != "published":
+        raise HTTPException(403, "Agent not published")
+    if not a.api_key or a.api_key != x_agent_key:
+        raise HTTPException(401, "Invalid or missing X-Agent-Key")
+
+    # Reuse internal chat logic
+    return await chat_with_agent(aid, body, db)
+
+
+@open_router.get("/{aid}/info")
+def open_agent_info(
+    aid: str,
+    x_agent_key: Optional[str] = Header(None, alias="X-Agent-Key"),
+    db: Session = Depends(get_db),
+):
+    a = db.get(Agent, aid)
+    if not a:
+        raise HTTPException(404, "Agent not found")
+    if a.status != "published":
+        raise HTTPException(403, "Agent not published")
+    if not a.api_key or a.api_key != x_agent_key:
+        raise HTTPException(401, "Invalid or missing X-Agent-Key")
+    return {
+        "id": a.id,
+        "name": a.name,
+        "description": a.description,
+        "tags": a.tags or [],
+    }

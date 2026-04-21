@@ -60,7 +60,7 @@ const router = createRouter({
     { path: '/scene/enterprise', name: 'scene-enterprise', component: () => import('../views/scene/EnterpriseScene.vue'), meta: { title: '政企根因分析' } },
     { path: '/scene/mnp', name: 'scene-mnp', component: () => import('../views/scene/MnpWorkbench.vue'), meta: { title: '携号转网预警' } },
     { path: '/app/alerts', name: 'app-alerts', component: Placeholder, meta: { title: '订阅预警' } },
-    { path: '/app/api', name: 'app-api', component: Placeholder, meta: { title: 'API开放' } },
+    { path: '/app/api', name: 'app-api', component: () => import('../views/api/ApiPortalView.vue'), meta: { title: 'API开放' } },
 
     // 治理中心
     { path: '/governance/versions', name: 'gov-versions', component: Placeholder, meta: { title: '版本管理' } },
