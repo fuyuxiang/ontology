@@ -131,7 +131,7 @@ const navGroups = [
     { path: '/governance/versions', label: '版本管理', icon: ico.version },
     { path: '/governance/permissions', label: '权限控制', icon: ico.permission },
     { path: '/governance/audit', label: '审计日志', icon: ico.audit },
-    { path: '/governance/glossary', label: '术语标准', icon: ico.glossary },
+    { path: '/governance/glossary', label: '帮助文档', icon: ico.glossary },
   ]},
 ]
 </script>
