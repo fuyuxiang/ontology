@@ -729,7 +729,7 @@ async function openDetail(ds: DataSource) {
 </script>
 
 <style scoped>
-.ds-page { padding: var(--space-8) var(--space-8); max-width: 1280px; }
+.ds-page { padding: var(--space-8) var(--space-8); }
 
 .ds-page__header {
   display: flex; justify-content: space-between; align-items: flex-start;
