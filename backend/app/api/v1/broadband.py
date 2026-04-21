@@ -1271,3 +1271,72 @@ def get_ontology_graph(churn_id: str):
             edges.append({"source": order["order_no"], "target": did, "relation": "派单"})
 
     return {"nodes": nodes, "edges": edges}
+
+
+# ── 语音质检 ──────────────────────────────────────────────────
+
+class VoiceAuditReq(BaseModel):
+    calls: list[dict]  # [{call_id, call_type, asr_text, engineer_name?}]
+
+@router.post("/detail/{churn_id}/voice-audit")
+def voice_audit(churn_id: str, req: VoiceAuditReq):
+    from openai import OpenAI
+    from app.config import settings
+
+    client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_API_BASE)
+
+    results = []
+    for call in req.calls:
+        asr = (call.get("asr_text") or "").strip()
+        if not asr:
+            results.append({"call_id": call.get("call_id"), "skipped": True, "reason": "无ASR文本"})
+            continue
+
+        prompt = f"""你是宽带装机服务质检专家。请对以下工程师与客户的通话文本进行质检分析。
+
+通话文本：
+{asr}
+
+请从以下5个维度逐一评分（pass/fail）并给出简短说明：
+1. 自我介绍：工程师是否进行了规范的自我介绍（姓名、工号、来意）
+2. 问题确认：是否清晰确认了客户问题或退单原因
+3. 操作规范：是否按规范流程操作，有无违规承诺或误导性表述
+4. 情绪处理：面对客户投诉/不满时是否妥善安抚
+5. 结果告知：是否明确告知处理结果或后续安排
+
+返回JSON格式：
+{{
+  "overall": "pass" | "fail" | "warning",
+  "score": 0-100,
+  "summary": "一句话总结",
+  "dimensions": [
+    {{"name": "自我介绍", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "问题确认", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "操作规范", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "情绪处理", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "结果告知", "result": "pass"|"fail"|"na", "comment": "..."}}
+  ],
+  "risk_flags": ["..."]
+}}
+只返回JSON，不要其他内容。"""
+
+        try:
+            resp = client.chat.completions.create(
+                model=settings.LLM_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=800,
+            )
+            raw = resp.choices[0].message.content.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            audit = json.loads(raw)
+            audit["call_id"] = call.get("call_id")
+            audit["call_type"] = call.get("call_type", "engineer")
+            results.append(audit)
+        except Exception as e:
+            results.append({"call_id": call.get("call_id"), "error": str(e), "overall": "error"})
+
+    return {"results": results}
