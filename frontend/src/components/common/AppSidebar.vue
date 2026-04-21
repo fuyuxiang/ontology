@@ -154,7 +154,7 @@ const navGroups = [
   padding: 16px 16px 12px;
   flex-shrink: 0;
 }
-.sidebar__logo-img { width: 28px; height: 28px; border-radius: 6px; }
+.sidebar__logo-img { width: 80px; height: 28px; border-radius: 6px; object-fit: contain; }
 .sidebar__logo-info { display: flex; flex-direction: column; line-height: 1.2; }
 .sidebar__logo-text { font-size: var(--text-body-size); font-weight: 700; color: var(--sidebar-text-active); }
 .sidebar__nav {
