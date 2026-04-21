@@ -58,7 +58,6 @@ const router = createRouter({
     // 治理中心
     { path: '/governance', name: 'governance', component: () => import('../views/governance/GovernanceView.vue'), meta: { title: '系统设置' },
       children: [
-        { path: 'versions', name: 'gov-versions', component: Placeholder, meta: { title: '版本管理' } },
         { path: 'permissions', name: 'gov-permissions', component: Placeholder, meta: { title: '权限控制' } },
         { path: 'audit', name: 'gov-audit', component: Placeholder, meta: { title: '审计日志' } },
         { path: 'glossary', name: 'gov-glossary', component: Placeholder, meta: { title: '帮助文档' } },
