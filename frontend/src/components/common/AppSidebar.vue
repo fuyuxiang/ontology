@@ -6,7 +6,7 @@
       </div>
       <div class="sidebar__logo-info">
         <span class="sidebar__logo-text">元枢</span>
-        <span class="sidebar__logo-text">Ontology</span>
+        <span class="sidebar__logo-subtext">Ontology</span>
       </div>
     </div>
 
@@ -139,12 +139,6 @@ const navGroups = [
     { path: '/scene', label: '场景验证', icon: ico.scene, exact: true },
     { path: '/app/api', label: 'API开放', icon: ico.api },
   ]},
-  { label: '治理中心', items: [
-    { path: '/governance/versions', label: '版本管理', icon: ico.version },
-    { path: '/governance/permissions', label: '权限控制', icon: ico.permission },
-    { path: '/governance/audit', label: '审计日志', icon: ico.audit },
-    { path: '/governance/glossary', label: '帮助文档', icon: ico.glossary },
-  ]},
 ]
 </script>
 
@@ -166,9 +160,10 @@ const navGroups = [
   padding: 16px 16px 12px;
   flex-shrink: 0;
 }
-.sidebar__logo-img { width: 28px; height: 28px; border-radius: 6px; }
-.sidebar__logo-info { display: flex; flex-direction: column; line-height: 1.2; }
-.sidebar__logo-text { font-size: var(--text-body-size); font-weight: 700; color: var(--sidebar-text-active); }
+.sidebar__logo-img { width: 48px; height: 28px; border-radius: 4px; object-fit: contain; }
+.sidebar__logo-info { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.sidebar__logo-text { font-size: 15px; font-weight: 700; color: var(--sidebar-text-active); }
+.sidebar__logo-subtext { font-size: 11px; font-weight: 600; color: var(--sidebar-text-muted); letter-spacing: 0.05em; }
 .sidebar__nav {
   flex: 1;
   overflow-y: auto;
