@@ -285,9 +285,9 @@ function nodeIcon(type: string): string {
 .onto-node--dynamic { background: rgba(230,252,245,.96); }
 .onto-node--kinetic { background: rgba(255,248,225,.96); }
 
-.onto-node__icon { color: #64748b; display: flex; align-items: center; justify-content: center; }
-.onto-node__name { font-size: 11px; font-weight: 700; color: #1e293b; line-height: 1.3; }
-.onto-node__meta { font-size: 9px; color: #94a3b8; }
+.onto-node__icon { color: var(--neutral-700); display: flex; align-items: center; justify-content: center; }
+.onto-node__name { font-size: var(--text-caption-size); font-weight: 700; color: var(--neutral-900); line-height: 1.3; }
+.onto-node__meta { font-size: var(--text-caption-upper-size); color: var(--neutral-500); }
 
 /* Relation badges */
 .onto-badge {
@@ -297,8 +297,8 @@ function nodeIcon(type: string): string {
   border-radius: 999px;
   background: rgba(16,185,129,.1);
   border: 1px solid rgba(16,185,129,.22);
-  color: #065f46;
-  font-size: 9px;
+  color: var(--dynamic-900);
+  font-size: var(--text-caption-upper-size);
   font-weight: 700;
   white-space: nowrap;
   z-index: 3;
@@ -319,15 +319,15 @@ function nodeIcon(type: string): string {
   pointer-events: none;
   transform: translateY(-50%);
 }
-.onto-probe__eyebrow { font-size: 9px; font-weight: 800; letter-spacing: .1em; color: #94a3b8; text-transform: uppercase; }
-.onto-probe__name { font-size: 13px; font-weight: 700; color: #1e293b; margin: 4px 0 8px; }
+.onto-probe__eyebrow { font-size: var(--text-caption-upper-size); font-weight: 800; letter-spacing: .1em; color: var(--neutral-500); text-transform: uppercase; }
+.onto-probe__name { font-size: var(--text-body-size); font-weight: 700; color: var(--neutral-900); margin: 4px 0 8px; }
 .onto-probe__rows { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
-.onto-probe__row { display: flex; justify-content: space-between; font-size: 11px; }
-.onto-probe__row span { color: #94a3b8; }
-.onto-probe__row strong { color: #334155; }
-.onto-probe__score-lbl { font-size: 9px; font-weight: 700; letter-spacing: .08em; color: #94a3b8; text-transform: uppercase; }
-.onto-probe__score-val { font-size: 22px; font-weight: 800; color: #f59e0b; margin: 2px 0 6px; }
-.onto-probe__bar-wrap { height: 5px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+.onto-probe__row { display: flex; justify-content: space-between; font-size: var(--text-caption-size); }
+.onto-probe__row span { color: var(--neutral-500); }
+.onto-probe__row strong { color: var(--neutral-800); }
+.onto-probe__score-lbl { font-size: var(--text-caption-upper-size); font-weight: 700; letter-spacing: .08em; color: var(--neutral-500); text-transform: uppercase; }
+.onto-probe__score-val { font-size: var(--text-h1-size); font-weight: 800; color: var(--kinetic-500); margin: 2px 0 6px; }
+.onto-probe__bar-wrap { height: 5px; background: var(--neutral-50); border-radius: 3px; overflow: hidden; }
 .onto-probe__bar { height: 100%; background: linear-gradient(90deg, #10b981, #f59e0b); border-radius: 3px; transition: width .5s ease; }
 
 .probe-enter-active, .probe-leave-active { transition: opacity .2s, transform .2s; }
@@ -342,8 +342,8 @@ function nodeIcon(type: string): string {
   text-align: center;
   border: 1px dashed #cbd5e1;
   border-radius: 16px;
-  color: #94a3b8;
-  font-size: 13px;
+  color: var(--neutral-500);
+  font-size: var(--text-body-size);
   background: rgba(255,255,255,.7);
 }
 </style>

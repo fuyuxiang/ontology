@@ -34,11 +34,11 @@ defineProps<{
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.page-loading__text { font-size: 13px; color: var(--neutral-500); }
+.page-loading__text { font-size: var(--text-body-size); color: var(--neutral-500); }
 
 .page-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   padding: 60px 0; gap: 12px; color: var(--neutral-400);
 }
-.page-empty__text { font-size: 13px; color: var(--neutral-500); }
+.page-empty__text { font-size: var(--text-body-size); color: var(--neutral-500); }
 </style>

@@ -108,10 +108,10 @@ async function handleDelete() {
 <style scoped>
 .entity-form { display: flex; flex-direction: column; gap: 14px; }
 .form-row { display: flex; flex-direction: column; gap: 4px; }
-.form-label { font-size: 12px; font-weight: 500; color: var(--neutral-600); }
+.form-label { font-size: var(--text-code-size); font-weight: 500; color: var(--neutral-600); }
 .form-input {
   padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
-  font-size: 13px; color: var(--neutral-800); background: var(--neutral-0); outline: none;
+  font-size: var(--text-body-size); color: var(--neutral-800); background: var(--neutral-0); outline: none;
 }
 .form-input:focus { border-color: var(--semantic-500); }
 .form-textarea { resize: vertical; font-family: inherit; }
@@ -119,26 +119,26 @@ async function handleDelete() {
 .form-radio {
   display: flex; align-items: center; gap: 6px; padding: 6px 12px;
   border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
-  font-size: 12px; cursor: pointer; transition: all var(--transition-fast);
+  font-size: var(--text-code-size); cursor: pointer; transition: all var(--transition-fast);
 }
 .form-radio input { display: none; }
 .form-radio--active { border-color: var(--semantic-500); background: var(--semantic-50); }
 .tier-dot { width: 8px; height: 8px; border-radius: 50%; }
 .btn-primary {
   padding: 8px 20px; border-radius: var(--radius-md); border: none;
-  background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
+  background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500; cursor: pointer;
 }
 .btn-primary:hover { background: var(--semantic-700); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-secondary {
   padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--neutral-300);
-  background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; cursor: pointer;
+  background: var(--neutral-0); color: var(--neutral-700); font-size: var(--text-body-size); cursor: pointer;
 }
 .btn-secondary:hover { background: var(--neutral-50); }
 .btn-danger {
   padding: 8px 16px; border-radius: var(--radius-md); border: 1px solid var(--status-error);
-  background: var(--status-error-bg); color: var(--status-error); font-size: 13px; cursor: pointer;
+  background: var(--status-error-bg); color: var(--status-error); font-size: var(--text-body-size); cursor: pointer;
 }
-.btn-danger:hover { background: var(--status-error); color: #fff; }
+.btn-danger:hover { background: var(--status-error); color: var(--neutral-0); }
 .btn-danger:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

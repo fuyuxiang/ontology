@@ -44,10 +44,10 @@ const labelStyle = computed(() => ({
 <style scoped>
 .edge-label {
   display: flex; align-items: center; gap: 4px;
-  background: #fff; padding: 2px 8px; border-radius: 4px;
-  border: 1px solid #e9ecef; font-size: 10px; white-space: nowrap;
+  background: var(--neutral-0); padding: 2px 8px; border-radius: 4px;
+  border: 1px solid var(--neutral-200); font-size: var(--text-caption-upper-size); white-space: nowrap;
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
-.edge-label__name { color: #495057; font-weight: 500; }
-.edge-label__card { color: #adb5bd; font-size: 9px; }
+.edge-label__name { color: var(--neutral-700); font-weight: 500; }
+.edge-label__card { color: var(--neutral-500); font-size: var(--text-caption-upper-size); }
 </style>

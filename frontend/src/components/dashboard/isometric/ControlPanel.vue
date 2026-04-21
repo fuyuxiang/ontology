@@ -151,14 +151,14 @@ function applyColor() {
 .ctrl-panel {
   width: 300px;
   height: 100%;
-  background: #ffffff;
-  border-left: 1px solid #e5e5e5;
+  background: var(--neutral-0);
+  border-left: 1px solid var(--neutral-200);
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .ctrl-panel__header {
@@ -168,20 +168,20 @@ function applyColor() {
 }
 
 .ctrl-panel__title {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--neutral-900);
   letter-spacing: 0.02em;
 }
 
 .ctrl-panel__close {
   width: 24px;
   height: 24px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--neutral-200);
   border-radius: 6px;
-  background: #fafafa;
-  color: #71717a;
-  font-size: 12px;
+  background: var(--neutral-50);
+  color: var(--neutral-600);
+  font-size: var(--text-code-size);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -189,8 +189,8 @@ function applyColor() {
 }
 
 .ctrl-panel__close:hover {
-  background: #f4f4f5;
-  color: #1a1a1a;
+  background: var(--neutral-50);
+  color: var(--neutral-900);
 }
 
 .ctrl-panel__empty {
@@ -199,8 +199,8 @@ function applyColor() {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #a1a1aa;
-  font-size: 13px;
+  color: var(--neutral-500);
+  font-size: var(--text-body-size);
   line-height: 1.6;
   padding: 40px 20px;
 }
@@ -212,31 +212,31 @@ function applyColor() {
 }
 
 .ctrl-panel__label {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: #a1a1aa;
+  color: var(--neutral-500);
   text-transform: uppercase;
 }
 
 .ctrl-panel__value {
-  font-size: 13px;
-  color: #3f3f46;
+  font-size: var(--text-body-size);
+  color: var(--neutral-800);
 }
 
 .ctrl-panel__value--title {
-  font-size: 18px;
+  font-size: var(--text-h2-size);
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--neutral-900);
 }
 
 .ctrl-panel__badge {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #f0fdf4;
-  color: #166534;
-  font-size: 11px;
+  background: var(--dynamic-50);
+  color: var(--dynamic-900);
+  font-size: var(--text-caption-size);
   font-weight: 600;
   width: fit-content;
 }
@@ -252,26 +252,26 @@ function applyColor() {
   flex-direction: column;
   align-items: center;
   padding: 10px 8px;
-  background: #fafafa;
-  border: 1px solid #f4f4f5;
+  background: var(--neutral-50);
+  border: 1px solid var(--neutral-100);
   border-radius: 8px;
 }
 
 .ctrl-panel__stat-value {
-  font-size: 18px;
+  font-size: var(--text-h2-size);
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--neutral-900);
 }
 
 .ctrl-panel__stat-label {
-  font-size: 10px;
-  color: #a1a1aa;
+  font-size: var(--text-caption-upper-size);
+  color: var(--neutral-500);
   margin-top: 2px;
 }
 
 .ctrl-panel__divider {
   height: 1px;
-  background: #f4f4f5;
+  background: var(--neutral-50);
   margin: 4px 0;
 }
 
@@ -284,41 +284,41 @@ function applyColor() {
 .ctrl-panel__input {
   flex: 1;
   padding: 7px 10px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--neutral-200);
   border-radius: 6px;
-  font-size: 12px;
-  color: #1a1a1a;
-  background: #fafafa;
+  font-size: var(--text-code-size);
+  color: var(--neutral-900);
+  background: var(--neutral-50);
   outline: none;
 }
 
 .ctrl-panel__input:focus {
-  border-color: #4ade80;
+  border-color: var(--dynamic-300);
   box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.15);
 }
 
 .ctrl-panel__color {
   width: 32px;
   height: 32px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--neutral-200);
   border-radius: 6px;
   cursor: pointer;
   padding: 2px;
 }
 
 .ctrl-panel__color-hex {
-  font-size: 11px;
-  color: #71717a;
-  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--text-caption-size);
+  color: var(--neutral-600);
+  font-family: var(--font-mono);
 }
 
 .ctrl-panel__apply {
   padding: 7px 12px;
   border: none;
   border-radius: 6px;
-  background: #1a1a1a;
-  color: #ffffff;
-  font-size: 11px;
+  background: var(--neutral-950);
+  color: var(--neutral-0);
+  font-size: var(--text-caption-size);
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
@@ -326,6 +326,6 @@ function applyColor() {
 }
 
 .ctrl-panel__apply:hover {
-  background: #3f3f46;
+  background: var(--neutral-800);
 }
 </style>
