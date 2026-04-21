@@ -3,7 +3,8 @@ import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 
 from app.database import SessionLocal, Base, engine
-from app.models.workflow import Workflow, gen_uuid
+from app.models.workflow import Workflow
+from app.utils.identifiers import gen_uuid
 from datetime import datetime
 
 # 确保表存在
