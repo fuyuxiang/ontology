@@ -149,6 +149,7 @@ const stateClass = computed(() => {
 <style scoped>
 .wf-node {
   width: 220px;
+  height: 100px;
   background: #ffffff;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
@@ -156,6 +157,8 @@ const stateClass = computed(() => {
   overflow: hidden;
   transition: box-shadow 0.2s, border-color 0.2s, transform 0.15s;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
 }
 .wf-node:hover {
   box-shadow: 0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
@@ -186,8 +189,9 @@ const stateClass = computed(() => {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px 10px;
+  padding: 10px 12px 8px;
   border-bottom: 1px solid #f1f5f9;
+  flex-shrink: 0;
 }
 
 .wf-node__icon-wrap {
@@ -264,15 +268,21 @@ const stateClass = computed(() => {
 .wf-node__state-badge--error .wf-node__state-text { color: #dc2626; }
 
 .wf-node__body {
-  padding: 8px 14px 12px;
+  padding: 6px 12px 8px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
 }
 .wf-node__desc {
   font-size: 11px;
   color: #64748b;
   line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .wf-node__extra {
   display: flex;
