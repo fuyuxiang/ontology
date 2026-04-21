@@ -51,9 +51,9 @@ defineProps<{
   align-items: center;
 }
 .cap-card__item {
-  color: #1a3a7a;
+  color: var(--semantic-900);
   font-size: 0.6vw;
-  font-family: AlimamaFangYuanTiVF-Regular, sans-serif;
+  font-family: var(--font-sans);
   white-space: nowrap;
   padding: 0.15vw 0.4vw;
   background: rgba(255, 255, 255, 0.55);

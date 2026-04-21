@@ -160,17 +160,17 @@ function goDetail(id: string) { router.push(`/ontology/${id}`) }
 </script>
 
 <style scoped>
-.canvas-page { display: flex; flex-direction: column; height: 100%; background: #f8f9fa; }
+.canvas-page { display: flex; flex-direction: column; height: 100%; background: var(--neutral-50); }
 .canvas-page__body { display: flex; flex: 1; overflow: hidden; }
 .canvas-page__canvas { flex: 1; position: relative; }
 .canvas-loading {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 12px;
-  background: rgba(248,249,250,0.85); z-index: 10; color: #868e96; font-size: 13px;
+  background: rgba(248,249,250,0.85); z-index: 10; color: var(--neutral-600); font-size: var(--text-body-size);
 }
 .canvas-loading__spinner {
-  width: 28px; height: 28px; border: 2.5px solid #e9ecef;
-  border-top-color: #4c6ef5; border-radius: 50%;
+  width: 28px; height: 28px; border: 2.5px solid var(--neutral-200);
+  border-top-color: var(--semantic-600); border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }

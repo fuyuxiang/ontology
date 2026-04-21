@@ -79,7 +79,7 @@ function handleLogout() {
   display: flex; align-items: center; justify-content: space-between;
   padding: 16px 20px; border-bottom: 1px solid var(--neutral-200);
 }
-.settings-dialog__title { font-size: 15px; font-weight: 600; color: var(--neutral-800); }
+.settings-dialog__title { font-size: var(--text-h3-size); font-weight: 600; color: var(--neutral-800); }
 .settings-dialog__close {
   width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
   border: none; background: transparent; border-radius: 6px;
@@ -89,19 +89,19 @@ function handleLogout() {
 .settings-dialog__body { padding: 16px 20px; }
 .settings-dialog__section { margin-bottom: 20px; }
 .settings-dialog__section:last-child { margin-bottom: 0; }
-.settings-dialog__label { font-size: 11px; font-weight: 600; color: var(--neutral-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+.settings-dialog__label { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
 .settings-dialog__user { display: flex; align-items: center; gap: 12px; }
 .settings-dialog__avatar {
   width: 36px; height: 36px; border-radius: 50%;
-  background: var(--semantic-600); color: #fff;
-  font-size: 14px; font-weight: 700;
+  background: var(--semantic-600); color: var(--neutral-0);
+  font-size: var(--text-body-size); font-weight: 700;
   display: flex; align-items: center; justify-content: center;
 }
-.settings-dialog__name { font-size: 14px; font-weight: 600; color: var(--neutral-800); }
-.settings-dialog__role { font-size: 12px; color: var(--neutral-500); }
+.settings-dialog__name { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); }
+.settings-dialog__role { font-size: var(--text-code-size); color: var(--neutral-500); }
 .settings-dialog__row {
   display: flex; align-items: center; justify-content: space-between;
-  font-size: 13px; color: var(--neutral-700);
+  font-size: var(--text-body-size); color: var(--neutral-700);
 }
 .settings-dialog__toggle {
   width: 40px; height: 22px; border-radius: 11px; border: none;
@@ -112,7 +112,7 @@ function handleLogout() {
 .settings-dialog__toggle-dot {
   position: absolute; top: 2px; left: 2px;
   width: 18px; height: 18px; border-radius: 50%;
-  background: #fff; transition: transform 0.2s;
+  background: var(--neutral-0); transition: transform 0.2s;
 }
 .settings-dialog__toggle--on .settings-dialog__toggle-dot { transform: translateX(18px); }
 .settings-dialog__footer {
@@ -121,10 +121,10 @@ function handleLogout() {
 .settings-dialog__logout {
   width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--neutral-200);
   background: transparent; color: var(--neutral-600);
-  font-size: 13px; font-weight: 500; cursor: pointer;
+  font-size: var(--text-body-size); font-weight: 500; cursor: pointer;
   transition: all 0.15s;
 }
-.settings-dialog__logout:hover { background: var(--neutral-50); color: #ef4444; border-color: #fca5a5; }
+.settings-dialog__logout:hover { background: var(--neutral-50); color: var(--status-error); border-color: var(--status-error); }
 .fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
