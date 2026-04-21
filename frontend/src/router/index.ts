@@ -20,17 +20,14 @@ const router = createRouter({
       meta: { title: '本体目录' },
       children: [
         { path: '', name: 'browser-objects', component: () => import('../views/ontology/OntologyExplorer.vue'), meta: { title: '本体目录' } },
-        { path: 'graph', name: 'browser-graph', component: () => import('../views/dataflow/DataflowView.vue'), meta: { title: '本体图谱' } },
-        { path: 'rules', name: 'browser-rules', component: () => import('../views/logic/LogicView.vue'), meta: { title: '业务规则' } },
-        { path: 'build/auto', name: 'browser-build-auto', component: () => import('../views/ontology/AutoBuildView.vue'), meta: { title: '自动化构建' } },
-        { path: 'build/manual', name: 'browser-build-manual', component: () => import('../views/ontology/ManualBuildView.vue'), meta: { title: '手工构建' } },
       ]
     },
+    { path: '/browser/graph', name: 'browser-graph', component: () => import('../views/dataflow/DataflowView.vue'), meta: { title: '本体图谱' } },
     { path: '/ontology/:id', name: 'ontology-detail', component: () => import('../views/detail/EntityDetail.vue'), meta: { title: '实体详情' } },
 
     // 数据接入
     { path: '/datasource', name: 'datasource', component: () => import('../views/datasource/DataSourceView.vue'), meta: { title: '数据源' } },
-    { path: '/data/mapping', name: 'data-mapping', component: Placeholder, meta: { title: '本体映射' } },
+    { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射' } },
     { path: '/data/resolution', name: 'data-resolution', component: Placeholder, meta: { title: '实体解析' } },
     { path: '/data/lineage', name: 'data-lineage', component: Placeholder, meta: { title: '血缘分析' } },
 
@@ -53,7 +50,7 @@ const router = createRouter({
     { path: '/scene/enterprise', name: 'scene-enterprise', component: () => import('../views/scene/EnterpriseScene.vue'), meta: { title: '政企根因分析' } },
     { path: '/scene/mnp', name: 'scene-mnp', component: () => import('../views/scene/MnpWorkbench.vue'), meta: { title: '携号转网预警' } },
     { path: '/app/alerts', name: 'app-alerts', component: Placeholder, meta: { title: '订阅预警' } },
-    { path: '/app/api', name: 'app-api', component: () => import('../views/api/ApiPortalView.vue'), meta: { title: 'API开放' } },
+    { path: '/app/api', name: 'app-api', component: () => import('../views/api/ApiPortalView.vue'), meta: { title: 'API开放平台' } },
 
     // 治理中心
     { path: '/governance', name: 'governance', component: () => import('../views/governance/GovernanceView.vue'), meta: { title: '系统设置' },

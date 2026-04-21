@@ -3,7 +3,7 @@
   <EdgeLabelRenderer>
     <div :style="labelStyle" class="edge-label">
       <span class="edge-label__name">{{ data.label }}</span>
-      <span class="edge-label__card">{{ data.cardinality }}</span>
+      <span class="edge-label__card" v-if="data.cardinality">{{ data.cardinality }}</span>
     </div>
   </EdgeLabelRenderer>
 </template>
@@ -30,7 +30,7 @@ const path = computed(() => {
   return p
 })
 
-const edgeStyle = { stroke: '#91a7ff', strokeWidth: 1.5 }
+const edgeStyle = { stroke: '#a5b4fc', strokeWidth: 1.8, opacity: 0.7 }
 
 const labelStyle = computed(() => ({
   position: 'absolute',
@@ -44,10 +44,11 @@ const labelStyle = computed(() => ({
 <style scoped>
 .edge-label {
   display: flex; align-items: center; gap: 4px;
-  background: var(--neutral-0); padding: 2px 8px; border-radius: 4px;
-  border: 1px solid var(--neutral-200); font-size: var(--text-caption-upper-size); white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  background: rgba(255,255,255,0.92); padding: 2px 8px; border-radius: 6px;
+  border: 1px solid #e2e8f0; font-size: 10px; white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  backdrop-filter: blur(4px);
 }
-.edge-label__name { color: var(--neutral-700); font-weight: 500; }
-.edge-label__card { color: var(--neutral-500); font-size: var(--text-caption-upper-size); }
+.edge-label__name { color: #475569; font-weight: 500; }
+.edge-label__card { color: #94a3b8; font-size: 10px; }
 </style>

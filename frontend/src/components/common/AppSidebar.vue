@@ -118,10 +118,7 @@ const navGroups = [
     { path: '/changes', label: '最近变更', icon: ico.changes },
   ]},
   { label: '本体管理', items: [
-    { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true, children: [
-      { path: '/browser/build/auto', label: '自动化构建' },
-      { path: '/browser/build/manual', label: '手工构建' },
-    ]},
+    { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },
     { path: '/browser/graph', label: '本体图谱', icon: ico.graph },
   ]},
   { label: '数据接入', items: [
@@ -137,7 +134,7 @@ const navGroups = [
   { label: '智能应用', items: [
     { path: '/copilot', label: '知识问答', icon: ico.copilot },
     { path: '/scene', label: '场景验证', icon: ico.scene, exact: true },
-    { path: '/app/api', label: 'API开放', icon: ico.api },
+    { path: '/app/api', label: 'API开放平台', icon: ico.api },
   ]},
 ]
 </script>
