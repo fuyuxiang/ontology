@@ -160,7 +160,7 @@ const navGroups = [
   padding: 16px 16px 12px;
   flex-shrink: 0;
 }
-.sidebar__logo-img { width: 48px; height: 28px; border-radius: 4px; object-fit: contain; }
+.sidebar__logo-img { width: 72px; height: 28px; border-radius: 4px; object-fit: contain; }
 .sidebar__logo-info { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
 .sidebar__logo-text { font-size: 15px; font-weight: 700; color: var(--sidebar-text-active); }
 .sidebar__logo-subtext { font-size: 11px; font-weight: 600; color: var(--sidebar-text-muted); letter-spacing: 0.05em; }
