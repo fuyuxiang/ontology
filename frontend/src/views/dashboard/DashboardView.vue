@@ -47,6 +47,12 @@
                 <div v-for="node in row" :key="node.id" class="platform-item"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon" :src="node.icon" :alt="node.label" />
+                  <span class="platform-label">{{ node.label }}</span>
+                  <div class="platform-tooltip">
+                    <div class="platform-tooltip-name">{{ node.label }}</div>
+                    <div class="platform-tooltip-desc">{{ node.desc }}</div>
+                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -59,6 +65,12 @@
                 <div v-for="node in coreNodes" :key="node.id" class="platform-item platform-item--core"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon platform-icon--core" :src="node.icon" :alt="node.label" />
+                  <span class="platform-label">{{ node.label }}</span>
+                  <div class="platform-tooltip">
+                    <div class="platform-tooltip-name">{{ node.label }}</div>
+                    <div class="platform-tooltip-desc">{{ node.desc }}</div>
+                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }}</div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -76,6 +88,9 @@
     <div class="bottom-controls">
       <button class="bottom-btn" @click="resetView"><img src="/images/ontology/btn-重置视角.png" alt="重置" /></button>
     </div>
+
+    <!-- 节点详情面板 -->
+    <NodeDetailPanel v-if="selectedNode" :node="selectedNode" :relations="nodeRelations" @close="selectedNode = null" />
 
   </div>
 </template>
