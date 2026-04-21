@@ -68,7 +68,7 @@ const router = createRouter({
     { path: '/governance/reviews', name: 'gov-reviews', component: Placeholder, meta: { title: '变更评审' } },
     { path: '/governance/releases', name: 'gov-releases', component: Placeholder, meta: { title: '发布中心' } },
     { path: '/governance/audit', name: 'gov-audit', component: Placeholder, meta: { title: '审计日志' } },
-    { path: '/governance/glossary', name: 'gov-glossary', component: Placeholder, meta: { title: '术语标准' } },
+    { path: '/governance/glossary', name: 'gov-glossary', component: Placeholder, meta: { title: '帮助文档' } },
   ]
 })
 
