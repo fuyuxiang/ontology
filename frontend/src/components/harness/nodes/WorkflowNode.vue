@@ -103,11 +103,6 @@ const NODE_META: Record<string, { label: string; icon: string; color: string; gr
     gradient: 'linear-gradient(135deg, #0ea5e9 0%, #38bdf8 100%)',
     icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 019.9-1M13 8a5 5 0 01-9.9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M12 4l1 3-3 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   },
-  'knowledge-retrieval': {
-    label: '知识库检索', color: '#0d9488',
-    gradient: 'linear-gradient(135deg, #0d9488 0%, #2dd4bf 100%)',
-    icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>`,
-  },
   'ontology-relation': {
     label: '关系图遍历', color: '#6366f1',
     gradient: 'linear-gradient(135deg, #6366f1 0%, #818cf8 100%)',
@@ -161,7 +156,6 @@ const bodyExtra = computed(() => {
   if (nodeType.value === 'variable-assign') return props.data.var_name || ''
   if (nodeType.value === 'rule-engine') return props.data.rule_expr || ''
   if (nodeType.value === 'ml-model') return props.data.model_name || ''
-  if (nodeType.value === 'knowledge-retrieval') return props.data.kb_name || ''
   if (nodeType.value === 'voice-audit') return props.data.scenario || ''
   if (nodeType.value === 'notification') return props.data.notify_type || ''
   if (nodeType.value === 'api-response') return props.data.format || 'JSON'
@@ -176,7 +170,6 @@ const bodyExtraKey = computed(() => {
   if (nodeType.value === 'variable-assign') return '变量'
   if (nodeType.value === 'rule-engine') return '条件'
   if (nodeType.value === 'ml-model') return '模型'
-  if (nodeType.value === 'knowledge-retrieval') return '知识库'
   if (nodeType.value === 'voice-audit') return '场景'
   if (nodeType.value === 'notification') return '方式'
   if (nodeType.value === 'api-response') return '格式'
