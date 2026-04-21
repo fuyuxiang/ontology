@@ -64,23 +64,23 @@ const hasActual = computed(() => props.conditions.some(c => c.actualValue !== un
 </script>
 
 <style scoped>
-.mapping-table { background: #fff; border-radius: 10px; border: 1px solid #e9ecef; padding: 16px; }
+.mapping-table { background: var(--neutral-0); border-radius: 10px; border: 1px solid var(--neutral-200); padding: 16px; }
 .mapping-table__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-.mapping-table__title { font-size: 14px; font-weight: 600; color: #343a40; }
-.mapping-table__badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 4px; }
-.badge--high { background: #fff5f5; color: #fa5252; }
-.badge--medium { background: #fff8e1; color: #f59f00; }
-.badge--low { background: #e7f5ff; color: #339af0; }
-.mtable { width: 100%; border-collapse: collapse; font-size: 12px; }
-.mtable th { text-align: left; padding: 8px 10px; background: #f8f9fa; color: #495057; font-weight: 600; border-bottom: 2px solid #e9ecef; }
-.mtable td { padding: 8px 10px; border-bottom: 1px solid #f1f3f5; color: #495057; }
-.entity-cell { color: #4c6ef5; font-weight: 500; }
-.attr-cell { font-family: monospace; font-size: 11px; color: #7048e8; }
-.actual-cell { font-weight: 600; color: #212529; }
+.mapping-table__title { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); }
+.mapping-table__badge { font-size: var(--text-caption-size); font-weight: 600; padding: 3px 10px; border-radius: 4px; }
+.badge--high { background: var(--status-error-bg); color: var(--status-error); }
+.badge--medium { background: var(--status-warning-bg); color: var(--kinetic-500); }
+.badge--low { background: var(--status-info-bg); color: var(--status-info); }
+.mtable { width: 100%; border-collapse: collapse; font-size: var(--text-code-size); }
+.mtable th { text-align: left; padding: 8px 10px; background: var(--neutral-50); color: var(--neutral-700); font-weight: 600; border-bottom: 2px solid var(--neutral-200); }
+.mtable td { padding: 8px 10px; border-bottom: 1px solid var(--neutral-100); color: var(--neutral-700); }
+.entity-cell { color: var(--semantic-600); font-weight: 500; }
+.attr-cell { font-family: var(--font-mono); font-size: var(--text-caption-size); color: var(--tier2-primary); }
+.actual-cell { font-weight: 600; color: var(--neutral-900); }
 .match-cell { text-align: center; }
-.match-icon { font-size: 14px; font-weight: 700; }
-.match--yes { color: #12b886; }
-.match--no { color: #fa5252; }
-.mapping-table__footer { margin-top: 12px; padding: 10px 12px; background: #f8f9fa; border-radius: 8px; font-size: 13px; font-weight: 500; color: #343a40; }
-.footer-icon { color: #4c6ef5; margin-right: 6px; }
+.match-icon { font-size: var(--text-body-size); font-weight: 700; }
+.match--yes { color: var(--status-success); }
+.match--no { color: var(--status-error); }
+.mapping-table__footer { margin-top: 12px; padding: 10px 12px; background: var(--neutral-50); border-radius: 8px; font-size: var(--text-body-size); font-weight: 500; color: var(--neutral-800); }
+.footer-icon { color: var(--semantic-600); margin-right: 6px; }
 </style>

@@ -69,7 +69,7 @@ function isTabActive(path: string) {
   align-items: center;
   gap: 6px;
   padding: 10px 16px;
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   color: var(--neutral-500);
   text-decoration: none;

@@ -89,14 +89,14 @@ function onColorInput() {
 .ctrl-panel {
   width: 300px;
   height: 100%;
-  background: #ffffff;
-  border-left: 1px solid #e5e5e5;
+  background: var(--neutral-0);
+  border-left: 1px solid var(--neutral-200);
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
 }
 
 .ctrl-panel__header {
@@ -106,20 +106,20 @@ function onColorInput() {
 }
 
 .ctrl-panel__title {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--neutral-900);
   margin: 0;
 }
 
 .ctrl-panel__close {
   width: 28px;
   height: 28px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--neutral-200);
   border-radius: 6px;
-  background: #fafafa;
-  color: #71717a;
-  font-size: 13px;
+  background: var(--neutral-50);
+  color: var(--neutral-600);
+  font-size: var(--text-body-size);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -128,8 +128,8 @@ function onColorInput() {
 }
 
 .ctrl-panel__close:hover {
-  background: #f4f4f5;
-  color: #1a1a1a;
+  background: var(--neutral-50);
+  color: var(--neutral-900);
 }
 
 .ctrl-panel__empty {
@@ -138,8 +138,8 @@ function onColorInput() {
   align-items: center;
   justify-content: center;
   text-align: center;
-  color: #a1a1aa;
-  font-size: 13px;
+  color: var(--neutral-500);
+  font-size: var(--text-body-size);
   padding: 20px;
 }
 
@@ -150,43 +150,43 @@ function onColorInput() {
 }
 
 .ctrl-panel__label {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #a1a1aa;
+  color: var(--neutral-500);
 }
 
 .ctrl-panel__value {
-  font-size: 14px;
+  font-size: var(--text-body-size);
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--neutral-900);
 }
 
 .ctrl-panel__value--title {
-  font-size: 16px;
+  font-size: var(--text-h3-size);
 }
 
 .ctrl-panel__value--mono {
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  color: #71717a;
+  font-family: var(--font-mono);
+  font-size: var(--text-caption-size);
+  color: var(--neutral-600);
 }
 
 .ctrl-panel__badge {
   display: inline-block;
   padding: 3px 10px;
   border-radius: 999px;
-  background: #eef2ff;
-  color: #3730a3;
-  font-size: 11px;
+  background: var(--semantic-50);
+  color: var(--semantic-900);
+  font-size: var(--text-caption-size);
   font-weight: 600;
   width: fit-content;
 }
 
 .ctrl-panel__divider {
   height: 1px;
-  background: #f4f4f5;
+  background: var(--neutral-50);
   margin: 4px 0;
 }
 
@@ -199,31 +199,31 @@ function onColorInput() {
 .ctrl-panel__input {
   flex: 1;
   padding: 7px 10px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--neutral-200);
   border-radius: 6px;
-  font-size: 12px;
-  color: #1a1a1a;
-  background: #fafafa;
+  font-size: var(--text-code-size);
+  color: var(--neutral-900);
+  background: var(--neutral-50);
   outline: none;
 }
 
 .ctrl-panel__input:focus {
-  border-color: #6366f1;
+  border-color: var(--semantic-600);
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.15);
 }
 
 .ctrl-panel__color {
   width: 32px;
   height: 32px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--neutral-200);
   border-radius: 6px;
   cursor: pointer;
   padding: 2px;
 }
 
 .ctrl-panel__color-hex {
-  font-size: 11px;
-  color: #71717a;
-  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--text-caption-size);
+  color: var(--neutral-600);
+  font-family: var(--font-mono);
 }
 </style>

@@ -455,14 +455,14 @@ const bottomCards = computed(() => allCards.value.slice(3))
 
 <style scoped>
 @font-face {
-  font-family: AlimamaFangYuanTiVF-Regular;
+  font-family: var(--font-sans);
   src: url(/fonts/AlimamaFangYuanTiVF-Thin.ttf) format('truetype');
   font-weight: 400;
 }
 
 .screen-wrapper {
   width: 100%; height: 100%; min-height: 720px;
-  position: relative; overflow: hidden; background: #0a0e1a;
+  position: relative; overflow: hidden; background: var(--neutral-950);
   cursor: grab;
 }
 .screen-wrapper:active { cursor: grabbing; }
@@ -530,9 +530,9 @@ const bottomCards = computed(() => allCards.value.slice(3))
 .platform-icon--core { width: 65px; }
 
 .platform-label {
-  color: #003291;
+  color: var(--semantic-900);
   text-align: center; white-space: nowrap;
-  font-family: AlimamaFangYuanTiVF-Regular, sans-serif;
+  font-family: var(--font-sans);
   font-size: 0.625vw; font-weight: 400;
   letter-spacing: 0;
   background: url(/images/ontology/label-bg.png) center / 100% 100% no-repeat;
@@ -559,7 +559,7 @@ const bottomCards = computed(() => allCards.value.slice(3))
   opacity: 1; visibility: visible;
   transform: translateX(-50%) translateY(0);
 }
-.platform-tooltip-name { color: #e8f0ff; font-size: 0.68vw; font-weight: 600; margin-bottom: 0.21vw; }
+.platform-tooltip-name { color: var(--semantic-100); font-size: 0.68vw; font-weight: 600; margin-bottom: 0.21vw; }
 .platform-tooltip-desc { color: rgba(200, 220, 255, 0.75); font-size: 0.57vw; line-height: 1.5; white-space: normal; margin-bottom: 0.21vw; }
 .platform-tooltip-row { color: rgba(200, 220, 255, 0.85); font-size: 0.57vw; line-height: 1.6; white-space: nowrap; }
 
@@ -575,5 +575,5 @@ const bottomCards = computed(() => allCards.value.slice(3))
 .bottom-btn img { width: auto; height: 2.78vh; display: block; }
 .bottom-btn:hover { filter: brightness(1.2); }
 .config-btn { color: rgba(0,50,145,0.7); padding: 4px; border-radius: 6px; }
-.config-btn:hover { color: #003291; filter: none; background: rgba(0,50,145,0.1); }
+.config-btn:hover { color: var(--semantic-900); filter: none; background: rgba(0,50,145,0.1); }
 </style>
