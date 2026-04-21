@@ -55,7 +55,7 @@ export const knowledgeApi = {
     fd.append('name', name)
     fd.append('description', description)
     fd.append('tags', tags)
-    return client.post<KnowledgeBase>('/api/v1/knowledge', fd).then(r => r.data)
+    return client.post<KnowledgeBase>('/knowledge', fd).then(r => r.data)
   },
   get(kbId: string) {
     return get<KnowledgeBase>(`/knowledge/${kbId}`)
@@ -65,7 +65,7 @@ export const knowledgeApi = {
     fd.append('name', name)
     fd.append('description', description)
     fd.append('tags', tags)
-    return client.put<KnowledgeBase>(`/api/v1/knowledge/${kbId}`, fd).then(r => r.data)
+    return client.put<KnowledgeBase>(`/knowledge/${kbId}`, fd).then(r => r.data)
   },
   delete(kbId: string) {
     return del<{ ok: boolean }>(`/knowledge/${kbId}`)
@@ -73,7 +73,7 @@ export const knowledgeApi = {
   uploadFile(kbId: string, file: File) {
     const fd = new FormData()
     fd.append('file', file)
-    return client.post<KnowledgeFile>(`/api/v1/knowledge/${kbId}/files`, fd).then(r => r.data)
+    return client.post<KnowledgeFile>(`/knowledge/${kbId}/files`, fd).then(r => r.data)
   },
   deleteFile(kbId: string, fid: string) {
     return del<{ ok: boolean }>(`/knowledge/${kbId}/files/${fid}`)
@@ -82,10 +82,10 @@ export const knowledgeApi = {
     return get<{ content: string; file_type: string; name: string }>(`/knowledge/${kbId}/files/${fid}/content`)
   },
   updateAsr(kbId: string, fid: string, asr_text: string) {
-    return client.put<{ ok: boolean }>(`/api/v1/knowledge/${kbId}/files/${fid}/asr`, { asr_text }).then(r => r.data)
+    return client.put<{ ok: boolean }>(`/knowledge/${kbId}/files/${fid}/asr`, { asr_text }).then(r => r.data)
   },
   voiceAudit(kbId: string, fid: string, asr_text: string, scenario = 'broadband') {
-    return client.post<VoiceAuditResult>(`/api/v1/knowledge/${kbId}/files/${fid}/voice-audit`, { asr_text, scenario }).then(r => r.data)
+    return client.post<VoiceAuditResult>(`/knowledge/${kbId}/files/${fid}/voice-audit`, { asr_text, scenario }).then(r => r.data)
   },
   search(q: string) {
     return get<SearchResult[]>('/knowledge/search', { params: { q } })
