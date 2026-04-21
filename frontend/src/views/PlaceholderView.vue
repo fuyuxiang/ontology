@@ -60,7 +60,7 @@ const title = computed(() => {
 .placeholder-tag {
   padding: 4px 12px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-size: var(--text-code-size);
   font-weight: 500;
 }
 .placeholder-tag--semantic { background: var(--semantic-50); color: var(--semantic-700); }

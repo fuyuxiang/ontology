@@ -34,7 +34,7 @@ const router = useRouter()
   display: flex;
   align-items: center;
   gap: 2px;
-  font-size: 12px;
+  font-size: var(--text-code-size);
   color: var(--neutral-600);
 }
 
@@ -62,12 +62,12 @@ const router = useRouter()
 .ontology-breadcrumb__sep {
   color: var(--neutral-400);
   margin: 0 2px;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
 }
 
 .ontology-breadcrumb__tier-tag {
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 600;
   padding: 1px 5px;
   border-radius: 3px;

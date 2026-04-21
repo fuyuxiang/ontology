@@ -29,18 +29,18 @@ defineEmits<{ layout: []; fit: []; direction: [d: 'LR' | 'TB'] }>()
 .canvas-toolbar {
   display: flex; align-items: center; justify-content: space-between;
   height: 44px; padding: 0 16px;
-  background: #fff; border-bottom: 1px solid #e9ecef;
+  background: var(--neutral-0); border-bottom: 1px solid var(--neutral-200);
   flex-shrink: 0;
 }
 .canvas-toolbar__left { display: flex; align-items: center; gap: 4px; }
 .toolbar-btn {
   display: flex; align-items: center; gap: 4px;
-  padding: 5px 10px; border: 1px solid #e9ecef; border-radius: 6px;
-  background: #f8f9fa; color: #495057; font-size: 12px; font-weight: 500;
+  padding: 5px 10px; border: 1px solid var(--neutral-200); border-radius: 6px;
+  background: var(--neutral-50); color: var(--neutral-700); font-size: var(--text-code-size); font-weight: 500;
   cursor: pointer; transition: all 0.15s;
 }
-.toolbar-btn:hover { background: #e9ecef; }
-.toolbar-btn--active { background: #4c6ef5; color: #fff; border-color: #4c6ef5; }
-.toolbar-sep { width: 1px; height: 20px; background: #e9ecef; margin: 0 4px; }
-.toolbar-stats { color: #868e96; }
+.toolbar-btn:hover { background: var(--neutral-200); }
+.toolbar-btn--active { background: var(--semantic-600); color: var(--neutral-0); border-color: var(--semantic-600); }
+.toolbar-sep { width: 1px; height: 20px; background: var(--neutral-200); margin: 0 4px; }
+.toolbar-stats { color: var(--neutral-600); }
 </style>

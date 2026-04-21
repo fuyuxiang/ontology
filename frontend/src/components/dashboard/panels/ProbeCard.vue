@@ -46,7 +46,7 @@ const posStyle = computed(() => ({
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(148, 163, 184, 0.12);
   border-radius: 12px;
-  color: #E2E8F0;
+  color: var(--neutral-300);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
   padding: 14px;
   pointer-events: auto;
@@ -64,19 +64,19 @@ const posStyle = computed(() => ({
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.probe__eyebrow { font-size: 9px; font-weight: 800; letter-spacing: .1em; color: #64748B; text-transform: uppercase; }
-.probe__name { font-size: 13px; font-weight: 700; color: #E2E8F0; margin: 3px 0 8px; }
+.probe__eyebrow { font-size: var(--text-caption-upper-size); font-weight: 800; letter-spacing: .1em; color: var(--neutral-700); text-transform: uppercase; }
+.probe__name { font-size: var(--text-body-size); font-weight: 700; color: var(--neutral-300); margin: 3px 0 8px; }
 .probe__rows { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
-.probe__row { display: flex; justify-content: space-between; font-size: 11px; }
-.probe__row span { color: #94A3B8; }
-.probe__row strong { color: #CBD5E1; }
-.probe__status { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #94A3B8; margin-bottom: 8px; }
+.probe__row { display: flex; justify-content: space-between; font-size: var(--text-caption-size); }
+.probe__row span { color: var(--neutral-500); }
+.probe__row strong { color: var(--neutral-400); }
+.probe__status { display: flex; align-items: center; gap: 5px; font-size: var(--text-caption-upper-size); color: var(--neutral-500); margin-bottom: 8px; }
 .probe__dot { width: 6px; height: 6px; border-radius: 50%; }
-.dot--active { background: #20C997; }
-.dot--warning { background: #F59F00; }
-.dot--error { background: #FA5252; }
-.probe__health-lbl { font-size: 9px; font-weight: 700; letter-spacing: .08em; color: #64748B; }
-.probe__health-val { font-size: 20px; font-weight: 800; color: #F59F00; margin: 2px 0 4px; }
+.dot--active { background: var(--dynamic-500); }
+.dot--warning { background: var(--kinetic-500); }
+.dot--error { background: var(--status-error); }
+.probe__health-lbl { font-size: var(--text-caption-upper-size); font-weight: 700; letter-spacing: .08em; color: var(--neutral-700); }
+.probe__health-val { font-size: var(--text-h2-size); font-weight: 800; color: var(--kinetic-500); margin: 2px 0 4px; }
 .probe__bar { height: 4px; background: rgba(241,245,249,.1); border-radius: 2px; overflow: hidden; }
 .probe__bar-fill { height: 100%; background: linear-gradient(90deg, #10B981, #F59F00); border-radius: 2px; transition: width .4s ease; }
 </style>
