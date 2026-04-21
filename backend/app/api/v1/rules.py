@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from datetime import datetime
 
 from app.database import get_db
@@ -10,11 +9,23 @@ from app.schemas.rule import (
     RuleCreate, RuleUpdate, RuleExecuteResult,
     RuleEvaluateRequest, RuleEvaluateResult,
 )
+from app.repositories import RuleRepository
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.services.audit import write_audit
 
 router = APIRouter(prefix="/rules", tags=["rules"])
+
+
+def _rule_to_out(r: BusinessRule, entity_name: str) -> RuleOut:
+    return RuleOut(
+        id=r.id, name=r.name, entity_id=r.entity_id,
+        entity_name=entity_name,
+        condition_expr=r.condition_expr, action_desc=r.action_desc,
+        status=r.status, priority=r.priority,
+        trigger_count=r.trigger_count, last_triggered=r.last_triggered,
+        conditions_json=r.conditions_json, rule_meta_json=r.rule_meta_json,
+    )
 
 
 @router.get("", response_model=list[RuleOut])
@@ -25,46 +36,18 @@ def list_rules(
     search: str | None = None,
     db: Session = Depends(get_db),
 ):
-    q = db.query(BusinessRule)
-    if entity_id:
-        q = q.filter(BusinessRule.entity_id == entity_id)
-    if status:
-        q = q.filter(BusinessRule.status == status)
-    if priority:
-        q = q.filter(BusinessRule.priority == priority)
-    if search:
-        pattern = f"%{search}%"
-        q = q.filter(BusinessRule.name.ilike(pattern) | BusinessRule.condition_expr.ilike(pattern))
-
-    rules = q.order_by(BusinessRule.priority.desc(), BusinessRule.name).all()
-    result = []
-    for r in rules:
-        entity = db.get(OntologyEntity, r.entity_id)
-        result.append(RuleOut(
-            id=r.id, name=r.name, entity_id=r.entity_id,
-            entity_name=entity.name if entity else "",
-            condition_expr=r.condition_expr, action_desc=r.action_desc,
-            status=r.status, priority=r.priority,
-            trigger_count=r.trigger_count, last_triggered=r.last_triggered,
-            conditions_json=r.conditions_json, rule_meta_json=r.rule_meta_json,
-        ))
-    return result
+    repo = RuleRepository(db)
+    rules = repo.list_with_filters(entity_id=entity_id, status=status, priority=priority, search=search)
+    return [_rule_to_out(r, repo.get_entity_name(r.entity_id)) for r in rules]
 
 
 @router.get("/{rule_id}", response_model=RuleOut)
 def get_rule(rule_id: str, db: Session = Depends(get_db)):
-    r = db.get(BusinessRule, rule_id)
+    repo = RuleRepository(db)
+    r = repo.get_by_id(rule_id)
     if not r:
         raise HTTPException(status_code=404, detail="规则不存在")
-    entity = db.get(OntologyEntity, r.entity_id)
-    return RuleOut(
-        id=r.id, name=r.name, entity_id=r.entity_id,
-        entity_name=entity.name if entity else "",
-        condition_expr=r.condition_expr, action_desc=r.action_desc,
-        status=r.status, priority=r.priority,
-        trigger_count=r.trigger_count, last_triggered=r.last_triggered,
-        conditions_json=r.conditions_json, rule_meta_json=r.rule_meta_json,
-    )
+    return _rule_to_out(r, repo.get_entity_name(r.entity_id))
 
 
 @router.post("", response_model=RuleOut, status_code=201)
@@ -73,6 +56,7 @@ def create_rule(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
+    repo = RuleRepository(db)
     entity = db.get(OntologyEntity, data.entity_id)
     if not entity:
         raise HTTPException(status_code=400, detail="关联实体不存在")
@@ -83,8 +67,7 @@ def create_rule(
         status=data.status, priority=data.priority,
         conditions_json=data.conditions_json, rule_meta_json=data.rule_meta_json,
     )
-    db.add(rule)
-    db.flush()
+    repo.create(rule)
 
     write_audit(
         db, user_id=user.id if user else None,
@@ -92,7 +75,7 @@ def create_rule(
         action="create", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )
-    db.commit()
+    repo.commit()
     return get_rule(rule.id, db)
 
 
@@ -102,7 +85,8 @@ def update_rule(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    rule = db.get(BusinessRule, rule_id)
+    repo = RuleRepository(db)
+    rule = repo.get_by_id(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="规则不存在")
 
@@ -120,7 +104,7 @@ def update_rule(
             action="update", target_type="rule",
             target_id=rule.id, target_name=rule.name, changes=changes,
         )
-    db.commit()
+    repo.commit()
     return get_rule(rule.id, db)
 
 
@@ -130,7 +114,8 @@ def delete_rule(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    rule = db.get(BusinessRule, rule_id)
+    repo = RuleRepository(db)
+    rule = repo.get_by_id(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="规则不存在")
 
@@ -140,8 +125,8 @@ def delete_rule(
         action="delete", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )
-    db.delete(rule)
-    db.commit()
+    repo.delete(rule)
+    repo.commit()
 
 
 @router.post("/{rule_id}/execute", response_model=RuleExecuteResult)
@@ -150,7 +135,8 @@ def execute_rule(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    rule = db.get(BusinessRule, rule_id)
+    repo = RuleRepository(db)
+    rule = repo.get_by_id(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="规则不存在")
 
@@ -163,7 +149,7 @@ def execute_rule(
         action="execute", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )
-    db.commit()
+    repo.commit()
 
     return RuleExecuteResult(
         success=True,
@@ -180,7 +166,8 @@ def evaluate_rule(
     user: User | None = Depends(get_current_user),
 ):
     """对指定用户评估规则，返回结构化判断结果"""
-    rule = db.get(BusinessRule, rule_id)
+    repo = RuleRepository(db)
+    rule = repo.get_by_id(rule_id)
     if not rule:
         raise HTTPException(status_code=404, detail="规则不存在")
     if not rule.conditions_json:
@@ -196,7 +183,7 @@ def evaluate_rule(
         action="evaluate", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )
-    db.commit()
+    repo.commit()
 
     return RuleEvaluateResult(
         rule_id=result.rule_id or rule.id,
