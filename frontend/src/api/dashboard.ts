@@ -1,4 +1,4 @@
-import { get } from './client'
+import { get, put } from './client'
 
 export interface DashboardStatsEx {
   entity_count: number
@@ -17,8 +17,35 @@ export interface DashboardStatsEx {
   datasources: { id: string; name: string; type: string; status: string }[]
 }
 
+export interface CardItemConfig {
+  type: 'dynamic' | 'static' | 'top_rules' | 'datasources' | 'rule_priority' | 'recent_activities'
+  field?: string
+  label?: string
+  text?: string
+  count?: number
+}
+
+export interface CardConfig {
+  key: string
+  title: string
+  enabled: boolean
+  items: CardItemConfig[]
+}
+
+export interface DashboardConfig {
+  cards_config: CardConfig[]
+  refresh_interval: number
+}
+
 export const dashboardApi = {
   stats() {
     return get<DashboardStatsEx>('/dashboard/stats')
   },
+  getConfig() {
+    return get<DashboardConfig>('/dashboard/config')
+  },
+  saveConfig(data: DashboardConfig) {
+    return put<{ ok: boolean }>('/dashboard/config', data)
+  },
 }
+

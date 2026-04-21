@@ -87,10 +87,20 @@
     <!-- 底部控制 -->
     <div class="bottom-controls">
       <button class="bottom-btn" @click="resetView"><img src="/images/ontology/btn-重置视角.png" alt="重置" /></button>
+      <button class="bottom-btn config-btn" @click="showConfig = true" title="配置仪表盘">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
     </div>
 
     <!-- 节点详情面板 -->
     <NodeDetailPanel v-if="selectedNode" :node="selectedNode" :relations="nodeRelations" @close="selectedNode = null" />
+
+    <!-- 仪表盘配置抽屉 -->
+    <DashboardConfigDrawer v-if="dashConfig" :visible="showConfig" :config="dashConfig"
+      @close="showConfig = false" @saved="onConfigSaved" />
 
   </div>
 </template>
@@ -100,8 +110,9 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import CapabilityCard from '../../components/dashboard/panels/CapabilityCard.vue'
 import NodeDetailPanel from '../../components/dashboard/panels/NodeDetailPanel.vue'
+import DashboardConfigDrawer from '../../components/dashboard/panels/DashboardConfigDrawer.vue'
 import { dashboardApi } from '../../api/dashboard'
-import type { DashboardStatsEx } from '../../api/dashboard'
+import type { DashboardStatsEx, DashboardConfig } from '../../api/dashboard'
 import { entityApi } from '../../api/ontology'
 import { relationApi } from '../../api/relations'
 import type { EntityListItem } from '../../types'
@@ -115,6 +126,9 @@ const entities = ref<EntityListItem[]>([])
 const relations = ref<RelationData[]>([])
 const hoveredNode = ref<OntologyNode | null>(null)
 const selectedNode = ref<OntologyNode | null>(null)
+const dashConfig = ref<DashboardConfig | null>(null)
+const showConfig = ref(false)
+let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 interface OntologyNode {
   id: string; label: string; desc: string; icon: string
@@ -124,15 +138,34 @@ interface OntologyNode {
 }
 
 onMounted(async () => {
-  const [s, e, r] = await Promise.all([
+  const [s, e, r, cfg] = await Promise.all([
     dashboardApi.stats().catch(() => null),
     entityApi.list().catch(() => []),
     relationApi.list().catch(() => []),
+    dashboardApi.getConfig().catch(() => null),
   ])
   stats.value = s as any
   entities.value = e as EntityListItem[]
   relations.value = r as RelationData[]
+  dashConfig.value = cfg as any
+
+  const interval = (cfg as any)?.refresh_interval ?? 30
+  refreshTimer = setInterval(async () => {
+    stats.value = await dashboardApi.stats().catch(() => stats.value) as any
+  }, interval * 1000)
 })
+
+onBeforeUnmount(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+})
+
+function onConfigSaved(cfg: DashboardConfig) {
+  dashConfig.value = cfg
+  if (refreshTimer) clearInterval(refreshTimer)
+  refreshTimer = setInterval(async () => {
+    stats.value = await dashboardApi.stats().catch(() => stats.value) as any
+  }, cfg.refresh_interval * 1000)
+}
 
 /* ── Icon mapping ── */
 const coreNames = new Set(['Customer', 'Order', 'Product', 'Channel', 'Organization', 'Staff', 'Address'])
@@ -314,6 +347,7 @@ onBeforeUnmount(() => {
   }
   window.removeEventListener('mousemove', onMouseMove)
   window.removeEventListener('mouseup', onMouseUp)
+  if (refreshTimer) clearInterval(refreshTimer)
 })
 
 function onNodeClick(node: OntologyNode) {
@@ -321,72 +355,87 @@ function onNodeClick(node: OntologyNode) {
 }
 
 /* ── Top & Bottom cards ── */
-const topCards = computed(() => [
-  {
-    title: 'ANALYTICS & WORKFLOWS',
-    bg: '/images/ontology/bg-ANALYTICS &WORKFLOWS.png',
-    flex: 479,
-    items: stats.value ? [
-      `${stats.value.entity_count} 个实体`,
-      `${stats.value.relation_count} 条关系`,
-      `${stats.value.rule_count} 条规则`,
-      `${stats.value.active_rule_count} 条活跃规则`,
-    ] : ['加载中...'],
-  },
-  {
-    title: 'AUTOMATIONS',
-    bg: '/images/ontology/bg-AUTOMATIONS.png',
-    flex: 537,
-    items: stats.value ? [
-      ...stats.value.top_rules.slice(0, 4).map((r: any) => r.name),
-      ...(stats.value.top_rules.length === 0 ? ['暂无规则'] : []),
-    ] : ['加载中...'],
-  },
-  {
-    title: 'PRODUCTS & SDKs',
-    bg: '/images/ontology/bg-PRODUCTS & SDKs.png',
-    flex: 470,
-    items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway'],
-  },
-])
+const BG_MAP: Record<string, string> = {
+  analytics: '/images/ontology/bg-ANALYTICS &WORKFLOWS.png',
+  automations: '/images/ontology/bg-AUTOMATIONS.png',
+  products: '/images/ontology/bg-PRODUCTS & SDKs.png',
+  datasources: '/images/ontology/bg-DATA SOURCES.png',
+  logic: '/images/ontology/bg-LOGIC SOURCES.png',
+  actions: '/images/ontology/bg-SYSTEMS OF ACTION.png',
+}
+const ICON_MAP: Record<string, string> = {
+  datasources: '/images/ontology/icon-DATA SOURCES.png',
+  logic: '/images/ontology/icon-LOGIC SOURCES.png',
+  actions: '/images/ontology/icon-SYSTEMS OF ACTION.png',
+}
+const FLEX_MAP: Record<string, number> = {
+  analytics: 479, automations: 537, products: 470,
+  datasources: 514, logic: 514, actions: 441,
+}
 
-const bottomCards = computed(() => {
-  const dsList = (stats.value as any)?.datasources ?? []
-  const bbSources = dsList.filter((d: any) => d.name.startsWith('bb_')).map((d: any) => d.name.replace('bb_', ''))
-  const otherSources = dsList.filter((d: any) => !d.name.startsWith('bb_')).map((d: any) => d.name)
-  const dsItems = [
-    ...(bbSources.length ? [`宽带退单(${bbSources.length}表)`, ...bbSources.slice(0, 4)] : []),
-    ...(otherSources.length ? [`携号转网(${otherSources.length}表)`, ...otherSources.slice(0, 3)] : []),
-    ...(!dsList.length ? ['暂无数据源'] : []),
-  ]
-  return [
-    {
-      title: 'DATA SOURCES',
-      bg: '/images/ontology/bg-DATA SOURCES.png',
-      icon: '/images/ontology/icon-DATA SOURCES.png',
-      flex: 514,
-      items: dsItems.slice(0, 8),
-    },
-    {
-      title: 'LOGIC SOURCES',
-      bg: '/images/ontology/bg-LOGIC SOURCES.png',
-      icon: '/images/ontology/icon-LOGIC SOURCES.png',
-      flex: 514,
-      items: (stats.value as any)?.rule_priority?.length
-        ? (stats.value as any).rule_priority.map((r: any) => `${r.priority} 优先级: ${r.count}`)
-        : ['暂无规则'],
-    },
-    {
-      title: 'SYSTEMS OF ACTION',
-      bg: '/images/ontology/bg-SYSTEMS OF ACTION.png',
-      icon: '/images/ontology/icon-SYSTEMS OF ACTION.png',
-      flex: 441,
-      items: (stats.value as any)?.recent_activities?.length
-        ? (stats.value as any).recent_activities.slice(0, 5).map((a: any) => a.description || a.name)
-        : ['暂无动态'],
-    },
-  ]
+function resolveCardItems(card: any): string[] {
+  if (!stats.value) return ['加载中...']
+  const s = stats.value as any
+  const items: string[] = []
+  for (const item of card.items) {
+    if (item.type === 'static') {
+      items.push(item.text || '')
+    } else if (item.type === 'dynamic') {
+      const val = s[item.field] ?? ''
+      items.push(`${val} ${item.label || ''}`.trim())
+    } else if (item.type === 'top_rules') {
+      const rules = s.top_rules?.slice(0, item.count ?? 4) ?? []
+      items.push(...(rules.length ? rules.map((r: any) => r.name) : ['暂无规则']))
+    } else if (item.type === 'datasources') {
+      const dsList = s.datasources ?? []
+      const bb = dsList.filter((d: any) => d.name.startsWith('bb_'))
+      const other = dsList.filter((d: any) => !d.name.startsWith('bb_'))
+      if (bb.length) items.push(`宽带退单(${bb.length}表)`, ...bb.slice(0, 4).map((d: any) => d.name.replace('bb_', '')))
+      if (other.length) items.push(`携号转网(${other.length}表)`, ...other.slice(0, 3).map((d: any) => d.name))
+      if (!dsList.length) items.push('暂无数据源')
+    } else if (item.type === 'rule_priority') {
+      const rp = s.rule_priority ?? []
+      items.push(...(rp.length ? rp.map((r: any) => `${r.priority} 优先级: ${r.count}`) : ['暂无规则']))
+    } else if (item.type === 'recent_activities') {
+      const acts = s.recent_activities?.slice(0, item.count ?? 5) ?? []
+      items.push(...(acts.length ? acts.map((a: any) => a.description || a.name || a.target_name) : ['暂无动态']))
+    }
+  }
+  return items.slice(0, 8)
+}
+
+const allCards = computed(() => {
+  const cards = dashConfig.value?.cards_config
+  if (!cards) {
+    // fallback to hardcoded defaults
+    const dsList = (stats.value as any)?.datasources ?? []
+    const bb = dsList.filter((d: any) => d.name.startsWith('bb_'))
+    const other = dsList.filter((d: any) => !d.name.startsWith('bb_'))
+    const dsItems = [
+      ...(bb.length ? [`宽带退单(${bb.length}表)`, ...bb.slice(0, 4).map((d: any) => d.name.replace('bb_', ''))] : []),
+      ...(other.length ? [`携号转网(${other.length}表)`, ...other.slice(0, 3).map((d: any) => d.name)] : []),
+      ...(!dsList.length ? ['暂无数据源'] : []),
+    ]
+    return [
+      { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: stats.value ? [`${stats.value.entity_count} 个实体`, `${stats.value.relation_count} 条关系`, `${stats.value.rule_count} 条规则`, `${stats.value.active_rule_count} 条活跃规则`] : ['加载中...'] },
+      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: stats.value ? [...(stats.value.top_rules.slice(0, 4).map((r: any) => r.name)), ...(stats.value.top_rules.length === 0 ? ['暂无规则'] : [])] : ['加载中...'] },
+      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway'] },
+      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, icon: ICON_MAP.datasources, items: dsItems.slice(0, 8) },
+      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, icon: ICON_MAP.logic, items: (stats.value as any)?.rule_priority?.length ? (stats.value as any).rule_priority.map((r: any) => `${r.priority} 优先级: ${r.count}`) : ['暂无规则'] },
+      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, icon: ICON_MAP.actions, items: (stats.value as any)?.recent_activities?.length ? (stats.value as any).recent_activities.slice(0, 5).map((a: any) => a.description || a.name) : ['暂无动态'] },
+    ]
+  }
+  return cards.filter(c => c.enabled).map(c => ({
+    key: c.key, title: c.title,
+    flex: FLEX_MAP[c.key] ?? 470,
+    bg: BG_MAP[c.key] ?? BG_MAP.analytics,
+    icon: ICON_MAP[c.key],
+    items: resolveCardItems(c),
+  }))
 })
+
+const topCards = computed(() => allCards.value.slice(0, 3))
+const bottomCards = computed(() => allCards.value.slice(3))
 </script>
 
 <style scoped>
@@ -510,4 +559,6 @@ const bottomCards = computed(() => {
 }
 .bottom-btn img { width: auto; height: 2.78vh; display: block; }
 .bottom-btn:hover { filter: brightness(1.2); }
+.config-btn { color: rgba(0,50,145,0.7); padding: 4px; border-radius: 6px; }
+.config-btn:hover { color: #003291; filter: none; background: rgba(0,50,145,0.1); }
 </style>
