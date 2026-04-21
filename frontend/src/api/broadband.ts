@@ -261,6 +261,24 @@ export interface OntologyGraphData {
   edges: OntologyEdge[]
 }
 
+export interface VoiceAuditDimension {
+  name: string
+  result: 'pass' | 'fail' | 'na'
+  comment: string
+}
+
+export interface VoiceAuditResult {
+  call_id: string
+  call_type: string
+  overall: 'pass' | 'fail' | 'warning' | 'error'
+  score: number
+  summary: string
+  dimensions: VoiceAuditDimension[]
+  risk_flags: string[]
+  skipped?: boolean
+  error?: string
+}
+
 export const broadbandApi = {
   overview: () => get<BroadbandOverview>('/scenes/broadband/overview'),
   list: (params?: ListQuery) => get<PaginatedList<ChurnListItem>>('/scenes/broadband/list', { params }),
@@ -301,6 +319,9 @@ export const broadbandApi = {
 
   ontologyGraph: (id: string) =>
     get<OntologyGraphData>(`/scenes/broadband/detail/${id}/ontology-graph`),
+
+  voiceAudit: (id: string, calls: { call_id: string; call_type: string; asr_text: string; engineer_name?: string }[]) =>
+    post<{ results: VoiceAuditResult[] }>(`/scenes/broadband/detail/${id}/voice-audit`, { calls }),
 
   startAnalysis: (
     churnId: string,
