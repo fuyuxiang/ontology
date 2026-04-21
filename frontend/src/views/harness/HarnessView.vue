@@ -40,10 +40,10 @@
     <div class="harness__body">
       <!-- 左侧面板 -->
       <div class="harness__left">
-        <!-- 场景列表 -->
+        <!-- 智能体列表 -->
         <div class="harness__section">
           <div class="harness__section-header">
-            <span class="harness__section-title">场景列表</span>
+            <span class="harness__section-title">智能体列表</span>
             <button class="harness__icon-btn" @click="showNewDialog = true" title="新建场景">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             </button>
@@ -299,7 +299,7 @@ const nodeTypes_: Record<string, any> = {
   'rule-evaluate': markRaw(WorkflowNode), 'datasource': markRaw(WorkflowNode),
   'variable-assign': markRaw(WorkflowNode), 'parallel': markRaw(WorkflowNode),
   'llm-inference': markRaw(WorkflowNode), 'ml-model': markRaw(WorkflowNode),
-  'knowledge-retrieval': markRaw(WorkflowNode), 'voice-audit': markRaw(WorkflowNode),
+  'voice-audit': markRaw(WorkflowNode),
   'condition': markRaw(WorkflowNode), 'loop': markRaw(WorkflowNode),
   'merge': markRaw(WorkflowNode), 'rule-engine': markRaw(WorkflowNode),
   'notification': markRaw(WorkflowNode), 'human-approval': markRaw(WorkflowNode),
@@ -320,7 +320,6 @@ const nodeTypes = [
   { type: 'parallel', label: '并行分支', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8h3M10 5h3M10 11h3M6 8l4-3M6 8l4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'llm-inference', label: '大模型推理', color: '#10b981', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
   { type: 'ml-model', label: '预测模型', color: '#06b6d4', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12L6 7l3 3 2-4 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
-  { type: 'knowledge-retrieval', label: '知识库检索', color: '#0d9488', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M5 7h6M5 9.5h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>` },
   { type: 'voice-audit', label: '语音质检', color: '#7c3aed', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="2" width="6" height="8" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 9a5 5 0 0010 0M8 14v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'condition', label: '条件判断', color: '#a855f7', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 6-6 6-6-6 6-6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
   { type: 'loop', label: '遍历列表', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 019.9-1M13 8a5 5 0 01-9.9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
@@ -335,7 +334,7 @@ const nodeTypes = [
 const nodeGroups = [
   { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
   { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
-  { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','knowledge-retrieval','voice-audit'].includes(n.type)) },
+  { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','voice-audit'].includes(n.type)) },
   { label: '流程控制', nodes: nodeTypes.filter(n => ['condition','loop','merge','rule-engine'].includes(n.type)) },
   { label: '触达输出', nodes: nodeTypes.filter(n => ['notification','human-approval','write-back','api-response'].includes(n.type)) },
 ]
