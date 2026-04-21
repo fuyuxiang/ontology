@@ -435,3 +435,92 @@ def delete_entity(
     )
     repo.delete(entity)
     repo.commit()
+
+
+# ── AI 智能提取本体 ──────────────────────────────────────────
+
+from pydantic import BaseModel
+from app.services.copilot import get_llm_client
+from app.config import settings
+import json as _json
+
+
+class _ExtractedAttr(BaseModel):
+    name: str
+    type: str = "string"
+    description: str = ""
+
+
+class _ExtractedEntity(BaseModel):
+    name: str
+    name_cn: str
+    tier: int = 2
+    description: str = ""
+    attributes: list[_ExtractedAttr] = []
+
+
+class _ExtractedRelation(BaseModel):
+    from_entity: str
+    to_entity: str
+    name: str
+    rel_type: str = "has_many"
+    cardinality: str = "1:N"
+
+
+class _ExtractResult(BaseModel):
+    entities: list[_ExtractedEntity] = []
+    relations: list[_ExtractedRelation] = []
+
+
+_EXTRACT_PROMPT = """你是本体建模专家。请从以下文本中提取本体实体、属性和关系。
+
+要求：
+1. 每个实体需要英文名(PascalCase)、中文名、层级(1=核心/2=领域/3=场景)、描述
+2. 每个属性需要名称(snake_case)、类型(string/number/boolean/date/json/ref/computed)、描述
+3. 关系需要源实体、目标实体、关系名、类型(has_one/has_many/belongs_to/many_to_many)、基数(1:1/1:N/N:1/N:N)
+
+严格返回JSON格式，不要包含其他文字：
+{"entities": [{"name": "...", "name_cn": "...", "tier": 2, "description": "...", "attributes": [{"name": "...", "type": "string", "description": "..."}]}], "relations": [{"from_entity": "...", "to_entity": "...", "name": "...", "rel_type": "has_many", "cardinality": "1:N"}]}
+
+文本内容：
+"""
+
+
+@router.post("/ai-extract", response_model=_ExtractResult)
+async def ai_extract_entities(
+    text: str | None = Form(None),
+    file: UploadFile | None = File(None),
+):
+    if not text and not file:
+        raise HTTPException(400, "请提供文本或文件")
+
+    content = text or ""
+    if file:
+        raw = await file.read()
+        content = raw.decode("utf-8", errors="ignore")
+
+    if not content.strip():
+        raise HTTPException(400, "内容为空")
+
+    client = get_llm_client()
+    resp = client.chat.completions.create(
+        model=settings.LLM_MODEL,
+        messages=[
+            {"role": "system", "content": _EXTRACT_PROMPT},
+            {"role": "user", "content": content[:8000]},
+        ],
+        temperature=0,
+        max_tokens=4096,
+    )
+
+    raw_text = resp.choices[0].message.content or "{}"
+    raw_text = raw_text.strip()
+    if raw_text.startswith("```"):
+        raw_text = raw_text.split("\n", 1)[-1].rsplit("```", 1)[0]
+
+    try:
+        data = _json.loads(raw_text)
+    except _json.JSONDecodeError:
+        raise HTTPException(500, "AI 返回格式异常，请重试")
+
+    return _ExtractResult(**data)
