@@ -20,3 +20,4 @@ backend/venv/
 # OS/editor noise
 .DS_Store
 .idea/
+backend/ontology.db
