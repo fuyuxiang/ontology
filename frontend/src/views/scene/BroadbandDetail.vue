@@ -393,6 +393,64 @@
       <div v-if="!trailList.length" class="bd-empty">暂无追溯记录</div>
     </div>
 
+    <!-- Tab: 语音质检 -->
+    <div v-if="activeTab === 'voice'" class="bd-voice-wrap">
+      <div class="bd-voice-header">
+        <span class="bd-voice-hint">基于通话 ASR 文本，AI 自动检测工程师话术合规性</span>
+        <div class="bd-voice-actions">
+          <button class="bd-btn bd-btn--primary" @click="runVoiceAudit" :disabled="voiceAuditing">
+            <span v-if="voiceAuditing" class="bd-spinner bd-spinner--sm"></span>
+            {{ voiceAuditing ? '质检中...' : '开始质检' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 补录文本区 -->
+      <div class="bd-voice-extra">
+        <div class="bd-voice-extra__label">补录通话文本（可选）</div>
+        <textarea v-model="extraAsrText" class="bd-voice-textarea" placeholder="粘贴工程师与客户的通话文本，或上传 ASR 转写结果..."></textarea>
+      </div>
+
+      <!-- 通话列表 -->
+      <div class="bd-voice-calls">
+        <div v-for="call in voiceCalls" :key="call.call_id" class="bd-voice-call">
+          <div class="bd-voice-call__meta">
+            <span class="bd-voice-call__type" :class="'bd-voice-call__type--' + call.call_type">
+              {{ call.call_type === 'engineer' ? '工程师通话' : '回访通话' }}
+            </span>
+            <span class="bd-voice-call__time">{{ call.call_time }}</span>
+            <span class="bd-voice-call__eng" v-if="call.engineer_name">{{ call.engineer_name }}</span>
+            <span v-if="call.result" class="bd-voice-badge" :class="'bd-voice-badge--' + call.result.overall">
+              {{ { pass: '合规', fail: '违规', warning: '警告', error: '错误' }[call.result.overall] }}
+              <template v-if="call.result.score != null"> · {{ call.result.score }}分</template>
+            </span>
+          </div>
+          <div class="bd-voice-call__asr">{{ call.asr_text || '（无ASR文本）' }}</div>
+          <!-- 质检结果 -->
+          <div v-if="call.result && !call.result.skipped && !call.result.error" class="bd-voice-result">
+            <div class="bd-voice-result__summary">{{ call.result.summary }}</div>
+            <div class="bd-voice-dims">
+              <div v-for="d in call.result.dimensions" :key="d.name" class="bd-voice-dim" :class="'bd-voice-dim--' + d.result">
+                <span class="bd-voice-dim__icon">
+                  <svg v-if="d.result === 'pass'" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <svg v-else-if="d.result === 'fail'" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  <span v-else>—</span>
+                </span>
+                <span class="bd-voice-dim__name">{{ d.name }}</span>
+                <span class="bd-voice-dim__comment">{{ d.comment }}</span>
+              </div>
+            </div>
+            <div v-if="call.result.risk_flags?.length" class="bd-voice-risks">
+              <span class="bd-voice-risk-label">风险标记：</span>
+              <span v-for="f in call.result.risk_flags" :key="f" class="bd-voice-risk-tag">{{ f }}</span>
+            </div>
+          </div>
+          <div v-if="call.result?.error" class="bd-voice-error">质检失败：{{ call.result.error }}</div>
+        </div>
+        <div v-if="!voiceCalls.length" class="bd-empty">该案件暂无通话记录</div>
+      </div>
+    </div>
+
     </template>
     </PageState>
   </div>
@@ -405,7 +463,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import PageState from '../../components/common/PageState.vue'
 import { broadbandApi } from '../../api/broadband'
-import type { ChurnDetail, AuditChain, EvidenceItem, LogicHit, AuditAction, AuditTrailItem, SSEEvent, SSEStepKey, OntologyGraphData, OntologyNode } from '../../api/broadband'
+import type { ChurnDetail, AuditChain, EvidenceItem, LogicHit, AuditAction, AuditTrailItem, SSEEvent, SSEStepKey, OntologyGraphData, OntologyNode, VoiceAuditResult } from '../../api/broadband'
 
 const route = useRoute()
 const loading = ref(true)
@@ -452,6 +510,7 @@ const tabs = computed(() => [
   { key: 'evidence', label: '证据与规则', badge: evidenceList.value.filter(e => e.hit).length || undefined },
   { key: 'actions', label: '稽核动作', badge: actionsList.value.filter(a => a.status === 'pending_approval').length || undefined },
   { key: 'trail', label: '追溯日志', badge: trailList.value.length || undefined },
+  { key: 'voice', label: '语音质检' },
 ])
 
 const timelineEvents = computed(() => {
@@ -642,7 +701,72 @@ onMounted(async () => {
     startAnalysis()
   }
 })
-</script>
+
+// ── 语音质检 ──────────────────────────────────────────────────
+interface VoiceCall {
+  call_id: string
+  call_type: 'engineer' | 'callback'
+  call_time: string
+  asr_text: string
+  engineer_name?: string
+  result?: VoiceAuditResult
+}
+
+const voiceAuditing = ref(false)
+const extraAsrText = ref('')
+
+const voiceCalls = computed<VoiceCall[]>(() => {
+  if (!data.value) return []
+  const calls: VoiceCall[] = []
+  for (const c of data.value.engineer_calls || []) {
+    calls.push({
+      call_id: c.call_id || String(Math.random()),
+      call_type: 'engineer',
+      call_time: fmt(c.call_start_time),
+      asr_text: c.asr_text || '',
+      engineer_name: data.value.engineer?.engineer_name,
+      result: voiceResults.value[c.call_id],
+    })
+  }
+  for (const c of data.value.callback_calls || []) {
+    calls.push({
+      call_id: c.call_id || String(Math.random()),
+      call_type: 'callback',
+      call_time: fmt(c.call_start_time),
+      asr_text: c.asr_text || '',
+      result: voiceResults.value[c.call_id],
+    })
+  }
+  if (extraAsrText.value.trim()) {
+    calls.push({
+      call_id: 'extra-manual',
+      call_type: 'engineer',
+      call_time: '补录',
+      asr_text: extraAsrText.value.trim(),
+      result: voiceResults.value['extra-manual'],
+    })
+  }
+  return calls
+})
+
+const voiceResults = ref<Record<string, VoiceAuditResult>>({})
+
+async function runVoiceAudit() {
+  const id = route.params.id as string
+  const calls = voiceCalls.value
+    .filter(c => c.asr_text.trim())
+    .map(c => ({ call_id: c.call_id, call_type: c.call_type, asr_text: c.asr_text, engineer_name: c.engineer_name }))
+  if (!calls.length) { alert('没有可质检的通话文本'); return }
+  voiceAuditing.value = true
+  try {
+    const res = await broadbandApi.voiceAudit(id, calls)
+    for (const r of res.results) {
+      voiceResults.value[r.call_id] = r
+    }
+  } finally {
+    voiceAuditing.value = false
+  }
+}</script>
 
 <!-- PLACEHOLDER_STYLE -->
 
@@ -880,5 +1004,41 @@ onMounted(async () => {
 .bd-graph-svg-wrap { border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); background: var(--neutral-0); overflow: auto; }
 .bd-graph-svg { display: block; width: 100%; min-width: 500px; }
 .bd-graph-info { font-size: 11px; color: var(--neutral-400); margin-top: 8px; }
+
+/* 语音质检 */
+.bd-voice-wrap { padding: 4px 0; }
+.bd-voice-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.bd-voice-hint { font-size: 13px; color: var(--neutral-500); }
+.bd-voice-extra { margin-bottom: 16px; }
+.bd-voice-extra__label { font-size: 12px; color: var(--neutral-500); margin-bottom: 6px; }
+.bd-voice-textarea { width: 100%; min-height: 80px; padding: 8px 10px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: 13px; color: var(--neutral-800); background: var(--neutral-0); resize: vertical; box-sizing: border-box; }
+.bd-voice-calls { display: flex; flex-direction: column; gap: 12px; }
+.bd-voice-call { border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); padding: 14px 16px; background: var(--neutral-0); }
+.bd-voice-call__meta { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.bd-voice-call__type { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); }
+.bd-voice-call__type--engineer { background: #dbeafe; color: #1d4ed8; }
+.bd-voice-call__type--callback { background: #d1fae5; color: #065f46; }
+.bd-voice-call__time { font-size: 12px; color: var(--neutral-400); }
+.bd-voice-call__eng { font-size: 12px; color: var(--neutral-600); }
+.bd-voice-call__asr { font-size: 13px; color: var(--neutral-700); line-height: 1.6; background: var(--neutral-50); border-radius: var(--radius-md); padding: 8px 10px; white-space: pre-wrap; max-height: 120px; overflow-y: auto; }
+.bd-voice-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); margin-left: auto; }
+.bd-voice-badge--pass { background: #d1fae5; color: #065f46; }
+.bd-voice-badge--fail { background: #fee2e2; color: #991b1b; }
+.bd-voice-badge--warning { background: #fef3c7; color: #92400e; }
+.bd-voice-badge--error { background: var(--neutral-100); color: var(--neutral-500); }
+.bd-voice-result { margin-top: 12px; border-top: 1px solid var(--neutral-100); padding-top: 12px; }
+.bd-voice-result__summary { font-size: 13px; color: var(--neutral-700); margin-bottom: 10px; font-weight: 500; }
+.bd-voice-dims { display: flex; flex-direction: column; gap: 6px; }
+.bd-voice-dim { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; }
+.bd-voice-dim__icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.bd-voice-dim--pass .bd-voice-dim__icon { color: #10b981; }
+.bd-voice-dim--fail .bd-voice-dim__icon { color: #ef4444; }
+.bd-voice-dim--na .bd-voice-dim__icon { color: var(--neutral-400); }
+.bd-voice-dim__name { font-weight: 600; color: var(--neutral-700); min-width: 64px; flex-shrink: 0; }
+.bd-voice-dim__comment { color: var(--neutral-500); }
+.bd-voice-risks { margin-top: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.bd-voice-risk-label { font-size: 12px; color: var(--neutral-500); }
+.bd-voice-risk-tag { font-size: 11px; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: var(--radius-full); }
+.bd-voice-error { margin-top: 8px; font-size: 12px; color: #ef4444; }
 </style>
 
