@@ -18,6 +18,8 @@ EXT_TYPE_MAP = {
     "xls": "excel", "xlsx": "excel",
     "png": "image", "jpg": "image", "jpeg": "image", "gif": "image", "webp": "image",
     "mp4": "video", "avi": "video", "mov": "video", "mkv": "video",
+    "mp3": "audio", "wav": "audio", "m4a": "audio", "aac": "audio", "ogg": "audio",
+    "txt": "text",
 }
 
 
@@ -203,3 +205,83 @@ def get_file_content(kb_id: str, fid: str, db: Session = Depends(get_db)):
     if not kf or kf.kb_id != kb_id:
         raise HTTPException(404, "文件不存在")
     return {"content": kf.parsed_content or "", "file_type": kf.file_type, "name": kf.name}
+
+
+from pydantic import BaseModel
+
+class AsrUpdateReq(BaseModel):
+    asr_text: str
+
+@router.put("/{kb_id}/files/{fid}/asr")
+def update_asr(kb_id: str, fid: str, req: AsrUpdateReq, db: Session = Depends(get_db)):
+    kf = db.get(KnowledgeFile, fid)
+    if not kf or kf.kb_id != kb_id:
+        raise HTTPException(404, "文件不存在")
+    kf.parsed_content = req.asr_text[:100000]
+    db.commit()
+    return {"ok": True}
+
+
+class VoiceAuditReq(BaseModel):
+    asr_text: str
+    scenario: str = "broadband"  # broadband / general
+
+@router.post("/{kb_id}/files/{fid}/voice-audit")
+def voice_audit_file(kb_id: str, fid: str, req: VoiceAuditReq, db: Session = Depends(get_db)):
+    from openai import OpenAI
+    from app.config import settings
+    import json as _json
+
+    kf = db.get(KnowledgeFile, fid)
+    if not kf or kf.kb_id != kb_id:
+        raise HTTPException(404, "文件不存在")
+
+    asr = req.asr_text.strip() or (kf.parsed_content or "").strip()
+    if not asr:
+        raise HTTPException(400, "无可质检的文本内容")
+
+    scenario_hint = "宽带装机服务工程师" if req.scenario == "broadband" else "客服/服务人员"
+    prompt = f"""你是{scenario_hint}话术质检专家。请对以下通话文本进行质检分析。
+
+通话文本：
+{asr}
+
+请从以下5个维度逐一评分并给出简短说明：
+1. 自我介绍：是否进行了规范的自我介绍（姓名、工号、来意）
+2. 问题确认：是否清晰确认了客户问题或诉求
+3. 操作规范：是否按规范流程操作，有无违规承诺或误导性表述
+4. 情绪处理：面对客户投诉/不满时是否妥善安抚
+5. 结果告知：是否明确告知处理结果或后续安排
+
+返回JSON格式：
+{{
+  "overall": "pass" | "fail" | "warning",
+  "score": 0-100,
+  "summary": "一句话总结",
+  "dimensions": [
+    {{"name": "自我介绍", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "问题确认", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "操作规范", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "情绪处理", "result": "pass"|"fail"|"na", "comment": "..."}},
+    {{"name": "结果告知", "result": "pass"|"fail"|"na", "comment": "..."}}
+  ],
+  "risk_flags": ["..."]
+}}
+只返回JSON，不要其他内容。"""
+
+    client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_API_BASE)
+    try:
+        resp = client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=800,
+        )
+        raw = resp.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        return _json.loads(raw)
+    except Exception as e:
+        raise HTTPException(500, f"质检失败: {e}")
