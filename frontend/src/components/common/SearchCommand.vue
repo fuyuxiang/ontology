@@ -200,7 +200,7 @@ defineExpose({ open, close })
   flex: 1;
   border: none;
   outline: none;
-  font-size: 15px;
+  font-size: var(--text-h3-size);
   color: var(--neutral-900);
   background: transparent;
   font-family: var(--font-sans);
@@ -208,7 +208,7 @@ defineExpose({ open, close })
 .search-command-input input::placeholder { color: var(--neutral-400); }
 
 .search-command-esc {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--neutral-200);
@@ -248,7 +248,7 @@ defineExpose({ open, close })
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--text-code-size);
   flex-shrink: 0;
 }
 .search-command-item__icon--object { background: var(--tier1-bg); color: var(--tier1-text); }
@@ -257,17 +257,17 @@ defineExpose({ open, close })
 .search-command-item__icon--relation { background: var(--tier2-bg); color: var(--tier2-text); }
 
 .search-command-item__name {
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   color: var(--neutral-800);
   flex: 1;
 }
 .search-command-item__meta {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-500);
 }
 .search-command-item__type-tag {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 600;
   padding: 1px 6px;
   border-radius: var(--radius-sm);
@@ -287,7 +287,7 @@ defineExpose({ open, close })
   align-items: center;
   gap: 8px;
   color: var(--neutral-500);
-  font-size: 13px;
+  font-size: var(--text-body-size);
 }
 .search-command-hint {
   align-items: flex-start;
@@ -311,13 +311,13 @@ defineExpose({ open, close })
   gap: 16px;
   padding: 8px 16px;
   border-top: 1px solid var(--neutral-200);
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-500);
   flex-shrink: 0;
 }
 .search-command-footer kbd {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   padding: 1px 5px;
   border-radius: 3px;
   border: 1px solid var(--neutral-200);

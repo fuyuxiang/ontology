@@ -54,7 +54,7 @@ const icons: Record<string, string> = {
   padding: 10px 14px;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  font-size: 13px;
+  font-size: var(--text-body-size);
   font-weight: 500;
   min-width: 260px;
   max-width: 400px;

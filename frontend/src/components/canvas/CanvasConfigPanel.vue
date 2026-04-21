@@ -74,36 +74,36 @@ const tierLabels: Record<number, string> = { 1: '核心对象', 2: '领域对象
 
 <style scoped>
 .config-panel {
-  width: 280px; flex-shrink: 0; background: #fff;
-  border-left: 1px solid #e9ecef; padding: 16px;
+  width: 280px; flex-shrink: 0; background: var(--neutral-0);
+  border-left: 1px solid var(--neutral-200); padding: 16px;
   overflow-y: auto; display: flex; flex-direction: column;
 }
 .config-panel__header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
 .config-badge {
   width: 32px; height: 32px; border-radius: 8px; display: flex;
-  align-items: center; justify-content: center; color: #fff;
-  font-size: 11px; font-weight: 700; flex-shrink: 0;
+  align-items: center; justify-content: center; color: var(--neutral-0);
+  font-size: var(--text-caption-size); font-weight: 700; flex-shrink: 0;
 }
-.config-panel__name { font-size: 15px; font-weight: 600; color: #343a40; }
-.config-panel__cn { font-size: 12px; color: #868e96; }
+.config-panel__name { font-size: var(--text-h3-size); font-weight: 600; color: var(--neutral-800); }
+.config-panel__cn { font-size: var(--text-code-size); color: var(--neutral-600); }
 .config-section { margin-bottom: 16px; }
-.config-section__title { font-size: 11px; font-weight: 600; color: #868e96; letter-spacing: 0.3px; margin-bottom: 8px; text-transform: uppercase; }
-.config-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: 12px; border-bottom: 1px solid #f1f3f5; }
-.config-label { color: #868e96; }
-.config-value { color: #343a40; font-weight: 500; }
-.config-status { padding: 1px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-.config-status--active { background: #e6fcf5; color: #087f5b; }
-.config-status--warning { background: #fff8e1; color: #e67700; }
-.config-status--error { background: #fff5f5; color: #c92a2a; }
-.config-edge { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: 11px; border-bottom: 1px solid #f8f9fa; }
-.config-edge__from, .config-edge__to { color: #343a40; font-weight: 500; }
-.config-edge__label { color: #4c6ef5; flex: 1; }
-.config-edge__card { color: #adb5bd; font-size: 10px; }
+.config-section__title { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-600); letter-spacing: 0.3px; margin-bottom: 8px; text-transform: uppercase; }
+.config-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: var(--text-code-size); border-bottom: 1px solid var(--neutral-100); }
+.config-label { color: var(--neutral-600); }
+.config-value { color: var(--neutral-800); font-weight: 500; }
+.config-status { padding: 1px 8px; border-radius: 4px; font-size: var(--text-caption-size); font-weight: 500; }
+.config-status--active { background: var(--status-success-bg); color: var(--dynamic-900); }
+.config-status--warning { background: var(--status-warning-bg); color: var(--kinetic-700); }
+.config-status--error { background: var(--status-error-bg); color: var(--kinetic-900); }
+.config-edge { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: var(--text-caption-size); border-bottom: 1px solid #f8f9fa; }
+.config-edge__from, .config-edge__to { color: var(--neutral-800); font-weight: 500; }
+.config-edge__label { color: var(--semantic-600); flex: 1; }
+.config-edge__card { color: var(--neutral-500); font-size: var(--text-caption-upper-size); }
 .config-detail-btn {
   margin-top: auto; padding: 10px; border-radius: 8px; border: none;
-  background: #4c6ef5; color: #fff; font-size: 13px; font-weight: 500;
+  background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500;
   cursor: pointer; transition: background 0.15s;
 }
-.config-detail-btn:hover { background: #4263eb; }
-.config-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: #adb5bd; font-size: 13px; }
+.config-detail-btn:hover { background: var(--semantic-700); }
+.config-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--neutral-500); font-size: var(--text-body-size); }
 </style>
