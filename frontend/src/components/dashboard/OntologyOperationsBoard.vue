@@ -431,7 +431,7 @@ const selectedMeta = computed<DetailMeta>(() => {
 .ontology-board__subtitle {
   max-width: 720px;
   margin-top: 8px;
-  font-size: 13px;
+  font-size: var(--text-body-size);
   line-height: 1.7;
   color: var(--neutral-600);
 }
@@ -455,14 +455,14 @@ const selectedMeta = computed<DetailMeta>(() => {
 }
 
 .stage-metric__value {
-  font-size: 22px;
+  font-size: var(--text-h1-size);
   font-weight: 700;
   line-height: 1;
   color: var(--neutral-900);
 }
 
 .stage-metric__label {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-500);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -493,7 +493,7 @@ const selectedMeta = computed<DetailMeta>(() => {
 
 .stage-pill__label {
   display: block;
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--neutral-500);
@@ -502,7 +502,7 @@ const selectedMeta = computed<DetailMeta>(() => {
 .stage-pill__title {
   display: block;
   margin-top: 6px;
-  font-size: 15px;
+  font-size: var(--text-h3-size);
   font-weight: 600;
   color: var(--neutral-800);
 }

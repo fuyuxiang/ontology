@@ -50,7 +50,7 @@ const stepIndex: Record<string, string> = {
   padding: 20px 24px;
 }
 .reasoning-chain__title {
-  font-size: 15px; font-weight: 600; color: var(--neutral-800); margin-bottom: 16px;
+  font-size: var(--text-h3-size); font-weight: 600; color: var(--neutral-800); margin-bottom: 16px;
 }
 .reasoning-chain__steps { display: flex; flex-direction: column; }
 
@@ -61,7 +61,7 @@ const stepIndex: Record<string, string> = {
 .reasoning-step__index {
   width: 24px; height: 24px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; z-index: 1;
+  font-size: var(--text-caption-size); font-weight: 700; color: var(--neutral-0); flex-shrink: 0; z-index: 1;
 }
 .reasoning-step__index--ontology { background: var(--semantic-600); }
 .reasoning-step__index--ml { background: var(--tier2-primary); }
@@ -73,7 +73,7 @@ const stepIndex: Record<string, string> = {
   background: var(--neutral-50); border: 1px solid var(--neutral-200); margin-bottom: 12px;
 }
 .reasoning-step__type {
-  font-size: 11px; font-weight: 600; text-transform: uppercase;
+  font-size: var(--text-caption-size); font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.3px; margin-bottom: 4px;
 }
 .reasoning-step__type--ontology { color: var(--semantic-600); }
@@ -82,11 +82,11 @@ const stepIndex: Record<string, string> = {
 .reasoning-step__type--output { color: var(--dynamic-600); }
 
 .reasoning-step__source {
-  font-family: var(--font-mono); font-size: 11px; color: var(--neutral-600);
+  font-family: var(--font-mono); font-size: var(--text-caption-size); color: var(--neutral-600);
   background: var(--neutral-100); padding: 2px 6px; border-radius: 3px;
   display: inline-block; margin-top: 4px;
 }
-.reasoning-step__result { font-size: 12px; color: var(--neutral-700); margin-top: 4px; }
+.reasoning-step__result { font-size: var(--text-code-size); color: var(--neutral-700); margin-top: 4px; }
 
 .reasoning-chain__connector {
   position: absolute; left: 11px; top: 24px; bottom: -12px;
