@@ -51,15 +51,13 @@ def chat(req: ChatRequest, db: Session = Depends(get_db)):
 class AgentChatRequest(BaseModel):
     question: str
     entity_id: str | None = None
-    app_id: str | None = None
-    session_id: str | None = None
 
 
 @router.post("/agent-chat")
 def agent_chat(req: AgentChatRequest, db: Session = Depends(get_db)):
     def event_stream():
         try:
-            agent = AgentService(db, app_id=req.app_id, session_id=req.session_id)
+            agent = AgentService(db)
             for event in agent.ask(req.question, req.entity_id):
                 yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
