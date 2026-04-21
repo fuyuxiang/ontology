@@ -86,7 +86,7 @@ onMounted(() => {
   padding: 0 20px;
   background: var(--neutral-50);
   border-top: 1px solid var(--neutral-200);
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   color: var(--neutral-500);
   flex-shrink: 0;
 }

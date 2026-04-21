@@ -51,10 +51,10 @@ onUnmounted(() => clearInterval(timer))
   width: 200px;
   padding: 14px 16px;
   background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--neutral-200);
   border-left: 3px solid #4ade80;
   border-radius: 8px;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: var(--font-sans);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   pointer-events: auto;
 }
@@ -67,18 +67,18 @@ onUnmounted(() => clearInterval(timer))
 }
 
 .asset-card__tag {
-  font-size: 10px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #1a1a1a;
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--neutral-900);
+  font-family: var(--font-mono);
 }
 
 .asset-card__dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #4ade80;
+  background: var(--dynamic-300);
   animation: pulse-dot 2s ease infinite;
 }
 
@@ -100,58 +100,58 @@ onUnmounted(() => clearInterval(timer))
 }
 
 .asset-card__label {
-  font-size: 10px;
-  color: #a1a1aa;
+  font-size: var(--text-caption-upper-size);
+  color: var(--neutral-500);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .asset-card__value {
-  font-size: 11px;
+  font-size: var(--text-caption-size);
   font-weight: 600;
-  color: #1a1a1a;
+  color: var(--neutral-900);
 }
 
 .asset-card__health {
   padding-top: 10px;
-  border-top: 1px solid #f4f4f5;
+  border-top: 1px solid var(--neutral-100);
 }
 
 .asset-card__health-label {
   display: block;
-  font-size: 9px;
+  font-size: var(--text-caption-upper-size);
   font-weight: 700;
   letter-spacing: 0.1em;
-  color: #a1a1aa;
+  color: var(--neutral-500);
   text-transform: uppercase;
   margin-bottom: 4px;
 }
 
 .asset-card__health-value {
   display: block;
-  font-size: 28px;
+  font-size: var(--text-display-size);
   font-weight: 700;
-  color: #22c55e;
-  font-family: 'JetBrains Mono', monospace;
+  color: var(--dynamic-400);
+  font-family: var(--font-mono);
   line-height: 1;
   margin-bottom: 6px;
   transition: color 0.3s;
 }
 
 .asset-card__health-value--warn {
-  color: #f59e0b;
+  color: var(--kinetic-500);
 }
 
 .asset-card__bar {
   height: 3px;
-  background: #f4f4f5;
+  background: var(--neutral-50);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .asset-card__bar-fill {
   height: 100%;
-  background: #4ade80;
+  background: var(--dynamic-300);
   border-radius: 2px;
   transition: width 0.6s ease;
 }
