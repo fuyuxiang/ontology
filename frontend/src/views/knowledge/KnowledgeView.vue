@@ -82,11 +82,11 @@
             @dragover.prevent="dragOver = true" @dragleave="dragOver = false"
             @drop.prevent="onDrop" @click="fileInputRef?.click()">
             <input ref="fileInputRef" type="file" style="display:none" multiple
-              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.mp4,.avi,.mov"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.gif,.mp4,.avi,.mov,.mp3,.wav,.m4a,.aac,.txt"
               @change="onFileChange" />
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="color:#94a3b8"><path d="M12 16V8M8 12l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" stroke-width="1.5"/></svg>
             <span class="kb-upload-hint">{{ uploading ? '上传中...' : '点击或拖拽文件上传（支持多文件）' }}</span>
-            <span class="kb-upload-types">PDF / Word / Excel / 图片 / 视频</span>
+            <span class="kb-upload-types">PDF / Word / Excel / 图片 / 视频 / 音频</span>
           </div>
 
           <!-- 文件列表 -->
@@ -101,6 +101,9 @@
                 <div class="kb-file-meta">{{ formatSize(f.size) }} · {{ f.file_type }}</div>
               </div>
               <div class="kb-file-actions" @click.stop>
+                <button v-if="f.file_type === 'audio'" class="kb-icon-btn kb-icon-btn--audit" @click="openAudit(f)" title="话术质检">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a3 3 0 013 3v3a3 3 0 01-6 0V5a3 3 0 013-3z" stroke="currentColor" stroke-width="1.5"/><path d="M4 8a4 4 0 008 0M8 12v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
                 <button v-if="f.has_content" class="kb-icon-btn" @click="toggleFile(f)" title="预览">
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" stroke="currentColor" stroke-width="1.5"/></svg>
                 </button>
@@ -119,6 +122,51 @@
                 <button class="kb-icon-btn" @click="activeFile = null; fileContent = ''">✕</button>
               </div>
               <pre class="kb-content-pre">{{ fileContent }}</pre>
+            </div>
+          </Transition>
+
+          <!-- 音频质检面板 -->
+          <Transition name="content-slide">
+            <div v-if="auditFile" class="kb-audit-panel">
+              <div class="kb-audit-panel__header">
+                <span>🎙 话术质检 — {{ auditFile.name }}</span>
+                <button class="kb-icon-btn" @click="auditFile = null; auditResult = null; auditAsrText = ''">✕</button>
+              </div>
+              <div class="kb-audit-asr">
+                <div class="kb-audit-asr__label">ASR 转写文本</div>
+                <textarea v-model="auditAsrText" class="kb-audit-textarea" placeholder="粘贴或输入通话 ASR 转写文本..."></textarea>
+                <div class="kb-audit-asr__actions">
+                  <button class="btn-secondary" @click="saveAsr" :disabled="auditSaving">{{ auditSaving ? '保存中...' : '保存文本' }}</button>
+                  <button class="btn-primary" @click="runAudit" :disabled="auditRunning || !auditAsrText.trim()">
+                    <span v-if="auditRunning" class="kb-spinner"></span>
+                    {{ auditRunning ? 'AI质检中...' : '开始质检' }}
+                  </button>
+                </div>
+              </div>
+              <div v-if="auditResult" class="kb-audit-result">
+                <div class="kb-audit-result__top">
+                  <span class="kb-audit-badge" :class="'kb-audit-badge--' + auditResult.overall">
+                    {{ { pass: '合规', fail: '违规', warning: '警告' }[auditResult.overall] || auditResult.overall }}
+                  </span>
+                  <span class="kb-audit-score">{{ auditResult.score }} 分</span>
+                  <span class="kb-audit-summary">{{ auditResult.summary }}</span>
+                </div>
+                <div class="kb-audit-dims">
+                  <div v-for="d in auditResult.dimensions" :key="d.name" class="kb-audit-dim" :class="'kb-audit-dim--' + d.result">
+                    <span class="kb-audit-dim__icon">
+                      <svg v-if="d.result === 'pass'" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 8l3 3 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      <svg v-else-if="d.result === 'fail'" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      <span v-else style="font-size:10px">—</span>
+                    </span>
+                    <span class="kb-audit-dim__name">{{ d.name }}</span>
+                    <span class="kb-audit-dim__comment">{{ d.comment }}</span>
+                  </div>
+                </div>
+                <div v-if="auditResult.risk_flags?.length" class="kb-audit-risks">
+                  <span class="kb-audit-risk-label">风险标记：</span>
+                  <span v-for="f in auditResult.risk_flags" :key="f" class="kb-audit-risk-tag">{{ f }}</span>
+                </div>
+              </div>
             </div>
           </Transition>
         </div>
@@ -153,7 +201,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { knowledgeApi } from '../../api/knowledge'
-import type { KnowledgeBase, KnowledgeFile, SearchResult } from '../../api/knowledge'
+import type { KnowledgeBase, KnowledgeFile, SearchResult, VoiceAuditResult } from '../../api/knowledge'
 
 const kbs = ref<KnowledgeBase[]>([])
 const loading = ref(false)
@@ -288,7 +336,7 @@ async function doSearch() {
 function clearSearch() { searchResults.value = []; searchQ.value = ''; lastSearchQ.value = '' }
 
 function fileIcon(type: string) {
-  const m: Record<string, string> = { pdf: '📄', word: '📝', excel: '📊', image: '🖼', video: '🎬' }
+  const m: Record<string, string> = { pdf: '📄', word: '📝', excel: '📊', image: '🖼', video: '🎬', audio: '🎙', text: '📃' }
   return m[type] || '📁'
 }
 
@@ -302,7 +350,49 @@ function formatTime(t: string) {
   if (!t) return ''
   return new Date(t).toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
-</script>
+
+// ── 话术质检 ──────────────────────────────────────────────────
+const auditFile = ref<KnowledgeFile | null>(null)
+const auditAsrText = ref('')
+const auditResult = ref<VoiceAuditResult | null>(null)
+const auditRunning = ref(false)
+const auditSaving = ref(false)
+
+async function openAudit(f: KnowledgeFile) {
+  auditFile.value = f
+  auditResult.value = null
+  auditAsrText.value = ''
+  activeFile.value = null
+  fileContent.value = ''
+  if (f.has_content) {
+    const res = await knowledgeApi.getFileContent(f.kb_id, f.id)
+    auditAsrText.value = res.content || ''
+  }
+}
+
+async function saveAsr() {
+  if (!auditFile.value) return
+  auditSaving.value = true
+  try {
+    await knowledgeApi.updateAsr(auditFile.value.kb_id, auditFile.value.id, auditAsrText.value)
+    auditFile.value.has_content = !!auditAsrText.value.trim()
+  } finally {
+    auditSaving.value = false
+  }
+}
+
+async function runAudit() {
+  if (!auditFile.value || !auditAsrText.value.trim()) return
+  auditRunning.value = true
+  auditResult.value = null
+  try {
+    auditResult.value = await knowledgeApi.voiceAudit(auditFile.value.kb_id, auditFile.value.id, auditAsrText.value)
+  } catch (e: any) {
+    alert(e.response?.data?.detail || '质检失败')
+  } finally {
+    auditRunning.value = false
+  }
+}</script>
 
 <style scoped>
 .kb-page { padding: 28px 32px; max-width: 1200px; }
@@ -404,4 +494,34 @@ function formatTime(t: string) {
 .drawer-enter-from .kb-drawer__mask, .drawer-leave-to .kb-drawer__mask { opacity: 0; }
 .content-slide-enter-active, .content-slide-leave-active { transition: all .2s ease; }
 .content-slide-enter-from, .content-slide-leave-to { transform: translateY(10px); opacity: 0; }
+
+/* 话术质检面板 */
+.kb-icon-btn--audit { color: #0d9488; }
+.kb-icon-btn--audit:hover { background: #ccfbf1; }
+.kb-audit-panel { margin-top: 12px; border: 1px solid #99f6e4; border-radius: var(--radius-lg); background: #f0fdfa; padding: 14px 16px; }
+.kb-audit-panel__header { display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; color: #0f766e; margin-bottom: 12px; }
+.kb-audit-asr__label { font-size: 12px; color: var(--neutral-500); margin-bottom: 6px; }
+.kb-audit-textarea { width: 100%; min-height: 90px; padding: 8px 10px; border: 1px solid #99f6e4; border-radius: var(--radius-md); font-size: 13px; color: var(--neutral-800); background: #fff; resize: vertical; box-sizing: border-box; }
+.kb-audit-asr__actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+.kb-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin .6s linear infinite; margin-right: 4px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.kb-audit-result { margin-top: 14px; border-top: 1px solid #99f6e4; padding-top: 12px; }
+.kb-audit-result__top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+.kb-audit-badge { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: var(--radius-full); }
+.kb-audit-badge--pass { background: #d1fae5; color: #065f46; }
+.kb-audit-badge--fail { background: #fee2e2; color: #991b1b; }
+.kb-audit-badge--warning { background: #fef3c7; color: #92400e; }
+.kb-audit-score { font-size: 20px; font-weight: 700; color: #0f766e; }
+.kb-audit-summary { font-size: 13px; color: var(--neutral-600); }
+.kb-audit-dims { display: flex; flex-direction: column; gap: 6px; }
+.kb-audit-dim { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; }
+.kb-audit-dim__icon { width: 16px; height: 16px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+.kb-audit-dim--pass .kb-audit-dim__icon { color: #10b981; }
+.kb-audit-dim--fail .kb-audit-dim__icon { color: #ef4444; }
+.kb-audit-dim--na .kb-audit-dim__icon { color: var(--neutral-400); }
+.kb-audit-dim__name { font-weight: 600; color: var(--neutral-700); min-width: 64px; flex-shrink: 0; }
+.kb-audit-dim__comment { color: var(--neutral-500); }
+.kb-audit-risks { margin-top: 10px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.kb-audit-risk-label { font-size: 12px; color: var(--neutral-500); }
+.kb-audit-risk-tag { font-size: 11px; background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: var(--radius-full); }
 </style>
