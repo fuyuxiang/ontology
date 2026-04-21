@@ -51,17 +51,18 @@ defineProps<{
   align-items: center;
 }
 .cap-card__item {
-  color: rgba(200, 220, 255, 0.85);
+  color: #1a3a7a;
   font-size: 0.6vw;
   font-family: AlimamaFangYuanTiVF-Regular, sans-serif;
   white-space: nowrap;
   padding: 0.15vw 0.4vw;
-  background: rgba(0, 50, 145, 0.15);
-  border: 1px solid rgba(0, 80, 234, 0.2);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 80, 200, 0.25);
   border-radius: 3px;
   transition: background .15s;
+  text-shadow: none;
 }
 .cap-card__item:hover {
-  background: rgba(0, 50, 145, 0.35);
+  background: rgba(255, 255, 255, 0.75);
 }
 </style>
