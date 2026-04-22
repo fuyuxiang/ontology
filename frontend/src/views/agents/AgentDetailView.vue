@@ -257,6 +257,32 @@ async function sendTest() {
   } finally { testLoading.value = false }
 }
 
+onMounted(async () => {
+  const id = route.params.id as string
+  const [agentRes, modelRes] = await Promise.all([
+    agentsApi.get(id),
+    modelsApi.list(),
+  ])
+  current.value = agentRes
+  models.value = modelRes
+  form.value = {
+    name: agentRes.name || '',
+    description: agentRes.description || '',
+    model_id: agentRes.model_id || null,
+    system_prompt: agentRes.system_prompt || '',
+    kb_ids: agentRes.kb_ids || [],
+    entity_ids: agentRes.entity_ids || [],
+    tags: agentRes.tags || [],
+    tools_config: { temperature: 0.7, max_tokens: 2048, ...(agentRes.tools_config || {}) }
+  }
+  if (agentRes.status === 'published') {
+    try { apiInfo.value = await agentsApi.apiInfo(id) } catch (_) {}
+  }
+  try { knowledgeBases.value = (await client.get('/knowledge')).data || [] } catch (_) {}
+  try { entities.value = (await client.get('/entities')).data || [] } catch (_) {}
+})
+</script>
+
 <style scoped>
 .agent-detail { display: flex; flex-direction: column; height: 100vh; background: #f5f7fa; overflow: hidden; }
 .detail-topbar { display: flex; align-items: center; gap: 10px; padding: 12px 20px; background: #fff; border-bottom: 1px solid #e8e8e8; flex-shrink: 0; }
@@ -321,29 +347,3 @@ async function sendTest() {
 .spinner { width: 28px; height: 28px; border: 3px solid #e8e8e8; border-top-color: #4c6ef5; border-radius: 50%; animation: spin 0.7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 </style>
-
-onMounted(async () => {
-  const id = route.params.id as string
-  const [agentRes, modelRes] = await Promise.all([
-    agentsApi.get(id),
-    modelsApi.list(),
-  ])
-  current.value = agentRes
-  models.value = modelRes
-  form.value = {
-    name: agentRes.name || '',
-    description: agentRes.description || '',
-    model_id: agentRes.model_id || null,
-    system_prompt: agentRes.system_prompt || '',
-    kb_ids: agentRes.kb_ids || [],
-    entity_ids: agentRes.entity_ids || [],
-    tags: agentRes.tags || [],
-    tools_config: { temperature: 0.7, max_tokens: 2048, ...(agentRes.tools_config || {}) }
-  }
-  if (agentRes.status === 'published') {
-    try { apiInfo.value = await agentsApi.apiInfo(id) } catch (_) {}
-  }
-  try { knowledgeBases.value = (await client.get('/knowledge')).data || [] } catch (_) {}
-  try { entities.value = (await client.get('/entities')).data || [] } catch (_) {}
-})
-</script>
