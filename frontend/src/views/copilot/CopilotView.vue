@@ -19,7 +19,7 @@
         </div>
         <div class="copilot__agent-select">
           <select v-model="selectedAgentId" class="copilot__agent-dropdown">
-            <option value="">默认知识问答</option>
+            <option value="">默认智能问答</option>
             <option v-for="a in publishedAgents" :key="a.id" :value="a.id">{{ a.name }}</option>
           </select>
         </div>
