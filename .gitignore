@@ -7,7 +7,7 @@ backend/venv/
 *.sqlite-*
 *.sqlite3
 *.sqlite3-*
-backend/ontology.db
+
 
 # Runtime logs and process IDs
 *.log
