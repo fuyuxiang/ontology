@@ -128,6 +128,7 @@ const navGroups = [
   ]},
   { label: '智能编排', items: [
     { path: '/harness', label: '智能体创建', icon: ico.harness },
+    { path: '/agents', label: '智能体管理', icon: ico.harness },
     { path: '/orchestration/models', label: '模型管理', icon: ico.model },
   ]},
   { label: '智能应用', items: [
