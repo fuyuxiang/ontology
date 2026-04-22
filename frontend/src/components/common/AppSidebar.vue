@@ -127,12 +127,11 @@ const navGroups = [
     { path: '/data/lineage', label: '血缘分析', icon: ico.lineage },
   ]},
   { label: '智能编排', items: [
-    { path: '/harness', label: '智能体编排', icon: ico.harness },
-    { path: '/agents', label: '智能体管理', icon: ico.harness },
+    { path: '/harness', label: '智能体创建', icon: ico.harness },
     { path: '/orchestration/models', label: '模型管理', icon: ico.model },
   ]},
   { label: '智能应用', items: [
-    { path: '/copilot', label: '知识问答', icon: ico.copilot },
+    { path: '/copilot', label: '智能问答', icon: ico.copilot },
     { path: '/scene', label: '场景验证', icon: ico.scene, exact: true },
     { path: '/app/api', label: 'API开放平台', icon: ico.api },
   ]},
