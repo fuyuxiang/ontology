@@ -23,7 +23,7 @@
         >
           <Background :gap="24" pattern-color="#e8ecf1" :size="0.8" />
           <Controls position="bottom-left" />
-          <MiniMap position="bottom-right" :node-color="miniMapNodeColor" />
+          <MiniMap position="bottom-right" :node-color="miniMapNodeColor" pannable zoomable />
         </VueFlow>
 
         <div v-if="loading" class="canvas-loading">
