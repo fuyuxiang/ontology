@@ -74,36 +74,36 @@ const tierLabels: Record<number, string> = { 1: '核心对象', 2: '领域对象
 
 <style scoped>
 .config-panel {
-  width: 280px; flex-shrink: 0; background: var(--neutral-0);
-  border-left: 1px solid var(--neutral-200); padding: 16px;
-  overflow-y: auto; display: flex; flex-direction: column;
+  width: 260px; flex-shrink: 0; background: #fff;
+  border-left: 1px solid #e2e8f0; padding: 16px;
+  overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
 }
-.config-panel__header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.config-panel__header { display: flex; align-items: center; gap: 10px; }
 .config-badge {
-  width: 32px; height: 32px; border-radius: 8px; display: flex;
-  align-items: center; justify-content: center; color: var(--neutral-0);
-  font-size: var(--text-caption-size); font-weight: 700; flex-shrink: 0;
+  width: 30px; height: 30px; border-radius: 8px; display: flex;
+  align-items: center; justify-content: center; color: #fff;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
 }
-.config-panel__name { font-size: var(--text-h3-size); font-weight: 600; color: var(--neutral-800); }
-.config-panel__cn { font-size: var(--text-code-size); color: var(--neutral-600); }
-.config-section { margin-bottom: 16px; }
-.config-section__title { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-600); letter-spacing: 0.3px; margin-bottom: 8px; text-transform: uppercase; }
-.config-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: var(--text-code-size); border-bottom: 1px solid var(--neutral-100); }
-.config-label { color: var(--neutral-600); }
-.config-value { color: var(--neutral-800); font-weight: 500; }
-.config-status { padding: 1px 8px; border-radius: 4px; font-size: var(--text-caption-size); font-weight: 500; }
-.config-status--active { background: var(--status-success-bg); color: var(--dynamic-900); }
-.config-status--warning { background: var(--status-warning-bg); color: var(--kinetic-700); }
-.config-status--error { background: var(--status-error-bg); color: var(--kinetic-900); }
-.config-edge { display: flex; align-items: center; gap: 6px; padding: 4px 0; font-size: var(--text-caption-size); border-bottom: 1px solid #f8f9fa; }
-.config-edge__from, .config-edge__to { color: var(--neutral-800); font-weight: 500; }
-.config-edge__label { color: var(--semantic-600); flex: 1; }
-.config-edge__card { color: var(--neutral-500); font-size: var(--text-caption-upper-size); }
+.config-panel__name { font-size: 14px; font-weight: 600; color: #0f172a; line-height: 1.3; }
+.config-panel__cn { font-size: 11px; color: #64748b; margin-top: 1px; }
+.config-section { display: flex; flex-direction: column; gap: 1px; }
+.config-section__title { font-size: 10px; font-weight: 600; color: #94a3b8; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; }
+.config-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 12px; border-bottom: 1px solid #f1f5f9; }
+.config-label { color: #64748b; }
+.config-value { color: #1e293b; font-weight: 500; }
+.config-status { padding: 1px 7px; border-radius: 4px; font-size: 11px; font-weight: 500; }
+.config-status--active { background: #d1fae5; color: #059669; }
+.config-status--warning { background: #fef3c7; color: #d97706; }
+.config-status--error { background: #fee2e2; color: #dc2626; }
+.config-edge { display: flex; align-items: center; gap: 5px; padding: 4px 0; font-size: 11px; border-bottom: 1px solid #f8fafc; }
+.config-edge__from, .config-edge__to { color: #1e293b; font-weight: 500; max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.config-edge__label { color: #4f6ef7; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.config-edge__card { color: #94a3b8; font-size: 10px; flex-shrink: 0; }
 .config-detail-btn {
-  margin-top: auto; padding: 10px; border-radius: 8px; border: none;
-  background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500;
+  margin-top: auto; padding: 9px; border-radius: 8px; border: none;
+  background: #4f46e5; color: #fff; font-size: 12px; font-weight: 500;
   cursor: pointer; transition: background 0.15s;
 }
-.config-detail-btn:hover { background: var(--semantic-700); }
-.config-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--neutral-500); font-size: var(--text-body-size); }
+.config-detail-btn:hover { background: #4338ca; }
+.config-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: #94a3b8; font-size: 12px; }
 </style>
