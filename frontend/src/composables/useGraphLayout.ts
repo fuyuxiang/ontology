@@ -19,13 +19,13 @@ export function useGraphLayout() {
     const strength = nodeCount > 30 ? -600 : nodeCount > 15 ? -400 : -300
 
     const sim = forceSimulation(simNodes as any)
-      .force('link', forceLink(simLinks as any).id((d: any) => d.id).distance(180).strength(0.4))
-      .force('charge', forceManyBody().strength(strength))
+      .force('link', forceLink(simLinks as any).id((d: any) => d.id).distance(240).strength(0.25))
+      .force('charge', forceManyBody().strength(strength * 1.5))
       .force('center', forceCenter(0, 0))
-      .force('collide', forceCollide(90))
+      .force('collide', forceCollide(80))
       .stop()
 
-    for (let i = 0; i < 300; i++) sim.tick()
+    for (let i = 0; i < 400; i++) sim.tick()
 
     const nodes: Node[] = data.nodes.map((n, i) => ({
       id: n.id,
