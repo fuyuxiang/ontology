@@ -10,7 +10,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@vue-flow/core'
+import { BaseEdge, EdgeLabelRenderer, getStraightPath } from '@vue-flow/core'
 
 const props = defineProps<{
   id: string
@@ -22,15 +22,14 @@ const props = defineProps<{
 }>()
 
 const path = computed(() => {
-  const [p] = getBezierPath({
+  const [p] = getStraightPath({
     sourceX: props.sourceX, sourceY: props.sourceY,
     targetX: props.targetX, targetY: props.targetY,
-    sourcePosition: props.sourcePosition, targetPosition: props.targetPosition,
   })
   return p
 })
 
-const edgeStyle = { stroke: '#a5b4fc', strokeWidth: 1.8, opacity: 0.7 }
+const edgeStyle = { stroke: '#b4bfcc', strokeWidth: 1.2, opacity: 0.9 }
 
 const labelStyle = computed(() => ({
   position: 'absolute',
@@ -43,12 +42,12 @@ const labelStyle = computed(() => ({
 
 <style scoped>
 .edge-label {
-  display: flex; align-items: center; gap: 4px;
-  background: rgba(255,255,255,0.92); padding: 2px 8px; border-radius: 6px;
-  border: 1px solid #e2e8f0; font-size: 10px; white-space: nowrap;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-  backdrop-filter: blur(4px);
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(255,255,255,0.97); padding: 3px 10px; border-radius: 12px;
+  border: 1px solid #edf0f4; font-size: 10px; white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  backdrop-filter: blur(8px);
 }
-.edge-label__name { color: #475569; font-weight: 500; }
-.edge-label__card { color: #94a3b8; font-size: 10px; }
+.edge-label__name { color: #475569; font-weight: 600; letter-spacing: 0.15px; }
+.edge-label__card { color: #a1aab6; font-size: 9px; font-weight: 500; }
 </style>
