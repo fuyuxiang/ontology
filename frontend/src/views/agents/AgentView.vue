@@ -118,7 +118,7 @@ function goCreate() {
 }
 
 function goEdit(a: AgentItem) {
-  router.push(`/harness?id=${a.id}`)
+  router.push(`/agents/${a.id}`)
 }
 
 function confirmDelete(a: AgentItem) {
