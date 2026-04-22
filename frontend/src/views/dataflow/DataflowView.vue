@@ -155,18 +155,23 @@ function goDetail(id: string) { router.push(`/ontology/${id}`) }
 </script>
 
 <style scoped>
-.canvas-page { display: flex; flex-direction: column; height: 100%; background: linear-gradient(135deg, #f8f9fc 0%, #eef1f8 100%); }
+.canvas-page { display: flex; flex-direction: column; height: 100%; background: #f8fafc; }
 .canvas-page__body { display: flex; flex: 1; overflow: hidden; }
 .canvas-page__canvas { flex: 1; position: relative; }
 .canvas-loading {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 12px;
-  background: rgba(248,249,250,0.85); z-index: 10; color: var(--neutral-600); font-size: var(--text-body-size);
+  background: rgba(248,250,252,0.9); z-index: 10; color: #64748b; font-size: 13px;
 }
 .canvas-loading__spinner {
-  width: 28px; height: 28px; border: 2.5px solid var(--neutral-200);
-  border-top-color: var(--semantic-600); border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  width: 24px; height: 24px; border: 2px solid #e2e8f0;
+  border-top-color: #4f6ef7; border-radius: 50%;
+  animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+:deep(.vue-flow__background) { background: #f8fafc; }
+:deep(.vue-flow__controls) { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+:deep(.vue-flow__controls-button) { background: #fff; border-color: #e2e8f0; color: #64748b; }
+:deep(.vue-flow__controls-button:hover) { background: #f1f5f9; color: #334155; }
+:deep(.vue-flow__minimap) { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; }
 </style>
