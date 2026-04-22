@@ -218,7 +218,7 @@ const tryInput = ref('')
 const tryLoading = ref(false)
 const tryMsgRef = ref<HTMLElement | null>(null)
 
-const totalCalls = ref(Math.floor(Math.random() * 500 + 100))
+const totalCalls = ref(0)
 
 const COLORS = ['#6366f1','#3b82f6','#10b981','#f59e0b','#ec4899','#8b5cf6','#0ea5e9','#14b8a6']
 function agentColor(id: string) {
