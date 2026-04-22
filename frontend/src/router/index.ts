@@ -37,6 +37,7 @@ const router = createRouter({
     { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '智能体创建' } },
     { path: '/orchestration/models', name: 'orch-models', component: () => import('../views/models/ModelManageView.vue'), meta: { title: '模型管理' } },
     { path: '/agents', name: 'agents', component: () => import('../views/agents/AgentView.vue'), meta: { title: '智能体管理' } },
+    { path: '/agents/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
 
     { path: '/aip/lowcode', name: 'aip-lowcode', component: Placeholder, meta: { title: '低代码平台' } },
 
