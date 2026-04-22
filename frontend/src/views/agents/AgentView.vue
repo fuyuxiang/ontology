@@ -1,674 +1,347 @@
 <template>
-  <div class="agent-page">
-    <!-- 左侧列表 -->
-    <div class="agent-list">
-      <div class="list-header">
-        <span class="list-title">智能体</span>
-        <a-button type="primary" size="small" @click="createNew">
-          <template #icon><PlusOutlined /></template>
-          新建
-        </a-button>
+  <div class="agents-page">
+    <div class="agents-topbar">
+      <div class="agents-topbar__left">
+        <span class="agents-title">智能体管理</span>
+        <span class="agents-count">{{ filtered.length }} 个智能体</span>
       </div>
-      <div class="list-body">
-        <template v-if="agents.length > 0">
-          <div
-            v-for="a in agents"
-            :key="a.id"
-            class="agent-item"
-            :class="{ active: current?.id === a.id }"
-            @click="select(a)"
-          >
-            <div class="item-row">
-              <span class="item-name">{{ a.name }}</span>
-              <a-tag :color="a.status === 'published' ? 'success' : 'warning'" size="small">
+      <div class="agents-topbar__right">
+        <div class="agents-search">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <input v-model="search" placeholder="搜索智能体..." class="agents-search__input" />
+        </div>
+        <button class="btn btn--primary" @click="goCreate">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          新建智能体
+        </button>
+      </div>
+    </div>
+
+    <div class="agents-body">
+      <div v-if="loading" class="agents-loading">
+        <div class="spinner"></div>
+        <span>加载中...</span>
+      </div>
+
+      <div v-else-if="filtered.length === 0" class="agents-empty">
+        <svg width="56" height="56" viewBox="0 0 56 56" fill="none" opacity=".25"><path d="M28 8a20 20 0 100 40A20 20 0 0028 8z" stroke="currentColor" stroke-width="2"/><path d="M20 24c0-4.4 3.6-8 8-8s8 3.6 8 8v4H20v-4z" stroke="currentColor" stroke-width="2"/><rect x="16" y="28" width="24" height="16" rx="3" stroke="currentColor" stroke-width="2"/></svg>
+        <p>暂无智能体，点击「新建智能体」开始创建</p>
+      </div>
+
+      <div v-else class="agents-grid">
+        <div v-for="a in filtered" :key="a.id" class="agent-card">
+          <div class="agent-card__header">
+            <div class="agent-card__avatar">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2a5 5 0 100 10A5 5 0 0012 2z" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="19" cy="8" r="2" fill="currentColor" opacity=".4"/><circle cx="5" cy="8" r="2" fill="currentColor" opacity=".4"/></svg>
+            </div>
+            <div class="agent-card__meta">
+              <span class="agent-card__name">{{ a.name }}</span>
+              <span class="agent-card__badge" :class="a.status === 'published' ? 'badge--green' : 'badge--gray'">
                 {{ a.status === 'published' ? '已发布' : '草稿' }}
-              </a-tag>
-            </div>
-            <div class="item-meta">
-              <span>{{ a.model_name || '未选模型' }}</span>
-              <span>知识库 {{ a.kb_count ?? 0 }}</span>
-              <span>实体 {{ a.entity_count ?? 0 }}</span>
+              </span>
             </div>
           </div>
-        </template>
-        <a-empty v-else description="暂无智能体" style="margin-top: 40px" />
+
+          <p class="agent-card__desc">{{ a.description || '暂无描述' }}</p>
+
+          <div class="agent-card__tags" v-if="a.tags?.length">
+            <span v-for="t in a.tags.slice(0, 3)" :key="t" class="tag">{{ t }}</span>
+          </div>
+
+          <div class="agent-card__footer">
+            <span class="agent-card__model">
+              <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.5"/></svg>
+              {{ a.model_name || '默认模型' }}
+            </span>
+            <div class="agent-card__actions">
+              <button class="btn-icon" title="编辑" @click="goEdit(a)">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M11 2l3 3-8 8H3v-3l8-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+              </button>
+              <button class="btn-icon btn-icon--danger" title="删除" @click="confirmDelete(a)">
+                <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6 5V3h4v2M6 8v5M10 8v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- 右侧面板 -->
-    <div class="agent-panel" v-if="current">
-      <div class="panel-header">
-        <div class="panel-title">
-          <RobotOutlined style="margin-right: 8px; color: #2e5bff" />
-          <span>{{ form.name || '未命名智能体' }}</span>
-          <a-badge
-            :status="current.status === 'published' ? 'success' : 'warning'"
-            :text="current.status === 'published' ? '已发布' : '草稿'"
-            style="margin-left: 12px"
-          />
-        </div>
-        <div class="panel-actions">
-          <a-popconfirm title="确认删除该智能体？" @confirm="deleteAgent">
-            <a-button danger size="small">删除</a-button>
-          </a-popconfirm>
-          <a-button size="small" :loading="saving" @click="saveDraft">保存草稿</a-button>
-          <a-button type="primary" size="small" :loading="publishing" @click="publish">发布</a-button>
+    <!-- 删除确认弹窗 -->
+    <div v-if="deleteTarget" class="modal-mask" @click.self="deleteTarget = null">
+      <div class="modal">
+        <div class="modal__title">确认删除</div>
+        <p class="modal__body">确定要删除智能体「{{ deleteTarget.name }}」吗？此操作不可撤销。</p>
+        <div class="modal__footer">
+          <button class="btn btn--ghost" @click="deleteTarget = null">取消</button>
+          <button class="btn btn--danger" :disabled="deleting" @click="doDelete">{{ deleting ? '删除中...' : '确认删除' }}</button>
         </div>
       </div>
-
-      <a-tabs v-model:activeKey="activeTab" class="panel-tabs">
-        <!-- 基础 -->
-        <a-tab-pane key="basic" tab="基础">
-          <div class="tab-content">
-            <a-form layout="vertical">
-              <a-form-item label="名称">
-                <a-input v-model:value="form.name" placeholder="请输入智能体名称" />
-              </a-form-item>
-              <a-form-item label="描述">
-                <a-textarea v-model:value="form.description" :rows="4" placeholder="请输入描述" />
-              </a-form-item>
-              <a-form-item label="标签">
-                <a-select v-model:value="form.tags" mode="tags" placeholder="输入标签后回车" style="width: 100%" />
-              </a-form-item>
-            </a-form>
-          </div>
-        </a-tab-pane>
-
-        <!-- 模型 -->
-        <a-tab-pane key="model" tab="模型">
-          <div class="tab-content">
-            <a-form layout="vertical">
-              <a-form-item label="模型">
-                <a-select
-                  v-model:value="form.model_id"
-                  placeholder="请选择模型"
-                  style="width: 100%"
-                  :options="models.map(m => ({ value: m.id, label: m.name }))"
-                />
-              </a-form-item>
-              <a-form-item label="温度 (Temperature)">
-                <a-slider
-                  v-model:value="form.tools_config.temperature"
-                  :min="0" :max="2" :step="0.1"
-                  :marks="{ 0: '0', 1: '1', 2: '2' }"
-                />
-              </a-form-item>
-              <a-form-item label="最大 Token 数">
-                <a-input-number
-                  v-model:value="form.tools_config.max_tokens"
-                  :min="1" :max="32768" :step="256"
-                  style="width: 200px"
-                />
-              </a-form-item>
-            </a-form>
-          </div>
-        </a-tab-pane>
-
-        <!-- 知识 -->
-        <a-tab-pane key="knowledge" tab="知识">
-          <div class="tab-content">
-            <a-form layout="vertical">
-              <a-form-item label="知识库">
-                <a-select
-                  v-model:value="form.kb_ids"
-                  mode="multiple"
-                  placeholder="请选择知识库"
-                  style="width: 100%"
-                  :options="knowledgeBases.map(k => ({ value: k.id, label: k.name }))"
-                />
-              </a-form-item>
-              <a-form-item label="实体">
-                <a-select
-                  v-model:value="form.entity_ids"
-                  mode="multiple"
-                  show-search
-                  placeholder="搜索并选择实体"
-                  style="width: 100%"
-                  :filter-option="(input, opt) => opt.label.toLowerCase().includes(input.toLowerCase())"
-                  :options="entities.map(e => ({ value: e.id, label: e.name }))"
-                />
-              </a-form-item>
-            </a-form>
-          </div>
-        </a-tab-pane>
-
-        <!-- 提示词 -->
-        <a-tab-pane key="prompt" tab="提示词">
-          <div class="tab-content">
-            <div class="prompt-templates">
-              <span style="margin-right: 8px; color: #666; font-size: 13px">预设模板：</span>
-              <a-button size="small" @click="applyTemplate('customer')">客服助手</a-button>
-              <a-button size="small" @click="applyTemplate('analysis')">数据分析</a-button>
-              <a-button size="small" @click="applyTemplate('ontology')">本体问答</a-button>
-            </div>
-            <a-textarea
-              v-model:value="form.system_prompt"
-              :rows="16"
-              placeholder="请输入系统提示词..."
-              class="prompt-textarea"
-            />
-          </div>
-        </a-tab-pane>
-
-        <!-- 测试 -->
-        <a-tab-pane key="test" tab="测试">
-          <div class="test-panel">
-            <div class="test-messages" ref="messagesRef">
-              <div v-if="testMessages.length === 0" class="test-empty">
-                <RobotOutlined style="font-size: 32px; color: #ccc" />
-                <p style="color: #999; margin-top: 8px">发送消息开始测试</p>
-              </div>
-              <div
-                v-for="(msg, i) in testMessages"
-                :key="i"
-                class="test-message"
-                :class="msg.role"
-              >
-                <div v-if="msg.role === 'assistant'" class="msg-avatar">
-                  <RobotOutlined />
-                </div>
-                <div class="msg-bubble">{{ msg.content }}</div>
-                <div v-if="msg.role === 'user'" class="msg-avatar user-avatar">
-                  <UserOutlined />
-                </div>
-              </div>
-            </div>
-            <div class="test-input-area">
-              <a-button size="small" style="margin-right: 8px" @click="testMessages = []" title="清空对话">
-                <template #icon><ClearOutlined /></template>
-              </a-button>
-              <a-input
-                v-model:value="testInput"
-                placeholder="输入测试消息..."
-                @pressEnter="sendTest"
-                :disabled="testLoading"
-              />
-              <a-button type="primary" :loading="testLoading" @click="sendTest" style="margin-left: 8px">
-                <template #icon><SendOutlined /></template>
-                发送
-              </a-button>
-            </div>
-          </div>
-        </a-tab-pane>
-      </a-tabs>
-
-      <!-- API 信息面板 -->
-      <div v-if="current.status === 'published' && apiInfo" class="api-panel">
-        <div class="api-panel-title">
-          <ApiOutlined style="margin-right: 6px" />
-          API 接入信息
-        </div>
-        <a-descriptions :column="1" size="small" bordered>
-          <a-descriptions-item label="接口地址">
-            <a-typography-text copyable>{{ apiInfo.endpoint }}</a-typography-text>
-          </a-descriptions-item>
-          <a-descriptions-item label="API Key">
-            <a-typography-text copyable :ellipsis="{ tooltip: apiInfo.api_key }">{{ apiInfo.api_key }}</a-typography-text>
-          </a-descriptions-item>
-          <a-descriptions-item label="cURL 示例">
-            <pre class="curl-example">{{ apiInfo.curl_example }}</pre>
-          </a-descriptions-item>
-        </a-descriptions>
-      </div>
-    </div>
-
-    <!-- 未选中空状态 -->
-    <div class="agent-empty" v-else>
-      <a-empty description="请从左侧选择或新建智能体" />
     </div>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import { message } from 'ant-design-vue'
-import {
-  PlusOutlined, ApiOutlined, SendOutlined,
-  RobotOutlined, UserOutlined, ClearOutlined
-} from '@ant-design/icons-vue'
-import { agentsApi, modelsApi } from '../../api/agents'
-import client from '../../api/client'
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { agentsApi, type AgentItem } from '../../api/agents'
 
-const agents = ref([])
-const models = ref([])
-const knowledgeBases = ref([])
-const entities = ref([])
+const router = useRouter()
+const agents = ref<AgentItem[]>([])
+const loading = ref(true)
+const search = ref('')
+const deleteTarget = ref<AgentItem | null>(null)
+const deleting = ref(false)
 
-const current = ref(null)
-const activeTab = ref('basic')
-const saving = ref(false)
-const publishing = ref(false)
-const apiInfo = ref(null)
-
-const form = ref({
-  name: '',
-  description: '',
-  model_id: null,
-  system_prompt: '',
-  kb_ids: [],
-  entity_ids: [],
-  tags: [],
-  tools_config: { temperature: 0.7, max_tokens: 2048 }
+const filtered = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  if (!q) return agents.value
+  return agents.value.filter(a =>
+    a.name.toLowerCase().includes(q) ||
+    a.description?.toLowerCase().includes(q) ||
+    a.tags?.some(t => t.toLowerCase().includes(q))
+  )
 })
 
-const testMessages = ref([])
-const testInput = ref('')
-const testLoading = ref(false)
-const messagesRef = ref(null)
-
-const TEMPLATES = {
-  customer: `你是一名专业的客服助手，负责解答用户的问题。\n请保持礼貌、耐心，用简洁清晰的语言回答。\n如果不确定答案，请如实告知并建议用户联系人工客服。`,
-  analysis: `你是一名数据分析专家，擅长解读数据、发现规律和提供洞察。\n请根据用户提供的数据或问题，给出专业的分析结论和建议。\n回答时请使用结构化格式，必要时列出关键指标。`,
-  ontology: `你是一名本体知识图谱问答助手，基于结构化知识库回答问题。\n请优先从知识库中检索相关实体和关系，给出准确的答案。\n回答时注明信息来源，对于知识库中没有的内容请明确说明。`
-}
-
 async function load() {
+  loading.value = true
   try {
-    const [agentRes, modelRes] = await Promise.all([agentsApi.list(), modelsApi.list()])
-    agents.value = agentRes.data || agentRes
-    models.value = modelRes.data || modelRes
+    agents.value = await agentsApi.list()
   } catch (e) {
-    message.error('加载失败：' + e.message)
-  }
-  try { knowledgeBases.value = (await client.get('/knowledge')).data || [] } catch (_) {}
-  try { entities.value = (await client.get('/entities')).data || [] } catch (_) {}
-}
-
-function select(a) {
-  current.value = a
-  activeTab.value = 'basic'
-  apiInfo.value = null
-  form.value = {
-    name: a.name || '',
-    description: a.description || '',
-    model_id: a.model_id || null,
-    system_prompt: a.system_prompt || '',
-    kb_ids: a.kb_ids || [],
-    entity_ids: a.entity_ids || [],
-    tags: a.tags || [],
-    tools_config: { temperature: 0.7, max_tokens: 2048, ...(a.tools_config || {}) }
-  }
-  testMessages.value = []
-  if (a.status === 'published') loadApiInfo(a.id)
-}
-
-async function loadApiInfo(id) {
-  try { apiInfo.value = (await client.get(`/agents/${id}/api-info`)).data || null } catch (_) {}
-}
-
-function createNew() {
-  current.value = { id: null, status: 'draft' }
-  activeTab.value = 'basic'
-  apiInfo.value = null
-  form.value = {
-    name: '', description: '', model_id: null, system_prompt: '',
-    kb_ids: [], entity_ids: [], tags: [],
-    tools_config: { temperature: 0.7, max_tokens: 2048 }
-  }
-  testMessages.value = []
-}
-
-async function saveDraft() {
-  saving.value = true
-  try {
-    const payload = { ...form.value, status: 'draft' }
-    const res = current.value.id
-      ? await agentsApi.update(current.value.id, payload)
-      : await agentsApi.create(payload)
-    current.value = { ...current.value, ...(res.data || res) }
-    await load()
-    message.success('草稿已保存')
-  } catch (e) {
-    message.error('保存失败：' + e.message)
+    console.error('加载智能体失败', e)
   } finally {
-    saving.value = false
+    loading.value = false
   }
 }
 
-async function publish() {
-  publishing.value = true
+function goCreate() {
+  router.push('/harness')
+}
+
+function goEdit(a: AgentItem) {
+  router.push('/harness')
+}
+
+function confirmDelete(a: AgentItem) {
+  deleteTarget.value = a
+}
+
+async function doDelete() {
+  if (!deleteTarget.value) return
+  deleting.value = true
   try {
-    const payload = { ...form.value, status: 'published' }
-    const res = current.value.id
-      ? await agentsApi.update(current.value.id, payload)
-      : await agentsApi.create(payload)
-    current.value = { ...current.value, ...(res.data || res), status: 'published' }
+    await agentsApi.delete(deleteTarget.value.id)
+    deleteTarget.value = null
     await load()
-    await loadApiInfo(current.value.id)
-    message.success('发布成功')
   } catch (e) {
-    message.error('发布失败：' + e.message)
+    console.error('删除失败', e)
   } finally {
-    publishing.value = false
+    deleting.value = false
   }
-}
-
-async function deleteAgent() {
-  if (!current.value.id) { current.value = null; return }
-  try {
-    await agentsApi.delete(current.value.id)
-    current.value = null
-    await load()
-    message.success('已删除')
-  } catch (e) {
-    message.error('删除失败：' + e.message)
-  }
-}
-
-function applyTemplate(key) {
-  form.value.system_prompt = TEMPLATES[key] || ''
-}
-
-async function sendTest() {
-  const text = testInput.value.trim()
-  if (!text || testLoading.value) return
-  if (!current.value?.id) { message.warning('请先保存智能体'); return }
-
-  testMessages.value.push({ role: 'user', content: text })
-  testInput.value = ''
-  testLoading.value = true
-
-  const assistantMsg = { role: 'assistant', content: '' }
-  testMessages.value.push(assistantMsg)
-  const idx = testMessages.value.length - 1
-
-  await nextTick()
-  scrollToBottom()
-
-  try {
-    const resp = await fetch(`/api/v1/agents/${current.value.id}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: testMessages.value.slice(0, -1) })
-    })
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      const chunk = decoder.decode(value, { stream: true })
-      for (const line of chunk.split('\n')) {
-        if (!line.startsWith('data: ')) continue
-        const data = line.slice(6).trim()
-        if (data === '[DONE]') continue
-        try {
-          const parsed = JSON.parse(data)
-          const delta = parsed.choices?.[0]?.delta?.content || parsed.content || ''
-          testMessages.value[idx].content += delta
-          await nextTick()
-          scrollToBottom()
-        } catch (_) {}
-      }
-    }
-  } catch (e) {
-    testMessages.value[idx].content = '请求失败：' + e.message
-  } finally {
-    testLoading.value = false
-  }
-}
-
-function scrollToBottom() {
-  if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight
 }
 
 onMounted(load)
 </script>
 
 <style scoped>
-.agent-page {
-  display: flex;
-  flex-direction: row;
-  height: 100vh;
-  background: #f5f7fa;
-  overflow: hidden;
-}
-
-.agent-list {
-  width: 240px;
-  min-width: 240px;
-  background: #fff;
-  border-right: 1px solid #e8e8e8;
+.agents-page {
   display: flex;
   flex-direction: column;
+  height: 100vh;
+  background: var(--neutral-50, #f5f7fa);
   overflow: hidden;
 }
 
-.list-header {
+.agents-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+  background: var(--neutral-0, #fff);
+  border-bottom: 1px solid var(--neutral-200, #e8e8e8);
+  flex-shrink: 0;
 }
 
-.list-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #1a1a2e;
-}
+.agents-topbar__left { display: flex; align-items: center; gap: 10px; }
+.agents-title { font-size: 16px; font-weight: 700; color: var(--neutral-900, #1a1a2e); }
+.agents-count { font-size: 12px; color: var(--neutral-400, #999); background: var(--neutral-100, #f0f0f0); padding: 2px 8px; border-radius: 10px; }
 
-.list-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 0;
-}
+.agents-topbar__right { display: flex; align-items: center; gap: 10px; }
 
-.agent-item {
-  padding: 10px 14px;
-  cursor: pointer;
-  border-left: 3px solid transparent;
-  transition: background 0.15s;
-}
-
-.agent-item:hover {
-  background: #f5f7fa;
-}
-
-.agent-item.active {
-  background: #e6f4ff;
-  border-left: 3px solid #2e5bff;
-}
-
-.item-row {
+.agents-search {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 4px;
+  gap: 6px;
+  background: var(--neutral-100, #f5f5f5);
+  border: 1px solid var(--neutral-200, #e8e8e8);
+  border-radius: 6px;
+  padding: 5px 10px;
+  color: var(--neutral-400, #999);
 }
+.agents-search__input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--neutral-800, #333);
+  width: 180px;
+}
+.agents-search__input::placeholder { color: var(--neutral-400, #bbb); }
 
-.item-name {
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
-  color: #1a1a2e;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 130px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
 }
+.btn--primary { background: var(--semantic-500, #4c6ef5); color: #fff; border-color: var(--semantic-500, #4c6ef5); }
+.btn--primary:hover { background: var(--semantic-600, #3b5bdb); }
+.btn--ghost { background: transparent; color: var(--neutral-600, #555); border-color: var(--neutral-300, #d9d9d9); }
+.btn--ghost:hover { background: var(--neutral-100, #f5f5f5); }
+.btn--danger { background: #ff4d4f; color: #fff; border-color: #ff4d4f; }
+.btn--danger:hover { background: #d9363e; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.item-meta {
-  display: flex;
-  gap: 8px;
-  font-size: 11px;
-  color: #999;
-}
-
-.agent-panel {
+.agents-body {
   flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+.agents-loading, .agents-empty {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+  gap: 12px;
+  color: var(--neutral-400, #999);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 28px; height: 28px;
+  border: 3px solid var(--neutral-200, #e8e8e8);
+  border-top-color: var(--semantic-500, #4c6ef5);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.agents-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.agent-card {
   background: #fff;
+  border: 1px solid var(--neutral-200, #e8e8e8);
+  border-radius: 10px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  cursor: default;
+}
+.agent-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  border-color: var(--semantic-300, #a5b4fc);
+}
+
+.agent-card__header { display: flex; align-items: center; gap: 10px; }
+.agent-card__avatar {
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--semantic-600, #3b5bdb);
+  flex-shrink: 0;
+}
+.agent-card__meta { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.agent-card__name { font-size: 14px; font-weight: 600; color: var(--neutral-900, #1a1a2e); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.agent-card__badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+  width: fit-content;
+}
+.badge--green { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.badge--gray { background: #f5f5f5; color: #888; border: 1px solid #e0e0e0; }
+
+.agent-card__desc {
+  font-size: 12px;
+  color: var(--neutral-500, #777);
+  line-height: 1.6;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
-.panel-header {
+.agent-card__tags { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--neutral-100, #f0f0f0);
+  color: var(--neutral-600, #555);
+}
+
+.agent-card__footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  flex-shrink: 0;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--neutral-100, #f0f0f0);
 }
-
-.panel-title {
+.agent-card__model {
   display: flex;
   align-items: center;
-  font-size: 15px;
-  font-weight: 600;
-  color: #1a1a2e;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--neutral-400, #aaa);
 }
+.agent-card__actions { display: flex; gap: 4px; }
 
-.panel-actions {
-  display: flex;
-  gap: 8px;
+.btn-icon {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--neutral-200, #e8e8e8);
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  color: var(--neutral-500, #777);
+  transition: all 0.15s;
 }
+.btn-icon:hover { background: var(--neutral-100, #f5f5f5); color: var(--semantic-500, #4c6ef5); border-color: var(--semantic-300, #a5b4fc); }
+.btn-icon--danger:hover { background: #fff1f0; color: #ff4d4f; border-color: #ffccc7; }
 
-.panel-tabs {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  padding: 0 20px;
+.modal-mask {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
 }
-
-.panel-tabs :deep(.ant-tabs-content-holder) {
-  overflow-y: auto;
-}
-
-.tab-content {
-  padding: 16px 0;
-  max-width: 640px;
-}
-
-.prompt-templates {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.prompt-textarea {
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-}
-
-.test-panel {
-  display: flex;
-  flex-direction: column;
-  height: 480px;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  overflow: hidden;
-  margin-top: 8px;
-}
-
-.test-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  background: #fafafa;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.test-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-}
-
-.test-message {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-}
-
-.test-message.user {
-  flex-direction: row-reverse;
-}
-
-.msg-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  background: #e8e8e8;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  flex-shrink: 0;
-  color: #666;
-}
-
-.msg-avatar.user-avatar {
-  background: #2e5bff;
-  color: #fff;
-}
-
-.msg-bubble {
-  max-width: 70%;
-  padding: 8px 12px;
-  border-radius: 12px;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.test-message.user .msg-bubble {
-  background: #2e5bff;
-  color: #fff;
-  border-bottom-right-radius: 4px;
-}
-
-.test-message.assistant .msg-bubble {
-  background: #f0f0f0;
-  color: #1a1a2e;
-  border-bottom-left-radius: 4px;
-}
-
-.test-input-area {
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border-top: 1px solid #e8e8e8;
+.modal {
   background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  width: 360px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
 }
-
-.agent-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.api-panel {
-  margin: 0 20px 16px;
-  padding: 14px 16px;
-  background: #f0f5ff;
-  border: 1px solid #d0e4ff;
-  border-radius: 8px;
-  flex-shrink: 0;
-}
-
-.api-panel-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #2e5bff;
-  margin-bottom: 10px;
-}
-
-.curl-example {
-  margin: 0;
-  font-size: 12px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #333;
-}
+.modal__title { font-size: 15px; font-weight: 600; color: #1a1a2e; margin-bottom: 10px; }
+.modal__body { font-size: 13px; color: #555; margin: 0 0 20px; line-height: 1.6; }
+.modal__footer { display: flex; justify-content: flex-end; gap: 8px; }
 </style>
-
