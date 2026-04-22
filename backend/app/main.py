@@ -10,6 +10,54 @@ from app.models import *  # noqa: F401,F403 — 确保所有模型注册
 from app.database import Base
 from app.api.v1.entities import router as entities_router
 from app.api.v1.auth import router as auth_router, seed_admin
+from app.models.agent import Agent
+
+
+def _seed_agents(db):
+    if db.query(Agent).count() > 0:
+        return
+    import uuid, secrets
+    from datetime import datetime
+    presets = [
+        {
+            "name": "宽带退单稽核智能体",
+            "description": "基于本体知识图谱，自动分析宽带退单原因，归因工程师责任，结合语音质检和规则引擎输出稽核结论",
+            "tags": ["宽带", "退单", "稽核", "归因"],
+            "system_prompt": "你是一名宽带退单稽核专家，基于本体知识图谱和业务规则，对宽带退单工单进行智能归因分析。请结合客户信息、工程师信息、工单记录和语音质检结果，给出准确的退单原因归因和责任判定。",
+        },
+        {
+            "name": "携号转网预警智能体",
+            "description": "实时监控高风险携号转网用户，结合用户行为、套餐偏好和竞品信息，输出预警等级和挽留策略建议",
+            "tags": ["携号转网", "预警", "挽留"],
+            "system_prompt": "你是一名携号转网预警分析专家，基于用户本体数据和行为特征，识别高风险用户并给出针对性的挽留策略。请综合分析用户的套餐使用情况、投诉记录、竞品偏好等多维度信息。",
+        },
+        {
+            "name": "政企根因分析智能体",
+            "description": "针对政企客户网络故障和服务投诉，基于本体关系图谱进行多维根因分析，快速定位问题根源",
+            "tags": ["政企", "根因分析", "故障"],
+            "system_prompt": "你是一名政企客户服务根因分析专家，基于网络拓扑本体和故障知识库，对政企客户的网络故障和服务问题进行深度根因分析。请给出清晰的故障链路和解决方案。",
+        },
+        {
+            "name": "FTTR续约策划智能体",
+            "description": "分析FTTR客户到期情况和使用行为，结合本体知识生成个性化续约方案和营销话术",
+            "tags": ["FTTR", "续约", "营销"],
+            "system_prompt": "你是一名FTTR业务续约策划专家，基于客户本体数据和历史使用记录，为即将到期的FTTR客户制定个性化续约方案。请结合客户价值、使用习惯和套餐偏好，给出最优续约建议和营销话术。",
+        },
+    ]
+    for p in presets:
+        a = Agent(
+            id=str(uuid.uuid4()),
+            name=p["name"],
+            description=p["description"],
+            tags=p["tags"],
+            system_prompt=p["system_prompt"],
+            kb_ids=[], entity_ids=[],
+            tools_config={"temperature": 0.4, "max_tokens": 2048},
+            status="published",
+            api_key=secrets.token_urlsafe(32),
+        )
+        db.add(a)
+    db.commit()
 from app.api.v1.rules import router as rules_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.copilot import router as copilot_router
@@ -81,6 +129,7 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         seed_admin(db)
+        _seed_agents(db)
     finally:
         db.close()
 
