@@ -40,37 +40,6 @@
     <div class="harness__body">
       <!-- 左侧面板 -->
       <div class="harness__left">
-        <!-- 智能体列表 -->
-        <div class="harness__section">
-          <div class="harness__section-header">
-            <span class="harness__section-title">智能体列表</span>
-            <button class="harness__icon-btn" @click="showNewDialog = true" title="新建场景">
-              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            </button>
-          </div>
-          <div class="harness__scene-list">
-            <div v-for="w in store.workflows" :key="w.id"
-              class="harness__scene-item"
-              :class="{ 'harness__scene-item--active': store.current?.id === w.id }"
-              @click="loadScene(w.id)">
-              <div class="harness__scene-item-row">
-                <span class="harness__scene-item-name">{{ w.name }}</span>
-                <span class="harness__scene-status" :class="`harness__scene-status--${w.status}`">
-                  {{ { draft:'草稿', published:'已发布', disabled:'停用' }[w.status] }}
-                </span>
-              </div>
-              <div class="harness__scene-item-meta">
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 8h2l2-4M6 8h2l2 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-                {{ w.node_count }} 个节点
-              </div>
-            </div>
-            <div v-if="!store.workflows.length" class="harness__empty">
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none" opacity=".3"><path d="M14 4L24 9.5v9L14 24 4 18.5v-9L14 4z" stroke="currentColor" stroke-width="1.5"/></svg>
-              <span>暂无场景</span>
-            </div>
-          </div>
-        </div>
-
         <!-- 节点库 -->
         <div class="harness__section harness__section--nodes">
           <div class="harness__section-header">
@@ -104,12 +73,8 @@
               <path d="M24 16v16M16 20l8 4 8-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
           </div>
-          <p class="harness__canvas-empty-title">选择或新建场景开始编排</p>
-          <p class="harness__canvas-empty-sub">从左侧节点库拖入节点，连接节点构建工作流</p>
-          <button class="harness__btn harness__btn--primary" @click="showNewDialog = true">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            新建场景
-          </button>
+          <p class="harness__canvas-empty-title">加载中...</p>
+          <p class="harness__canvas-empty-sub">正在加载智能体工作流</p>
         </div>
 
         <VueFlow v-else
@@ -276,6 +241,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, markRaw, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { VueFlow, MarkerType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
@@ -287,6 +253,8 @@ import WorkflowNode from '../../components/harness/nodes/WorkflowNode.vue'
 import { useHarnessStore } from '../../store/harness'
 
 const store = useHarnessStore()
+const route = useRoute()
+const router = useRouter()
 const canvasWrap = ref<HTMLElement>()
 const logExpanded = ref(false)
 const showNewDialog = ref(false)
@@ -367,7 +335,11 @@ watch(() => store.executionLog, (log) => {
   if (log.length > 0) logExpanded.value = true
 }, { deep: true })
 
-onMounted(() => store.loadList())
+onMounted(async () => {
+  await store.loadList()
+  const id = route.query.id as string
+  if (id) await store.loadWorkflow(id)
+})
 
 async function loadScene(id: string) { await store.loadWorkflow(id) }
 async function handleCreate() {
