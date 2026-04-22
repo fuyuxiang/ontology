@@ -5,6 +5,11 @@ import type { GraphData } from '../types'
 interface SimNode { id: string; x: number; y: number; tier: number }
 interface SimLink { source: string; target: string }
 
+export interface DataLayerItem {
+  entity_id: string; entity_name_cn: string; table_name: string
+  field_count: number; record_count: number; datasource_name: string
+}
+
 export function useGraphLayout() {
   function transformGraphData(data: GraphData, _direction: 'LR' | 'TB' = 'LR') {
     const simNodes: SimNode[] = data.nodes.map(n => ({
@@ -55,5 +60,31 @@ export function useGraphLayout() {
     return { nodes, edges }
   }
 
-  return { transformGraphData }
+  function buildDataLayerNodes(dataItems: DataLayerItem[], ontologyNodes: Node[]): { nodes: Node[]; edges: Edge[] } {
+    const nodeMap = new Map(ontologyNodes.map(n => [n.id, n]))
+    const nodes: Node[] = []
+    const edges: Edge[] = []
+    for (const item of dataItems) {
+      const parent = nodeMap.get(item.entity_id)
+      if (!parent) continue
+      const dnId = `data-${item.entity_id}`
+      nodes.push({
+        id: dnId,
+        type: 'dataNode',
+        position: { x: parent.position.x + 20, y: parent.position.y + 110 },
+        data: { ...item },
+      })
+      edges.push({
+        id: `data-edge-${item.entity_id}`,
+        source: item.entity_id,
+        target: dnId,
+        type: 'default',
+        style: { stroke: '#94a3b8', strokeWidth: 1.2, strokeDasharray: '5,4' },
+        animated: false,
+      })
+    }
+    return { nodes, edges }
+  }
+
+  return { transformGraphData, buildDataLayerNodes }
 }
