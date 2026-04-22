@@ -36,6 +36,8 @@ class Agent(Base):
     kb_ids: Mapped[list | None] = mapped_column(JSON)      # knowledge base ids
     entity_ids: Mapped[list | None] = mapped_column(JSON)  # ontology entity ids
     tools_config: Mapped[dict | None] = mapped_column(JSON)
+    nodes_json: Mapped[list | None] = mapped_column(JSON)   # workflow canvas nodes
+    edges_json: Mapped[list | None] = mapped_column(JSON)   # workflow canvas edges
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft/published
     api_key: Mapped[str | None] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
