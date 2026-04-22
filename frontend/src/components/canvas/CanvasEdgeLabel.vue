@@ -1,16 +1,15 @@
 <template>
   <BaseEdge :path="path" :marker-end="markerEnd" :style="edgeStyle" />
   <EdgeLabelRenderer>
-    <div :style="labelStyle" class="edge-label">
-      <span class="edge-label__name">{{ data.label }}</span>
-      <span class="edge-label__card" v-if="data.cardinality">{{ data.cardinality }}</span>
+    <div :style="labelStyle" class="edge-label" v-if="data.label">
+      {{ data.label }}<span class="edge-label__card" v-if="data.cardinality"> · {{ data.cardinality }}</span>
     </div>
   </EdgeLabelRenderer>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { BaseEdge, EdgeLabelRenderer, getStraightPath } from '@vue-flow/core'
+import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@vue-flow/core'
 
 const props = defineProps<{
   id: string
@@ -22,32 +21,37 @@ const props = defineProps<{
 }>()
 
 const path = computed(() => {
-  const [p] = getStraightPath({
+  const [p] = getBezierPath({
     sourceX: props.sourceX, sourceY: props.sourceY,
+    sourcePosition: props.sourcePosition,
     targetX: props.targetX, targetY: props.targetY,
+    targetPosition: props.targetPosition,
   })
   return p
 })
 
-const edgeStyle = { stroke: '#b4bfcc', strokeWidth: 1.2, opacity: 0.9 }
+const edgeStyle = { stroke: '#cbd5e1', strokeWidth: 1.5, opacity: 0.8 }
 
 const labelStyle = computed(() => ({
   position: 'absolute',
   transform: 'translate(-50%, -50%)',
   left: `${(props.sourceX + props.targetX) / 2}px`,
   top: `${(props.sourceY + props.targetY) / 2}px`,
-  pointerEvents: 'all',
+  pointerEvents: 'none',
 }))
 </script>
 
 <style scoped>
 .edge-label {
-  display: flex; align-items: center; gap: 5px;
-  background: rgba(255,255,255,0.97); padding: 3px 10px; border-radius: 12px;
-  border: 1px solid #edf0f4; font-size: 10px; white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
-  backdrop-filter: blur(8px);
+  background: #fff;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 10px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
-.edge-label__name { color: #475569; font-weight: 600; letter-spacing: 0.15px; }
-.edge-label__card { color: #a1aab6; font-size: 9px; font-weight: 500; }
+.edge-label__card { color: #94a3b8; font-size: 9px; }
 </style>
