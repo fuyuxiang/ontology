@@ -29,7 +29,7 @@
       </div>
 
       <div v-else class="agents-grid">
-        <div v-for="a in filtered" :key="a.id" class="agent-card">
+        <div v-for="a in filtered" :key="a.id" class="agent-card" @click="goEdit(a)">
           <div class="agent-card__header">
             <div class="agent-card__avatar">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2a5 5 0 100 10A5 5 0 0012 2z" stroke="currentColor" stroke-width="1.8"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="19" cy="8" r="2" fill="currentColor" opacity=".4"/><circle cx="5" cy="8" r="2" fill="currentColor" opacity=".4"/></svg>
@@ -54,10 +54,10 @@
               {{ a.model_name || '默认模型' }}
             </span>
             <div class="agent-card__actions">
-              <button class="btn-icon" title="编辑" @click="goEdit(a)">
+              <button class="btn-icon" title="编辑" @click.stop="goEdit(a)">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M11 2l3 3-8 8H3v-3l8-8z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
               </button>
-              <button class="btn-icon btn-icon--danger" title="删除" @click="confirmDelete(a)">
+              <button class="btn-icon btn-icon--danger" title="删除" @click.stop="confirmDelete(a)">
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 5h10M6 5V3h4v2M6 8v5M10 8v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
               </button>
             </div>
