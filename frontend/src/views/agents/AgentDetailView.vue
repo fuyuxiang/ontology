@@ -33,7 +33,6 @@
     </div>
 
     <div class="harness__body" v-if="current">
-      <!-- 左侧节点库 -->
       <div class="harness__left">
         <div class="harness__section harness__section--nodes">
           <div class="harness__section-header">
@@ -58,7 +57,6 @@
         </div>
       </div>
 
-      <!-- 画布 -->
       <div class="harness__canvas-wrap" ref="canvasWrap">
         <VueFlow
           v-model:nodes="flowNodes"
@@ -82,7 +80,6 @@
         </div>
       </div>
 
-      <!-- 右侧节点配置 -->
       <transition name="panel-slide">
         <div class="harness__right" v-if="selectedNodeId && selectedNode">
           <div class="harness__panel-header">
@@ -132,7 +129,7 @@
               </select>
             </div>
             <div class="harness__panel-actions">
-              <button class="harness__btn harness__btn--danger harness__btn--sm" @click="deleteNode(selectedNodeId!)">
+              <button class="harness__btn harness__btn--danger harness__btn--sm" @click="deleteNode(selectedNodeId)">
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 删除节点
               </button>
@@ -141,7 +138,6 @@
         </div>
       </transition>
 
-      <!-- 右侧智能体设置面板 -->
       <transition name="panel-slide">
         <div class="harness__right" v-if="showSettings && !selectedNodeId">
           <div class="harness__panel-header">
@@ -262,107 +258,36 @@ const nodeTypes = [
 const nodeGroups = [
   { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
   { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
-  { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference'
-
-<script setup>
-import { ref, computed, onMounted, markRaw } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { VueFlow, MarkerType } from '@vue-flow/core'
-import { Background } from '@vue-flow/background'
-import { Controls } from '@vue-flow/controls'
-import { MiniMap } from '@vue-flow/minimap'
-import WorkflowNode from '../../components/harness/nodes/WorkflowNode.vue'
-import { agentsApi, modelsApi } from '../../api/agents'
-
-const route = useRoute()
-const router = useRouter()
-const current = ref(null)
-const models = ref([])
-const saving = ref(false)
-const publishing = ref(false)
-const isDirty = ref(false)
-const showSettings = ref(false)
-const selectedNodeId = ref(null)
-const canvasWrap = ref()
-const flowNodes = ref([])
-const flowEdges = ref([])
-
-const form = ref({
-  name: '', description: '', model_id: null,
-  system_prompt: '', kb_ids: [], entity_ids: [],
-  tags: [], tools_config: { temperature: 0.7, max_tokens: 2048 }
-})
-
-const nodeTypes_ = {
-  'ontology-query': markRaw(WorkflowNode), 'ontology-relation': markRaw(WorkflowNode),
-  'rule-evaluate': markRaw(WorkflowNode), 'datasource': markRaw(WorkflowNode),
-  'variable-assign': markRaw(WorkflowNode), 'parallel': markRaw(WorkflowNode),
-  'llm-inference': markRaw(WorkflowNode), 'ml-model': markRaw(WorkflowNode),
-  'voice-audit': markRaw(WorkflowNode), 'condition': markRaw(WorkflowNode),
-  'loop': markRaw(WorkflowNode), 'merge': markRaw(WorkflowNode),
-  'rule-engine': markRaw(WorkflowNode), 'notification': markRaw(WorkflowNode),
-  'human-approval': markRaw(WorkflowNode), 'write-back': markRaw(WorkflowNode),
-  'api-response': markRaw(WorkflowNode),
-}
-
-const defaultEdgeOptions = {
-  type: 'smoothstep', markerEnd: MarkerType.ArrowClosed,
-  style: { stroke: '#94a3b8', strokeWidth: 1.5 },
-}
-
-const nodeTypes = [
-  { type: 'ontology-query', label: '本体实体查询', color: '#3b82f6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'ontology-relation', label: '关系图遍历', color: '#6366f1', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="3" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h3l3-4M5 8h3l3 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>` },
-  { type: 'rule-evaluate', label: '规则评估', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'datasource', label: '数据源连接', color: '#8b5cf6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="currentColor" stroke-width="1.5"/></svg>` },
-  { type: 'variable-assign', label: '变量赋值', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 5h8M4 8h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'parallel', label: '并行分支', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8h3M10 5h3M10 11h3M6 8l4-3M6 8l4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'llm-inference', label: '大模型推理', color: '#10b981', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
-  { type: 'ml-model', label: '预测模型', color: '#06b6d4', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12L6 7l3 3 2-4 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
-  { type: 'voice-audit', label: '语音质检', color: '#7c3aed', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="2" width="6" height="8" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 9a5 5 0 0010 0M8 14v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'condition', label: '条件判断', color: '#a855f7', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 6-6 6-6-6 6-6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
-  { type: 'loop', label: '遍历列表', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 019.9-1M13 8a5 5 0 01-9.9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'merge', label: '合并分支', color: '#84cc16', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 3v4l4 3 4-3V3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
-  { type: 'rule-engine', label: '规则引擎', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'notification', label: '通知触达', color: '#ec4899', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a5 5 0 015 5v2l1 2H2l1-2V7a5 5 0 015-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
-  { type: 'human-approval', label: '人工审批', color: '#f97316', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-  { type: 'write-back', label: '结果写回', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
-  { type: 'api-response', label: 'API 响应', color: '#2e5bff', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
-]
-
-const nodeGroups = [
-  { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
-  { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
   { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','voice-audit'].includes(n.type)) },
   { label: '流程控制', nodes: nodeTypes.filter(n => ['condition','loop','merge','rule-engine'].includes(n.type)) },
   { label: '触达输出', nodes: nodeTypes.filter(n => ['notification','human-approval','write-back','api-response'].includes(n.type)) },
 ]
 
 const selectedNode = computed(() => flowNodes.value.find(n => n.id === selectedNodeId.value) ?? null)
-function nodeTypeColor(type) { return nodeTypes.find(n => n.type === type)?.color ?? '#94a3b8' }
-function nodeTypeLabel(type) { return nodeTypes.find(n => n.type === type)?.label ?? type }
-function nodeTypeIcon(type) { return nodeTypes.find(n => n.type === type)?.icon ?? '' }
-function miniMapColor(node) { return nodeTypeColor(node.type) }
-function onNodeClick({ node }) { selectedNodeId.value = node.id; showSettings.value = false }
+function nodeTypeColor(type: string) { return nodeTypes.find(n => n.type === type)?.color ?? '#94a3b8' }
+function nodeTypeLabel(type: string) { return nodeTypes.find(n => n.type === type)?.label ?? type }
+function nodeTypeIcon(type: string) { return nodeTypes.find(n => n.type === type)?.icon ?? '' }
+function miniMapColor(node: any) { return nodeTypeColor(node.type) }
+function onNodeClick({ node }: any) { selectedNodeId.value = node.id; showSettings.value = false }
 
 let dragType = ''
-function onDragStart(e, type) { dragType = type; e.dataTransfer.effectAllowed = 'move' }
-function onDrop(e) {
+function onDragStart(e: DragEvent, type: string) { dragType = type; e.dataTransfer!.effectAllowed = 'move' }
+function onDrop(e: DragEvent) {
   if (!dragType || !canvasWrap.value) return
   const rect = canvasWrap.value.getBoundingClientRect()
   addNode(dragType, { x: e.clientX - rect.left - 80, y: e.clientY - rect.top - 30 })
   dragType = ''
 }
-function addNodeToCenter(type) {
+function addNodeToCenter(type: string) {
   const i = flowNodes.value.length
   addNode(type, { x: 80 + (i % 4) * 220, y: 80 + Math.floor(i / 4) * 120 })
 }
-function addNode(type, position) {
+function addNode(type: string, position: { x: number; y: number }) {
   const meta = nodeTypes.find(n => n.type === type)
   flowNodes.value.push({ id: `node-${Date.now()}`, type, position, data: { label: meta?.label || type, execState: 'pending' } })
   isDirty.value = true
 }
-function deleteNode(id) {
+function deleteNode(id: string) {
   flowNodes.value = flowNodes.value.filter(n => n.id !== id)
   flowEdges.value = flowEdges.value.filter(e => e.source !== id && e.target !== id)
   selectedNodeId.value = null; isDirty.value = true
@@ -382,7 +307,7 @@ async function publishAgent() {
   } catch (e) { console.error(e) } finally { publishing.value = false }
 }
 onMounted(async () => {
-  const id = route.params.id
+  const id = route.params.id as string
   const [agentRes, modelRes] = await Promise.all([agentsApi.get(id), modelsApi.list()])
   current.value = agentRes; models.value = modelRes
   form.value = {
@@ -391,8 +316,8 @@ onMounted(async () => {
     kb_ids: agentRes.kb_ids || [], entity_ids: agentRes.entity_ids || [],
     tags: agentRes.tags || [], tools_config: { temperature: 0.7, max_tokens: 2048, ...(agentRes.tools_config || {}) }
   }
-  flowNodes.value = (agentRes.nodes_json || []).map(n => ({ ...n }))
-  flowEdges.value = (agentRes.edges_json || []).map(e => ({ ...e }))
+  flowNodes.value = (agentRes.nodes_json || []).map((n: any) => ({ ...n }))
+  flowEdges.value = (agentRes.edges_json || []).map((e: any) => ({ ...e }))
 })
 </script>
 
