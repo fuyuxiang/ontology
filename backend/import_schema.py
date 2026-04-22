@@ -76,6 +76,9 @@ def import_schema(json_path: str, db):
                 required=prop.get("required", False),
                 example=prop.get("default", None),
                 constraints_json=constraints if constraints else None,
+                source_table=prop.get("source_table"),
+                source_field=prop.get("source_field"),
+                data_status=prop.get("data_status", "未确认来源"),
             )
             db.add(attr)
 
