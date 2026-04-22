@@ -1,145 +1,191 @@
 <template>
-  <div class="ad-page">
-    <!-- 顶栏 -->
-    <div class="ad-topbar">
-      <button class="btn-back" @click="router.push('/agents')">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        返回
-      </button>
-      <span class="ad-divider"></span>
-      <span class="ad-name">{{ form.name || '未命名智能体' }}</span>
-      <span class="ad-badge" :class="current?.status === 'published' ? 'badge--green' : 'badge--gray'">
-        {{ current?.status === 'published' ? '已发布' : '草稿' }}
-      </span>
-      <div class="ad-topbar-right">
-        <button class="hbtn" :disabled="saving" @click="saveAgent">{{ saving ? '保存中...' : '保存' }}</button>
-        <button class="hbtn hbtn--outline" :disabled="publishing" @click="publishAgent" v-if="current?.status === 'draft'">发布</button>
-        <button class="hbtn hbtn--primary" :disabled="executing" @click="executeAgent">
-          {{ executing ? '执行中...' : '执行' }}
+  <div class="harness">
+    <div class="harness__topbar">
+      <div class="harness__topbar-left">
+        <button class="harness__btn harness__btn--ghost" @click="router.push('/agents')" style="padding: 4px 8px">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          返回
+        </button>
+        <span class="harness__divider"></span>
+        <span class="harness__scene-name">{{ form.name || '未命名智能体' }}</span>
+        <span class="harness__status-tag" :class="`harness__status-tag--${current?.status}`">
+          {{ current?.status === 'published' ? '已发布' : '草稿' }}
+        </span>
+        <span class="harness__dirty" v-if="isDirty">
+          <svg width="6" height="6" viewBox="0 0 6 6"><circle cx="3" cy="3" r="3" fill="#f59e0b"/></svg>
+          未保存
+        </span>
+      </div>
+      <div class="harness__topbar-right" v-if="current">
+        <button class="harness__btn" @click="saveAgent" :disabled="saving">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h8l3 3v9H3V2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M6 2v4h5V2M5 9h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          {{ saving ? '保存中...' : '保存' }}
+        </button>
+        <button class="harness__btn harness__btn--outline" @click="publishAgent" v-if="current.status === 'draft'" :disabled="publishing">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 4v4l-6 4-6-4V6l6-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          发布
+        </button>
+        <button class="harness__btn harness__btn--ghost" @click="showSettings = !showSettings">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 2v1.5M8 12.5V14M2 8h1.5M12.5 8H14M3.5 3.5l1 1M11.5 11.5l1 1M3.5 12.5l1-1M11.5 4.5l1-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          设置
         </button>
       </div>
     </div>
 
-    <!-- 主体 -->
-    <div class="ad-body" v-if="current">
-      <!-- 左侧配置面板 -->
-      <div class="ad-left">
-        <!-- 节点库 -->
-        <div class="ad-section ad-section--nodes">
-          <div class="ad-section-header">
-            <span class="ad-section-title">节点库</span>
-            <span class="ad-section-hint">拖入或点击</span>
+    <div class="harness__body" v-if="current">
+      <!-- 左侧节点库 -->
+      <div class="harness__left">
+        <div class="harness__section harness__section--nodes">
+          <div class="harness__section-header">
+            <span class="harness__section-title">节点库</span>
+            <span class="harness__section-hint">拖入或点击添加</span>
           </div>
-          <div class="ad-node-lib">
+          <div class="harness__node-lib">
             <template v-for="group in nodeGroups" :key="group.label">
-              <div class="ad-node-group-label">{{ group.label }}</div>
+              <div class="harness__node-group-label">{{ group.label }}</div>
               <div v-for="nt in group.nodes" :key="nt.type"
-                class="ad-node-item"
+                class="harness__node-item"
                 draggable="true"
                 @dragstart="onDragStart($event, nt.type)"
-                @click="addNodeToCenter(nt.type)">
-                <span class="ad-node-icon" :style="{ color: nt.color }" v-html="nt.icon"></span>
-                <span class="ad-node-label">{{ nt.label }}</span>
+                @click="addNodeToCenter(nt.type)"
+                :title="`点击添加 ${nt.label}`">
+                <span class="harness__node-item-icon" :style="{ color: nt.color }" v-html="nt.icon"></span>
+                <span class="harness__node-item-label">{{ nt.label }}</span>
+                <svg class="harness__node-item-add" width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               </div>
             </template>
-          </div>
-        </div>
-
-        <!-- 智能体设置 -->
-        <div class="ad-section">
-          <div class="ad-section-header">
-            <span class="ad-section-title">智能体设置</span>
-          </div>
-          <div class="ad-settings">
-            <div class="ad-tabs">
-              <button v-for="t in tabs" :key="t.key" class="ad-tab" :class="{ active: activeTab === t.key }" @click="activeTab = t.key">{{ t.label }}</button>
-            </div>
-
-            <!-- 基础 -->
-            <div v-show="activeTab === 'basic'" class="ad-tab-content">
-              <div class="sf"><label>名称</label><input v-model="form.name" class="si" /></div>
-              <div class="sf"><label>描述</label><textarea v-model="form.description" class="si si--ta" rows="3"></textarea></div>
-              <div class="sf">
-                <label>标签</label>
-                <div class="tags-wrap">
-                  <span v-for="(t,i) in form.tags" :key="i" class="stag">{{ t }}<button @click="form.tags.splice(i,1)">×</button></span>
-                  <input v-model="tagInput" class="tag-in" placeholder="回车添加" @keydown.enter.prevent="addTag" />
-                </div>
-              </div>
-            </div>
-
-            <!-- 模型 -->
-            <div v-show="activeTab === 'model'" class="ad-tab-content">
-              <div class="sf"><label>模型</label>
-                <select v-model="form.model_id" class="si">
-                  <option :value="null">默认模型</option>
-                  <option v-for="m in models" :key="m.id" :value="m.id">{{ m.name }}</option>
-                </select>
-              </div>
-              <div class="sf"><label>温度 {{ form.tools_config.temperature }}</label>
-                <input type="range" v-model.number="form.tools_config.temperature" min="0" max="2" step="0.1" class="slider" />
-              </div>
-              <div class="sf"><label>Max Tokens</label>
-                <input type="number" v-model.number="form.tools_config.max_tokens" class="si" style="width:120px" min="1" max="32768" step="256" />
-              </div>
-            </div>
-
-            <!-- 提示词 -->
-            <div v-show="activeTab === 'prompt'" class="ad-tab-content">
-              <div class="prompt-btns">
-                <button class="hbtn hbtn--xs" @click="applyTemplate('customer')">客服</button>
-                <button class="hbtn hbtn--xs" @click="applyTemplate('analysis')">分析</button>
-                <button class="hbtn hbtn--xs" @click="applyTemplate('ontology')">本体</button>
-              </div>
-              <textarea v-model="form.system_prompt" class="si si--ta si--mono" rows="10" placeholder="系统提示词..."></textarea>
-            </div>
           </div>
         </div>
       </div>
 
       <!-- 画布 -->
-      <div class="ad-canvas-wrap" ref="canvasWrap"
-        @drop="onDrop" @dragover.prevent>
+      <div class="harness__canvas-wrap" ref="canvasWrap">
         <VueFlow
           v-model:nodes="flowNodes"
           v-model:edges="flowEdges"
           :node-types="nodeTypes_"
           :default-edge-options="defaultEdgeOptions"
           :snap-to-grid="true"
-          :snap-grid="[16,16]"
+          :snap-grid="[16, 16]"
           fit-view-on-init
-          class="ad-flow"
+          class="harness__flow"
           @node-click="onNodeClick"
-          @pane-click="selectedNodeId = null">
+          @pane-click="selectedNodeId = null"
+          @drop="onDrop"
+          @dragover.prevent>
           <Background variant="lines" pattern-color="#e8edf2" :gap="24" :size="1" />
           <Controls />
-          <MiniMap :node-color="nodeColor" node-stroke-color="transparent" mask-color="rgba(15,23,42,0.6)" />
+          <MiniMap :node-color="miniMapColor" node-stroke-color="transparent" mask-color="rgba(15,23,42,0.6)" />
         </VueFlow>
-        <div v-if="flowNodes.length === 0" class="ad-canvas-hint">从左侧节点库拖入节点开始编排</div>
+        <div class="harness__canvas-hint" v-if="flowNodes.length === 0">
+          从左侧节点库拖入节点，或点击节点旁的 + 按钮添加
+        </div>
       </div>
 
-      <!-- 右侧节点属性 -->
-      <div class="ad-right" v-if="selectedNodeId && selectedNode">
-        <div class="ad-right-header">
-          <span>节点属性</span>
-          <button class="ad-icon-btn" @click="selectedNodeId = null">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
-        </div>
-        <div class="ad-right-body">
-          <div class="sf"><label>节点名称</label><input class="si" v-model="selectedNode.data.label" /></div>
-          <div class="sf"><label>说明</label><textarea class="si si--ta" v-model="selectedNode.data.description" rows="2"></textarea></div>
-          <div class="sf" v-if="selectedNode.type === 'llm-inference'">
-            <label>Prompt</label>
-            <textarea class="si si--ta si--mono" v-model="selectedNode.data.prompt" rows="5" placeholder="输入 Prompt 模板"></textarea>
+      <!-- 右侧节点配置 -->
+      <transition name="panel-slide">
+        <div class="harness__right" v-if="selectedNodeId && selectedNode">
+          <div class="harness__panel-header">
+            <div class="harness__panel-header-left">
+              <span class="harness__panel-type-dot" :style="{ background: nodeTypeColor(selectedNode.type) }"></span>
+              <span>节点配置</span>
+            </div>
+            <button class="harness__icon-btn" @click="selectedNodeId = null">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
           </div>
-          <button class="hbtn hbtn--danger hbtn--sm" @click="deleteNode(selectedNodeId)">删除节点</button>
+          <div class="harness__panel-body">
+            <div class="harness__panel-type-badge" :style="{ color: nodeTypeColor(selectedNode.type), borderColor: nodeTypeColor(selectedNode.type) + '40', background: nodeTypeColor(selectedNode.type) + '12' }">
+              <span v-html="nodeTypeIcon(selectedNode.type)"></span>
+              {{ nodeTypeLabel(selectedNode.type) }}
+            </div>
+            <div class="harness__field">
+              <label>节点名称</label>
+              <input class="harness__input" v-model="selectedNode.data.label" @input="isDirty = true" placeholder="输入节点名称" />
+            </div>
+            <div class="harness__field">
+              <label>描述</label>
+              <textarea class="harness__input harness__input--ta" v-model="selectedNode.data.description" @input="isDirty = true" placeholder="节点说明" rows="2"></textarea>
+            </div>
+            <div class="harness__field" v-if="selectedNode.type === 'ontology-query'">
+              <label>本体对象</label>
+              <input class="harness__input" v-model="selectedNode.data.ontology_type" @input="isDirty = true" placeholder="如 InstallOrder" />
+            </div>
+            <div class="harness__field" v-if="selectedNode.type === 'llm-inference'">
+              <label>Prompt 模板</label>
+              <textarea class="harness__input harness__input--ta" v-model="selectedNode.data.prompt" @input="isDirty = true" placeholder="输入 Prompt 模板，支持 {变量} 占位符" rows="5"></textarea>
+            </div>
+            <div class="harness__field" v-if="selectedNode.type === 'datasource'">
+              <label>SQL 查询</label>
+              <textarea class="harness__input harness__input--ta harness__input--mono" v-model="selectedNode.data.sql" @input="isDirty = true" placeholder="SELECT * FROM table WHERE ..." rows="4"></textarea>
+            </div>
+            <div class="harness__field" v-if="selectedNode.type === 'condition'">
+              <label>判断条件</label>
+              <input class="harness__input" v-model="selectedNode.data.condition_expr" @input="isDirty = true" placeholder="如 risk_score > 80" />
+            </div>
+            <div class="harness__field" v-if="selectedNode.type === 'notification'">
+              <label>通知方式</label>
+              <select class="harness__input" v-model="selectedNode.data.notify_type" @change="isDirty = true">
+                <option value="sms">短信</option>
+                <option value="workorder">工单</option>
+                <option value="email">邮件</option>
+              </select>
+            </div>
+            <div class="harness__panel-actions">
+              <button class="harness__btn harness__btn--danger harness__btn--sm" @click="deleteNode(selectedNodeId!)">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                删除节点
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </transition>
+
+      <!-- 右侧智能体设置面板 -->
+      <transition name="panel-slide">
+        <div class="harness__right" v-if="showSettings && !selectedNodeId">
+          <div class="harness__panel-header">
+            <div class="harness__panel-header-left">
+              <span>智能体设置</span>
+            </div>
+            <button class="harness__icon-btn" @click="showSettings = false">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+          <div class="harness__panel-body">
+            <div class="harness__field">
+              <label>名称</label>
+              <input class="harness__input" v-model="form.name" @input="isDirty = true" />
+            </div>
+            <div class="harness__field">
+              <label>描述</label>
+              <textarea class="harness__input harness__input--ta" v-model="form.description" @input="isDirty = true" rows="3"></textarea>
+            </div>
+            <div class="harness__field">
+              <label>模型</label>
+              <select class="harness__input" v-model="form.model_id" @change="isDirty = true">
+                <option :value="null">默认模型</option>
+                <option v-for="m in models" :key="m.id" :value="m.id">{{ m.name }}</option>
+              </select>
+            </div>
+            <div class="harness__field">
+              <label>温度 {{ form.tools_config.temperature }}</label>
+              <input type="range" v-model.number="form.tools_config.temperature" min="0" max="2" step="0.1" class="harness__slider" @input="isDirty = true" />
+            </div>
+            <div class="harness__field">
+              <label>系统提示词</label>
+              <textarea class="harness__input harness__input--ta harness__input--mono" v-model="form.system_prompt" @input="isDirty = true" rows="8" placeholder="系统提示词..."></textarea>
+            </div>
+          </div>
+        </div>
+      </transition>
     </div>
 
-    <div v-else class="ad-loading">
-      <div class="spinner"></div><span>加载中...</span>
+    <div v-else class="harness__canvas-empty" style="flex:1">
+      <div class="harness__canvas-empty-icon">
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><path d="M24 6L42 16v16L24 42 6 32V16L24 6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </div>
+      <p class="harness__canvas-empty-title">加载中...</p>
     </div>
   </div>
 </template>
@@ -151,19 +197,20 @@ import { VueFlow, MarkerType } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
+import '@vue-flow/core/dist/style.css'
+import '@vue-flow/controls/dist/style.css'
+import '@vue-flow/minimap/dist/style.css'
 import WorkflowNode from '../../components/harness/nodes/WorkflowNode.vue'
 import { agentsApi, modelsApi } from '../../api/agents'
 
 const route = useRoute()
 const router = useRouter()
-
 const current = ref<any>(null)
 const models = ref<any[]>([])
 const saving = ref(false)
 const publishing = ref(false)
-const executing = ref(false)
-const activeTab = ref('basic')
-const tagInput = ref('')
+const isDirty = ref(false)
+const showSettings = ref(false)
 const selectedNodeId = ref<string | null>(null)
 const canvasWrap = ref<HTMLElement>()
 const flowNodes = ref<any[]>([])
@@ -175,17 +222,76 @@ const form = ref({
   tags: [] as string[], tools_config: { temperature: 0.7, max_tokens: 2048 }
 })
 
-const tabs = [
-  { key: 'basic', label: '基础' },
-  { key: 'model', label: '模型' },
-  { key: 'prompt', label: '提示词' },
+const nodeTypes_: Record<string, any> = {
+  'ontology-query': markRaw(WorkflowNode), 'ontology-relation': markRaw(WorkflowNode),
+  'rule-evaluate': markRaw(WorkflowNode), 'datasource': markRaw(WorkflowNode),
+  'variable-assign': markRaw(WorkflowNode), 'parallel': markRaw(WorkflowNode),
+  'llm-inference': markRaw(WorkflowNode), 'ml-model': markRaw(WorkflowNode),
+  'voice-audit': markRaw(WorkflowNode), 'condition': markRaw(WorkflowNode),
+  'loop': markRaw(WorkflowNode), 'merge': markRaw(WorkflowNode),
+  'rule-engine': markRaw(WorkflowNode), 'notification': markRaw(WorkflowNode),
+  'human-approval': markRaw(WorkflowNode), 'write-back': markRaw(WorkflowNode),
+  'api-response': markRaw(WorkflowNode),
+}
+
+const defaultEdgeOptions = {
+  type: 'smoothstep', markerEnd: MarkerType.ArrowClosed,
+  style: { stroke: '#94a3b8', strokeWidth: 1.5 },
+}
+
+const nodeTypes = [
+  { type: 'ontology-query', label: '本体实体查询', color: '#3b82f6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'ontology-relation', label: '关系图遍历', color: '#6366f1', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="3" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h3l3-4M5 8h3l3 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>` },
+  { type: 'rule-evaluate', label: '规则评估', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'datasource', label: '数据源连接', color: '#8b5cf6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="currentColor" stroke-width="1.5"/></svg>` },
+  { type: 'variable-assign', label: '变量赋值', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 5h8M4 8h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'parallel', label: '并行分支', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8h3M10 5h3M10 11h3M6 8l4-3M6 8l4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'llm-inference', label: '大模型推理', color: '#10b981', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
+  { type: 'ml-model', label: '预测模型', color: '#06b6d4', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12L6 7l3 3 2-4 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+  { type: 'voice-audit', label: '语音质检', color: '#7c3aed', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="2" width="6" height="8" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 9a5 5 0 0010 0M8 14v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'condition', label: '条件判断', color: '#a855f7', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 6-6 6-6-6 6-6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
+  { type: 'loop', label: '遍历列表', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 019.9-1M13 8a5 5 0 01-9.9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'merge', label: '合并分支', color: '#84cc16', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 3v4l4 3 4-3V3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+  { type: 'rule-engine', label: '规则引擎', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'notification', label: '通知触达', color: '#ec4899', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a5 5 0 015 5v2l1 2H2l1-2V7a5 5 0 015-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
+  { type: 'human-approval', label: '人工审批', color: '#f97316', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'write-back', label: '结果写回', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+  { type: 'api-response', label: 'API 响应', color: '#2e5bff', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
 ]
 
-const TEMPLATES: Record<string, string> = {
-  customer: '你是一名专业的客服助手，负责解答用户的问题。\n请保持礼貌、耐心，用简洁清晰的语言回答。',
-  analysis: '你是一名数据分析专家，擅长解读数据、发现规律和提供洞察。\n请根据用户提供的数据或问题，给出专业的分析结论和建议。',
-  ontology: '你是一名本体知识图谱问答助手，基于结构化知识库回答问题。\n请优先从知识库中检索相关实体和关系，给出准确的答案。'
-}
+const nodeGroups = [
+  { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
+  { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
+  { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference'
+
+<script setup>
+import { ref, computed, onMounted, markRaw } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { VueFlow, MarkerType } from '@vue-flow/core'
+import { Background } from '@vue-flow/background'
+import { Controls } from '@vue-flow/controls'
+import { MiniMap } from '@vue-flow/minimap'
+import WorkflowNode from '../../components/harness/nodes/WorkflowNode.vue'
+import { agentsApi, modelsApi } from '../../api/agents'
+
+const route = useRoute()
+const router = useRouter()
+const current = ref(null)
+const models = ref([])
+const saving = ref(false)
+const publishing = ref(false)
+const isDirty = ref(false)
+const showSettings = ref(false)
+const selectedNodeId = ref(null)
+const canvasWrap = ref()
+const flowNodes = ref([])
+const flowEdges = ref([])
+
+const form = ref({
+  name: '', description: '', model_id: null,
+  system_prompt: '', kb_ids: [], entity_ids: [],
+  tags: [], tools_config: { temperature: 0.7, max_tokens: 2048 }
+})
 
 const nodeTypes_ = {
   'ontology-query': markRaw(WorkflowNode), 'ontology-relation': markRaw(WorkflowNode),
@@ -204,161 +310,160 @@ const defaultEdgeOptions = {
   style: { stroke: '#94a3b8', strokeWidth: 1.5 },
 }
 
-const nodeTypesMeta = [
+const nodeTypes = [
   { type: 'ontology-query', label: '本体实体查询', color: '#3b82f6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'ontology-relation', label: '关系图遍历', color: '#6366f1', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="3" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h3l3-4M5 8h3l3 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>` },
   { type: 'rule-evaluate', label: '规则评估', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'datasource', label: '数据源连接', color: '#8b5cf6', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="currentColor" stroke-width="1.5"/></svg>` },
+  { type: 'variable-assign', label: '变量赋值', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 5h8M4 8h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'parallel', label: '并行分支', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8h3M10 5h3M10 11h3M6 8l4-3M6 8l4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'llm-inference', label: '大模型推理', color: '#10b981', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 3.5L13 7l-3.5 1.5L8 12l-1.5-3.5L3 7l3.5-1.5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
   { type: 'ml-model', label: '预测模型', color: '#06b6d4', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12L6 7l3 3 2-4 3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
   { type: 'voice-audit', label: '语音质检', color: '#7c3aed', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="2" width="6" height="8" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 9a5 5 0 0010 0M8 14v-2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'condition', label: '条件判断', color: '#a855f7', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 6-6 6-6-6 6-6z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
+  { type: 'loop', label: '遍历列表', color: '#0ea5e9', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8a5 5 0 019.9-1M13 8a5 5 0 01-9.9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'merge', label: '合并分支', color: '#84cc16', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M4 3v4l4 3 4-3V3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
+  { type: 'rule-engine', label: '规则引擎', color: '#f59e0b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h8M2 12h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'notification', label: '通知触达', color: '#ec4899', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a5 5 0 015 5v2l1 2H2l1-2V7a5 5 0 015-5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>` },
+  { type: 'human-approval', label: '人工审批', color: '#f97316', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'write-back', label: '结果写回', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
   { type: 'api-response', label: 'API 响应', color: '#2e5bff', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
 ]
 
 const nodeGroups = [
-  { label: '本体推理', nodes: nodeTypesMeta.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
-  { label: 'AI 能力', nodes: nodeTypesMeta.filter(n => ['llm-inference','ml-model','voice-audit'].includes(n.type)) },
-  { label: '数据/流程', nodes: nodeTypesMeta.filter(n => ['datasource','condition','notification','api-response'].includes(n.type)) },
+  { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
+  { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
+  { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','voice-audit'].includes(n.type)) },
+  { label: '流程控制', nodes: nodeTypes.filter(n => ['condition','loop','merge','rule-engine'].includes(n.type)) },
+  { label: '触达输出', nodes: nodeTypes.filter(n => ['notification','human-approval','write-back','api-response'].includes(n.type)) },
 ]
 
 const selectedNode = computed(() => flowNodes.value.find(n => n.id === selectedNodeId.value) ?? null)
-function nodeColor(node: any) { return nodeTypesMeta.find(n => n.type === node.type)?.color ?? '#94a3b8' }
-
-function addTag() {
-  const t = tagInput.value.trim()
-  if (t && !form.value.tags.includes(t)) form.value.tags.push(t)
-  tagInput.value = ''
-}
-function applyTemplate(key: string) { form.value.system_prompt = TEMPLATES[key] || '' }
+function nodeTypeColor(type) { return nodeTypes.find(n => n.type === type)?.color ?? '#94a3b8' }
+function nodeTypeLabel(type) { return nodeTypes.find(n => n.type === type)?.label ?? type }
+function nodeTypeIcon(type) { return nodeTypes.find(n => n.type === type)?.icon ?? '' }
+function miniMapColor(node) { return nodeTypeColor(node.type) }
+function onNodeClick({ node }) { selectedNodeId.value = node.id; showSettings.value = false }
 
 let dragType = ''
-function onDragStart(e: DragEvent, type: string) { dragType = type; e.dataTransfer!.effectAllowed = 'move' }
-function onDrop(e: DragEvent) {
+function onDragStart(e, type) { dragType = type; e.dataTransfer.effectAllowed = 'move' }
+function onDrop(e) {
   if (!dragType || !canvasWrap.value) return
   const rect = canvasWrap.value.getBoundingClientRect()
   addNode(dragType, { x: e.clientX - rect.left - 80, y: e.clientY - rect.top - 30 })
   dragType = ''
 }
-function addNodeToCenter(type: string) {
+function addNodeToCenter(type) {
   const i = flowNodes.value.length
   addNode(type, { x: 80 + (i % 4) * 220, y: 80 + Math.floor(i / 4) * 120 })
 }
-function addNode(type: string, position: { x: number; y: number }) {
-  const meta = nodeTypesMeta.find(n => n.type === type)
-  flowNodes.value.push({ id: `node-${Date.now()}`, type, position, data: { label: meta?.label || type } })
+function addNode(type, position) {
+  const meta = nodeTypes.find(n => n.type === type)
+  flowNodes.value.push({ id: `node-${Date.now()}`, type, position, data: { label: meta?.label || type, execState: 'pending' } })
+  isDirty.value = true
 }
-function deleteNode(id: string) {
+function deleteNode(id) {
   flowNodes.value = flowNodes.value.filter(n => n.id !== id)
   flowEdges.value = flowEdges.value.filter(e => e.source !== id && e.target !== id)
-  selectedNodeId.value = null
+  selectedNodeId.value = null; isDirty.value = true
 }
-function onNodeClick({ node }: { node: any }) { selectedNodeId.value = node.id }
-
 async function saveAgent() {
   saving.value = true
   try {
-    const res = await agentsApi.update(current.value.id, {
-      ...form.value, nodes_json: flowNodes.value, edges_json: flowEdges.value, status: current.value.status
-    } as any)
-    current.value = res
-  } catch (e) { console.error(e) }
-  finally { saving.value = false }
+    const res = await agentsApi.update(current.value.id, { ...form.value, nodes_json: flowNodes.value, edges_json: flowEdges.value, status: current.value.status })
+    current.value = res; isDirty.value = false
+  } catch (e) { console.error(e) } finally { saving.value = false }
 }
-
 async function publishAgent() {
   publishing.value = true
   try {
-    const res = await agentsApi.update(current.value.id, {
-      ...form.value, nodes_json: flowNodes.value, edges_json: flowEdges.value, status: 'published'
-    } as any)
-    current.value = res
-  } catch (e) { console.error(e) }
-  finally { publishing.value = false }
+    const res = await agentsApi.update(current.value.id, { ...form.value, nodes_json: flowNodes.value, edges_json: flowEdges.value, status: 'published' })
+    current.value = res; isDirty.value = false
+  } catch (e) { console.error(e) } finally { publishing.value = false }
 }
-
-function executeAgent() {}
-
 onMounted(async () => {
-  const id = route.params.id as string
+  const id = route.params.id
   const [agentRes, modelRes] = await Promise.all([agentsApi.get(id), modelsApi.list()])
-  current.value = agentRes
-  models.value = modelRes
+  current.value = agentRes; models.value = modelRes
   form.value = {
-    name: agentRes.name || '',
-    description: agentRes.description || '',
-    model_id: agentRes.model_id || null,
-    system_prompt: agentRes.system_prompt || '',
-    kb_ids: (agentRes as any).kb_ids || [],
-    entity_ids: (agentRes as any).entity_ids || [],
-    tags: agentRes.tags || [],
-    tools_config: { temperature: 0.7, max_tokens: 2048, ...(agentRes.tools_config || {}) }
+    name: agentRes.name || '', description: agentRes.description || '',
+    model_id: agentRes.model_id || null, system_prompt: agentRes.system_prompt || '',
+    kb_ids: agentRes.kb_ids || [], entity_ids: agentRes.entity_ids || [],
+    tags: agentRes.tags || [], tools_config: { temperature: 0.7, max_tokens: 2048, ...(agentRes.tools_config || {}) }
   }
-  flowNodes.value = ((agentRes as any).nodes_json || []).map((n: any) => ({ ...n }))
-  flowEdges.value = ((agentRes as any).edges_json || []).map((e: any) => ({ ...e }))
+  flowNodes.value = (agentRes.nodes_json || []).map(n => ({ ...n }))
+  flowEdges.value = (agentRes.edges_json || []).map(e => ({ ...e }))
 })
 </script>
 
 <style scoped>
-.ad-page { display: flex; flex-direction: column; height: 100vh; background: #f0f2f5; overflow: hidden; }
-.ad-topbar { display: flex; align-items: center; gap: 8px; padding: 0 16px; height: 44px; background: #1a1a2e; color: #e0e0e0; flex-shrink: 0; }
-.btn-back { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #aaa; background: none; border: none; cursor: pointer; padding: 4px 8px; border-radius: 4px; }
-.btn-back:hover { background: rgba(255,255,255,0.1); color: #fff; }
-.ad-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.15); }
-.ad-name { font-size: 13px; font-weight: 600; color: #e8e8e8; flex: 1; }
-.ad-badge { font-size: 11px; padding: 2px 7px; border-radius: 10px; }
-.badge--green { background: rgba(22,163,74,0.2); color: #4ade80; }
-.badge--gray { background: rgba(255,255,255,0.1); color: #aaa; }
-.ad-topbar-right { display: flex; gap: 6px; }
-.hbtn { display: inline-flex; align-items: center; gap: 4px; padding: 5px 12px; border-radius: 5px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); background: rgba(255,255,255,0.08); color: #e0e0e0; transition: all 0.15s; }
-.hbtn:hover { background: rgba(255,255,255,0.15); }
-.hbtn--primary { background: #4c6ef5; border-color: #4c6ef5; color: #fff; }
-.hbtn--primary:hover { background: #3b5bdb; }
-.hbtn--outline { border-color: #4c6ef5; color: #748ffc; }
-.hbtn--danger { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171; }
-.hbtn--sm { padding: 3px 8px; font-size: 11px; }
-.hbtn--xs { padding: 2px 7px; font-size: 11px; }
-.hbtn:disabled { opacity: 0.4; cursor: not-allowed; }
-.ad-body { flex: 1; display: flex; overflow: hidden; }
-.ad-left { width: 220px; min-width: 220px; background: #1e2235; display: flex; flex-direction: column; overflow: hidden; border-right: 1px solid rgba(255,255,255,0.06); }
-.ad-section { display: flex; flex-direction: column; overflow: hidden; }
-.ad-section--nodes { flex-shrink: 0; max-height: 40%; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.ad-section-header { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px 4px; flex-shrink: 0; }
-.ad-section-title { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; }
-.ad-section-hint { font-size: 10px; color: #64748b; }
-.ad-node-lib { overflow-y: auto; padding: 0 8px 8px; }
-.ad-node-group-label { font-size: 10px; color: #64748b; padding: 4px 4px 2px; text-transform: uppercase; letter-spacing: 0.3px; }
-.ad-node-item { display: flex; align-items: center; gap: 7px; padding: 5px 8px; border-radius: 5px; cursor: pointer; color: #cbd5e1; font-size: 12px; transition: background 0.12s; }
-.ad-node-item:hover { background: rgba(255,255,255,0.07); }
-.ad-node-icon { width: 13px; height: 13px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.ad-settings { flex: 1; overflow-y: auto; }
-.ad-tabs { display: flex; border-bottom: 1px solid rgba(255,255,255,0.06); }
-.ad-tab { flex: 1; padding: 7px 4px; font-size: 11px; color: #64748b; background: none; border: none; border-bottom: 2px solid transparent; cursor: pointer; transition: all 0.12s; }
-.ad-tab:hover { color: #94a3b8; }
-.ad-tab.active { color: #748ffc; border-bottom-color: #748ffc; }
-.ad-tab-content { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-.sf { display: flex; flex-direction: column; gap: 4px; }
-.sf label { font-size: 11px; color: #64748b; }
-.si { padding: 5px 8px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; font-size: 12px; color: #e0e0e0; outline: none; width: 100%; box-sizing: border-box; }
-.si:focus { border-color: #748ffc; }
-.si--ta { resize: vertical; font-family: inherit; }
-.si--mono { font-family: 'Consolas', monospace; }
-.slider { width: 100%; accent-color: #748ffc; }
-.tags-wrap { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 6px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; min-height: 32px; align-items: center; }
-.stag { display: inline-flex; align-items: center; gap: 3px; background: rgba(116,143,252,0.2); color: #748ffc; font-size: 11px; padding: 1px 6px; border-radius: 3px; }
-.stag button { background: none; border: none; cursor: pointer; color: #748ffc; font-size: 12px; line-height: 1; padding: 0; }
-.tag-in { border: none; outline: none; background: transparent; font-size: 12px; color: #e0e0e0; min-width: 80px; }
-.prompt-btns { display: flex; gap: 4px; flex-wrap: wrap; }
-.ad-canvas-wrap { flex: 1; position: relative; overflow: hidden; }
-.ad-flow { width: 100%; height: 100%; }
-.ad-canvas-hint { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 13px; color: #94a3b8; pointer-events: none; }
-.ad-right { width: 220px; min-width: 220px; background: #1e2235; border-left: 1px solid rgba(255,255,255,0.06); display: flex; flex-direction: column; overflow: hidden; }
-.ad-right-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,0.06); font-size: 12px; font-weight: 600; color: #94a3b8; flex-shrink: 0; }
-.ad-icon-btn { background: none; border: none; cursor: pointer; color: #64748b; padding: 2px; border-radius: 3px; display: flex; align-items: center; }
-.ad-icon-btn:hover { color: #94a3b8; background: rgba(255,255,255,0.07); }
-.ad-right-body { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
-.ad-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: #999; font-size: 14px; }
-.spinner { width: 28px; height: 28px; border: 3px solid #333; border-top-color: #4c6ef5; border-radius: 50%; animation: spin 0.7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
+.harness {
+  --h-bg:#f8fafc;--h-bg-2:#fff;--h-bg-3:#f1f5f9;--h-border:#e2e8f0;--h-border-2:#cbd5e1;
+  --h-text:#0f172a;--h-text-2:#334155;--h-text-3:#64748b;--h-text-4:#94a3b8;
+  --h-input-bg:#fff;--h-accent:#4f46e5;--h-canvas-bg:#ffffff;
+  display:flex;flex-direction:column;height:100vh;background:var(--h-bg);color:var(--h-text);
+}
+.harness__topbar{display:flex;align-items:center;justify-content:space-between;height:48px;padding:0 16px;flex-shrink:0;background:var(--h-bg);border-bottom:1px solid var(--h-border);gap:8px;}
+.harness__topbar-left{display:flex;align-items:center;gap:8px;}
+.harness__topbar-right{display:flex;align-items:center;gap:6px;}
+.harness__divider{width:1px;height:14px;background:var(--h-border-2);}
+.harness__scene-name{font-size:13px;color:var(--h-text-2);}
+.harness__dirty{display:flex;align-items:center;gap:4px;font-size:11px;color:#f59e0b;}
+.harness__status-tag{font-size:11px;padding:2px 7px;border-radius:10px;font-weight:600;background:var(--h-bg-2);color:var(--h-text-3);}
+.harness__status-tag--draft{background:#fef3c7;color:#d97706;}
+.harness__status-tag--published{background:#d1fae5;color:#059669;}
+.harness__btn{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:6px;font-size:12px;font-weight:500;border:1px solid var(--h-border-2);background:var(--h-bg-2);color:var(--h-text-2);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.harness__btn:hover:not(:disabled){color:var(--h-text);}
+.harness__btn:disabled{opacity:.4;cursor:not-allowed;}
+.harness__btn--primary{background:#4f46e5;border-color:#4f46e5;color:#fff;}
+.harness__btn--primary:hover:not(:disabled){background:#4338ca;}
+.harness__btn--outline{border-color:#4f46e5;color:#6366f1;background:transparent;}
+.harness__btn--outline:hover:not(:disabled){background:#eef2ff;}
+.harness__btn--ghost{border-color:transparent;background:transparent;color:var(--h-text-3);}
+.harness__btn--ghost:hover:not(:disabled){background:var(--h-bg-2);color:var(--h-text-2);}
+.harness__btn--danger{border-color:#fca5a5;background:#fff1f2;color:#ef4444;}
+.harness__btn--sm{padding:3px 8px;font-size:11px;}
+.harness__body{flex:1;display:flex;overflow:hidden;}
+.harness__left{width:200px;min-width:200px;background:var(--h-bg-2);border-right:1px solid var(--h-border);display:flex;flex-direction:column;overflow:hidden;}
+.harness__section{display:flex;flex-direction:column;overflow:hidden;flex:1;}
+.harness__section-header{display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px;flex-shrink:0;}
+.harness__section-title{font-size:11px;font-weight:600;color:var(--h-text-3);text-transform:uppercase;letter-spacing:0.5px;}
+.harness__section-hint{font-size:10px;color:var(--h-text-4);}
+.harness__node-lib{overflow-y:auto;padding:0 8px 8px;}
+.harness__node-group-label{font-size:10px;color:var(--h-text-4);padding:6px 4px 2px;text-transform:uppercase;letter-spacing:0.3px;}
+.harness__node-item{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:5px;cursor:pointer;color:var(--h-text-2);font-size:12px;transition:background 0.12s;}
+.harness__node-item:hover{background:var(--h-bg-3);}
+.harness__node-item-icon{width:13px;height:13px;flex-shrink:0;display:flex;align-items:center;justify-content:center;}
+.harness__node-item-label{flex:1;}
+.harness__node-item-add{color:var(--h-text-4);flex-shrink:0;opacity:0;transition:opacity 0.12s;}
+.harness__node-item:hover .harness__node-item-add{opacity:1;}
+.harness__canvas-wrap{flex:1;position:relative;overflow:hidden;}
+.harness__flow{width:100%;height:100%;}
+.harness__canvas-hint{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:13px;color:var(--h-text-4);pointer-events:none;}
+.harness__canvas-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--h-text-4);}
+.harness__canvas-empty-icon{opacity:0.3;}
+.harness__canvas-empty-title{font-size:14px;color:var(--h-text-3);margin:0;}
+.harness__right{width:260px;min-width:260px;background:var(--h-bg-2);border-left:1px solid var(--h-border);display:flex;flex-direction:column;overflow:hidden;}
+.harness__panel-header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--h-border);flex-shrink:0;font-size:12px;font-weight:600;color:var(--h-text-2);}
+.harness__panel-header-left{display:flex;align-items:center;gap:8px;}
+.harness__panel-type-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.harness__icon-btn{background:none;border:none;cursor:pointer;color:var(--h-text-4);padding:3px;border-radius:4px;display:flex;align-items:center;}
+.harness__icon-btn:hover{background:var(--h-bg-3);color:var(--h-text-2);}
+.harness__panel-body{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;}
+.harness__panel-type-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 8px;border-radius:5px;border:1px solid;width:fit-content;}
+.harness__field{display:flex;flex-direction:column;gap:5px;}
+.harness__field label{font-size:11px;font-weight:500;color:var(--h-text-3);}
+.harness__input{padding:6px 9px;background:var(--h-input-bg);border:1px solid var(--h-border);border-radius:6px;font-size:12px;color:var(--h-text);outline:none;width:100%;box-sizing:border-box;transition:border-color 0.15s;}
+.harness__input:focus{border-color:var(--h-accent);}
+.harness__input--ta{resize:vertical;font-family:inherit;}
+.harness__input--mono{font-family:'Consolas','Monaco',monospace;}
+.harness__slider{width:100%;accent-color:var(--h-accent);}
+.harness__panel-actions{margin-top:4px;}
+.panel-slide-enter-active,.panel-slide-leave-active{transition:all .2s ease;}
+.panel-slide-enter-from,.panel-slide-leave-to{transform:translateX(20px);opacity:0;}
+:deep(.vue-flow__background){background:var(--h-canvas-bg);}
+:deep(.vue-flow__controls){background:var(--h-bg-2);border:1px solid var(--h-border-2);border-radius:8px;overflow:hidden;}
+:deep(.vue-flow__controls-button){background:var(--h-bg-2);border-color:var(--h-border-2);color:var(--h-text-3);}
+:deep(.vue-flow__controls-button:hover){background:var(--h-bg-3);color:var(--h-text-2);}
+:deep(.vue-flow__minimap){background:var(--h-bg-3);border:1px solid var(--h-border);border-radius:8px;}
 </style>
