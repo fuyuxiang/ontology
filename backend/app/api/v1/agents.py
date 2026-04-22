@@ -21,6 +21,8 @@ class AgentCreate(BaseModel):
     kb_ids: Optional[list] = None
     entity_ids: Optional[list] = None
     tools_config: Optional[dict] = None
+    nodes_json: Optional[list] = None
+    edges_json: Optional[list] = None
 
 
 class AgentUpdate(BaseModel):
@@ -32,6 +34,8 @@ class AgentUpdate(BaseModel):
     kb_ids: Optional[list] = None
     entity_ids: Optional[list] = None
     tools_config: Optional[dict] = None
+    nodes_json: Optional[list] = None
+    edges_json: Optional[list] = None
     status: Optional[str] = None
 
 
@@ -56,6 +60,8 @@ def _agent_out(a: Agent, db: Session) -> dict:
         "kb_ids": a.kb_ids or [],
         "entity_ids": a.entity_ids or [],
         "tools_config": a.tools_config or {},
+        "nodes_json": a.nodes_json or [],
+        "edges_json": a.edges_json or [],
         "status": a.status,
         "api_key": a.api_key if a.status == "published" else None,
         "created_at": a.created_at.isoformat() if a.created_at else None,
