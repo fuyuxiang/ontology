@@ -13,16 +13,21 @@
       <div class="toolbar-sep"></div>
       <button class="toolbar-btn" :class="{ 'toolbar-btn--active': direction === 'LR' }" @click="$emit('direction', 'LR')">水平</button>
       <button class="toolbar-btn" :class="{ 'toolbar-btn--active': direction === 'TB' }" @click="$emit('direction', 'TB')">垂直</button>
+      <div class="toolbar-sep"></div>
+      <button class="toolbar-btn" :class="{ 'toolbar-btn--active': showDataLayer }" @click="$emit('toggleDataLayer')" title="切换数据层显示">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4M3 8v4c0 1.1 2.24 2 5 2s5-.9 5-2V8" stroke="currentColor" stroke-width="1.5"/></svg>
+        数据层
+      </button>
     </div>
     <div class="canvas-toolbar__right">
-      <span class="toolbar-stats text-caption">{{ nodeCount }} 对象 · {{ edgeCount }} 关系</span>
+      <span class="toolbar-stats">{{ nodeCount }} 对象 · {{ edgeCount }} 关系</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-defineProps<{ direction: 'LR' | 'TB'; nodeCount: number; edgeCount: number }>()
-defineEmits<{ layout: []; fit: []; direction: [d: 'LR' | 'TB'] }>()
+defineProps<{ direction: 'LR' | 'TB'; nodeCount: number; edgeCount: number; showDataLayer: boolean }>()
+defineEmits<{ layout: []; fit: []; direction: [d: 'LR' | 'TB']; toggleDataLayer: [] }>()
 </script>
 
 <style scoped>

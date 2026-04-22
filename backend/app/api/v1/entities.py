@@ -85,6 +85,45 @@ def get_scene_layer_stats(
     return result
 
 
+@router.get("/data-layer")
+def get_data_layer(db: Session = Depends(get_db)):
+    from app.models.datasource import DataSource
+    from sqlalchemy import distinct
+    rows = (
+        db.query(
+            EntityAttribute.entity_id,
+            EntityAttribute.source_table,
+        )
+        .filter(EntityAttribute.source_table.isnot(None), EntityAttribute.source_table != '')
+        .all()
+    )
+    # group by entity_id
+    entity_tables: dict[str, str] = {}
+    entity_field_counts: dict[str, int] = {}
+    for r in rows:
+        entity_tables[r.entity_id] = r.source_table
+        entity_field_counts[r.entity_id] = entity_field_counts.get(r.entity_id, 0) + 1
+
+    from app.models import OntologyEntity
+    result = []
+    for entity_id, table_name in entity_tables.items():
+        e = db.get(OntologyEntity, entity_id)
+        if not e:
+            continue
+        ds = db.query(DataSource).filter(DataSource.table_name == table_name).first()
+        record_count = ds.record_count if ds else 0
+        datasource_name = ds.name if ds else ''
+        result.append({
+            'entity_id': entity_id,
+            'entity_name_cn': e.name_cn,
+            'table_name': table_name,
+            'field_count': entity_field_counts.get(entity_id, 0),
+            'record_count': record_count,
+            'datasource_name': datasource_name,
+        })
+    return result
+
+
 @router.get("/graph", response_model=GraphData)
 def get_full_graph(db: Session = Depends(get_db)):
     repo = EntityRepository(db)
