@@ -126,6 +126,15 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE entity_attributes ADD COLUMN data_status VARCHAR(20) DEFAULT '未确认来源'"))
             conn.commit()
 
+        # agents 表增加 nodes_json / edges_json 列
+        if "agents" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("agents")}
+            if "nodes_json" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN nodes_json JSON"))
+            if "edges_json" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN edges_json JSON"))
+            conn.commit()
+
     db = SessionLocal()
     try:
         seed_admin(db)
