@@ -73,8 +73,8 @@
               <path d="M24 16v16M16 20l8 4 8-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
           </div>
-          <p class="harness__canvas-empty-title">加载中...</p>
-          <p class="harness__canvas-empty-sub">正在加载智能体工作流</p>
+          <p class="harness__canvas-empty-title">选择场景开始编排</p>
+          <p class="harness__canvas-empty-sub">从左侧节点库拖入节点，连接节点构建工作流</p>
         </div>
 
         <VueFlow v-else
