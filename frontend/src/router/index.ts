@@ -34,13 +34,13 @@ const router = createRouter({
     // 智能编排
     { path: '/orchestration/semantic', name: 'orch-semantic', component: Placeholder, meta: { title: '语义封装' } },
     { path: '/orchestration/prompts', name: 'orch-prompts', component: Placeholder, meta: { title: 'Prompt模板' } },
-    { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '智能体编排' } },
+    { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '智能体创建' } },
     { path: '/orchestration/models', name: 'orch-models', component: () => import('../views/models/ModelManageView.vue'), meta: { title: '模型管理' } },
-    { path: '/agents', name: 'agents', component: () => import('../views/agents/AgentView.vue'), meta: { title: '智能体管理' } },
+
     { path: '/aip/lowcode', name: 'aip-lowcode', component: Placeholder, meta: { title: '低代码平台' } },
 
     // 智能应用
-    { path: '/copilot', name: 'copilot', component: () => import('../views/copilot/CopilotView.vue'), meta: { title: '知识问答' } },
+    { path: '/copilot', name: 'copilot', component: () => import('../views/copilot/CopilotView.vue'), meta: { title: '智能问答' } },
     { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景验证' } },
     { path: '/scene/fttr', name: 'scene-fttr', component: () => import('../views/scene/FttrScene.vue'), meta: { title: 'FTTR续约策划' } },
     { path: '/scene/broadband', name: 'scene-broadband', component: () => import('../views/scene/BroadbandScene.vue'), meta: { title: '宽带退单稽核' } },
