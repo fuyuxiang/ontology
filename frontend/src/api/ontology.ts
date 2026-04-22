@@ -63,6 +63,10 @@ export const entityApi = {
     return post<FileImportResult>('/entities/from-file', formData)
   },
 
+  dataLayer() {
+    return get<{ entity_id: string; entity_name_cn: string; table_name: string; field_count: number; record_count: number; datasource_name: string }[]>('/entities/data-layer')
+  },
+
   updateAttributeMappings(entityId: string, items: { attribute_id: string; source_table: string | null; source_field: string | null; data_status: string }[]) {
     return put<OntologyEntity>(`/entities/${entityId}/attribute-mappings`, items)
   },

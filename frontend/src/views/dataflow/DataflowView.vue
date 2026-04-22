@@ -2,11 +2,13 @@
   <div class="canvas-page">
     <CanvasToolbar
       :direction="direction"
-      :node-count="flowNodes.length"
-      :edge-count="flowEdges.length"
+      :node-count="ontologyNodes.length"
+      :edge-count="ontologyEdges.length"
+      :show-data-layer="showDataLayer"
       @layout="doLayout"
       @fit="fitView"
       @direction="onDirection"
+      @toggle-data-layer="showDataLayer = !showDataLayer"
     />
     <div class="canvas-page__body">
       <div class="canvas-page__canvas" @drop="onDrop" @dragover.prevent>
@@ -54,12 +56,14 @@ import { useGraphLayout } from '../../composables/useGraphLayout'
 import CanvasToolbar from '../../components/canvas/CanvasToolbar.vue'
 import CanvasConfigPanel from '../../components/canvas/CanvasConfigPanel.vue'
 import OntologyNode from '../../components/canvas/OntologyNode.vue'
+import DataNode from '../../components/canvas/DataNode.vue'
 import CanvasEdgeLabel from '../../components/canvas/CanvasEdgeLabel.vue'
+import { entityApi } from '../../api/ontology'
 import type { Node, Edge } from '@vue-flow/core'
 
 const store = useOntologyStore()
 const router = useRouter()
-const { transformGraphData } = useGraphLayout()
+const { transformGraphData, buildDataLayerNodes } = useGraphLayout()
 const { fitView: doFitView, screenToFlowCoordinate } = useVueFlow()
 
 const flowNodes = ref<Node[]>([])
@@ -67,8 +71,12 @@ const flowEdges = ref<Edge[]>([])
 const direction = ref<'LR' | 'TB'>('LR')
 const selectedNodeId = ref<string | null>(null)
 const loading = ref(false)
+const showDataLayer = ref(true)
+const dataLayerItems = ref<any[]>([])
+const ontologyNodes = ref<Node[]>([])
+const ontologyEdges = ref<Edge[]>([])
 
-const nodeTypes = { ontologyNode: markRaw(OntologyNode) }
+const nodeTypes = { ontologyNode: markRaw(OntologyNode), dataNode: markRaw(DataNode) }
 const edgeTypes = { ontologyEdge: markRaw(CanvasEdgeLabel) }
 const defaultEdgeOptions = { markerEnd: MarkerType.ArrowClosed, animated: false }
 
@@ -80,7 +88,8 @@ function miniMapNodeColor(node: Node) {
 onMounted(async () => {
   loading.value = true
   if (store.entities.length === 0) await store.fetchEntities()
-  await store.fetchGraph()
+  const [_, dataItems] = await Promise.all([store.fetchGraph(), entityApi.dataLayer()])
+  dataLayerItems.value = dataItems
   loading.value = false
   doLayout()
 })
@@ -90,10 +99,24 @@ watch(() => store.graphData, () => { if (store.graphData) doLayout() })
 function doLayout() {
   if (!store.graphData) return
   const { nodes, edges } = transformGraphData(store.graphData, direction.value)
-  flowNodes.value = nodes
-  flowEdges.value = edges
+  ontologyNodes.value = nodes
+  ontologyEdges.value = edges
+  applyLayers()
   setTimeout(() => doFitView({ padding: 0.15 }), 50)
 }
+
+function applyLayers() {
+  if (showDataLayer.value && dataLayerItems.value.length) {
+    const { nodes: dn, edges: de } = buildDataLayerNodes(dataLayerItems.value, ontologyNodes.value)
+    flowNodes.value = [...ontologyNodes.value, ...dn]
+    flowEdges.value = [...ontologyEdges.value, ...de]
+  } else {
+    flowNodes.value = [...ontologyNodes.value]
+    flowEdges.value = [...ontologyEdges.value]
+  }
+}
+
+watch(showDataLayer, applyLayers)
 
 function fitView() { doFitView({ padding: 0.15 }) }
 
