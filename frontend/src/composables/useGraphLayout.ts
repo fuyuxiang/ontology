@@ -1,87 +1,9 @@
-import { MarkerType, Position, type Edge, type Node } from '@vue-flow/core'
-import type { EntityListItem, GraphData, Tier } from '../types'
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
+import { MarkerType, Position, type Node, type Edge } from '@vue-flow/core'
+import type { GraphData } from '../types'
 
-interface LayoutNode {
-  id: string
-  tier: Tier
-  relationCount: number
-}
-
-type LayoutDirection = 'LR' | 'TB'
-
-function compareNodes(a: LayoutNode, b: LayoutNode) {
-  if (a.tier !== b.tier) return a.tier - b.tier
-  if (a.relationCount !== b.relationCount) return b.relationCount - a.relationCount
-  return a.id.localeCompare(b.id)
-}
-
-function resolvePortPositions(direction: LayoutDirection) {
-  return direction === 'TB'
-    ? { sourcePosition: Position.Bottom, targetPosition: Position.Top }
-    : { sourcePosition: Position.Right, targetPosition: Position.Left }
-}
-
-function createTieredPositions(nodes: LayoutNode[], direction: LayoutDirection) {
-  const positions = new Map<string, { x: number; y: number }>()
-  const sorted = [...nodes].sort(compareNodes)
-  const buckets = {
-    1: sorted.filter(node => node.tier === 1),
-    2: sorted.filter(node => node.tier === 2),
-    3: sorted.filter(node => node.tier === 3),
-  } satisfies Record<Tier, LayoutNode[]>
-
-  if (direction === 'TB') {
-    const laneY: Record<Tier, number> = { 1: -280, 2: 0, 3: 280 }
-    const perRow = 4
-    const columnGap = 250
-    const rowGap = 176
-
-    ;([1, 2, 3] as Tier[]).forEach(tier => {
-      const laneNodes = buckets[tier]
-      const rowCount = Math.max(1, Math.ceil(laneNodes.length / perRow))
-      const visibleColumnCount = Math.min(perRow, Math.max(1, laneNodes.length))
-
-      laneNodes.forEach((node, index) => {
-        const row = Math.floor(index / perRow)
-        const column = index % perRow
-        const centeredColumn = column - (visibleColumnCount - 1) / 2
-        const centeredRow = row - (rowCount - 1) / 2
-
-        positions.set(node.id, {
-          x: centeredColumn * columnGap + (row % 2 === 1 ? 38 : 0),
-          y: laneY[tier] + centeredRow * rowGap,
-        })
-      })
-    })
-
-    return positions
-  }
-
-  const laneX: Record<Tier, number> = { 1: -500, 2: 0, 3: 500 }
-  const perColumn = 5
-  const columnGap = 240
-  const rowGap = 168
-
-  ;([1, 2, 3] as Tier[]).forEach(tier => {
-    const laneNodes = buckets[tier]
-    const columnCount = Math.max(1, Math.ceil(laneNodes.length / perColumn))
-    const visibleRowCount = Math.min(perColumn, Math.max(1, laneNodes.length))
-
-    laneNodes.forEach((node, index) => {
-      const column = Math.floor(index / perColumn)
-      const row = index % perColumn
-      const centeredColumn = column - (columnCount - 1) / 2
-      const centeredRow = row - (visibleRowCount - 1) / 2
-
-      positions.set(node.id, {
-        x: laneX[tier] + centeredColumn * columnGap,
-        y: centeredRow * rowGap + (column % 2 === 1 ? 34 : 0),
-      })
-    })
-  })
-
-  return positions
-}
+interface SimNode { id: string; x: number; y: number; tier: number }
+interface SimLink { source: string; target: string }
 
 export interface DataLayerItem {
   entity_id: string; entity_name_cn: string; table_name: string
@@ -89,53 +11,48 @@ export interface DataLayerItem {
 }
 
 export function useGraphLayout() {
-  const lanePositions = {
-    LR: { 1: -500, 2: 0, 3: 500 } as Record<Tier, number>,
-    TB: { 1: -280, 2: 0, 3: 280 } as Record<Tier, number>,
-  }
-
-  function transformGraphData(
-    data: GraphData,
-    direction: LayoutDirection = 'LR',
-    entityMeta = new Map<string, EntityListItem>(),
-  ) {
-    const layoutNodes: LayoutNode[] = data.nodes.map(node => ({
-      id: node.id,
-      tier: node.tier,
-      relationCount: node.relation_count,
+  function transformGraphData(data: GraphData, _direction: 'LR' | 'TB' = 'LR') {
+    const simNodes: SimNode[] = data.nodes.map(n => ({
+      id: n.id, x: Math.random() * 800, y: Math.random() * 600, tier: n.tier,
     }))
 
-    const positions = createTieredPositions(layoutNodes, direction)
-    const { sourcePosition, targetPosition } = resolvePortPositions(direction)
+    const simLinks: SimLink[] = data.edges.map(e => ({
+      source: e.from_id, target: e.to_id,
+    }))
 
-    const nodes: Node[] = data.nodes.map(node => {
-      const meta = entityMeta.get(node.id)
+    const nodeCount = simNodes.length
+    const strength = nodeCount > 30 ? -600 : nodeCount > 15 ? -400 : -300
 
-      return {
-        id: node.id,
-        type: 'ontologyNode',
-        position: positions.get(node.id) ?? { x: 0, y: 0 },
-        data: {
-          name: meta?.name ?? node.name,
-          nameCn: meta?.name_cn ?? node.name_cn,
-          tier: node.tier,
-          status: meta?.status ?? node.status,
-          relCount: node.relation_count,
-          attrCount: meta?.attr_count ?? 0,
-          ruleCount: meta?.rule_count ?? 0,
-          datasource: meta?.datasource_name ?? null,
-        },
-        sourcePosition,
-        targetPosition,
-      }
-    })
+    const sim = forceSimulation(simNodes as any)
+      .force('link', forceLink(simLinks as any).id((d: any) => d.id).distance(240).strength(0.25))
+      .force('charge', forceManyBody().strength(strength * 1.5))
+      .force('center', forceCenter(0, 0))
+      .force('collide', forceCollide(80))
+      .stop()
 
-    const edges: Edge[] = data.edges.map(edge => ({
-      id: `${edge.from_id}-${edge.to_id}-${edge.label}`,
-      source: edge.from_id,
-      target: edge.to_id,
+    for (let i = 0; i < 400; i++) sim.tick()
+
+    const nodes: Node[] = data.nodes.map((n, i) => ({
+      id: n.id,
+      type: 'ontologyNode',
+      position: { x: (simNodes[i] as any).x, y: (simNodes[i] as any).y },
+      data: {
+        name: n.name,
+        nameCn: n.name_cn,
+        tier: n.tier,
+        status: n.status,
+        relCount: n.relation_count,
+      },
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+    }))
+
+    const edges: Edge[] = data.edges.map(e => ({
+      id: `${e.from_id}-${e.to_id}-${e.label}`,
+      source: e.from_id,
+      target: e.to_id,
       type: 'ontologyEdge',
-      data: { label: edge.label, cardinality: edge.cardinality },
+      data: { label: e.label, cardinality: e.cardinality },
       markerEnd: MarkerType.ArrowClosed,
       animated: false,
     }))
@@ -143,5 +60,31 @@ export function useGraphLayout() {
     return { nodes, edges }
   }
 
-  return { transformGraphData, lanePositions }
+  function buildDataLayerNodes(dataItems: DataLayerItem[], ontologyNodes: Node[]): { nodes: Node[]; edges: Edge[] } {
+    const nodeMap = new Map(ontologyNodes.map(n => [n.id, n]))
+    const nodes: Node[] = []
+    const edges: Edge[] = []
+    for (const item of dataItems) {
+      const parent = nodeMap.get(item.entity_id)
+      if (!parent) continue
+      const dnId = `data-${item.entity_id}`
+      nodes.push({
+        id: dnId,
+        type: 'dataNode',
+        position: { x: parent.position.x + 20, y: parent.position.y + 110 },
+        data: { ...item },
+      })
+      edges.push({
+        id: `data-edge-${item.entity_id}`,
+        source: item.entity_id,
+        target: dnId,
+        type: 'default',
+        style: { stroke: '#94a3b8', strokeWidth: 1.2, strokeDasharray: '5,4' },
+        animated: false,
+      })
+    }
+    return { nodes, edges }
+  }
+
+  return { transformGraphData, buildDataLayerNodes }
 }
