@@ -2,9 +2,6 @@
   <div class="screen-wrapper" ref="wrapperRef">
     <!-- 背景 -->
     <img class="screen-bg" src="/images/ontology/bg.png" alt="" />
-    <img class="border-left" src="/images/ontology/left.png" alt="" />
-    <img class="border-right" src="/images/ontology/right.png" alt="" />
-    <img class="screen-title" src="/images/ontology/dh.png" alt="" />
     <img class="screen-bottom" src="/images/ontology/bottom.png" alt="" />
 
     <!-- 主内容（可拖拽缩放） -->
@@ -86,7 +83,6 @@
 
     <!-- 底部控制 -->
     <div class="bottom-controls">
-      <button class="bottom-btn" @click="resetView"><img src="/images/ontology/btn-重置视角.png" alt="重置" /></button>
       <button class="bottom-btn config-btn" @click="showConfig = true" title="配置仪表盘">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
           <circle cx="10" cy="10" r="2.5" stroke="currentColor" stroke-width="1.5"/>
@@ -104,7 +100,7 @@
 
     <!-- 仪表盘配置抽屉 -->
     <DashboardConfigDrawer v-if="dashConfig" :visible="showConfig" :config="dashConfig"
-      @close="showConfig = false" @saved="onConfigSaved" />
+      @close="showConfig = false" @saved="onConfigSaved" @reset-view="resetView" />
 
   </div>
 </template>
@@ -228,11 +224,11 @@ const domainZones = computed(() => {
 
   // Zone positions (percentage-based trapezoid layout)
   const zonePositions = [
-    { style: { left: '4%', top: '16%', width: '23%', height: '39%' }, maxCols: 3, rowOffset: '0.35vw' },
-    { style: { left: '26.5%', top: '15%', width: '21%', height: '22%' }, maxCols: 3, rowOffset: '0.45vw' },
-    { style: { left: '49.5%', top: '15%', width: '21%', height: '22%' }, maxCols: 3, rowOffset: '0.45vw' },
-    { style: { left: '69%', top: '16%', width: '22.5%', height: '39%' }, maxCols: 3, rowOffset: '-0.35vw' },
-    { style: { left: '16.5%', top: '37%', width: '62.5%', height: '22%' }, maxCols: 6, rowOffset: '0.45vw' },
+    { style: { left: '6%', top: '29%', width: '23%', height: '39%' }, maxCols: 3, rowOffset: '0.35vw' },
+    { style: { left: '27.5%', top: '28%', width: '21%', height: '22%' }, maxCols: 3, rowOffset: '0.45vw' },
+    { style: { left: '50.5%', top: '28%', width: '21%', height: '22%' }, maxCols: 3, rowOffset: '0.45vw' },
+    { style: { left: '70%', top: '29%', width: '22.5%', height: '39%' }, maxCols: 3, rowOffset: '-0.35vw' },
+    { style: { left: '17.5%', top: '50%', width: '62.5%', height: '22%' }, maxCols: 6, rowOffset: '0.45vw' },
   ]
 
   for (let i = 0; i < zoneCount; i++) {
@@ -259,7 +255,7 @@ const domainZones = computed(() => {
 const coreZone = computed(() => {
   const cols = Math.max(1, ...coreRows.value.map(row => row.length))
   return {
-    style: { left: '22.5%', bottom: '5%', width: '52%', height: '29%' },
+    style: { left: '23.5%', bottom: '17%', width: '52%', height: '29%' },
     gridStyle: {
       '--cols': String(cols),
       '--item-width': `${100 / cols}%`,
@@ -347,9 +343,9 @@ const svgLinks = computed(() => {
   })
 
   const linkColors: Record<string, { color: string; particleColor: string }> = {
-    'core-core': { color: '#0050EA', particleColor: '#4a9ff5' },
-    'core-domain': { color: '#6592EA', particleColor: '#7ab0ff' },
-    'domain-domain': { color: '#C2D0EA', particleColor: '#a0b8e0' },
+    'core-core': { color: '#4c6ef5', particleColor: '#748ffc' },
+    'core-domain': { color: '#91a7ff', particleColor: '#bac8ff' },
+    'domain-domain': { color: '#bac8ff', particleColor: '#dbe4ff' },
   }
 
   return relations.value
@@ -390,9 +386,14 @@ const contentTransform = computed(() => ({
   transformOrigin: 'center center',
 }))
 
-function resetView() { scale.value = 1; ox.value = 0; oy.value = 0 }
+function resetView() {
+  scale.value = 1
+  ox.value = 0
+  oy.value = 0
+}
 
 function onWheel(e: WheelEvent) {
+  if (showConfig.value || selectedNode.value) return
   e.preventDefault()
   const delta = e.deltaY > 0 ? 0.95 : 1.05
   scale.value = Math.max(0.4, Math.min(2.5, scale.value * delta))
@@ -462,6 +463,14 @@ const ICON_MAP: Record<string, string> = {
   logic: '/images/ontology/icon-LOGIC SOURCES.png',
   actions: '/images/ontology/icon-SYSTEMS OF ACTION.png',
 }
+const WORKFLOW_ICON = '/images/ontology/icon-核心本体.png'
+const WORKFLOW_CARD_ITEMS = [
+  { icon: WORKFLOW_ICON, label: '风险工作流' },
+  { icon: WORKFLOW_ICON, label: '证据检测流' },
+  { icon: WORKFLOW_ICON, label: '客户分析' },
+  { icon: WORKFLOW_ICON, label: '异网分析' },
+  { icon: WORKFLOW_ICON, label: '仪表盘' },
+]
 const FLEX_MAP: Record<string, number> = {
   analytics: 479, automations: 537, products: 470,
   datasources: 514, logic: 514, actions: 441,
@@ -512,12 +521,12 @@ const allCards = computed(() => {
     ]
     const activeRules = stats.value ? stats.value.top_rules.slice(0, 4).map((r: any) => r.name) : []
     return [
-      { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: ['客户360画像', '区域热力分析', '波次时间线', '绩效仪表盘', '趋势分析'] },
-      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: activeRules.length ? activeRules : ['携号转网预警', 'FTTR续约策划', '宽带退单稽核', '政企根因分析'] },
-      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway', 'TypeScript/Python SDK'] },
-      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, icon: ICON_MAP.datasources, items: dsItems.length ? dsItems.slice(0, 8) : ['BSS', 'CRM', 'GIS', '精准营销平台'] },
-      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, icon: ICON_MAP.logic, items: ['规则引擎', 'LLM话术生成', '营销策类', '顶天预测', '产品承接器', '触点视频'] },
-      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, icon: ICON_MAP.actions, items: ['装维工单', 'CRM短信', '短信网关', '企业微信', '吉警通知', '外呼中心'] },
+      { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: [], iconItems: WORKFLOW_CARD_ITEMS },
+      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: stats.value ? [...(stats.value.top_rules.slice(0, 4).map((r: any) => r.name)), ...(stats.value.top_rules.length === 0 ? ['暂无规则'] : [])] : ['加载中...'] },
+      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway'] },
+      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, icon: ICON_MAP.datasources, items: dsItems.slice(0, 8) },
+      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, icon: ICON_MAP.logic, items: (stats.value as any)?.rule_priority?.length ? (stats.value as any).rule_priority.map((r: any) => `${r.priority} 优先级: ${r.count}`) : ['暂无规则'] },
+      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, icon: ICON_MAP.actions, items: (stats.value as any)?.recent_activities?.length ? (stats.value as any).recent_activities.slice(0, 5).map((a: any) => a.description || a.name) : ['暂无动态'] },
     ]
   }
   return cards.filter(c => c.enabled).map(c => ({
@@ -525,7 +534,8 @@ const allCards = computed(() => {
     flex: FLEX_MAP[c.key] ?? 470,
     bg: BG_MAP[c.key] ?? BG_MAP.analytics,
     icon: ICON_MAP[c.key],
-    items: resolveCardItems(c),
+    items: c.key === 'analytics' ? [] : resolveCardItems(c),
+    iconItems: c.key === 'analytics' ? WORKFLOW_CARD_ITEMS : undefined,
   }))
 })
 
@@ -542,14 +552,12 @@ const bottomCards = computed(() => allCards.value.slice(3))
 
 .screen-wrapper {
   width: 100%; height: 100%; min-height: 720px;
-  position: relative; overflow: hidden; background: var(--neutral-950);
+  position: relative; overflow: hidden; background: var(--neutral-0);
   cursor: grab;
 }
 .screen-wrapper:active { cursor: grabbing; }
 
 .screen-bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 0; }
-.border-left { position: absolute; top: 0; left: 0; width: 48%; height: 100%; object-fit: fill; z-index: 10; pointer-events: none; padding-bottom: 10px; }
-.border-right { position: absolute; top: 0; right: 0; width: 48%; height: 100%; object-fit: fill; z-index: 10; pointer-events: none; padding-bottom: 10px; }
 .screen-title { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 46.15%; height: auto; z-index: 20; pointer-events: none; }
 .screen-bottom { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 31.25%; height: auto; z-index: 20; pointer-events: none; }
 
@@ -557,18 +565,18 @@ const bottomCards = computed(() => allCards.value.slice(3))
   position: relative; z-index: 5;
   display: flex; flex-direction: column;
   width: 100%; height: 100%;
-  padding: 10.1vw 60px 40px;
+  padding: 3.5vw 60px 40px;
   box-sizing: border-box;
   transition: transform 0.05s linear;
 }
 
 .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; width: 100%; }
 .row-top { align-items: flex-end; }
-.row-bottom { margin-top: -8.33vw; }
+.row-bottom { margin-top: 2vw; }
 
 /* ── 本体层 ── */
 .onto-layer {
-  position: relative; width: 96.15%; max-width: 100%; margin: 0 auto;
+  position: relative; width: 96.15%; max-width: 100%; margin: 1.5vw auto 0;
   flex: 1; min-height: 300px; overflow: visible;
 }
 .onto-layer__bg { width: 100%; height: auto; display: block; }
@@ -623,17 +631,17 @@ const bottomCards = computed(() => allCards.value.slice(3))
 }
 .platform-item:hover {
   z-index: 200;
-  filter: brightness(1.05) drop-shadow(0 2px 8px rgba(0, 50, 145, 0.25));
+  filter: brightness(1.05) drop-shadow(0 2px 8px rgba(76, 110, 245, 0.2));
   transform: scale(1.06);
 }
 .platform-item--focus {
   z-index: 230;
-  filter: brightness(1.12) drop-shadow(0 0 14px rgba(0, 80, 234, 0.45));
+  filter: brightness(1.12) drop-shadow(0 0 14px rgba(76, 110, 245, 0.35));
   transform: scale(1.1);
 }
 .platform-item--related {
   z-index: 210;
-  filter: brightness(1.08) drop-shadow(0 0 10px rgba(0, 80, 234, 0.28));
+  filter: brightness(1.08) drop-shadow(0 0 10px rgba(76, 110, 245, 0.22));
   transform: scale(1.04);
 }
 .platform-item--hidden {
@@ -671,8 +679,8 @@ const bottomCards = computed(() => allCards.value.slice(3))
   transform: translateX(-50%) translateY(4px);
   pointer-events: none; white-space: nowrap; z-index: 9999;
   opacity: 0; visibility: hidden;
-  background: rgba(0, 18, 68, 0.92);
-  border: 1px solid rgba(0, 80, 234, 0.5);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid rgba(76, 110, 245, 0.25);
   border-radius: 0.21vw;
   min-width: 8.33vw; max-width: 16.67vw;
   padding: 0.42vw 0.63vw;
@@ -682,9 +690,9 @@ const bottomCards = computed(() => allCards.value.slice(3))
   opacity: 1; visibility: visible;
   transform: translateX(-50%) translateY(0);
 }
-.platform-tooltip-name { color: var(--semantic-100); font-size: 0.68vw; font-weight: 600; margin-bottom: 0.21vw; }
-.platform-tooltip-desc { color: rgba(200, 220, 255, 0.75); font-size: 0.57vw; line-height: 1.5; white-space: normal; margin-bottom: 0.21vw; }
-.platform-tooltip-row { color: rgba(200, 220, 255, 0.85); font-size: 0.57vw; line-height: 1.6; white-space: nowrap; }
+.platform-tooltip-name { color: var(--neutral-900); font-size: 0.68vw; font-weight: 600; margin-bottom: 0.21vw; }
+.platform-tooltip-desc { color: var(--neutral-600); font-size: 0.57vw; line-height: 1.5; white-space: normal; margin-bottom: 0.21vw; }
+.platform-tooltip-row { color: var(--neutral-700); font-size: 0.57vw; line-height: 1.6; white-space: nowrap; }
 
 /* ── 底部控制 ── */
 .bottom-controls {
@@ -697,6 +705,6 @@ const bottomCards = computed(() => allCards.value.slice(3))
 }
 .bottom-btn img { width: auto; height: 2.78vh; display: block; }
 .bottom-btn:hover { filter: brightness(1.2); }
-.config-btn { color: rgba(0,50,145,0.7); padding: 4px; border-radius: 6px; }
-.config-btn:hover { color: var(--semantic-900); filter: none; background: rgba(0,50,145,0.1); }
+.config-btn { color: rgba(76, 110, 245, 0.7); padding: 4px; border-radius: 6px; }
+.config-btn:hover { color: var(--semantic-700); filter: none; background: rgba(76, 110, 245, 0.08); }
 </style>

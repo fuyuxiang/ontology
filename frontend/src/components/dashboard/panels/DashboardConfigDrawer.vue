@@ -14,6 +14,11 @@
             <input v-model.number="localConfig.refresh_interval" type="number" min="10" max="3600" class="dc-input" />
           </div>
 
+          <div class="dc-section">
+            <div class="dc-section__label">视图操作</div>
+            <button class="dc-btn dc-btn--full" @click="$emit('reset-view')">重置视角</button>
+          </div>
+
           <div class="dc-section__label" style="margin-bottom:8px">卡片配置</div>
           <div v-for="(card, i) in localConfig.cards_config" :key="card.key" class="dc-card">
             <div class="dc-card__header">
@@ -54,7 +59,11 @@ import { dashboardApi } from '../../../api/dashboard'
 import type { DashboardConfig, CardConfig, CardItemConfig } from '../../../api/dashboard'
 
 const props = defineProps<{ visible: boolean; config: DashboardConfig }>()
-const emit = defineEmits<{ (e: 'close'): void; (e: 'saved', cfg: DashboardConfig): void }>()
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'saved', cfg: DashboardConfig): void
+  (e: 'reset-view'): void
+}>()
 
 const saving = ref(false)
 const localConfig = ref<DashboardConfig>(JSON.parse(JSON.stringify(props.config)))
@@ -152,6 +161,8 @@ async function handleSave() {
 .dc-btn--primary:disabled { opacity: .5; cursor: not-allowed; }
 .dc-btn--ghost { color: var(--color-text-3, #64748b); }
 .dc-btn--ghost:hover { background: var(--color-bg-2, #f1f5f9); }
+.dc-btn--full { width: 100%; color: var(--semantic-700); border-color: rgba(76, 110, 245, 0.28); background: rgba(76, 110, 245, 0.06); }
+.dc-btn--full:hover { background: rgba(76, 110, 245, 0.12); border-color: rgba(76, 110, 245, 0.42); }
 .drawer-slide-enter-active, .drawer-slide-leave-active { transition: all .2s ease; }
 .drawer-slide-enter-from .dc-drawer__panel, .drawer-slide-leave-to .dc-drawer__panel { transform: translateX(100%); }
 .drawer-slide-enter-from .dc-drawer__mask, .drawer-slide-leave-to .dc-drawer__mask { opacity: 0; }
