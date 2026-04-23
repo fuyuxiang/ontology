@@ -12,25 +12,30 @@
       </div>
 
       <!-- ═══ 中间本体层 ═══ -->
-      <div class="onto-layer">
+      <div class="onto-layer" ref="ontoLayerRef">
         <img class="onto-layer__bg" src="/images/ontology/bg-本体层.png" alt="" />
 
         <!-- SVG 连线层 -->
         <svg class="onto-layer__svg" :viewBox="`0 0 ${svgW} ${svgH}`" preserveAspectRatio="none">
           <defs>
             <filter id="particle-glow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="2.5" result="blur" />
+              <feGaussianBlur stdDeviation="3" result="blur" />
               <feMerge><feMergeNode in="blur" /><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+            <filter id="line-glow" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="1.5" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
           <g v-for="link in svgLinks" :key="link.id" class="onto-link" :class="linkHighlightClass(link)">
             <path :id="'lp-'+link.id" :d="link.path" fill="none" stroke="none" />
-            <path class="onto-link__line" :d="link.path" fill="none" :stroke="link.color" stroke-width="0.5" stroke-dasharray="5 3" opacity="0.55" />
-            <circle v-for="p in 3" :key="p" class="onto-link__particle" :r="1.5" :fill="link.particleColor" filter="url(#particle-glow)">
-              <animateMotion :dur="link.dur+'s'" :begin="(-p * link.dur / 3)+'s'" repeatCount="indefinite">
+            <path class="onto-link__line" :d="link.path" fill="none" :stroke="link.color" stroke-width="1" stroke-opacity="0.35" filter="url(#line-glow)" />
+            <path class="onto-link__line-dash" :d="link.path" fill="none" :stroke="link.color" stroke-width="0.6" stroke-dasharray="6 4" stroke-opacity="0.6" />
+            <circle v-for="p in 4" :key="p" class="onto-link__particle" :r="2" :fill="link.particleColor" filter="url(#particle-glow)">
+              <animateMotion :dur="link.dur+'s'" :begin="(-p * link.dur / 4)+'s'" repeatCount="indefinite">
                 <mpath :href="'#lp-'+link.id" />
               </animateMotion>
-              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.1;0.9;1" :dur="link.dur+'s'" :begin="(-p * link.dur / 3)+'s'" repeatCount="indefinite" />
+              <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.9;1" :dur="link.dur+'s'" :begin="(-p * link.dur / 4)+'s'" repeatCount="indefinite" />
             </circle>
           </g>
         </svg>
@@ -42,6 +47,7 @@
             <div class="platform-rows-wrapper" :style="zone.gridStyle">
               <div v-for="(row, ri) in zone.rows" :key="ri" class="platform-row" :class="{ 'platform-row--offset': ri % 2 === 1 }">
                 <div v-for="node in row" :key="node.id" class="platform-item" :class="nodeHighlightClass(node)"
+                  :data-node-id="node.id"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon" :src="node.icon" :alt="node.label" />
                   <span class="platform-label">{{ node.label }}</span>
@@ -60,6 +66,7 @@
             <div class="platform-rows-wrapper" :style="coreZone.gridStyle">
               <div v-for="(row, ri) in coreRows" :key="'cr-'+ri" class="platform-row" :class="{ 'platform-row--offset': ri % 2 === 1 }">
                 <div v-for="node in row" :key="node.id" class="platform-item platform-item--core" :class="nodeHighlightClass(node)"
+                  :data-node-id="node.id"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon platform-icon--core" :src="node.icon" :alt="node.label" />
                   <span class="platform-label">{{ node.label }}</span>
@@ -106,7 +113,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import CapabilityCard from '../../components/dashboard/panels/CapabilityCard.vue'
 import NodeDetailPanel from '../../components/dashboard/panels/NodeDetailPanel.vue'
@@ -149,6 +156,9 @@ onMounted(async () => {
   relations.value = r as RelationData[]
   dashConfig.value = cfg as any
 
+  nextTick(recalcPositions)
+  window.addEventListener('resize', recalcPositions)
+
   const interval = (cfg as any)?.refresh_interval ?? 30
   refreshTimer = setInterval(async () => {
     stats.value = await dashboardApi.stats().catch(() => stats.value) as any
@@ -157,6 +167,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (refreshTimer) clearInterval(refreshTimer)
+  window.removeEventListener('resize', recalcPositions)
 })
 
 function onConfigSaved(cfg: DashboardConfig) {
@@ -255,7 +266,7 @@ const domainZones = computed(() => {
 const coreZone = computed(() => {
   const cols = Math.max(1, ...coreRows.value.map(row => row.length))
   return {
-    style: { left: '23.5%', bottom: '17%', width: '52%', height: '29%' },
+    style: { left: '23.5%', bottom: '10%', width: '52%', height: '29%' },
     gridStyle: {
       '--cols': String(cols),
       '--item-width': `${100 / cols}%`,
@@ -315,32 +326,44 @@ function linkHighlightClass(link: { highlighted: boolean }) {
   }
 }
 
-/* ── SVG connections ── */
+/* ── SVG connections (DOM-based positions) ── */
+const ontoLayerRef = ref<HTMLElement | null>(null)
 const svgW = 1920
 const svgH = 600
+const domPositionTick = ref(0)
+
+function recalcPositions() {
+  domPositionTick.value++
+}
+
+watch([entities, relations], () => {
+  nextTick(recalcPositions)
+})
 
 const svgLinks = computed(() => {
+  domPositionTick.value // reactive dependency
+
+  const layer = ontoLayerRef.value
+  if (!layer) return []
+
+  const layerRect = layer.getBoundingClientRect()
+  if (!layerRect.width || !layerRect.height) return []
+
   const nodeMap = new Map<string, OntologyNode>()
   for (const n of [...coreNodes.value, ...domainNodes.value]) nodeMap.set(n.id, n)
 
-  // Simple layout: assign approximate positions based on index
-  const allNodes = [...coreNodes.value, ...domainNodes.value]
   const posMap = new Map<string, { x: number; y: number }>()
-  allNodes.forEach((n, i) => {
-    if (n.isCore) {
-      const ci = coreNodes.value.indexOf(n)
-      const cx = svgW * 0.3 + (ci / Math.max(1, coreNodes.value.length - 1)) * svgW * 0.4
-      posMap.set(n.id, { x: cx, y: svgH * 0.8 })
-    } else {
-      const di = domainNodes.value.indexOf(n)
-      const total = domainNodes.value.length
-      const angle = (di / total) * Math.PI + Math.PI * 0.1
-      posMap.set(n.id, {
-        x: svgW * 0.5 + Math.cos(angle) * svgW * 0.35,
-        y: svgH * 0.15 + Math.sin(angle) * svgH * 0.45,
-      })
-    }
-  })
+  const nodeEls = layer.querySelectorAll('[data-node-id]')
+  for (const el of nodeEls) {
+    const id = (el as HTMLElement).dataset.nodeId!
+    const r = el.getBoundingClientRect()
+    const cx = r.left + r.width / 2 - layerRect.left
+    const cy = r.top + r.height / 2 - layerRect.top
+    posMap.set(id, {
+      x: (cx / layerRect.width) * svgW,
+      y: (cy / layerRect.height) * svgH,
+    })
+  }
 
   const linkColors: Record<string, { color: string; particleColor: string }> = {
     'core-core': { color: '#4c6ef5', particleColor: '#748ffc' },
@@ -358,12 +381,17 @@ const svgLinks = computed(() => {
       const type = fromCore && toCore ? 'core-core' : (fromCore || toCore) ? 'core-domain' : 'domain-domain'
       const lc = linkColors[type]
       const dx = t.x - f.x, dy = t.y - f.y
-      const path = `M${f.x},${f.y} C${f.x + dx * 0.05},${f.y + dy * 0.3} ${t.x - dx * 0.05},${t.y - dy * 0.3} ${t.x},${t.y}`
+      const mx = (f.x + t.x) / 2, my = (f.y + t.y) / 2
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      const bulge = dist * 0.15
+      const nx = -dy / (dist || 1), ny = dx / (dist || 1)
+      const cx1 = mx + nx * bulge, cy1 = my + ny * bulge
+      const path = `M${f.x},${f.y} Q${cx1},${cy1} ${t.x},${t.y}`
       const activeIds = highlightedNodeIds.value
       const highlighted = !isHoverFiltering.value || (activeIds.has(r.from_entity_id) && activeIds.has(r.to_entity_id))
       return {
         id: r.id, path, color: lc.color, particleColor: lc.particleColor,
-        dur: 1.8 + (idx % 5) * 0.15,
+        dur: 1.5 + (idx % 5) * 0.12,
         highlighted,
       }
     })
@@ -591,11 +619,15 @@ const bottomCards = computed(() => allCards.value.slice(3))
   opacity: 0;
 }
 .onto-link--highlighted .onto-link__line {
-  stroke-width: 1.2;
-  opacity: 0.9;
+  stroke-width: 1.8;
+  stroke-opacity: 0.7;
+}
+.onto-link--highlighted .onto-link__line-dash {
+  stroke-width: 1;
+  stroke-opacity: 0.9;
 }
 .onto-link--highlighted .onto-link__particle {
-  opacity: 1;
+  r: 3;
 }
 .onto-zones { position: absolute; inset: 0; z-index: 2; overflow: visible; }
 
