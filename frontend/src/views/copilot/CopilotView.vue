@@ -286,9 +286,7 @@ async function sendMessage(text?: string) {
     const url = selectedAgentId.value
       ? `/api/v1/agents/${selectedAgentId.value}/chat`
       : '/api/v1/copilot/agent-chat'
-    const body = selectedAgentId.value
-      ? JSON.stringify({ messages: messages.value.filter(m => m.role !== 'ai' || m.content).map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.content })) })
-      : JSON.stringify({ question: content })
+    const body = JSON.stringify({ question: content })
 
     const response = await fetch(url, {
       method: 'POST',
@@ -318,18 +316,12 @@ async function sendMessage(text?: string) {
           if (!line.startsWith('data: ')) continue
           const data = line.slice(6).trim()
           if (data === '[DONE]') break
-          if (selectedAgentId.value) {
-            // Agent chat: plain text streaming
-            if (!data.startsWith('[ERROR]')) aiMsgRef.content += data
+          try {
+            const event = JSON.parse(data)
+            handleSSEEvent(event, aiMsgRef)
             await scrollToBottom()
-          } else {
-            try {
-              const event = JSON.parse(data)
-              handleSSEEvent(event, aiMsgRef)
-              await scrollToBottom()
-            } catch {
-              // 非 JSON，忽略
-            }
+          } catch {
+            // 非 JSON，忽略
           }
         }
       }

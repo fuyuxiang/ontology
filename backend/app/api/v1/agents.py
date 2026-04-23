@@ -40,7 +40,8 @@ class AgentUpdate(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    messages: list
+    messages: Optional[list] = None
+    question: Optional[str] = None
     stream: Optional[bool] = True
 
 
@@ -149,61 +150,56 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
     if not a:
         raise HTTPException(404, "Agent not found")
 
-    from app.services.copilot import build_ontology_context, get_llm_client
-    from app.config import settings
+    import json as _json
+    from app.services.agent.orchestrator import AgentService
 
-    # Build ontology context from linked entities
-    entity_ids = a.entity_ids or []
-    ontology_ctx = ""
-    if entity_ids:
-        ontology_ctx = build_ontology_context(db, entity_ids[0] if entity_ids else None)
+    # Extract question from messages or direct field
+    question = body.question or ""
+    if not question and body.messages:
+        for m in reversed(body.messages):
+            if m.get("role") == "user" and m.get("content"):
+                question = m["content"]
+                break
 
-    system_parts = []
-    if a.system_prompt:
-        system_parts.append(a.system_prompt)
-    if ontology_ctx:
-        system_parts.append(ontology_ctx)
-    system_content = "\n\n".join(system_parts) or "你是一个智能助手。"
+    if not question:
+        raise HTTPException(400, "No question provided")
 
-    messages = [{"role": "system", "content": system_content}] + list(body.messages)
-
-    # Determine model config
-    model_cfg = {}
-    model_name = settings.LLM_MODEL
-    api_key = settings.LLM_API_KEY
-    api_base = settings.LLM_API_BASE
-
+    # Build model config from agent settings
+    model_name = None
+    model_config: dict = {}
     if a.model_id:
         m = db.get(ModelRegistry, a.model_id)
         if m:
             model_name = m.model_name
             if m.api_key:
-                api_key = m.api_key
+                model_config["api_key"] = m.api_key
             if m.api_base:
-                api_base = m.api_base
-            model_cfg = m.config_json or {}
+                model_config["api_base"] = m.api_base
+            if m.config_json:
+                model_config.update(m.config_json)
+    if a.tools_config:
+        for k in ("temperature", "max_tokens"):
+            if k in a.tools_config:
+                model_config.setdefault(k, a.tools_config[k])
 
-    from openai import OpenAI
-    client = OpenAI(api_key=api_key, base_url=api_base)
+    entity_id = (a.entity_ids or [None])[0] if a.entity_ids else None
 
-    def generate():
+    agent_svc = AgentService(
+        db,
+        system_prompt_prefix=a.system_prompt or None,
+        model_name=model_name,
+        model_config=model_config or None,
+    )
+
+    def event_stream():
         try:
-            stream = client.chat.completions.create(
-                model=model_name,
-                messages=messages,
-                stream=True,
-                temperature=model_cfg.get("temperature", 0.7),
-                max_tokens=model_cfg.get("max_tokens", 2048),
-            )
-            for chunk in stream:
-                delta = chunk.choices[0].delta.content or ""
-                if delta:
-                    yield f"data: {delta}\n\n"
+            for event in agent_svc.ask(question, entity_id):
+                yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
         except Exception as e:
-            yield f"data: [ERROR] {e}\n\n"
+            yield f"data: {_json.dumps({'type': 'answer', 'content': f'服务异常: {e}', 'suggestions': []}, ensure_ascii=False)}\n\n"
         yield "data: [DONE]\n\n"
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
 # ── 公开 API（外部调用，X-Agent-Key 鉴权）──────────────────────────────────
