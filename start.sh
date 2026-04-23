@@ -87,6 +87,12 @@ cd "$BACKEND_DIR"
 echo "Dependencies ready."
 echo
 
+if [ -f "$ROOT_DIR/.env" ]; then
+    set -a
+    source "$ROOT_DIR/.env"
+    set +a
+fi
+
 echo "[2/3] Starting backend (port $BACKEND_PORT)..."
 cd "$BACKEND_DIR"
 backend_args=(app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" --log-level info)
