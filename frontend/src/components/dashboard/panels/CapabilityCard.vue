@@ -1,11 +1,22 @@
 <template>
   <div class="cap-card" :style="{ flex: flex }">
     <img class="cap-card__bg" :src="bg" alt="" />
-    <div class="cap-card__content">
-      <img v-if="icon" class="cap-card__icon" :src="icon" alt="" />
-      <div class="cap-card__items">
-        <span v-for="(item, i) in items" :key="i" class="cap-card__item">{{ item }}</span>
+    <div class="cap-card__content" :class="{ 'cap-card__content--icon-grid': iconItems?.length }">
+      <div v-if="iconItems?.length" class="cap-card__icon-grid">
+        <template v-for="(item, index) in iconItems" :key="item.label">
+          <span v-if="index === 2" class="cap-card__icon-break" aria-hidden="true"></span>
+          <div class="cap-card__icon-item">
+          <img class="cap-card__icon-item-img" :src="item.icon" :alt="item.label" />
+          <span class="cap-card__icon-item-label">{{ item.label }}</span>
+          </div>
+        </template>
       </div>
+      <template v-else>
+        <img v-if="icon" class="cap-card__icon" :src="icon" alt="" />
+        <div class="cap-card__items">
+          <span v-for="(item, i) in items" :key="i" class="cap-card__item">{{ item }}</span>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -17,6 +28,7 @@ defineProps<{
   icon?: string
   flex: number
   items: string[]
+  iconItems?: { icon: string; label: string }[]
 }>()
 </script>
 
@@ -39,6 +51,10 @@ defineProps<{
   align-items: center;
   gap: 8px;
 }
+.cap-card__content--icon-grid {
+  inset: 5% 7% 20.5% 7%;
+  justify-content: center;
+}
 .cap-card__icon {
   width: 3.4vw;
   height: auto;
@@ -47,7 +63,7 @@ defineProps<{
 .cap-card__items {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 2px 8px;
   align-items: center;
 }
 .cap-card__item {
@@ -56,13 +72,50 @@ defineProps<{
   font-family: var(--font-sans);
   white-space: nowrap;
   padding: 0.15vw 0.4vw;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(0, 80, 200, 0.25);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(76, 110, 245, 0.2);
   border-radius: 3px;
   transition: background .15s;
   text-shadow: none;
 }
 .cap-card__item:hover {
   background: rgba(255, 255, 255, 0.75);
+}
+.cap-card__icon-grid {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.1vw 0.2vw;
+  align-items: flex-end;
+}
+.cap-card__icon-item {
+  min-width: 0;
+  flex: 0 0 26%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.06vw;
+}
+.cap-card__icon-break {
+  flex-basis: 100%;
+  width: 0;
+  height: 0;
+}
+.cap-card__icon-item-img {
+  width: clamp(16px, 1.8vw, 36px);
+  height: auto;
+  display: block;
+  filter: drop-shadow(0 0 8px rgba(76, 110, 245, 0.2));
+}
+.cap-card__icon-item-label {
+  max-width: 100%;
+  color: var(--semantic-900);
+  font-size: clamp(8px, 0.48vw, 11px);
+  font-family: var(--font-sans);
+  line-height: 1.1;
+  white-space: nowrap;
+  text-align: center;
+  text-shadow: none;
 }
 </style>

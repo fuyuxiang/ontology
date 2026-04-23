@@ -248,13 +248,6 @@ const nodeTypes_: Record<string, any> = {
   'human-approval': markRaw(WorkflowNode), 'write-back': markRaw(WorkflowNode),
   'api-response': markRaw(WorkflowNode), 'skill': markRaw(WorkflowNode),
 }
-  'voice-audit': markRaw(WorkflowNode), 'condition': markRaw(WorkflowNode),
-  'loop': markRaw(WorkflowNode), 'merge': markRaw(WorkflowNode),
-  'rule-engine': markRaw(WorkflowNode), 'notification': markRaw(WorkflowNode),
-  'human-approval': markRaw(WorkflowNode), 'write-back': markRaw(WorkflowNode),
-  'api-response': markRaw(WorkflowNode),
-}
-
 const defaultEdgeOptions = {
   type: 'smoothstep', markerEnd: MarkerType.ArrowClosed,
   style: { stroke: '#94a3b8', strokeWidth: 1.5 },
