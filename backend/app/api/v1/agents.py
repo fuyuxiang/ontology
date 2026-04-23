@@ -152,6 +152,7 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
 
     import json as _json
     from app.services.agent.orchestrator import AgentService
+    from app.services.agent.graph_engine import GraphEngine
 
     # Extract question from messages or direct field
     question = body.question or ""
@@ -182,22 +183,41 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
             if k in a.tools_config:
                 model_config.setdefault(k, a.tools_config[k])
 
-    entity_id = (a.entity_ids or [None])[0] if a.entity_ids else None
+    has_canvas = bool(a.nodes_json and len(a.nodes_json) > 0)
 
-    agent_svc = AgentService(
-        db,
-        system_prompt_prefix=a.system_prompt or None,
-        model_name=model_name,
-        model_config=model_config or None,
-    )
+    if has_canvas:
+        engine = GraphEngine(
+            db,
+            nodes_json=a.nodes_json,
+            edges_json=a.edges_json or [],
+            system_prompt=a.system_prompt or "",
+            model_name=model_name,
+            model_config=model_config or None,
+        )
 
-    def event_stream():
-        try:
-            for event in agent_svc.ask(question, entity_id):
-                yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
-        except Exception as e:
-            yield f"data: {_json.dumps({'type': 'answer', 'content': f'服务异常: {e}', 'suggestions': []}, ensure_ascii=False)}\n\n"
-        yield "data: [DONE]\n\n"
+        def event_stream():
+            try:
+                for event in engine.run(question):
+                    yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                yield f"data: {_json.dumps({'type': 'answer', 'content': f'服务异常: {e}', 'suggestions': []}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+    else:
+        entity_id = (a.entity_ids or [None])[0] if a.entity_ids else None
+        agent_svc = AgentService(
+            db,
+            system_prompt_prefix=a.system_prompt or None,
+            model_name=model_name,
+            model_config=model_config or None,
+        )
+
+        def event_stream():
+            try:
+                for event in agent_svc.ask(question, entity_id):
+                    yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
+            except Exception as e:
+                yield f"data: {_json.dumps({'type': 'answer', 'content': f'服务异常: {e}', 'suggestions': []}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
