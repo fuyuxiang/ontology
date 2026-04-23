@@ -11,6 +11,7 @@ from app.database import Base
 from app.api.v1.entities import router as entities_router
 from app.api.v1.auth import router as auth_router, seed_admin
 from app.models.agent import Agent
+from app.models.skill import Skill
 
 
 def _seed_agents(db):
@@ -58,6 +59,41 @@ def _seed_agents(db):
         )
         db.add(a)
     db.commit()
+
+
+def _seed_skills(db):
+    if db.query(Skill).count() > 0:
+        return
+    from app.utils.identifiers import gen_uuid
+    presets = [
+        {
+            "name": "携号转网风险评估",
+            "description": "基于本体实体和业务规则，对用户进行携号转网风险评估，输出风险等级、根因分析和挽留策略建议",
+            "skill_type": "builtin",
+            "code_ref": "mnp_risk_evaluate",
+            "config_json": {
+                "params": [
+                    {"name": "user_id", "type": "string", "required": True, "description": "用户标识"}
+                ]
+            },
+        },
+        {
+            "name": "宽带退单稽核",
+            "description": "基于退单工单数据和稽核规则，自动分析退单根因，输出归因判定和稽核结论",
+            "skill_type": "builtin",
+            "code_ref": "broadband_audit",
+            "config_json": {
+                "params": [
+                    {"name": "churn_id", "type": "string", "required": True, "description": "退单工单ID"}
+                ]
+            },
+        },
+    ]
+    for p in presets:
+        s = Skill(id=gen_uuid(), **p, status="active")
+        db.add(s)
+    db.commit()
+
 from app.api.v1.rules import router as rules_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.copilot import router as copilot_router
@@ -69,6 +105,7 @@ from app.api.v1.broadband import router as broadband_router
 from app.api.v1.workflows import router as workflows_router
 from app.api.v1.models import router as models_router
 from app.api.v1.agents import router as agents_router, open_router as agents_open_router
+from app.api.v1.skills import router as skills_router
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +176,7 @@ async def lifespan(app: FastAPI):
     try:
         seed_admin(db)
         _seed_agents(db)
+        _seed_skills(db)
     finally:
         db.close()
 
@@ -200,6 +238,7 @@ app.include_router(workflows_router, prefix="/api/v1")
 app.include_router(models_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 app.include_router(agents_open_router, prefix="/api/v1")
+app.include_router(skills_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
