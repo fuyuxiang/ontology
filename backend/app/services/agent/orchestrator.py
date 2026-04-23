@@ -21,9 +21,21 @@ logger = logging.getLogger(__name__)
 class AgentService:
     MAX_TOOL_ROUNDS = 8
 
-    def __init__(self, db: Session):
+    def __init__(
+        self,
+        db: Session,
+        system_prompt_prefix: str | None = None,
+        model_name: str | None = None,
+        model_config: dict | None = None,
+    ):
         self.db = db
-        self.client = get_llm_client()
+        self._system_prompt_prefix = system_prompt_prefix
+        self._model_name = model_name or settings.LLM_MODEL
+        self._model_config = model_config or {}
+        self.client = get_llm_client(
+            api_key=self._model_config.get("api_key"),
+            api_base=self._model_config.get("api_base"),
+        )
         self._tool_router = ToolRouter(db)
 
     # ── public ──────────────────────────────────────────────
@@ -36,6 +48,8 @@ class AgentService:
             return
 
         system_prompt = build_system_prompt(self.db, entity_id, None)
+        if self._system_prompt_prefix:
+            system_prompt = self._system_prompt_prefix + "\n\n" + system_prompt
         messages: list[dict[str, Any]] = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": question},
@@ -43,15 +57,17 @@ class AgentService:
         tool_runs: list[dict[str, Any]] = []
         tool_defs = agent_tool_definitions()
 
+        temperature = self._model_config.get("temperature", 0)
+
         for _round in range(self.MAX_TOOL_ROUNDS):
             try:
                 response = self.client.chat.completions.create(
-                    model=settings.LLM_MODEL,
+                    model=self._model_name,
                     messages=messages,
                     tools=tool_defs,
                     tool_choice="auto",
-                    temperature=0,
-                    max_tokens=4096,
+                    temperature=temperature,
+                    max_tokens=self._model_config.get("max_tokens", 4096),
                 )
             except Exception as e:
                 logger.error(f"LLM 调用失败: {e}")
