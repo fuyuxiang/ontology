@@ -26,10 +26,10 @@
               <feMerge><feMergeNode in="blur" /><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
             </filter>
           </defs>
-          <g v-for="link in svgLinks" :key="link.id">
+          <g v-for="link in svgLinks" :key="link.id" class="onto-link" :class="linkHighlightClass(link)">
             <path :id="'lp-'+link.id" :d="link.path" fill="none" stroke="none" />
-            <path :d="link.path" fill="none" :stroke="link.color" stroke-width="0.5" stroke-dasharray="5 3" opacity="0.55" />
-            <circle v-for="p in 3" :key="p" :r="1.5" :fill="link.particleColor" filter="url(#particle-glow)">
+            <path class="onto-link__line" :d="link.path" fill="none" :stroke="link.color" stroke-width="0.5" stroke-dasharray="5 3" opacity="0.55" />
+            <circle v-for="p in 3" :key="p" class="onto-link__particle" :r="1.5" :fill="link.particleColor" filter="url(#particle-glow)">
               <animateMotion :dur="link.dur+'s'" :begin="(-p * link.dur / 3)+'s'" repeatCount="indefinite">
                 <mpath :href="'#lp-'+link.id" />
               </animateMotion>
@@ -44,7 +44,7 @@
           <div v-for="(zone, zi) in domainZones" :key="'dz-'+zi" class="onto-zone" :style="zone.style">
             <div class="platform-rows-wrapper" :style="zone.gridStyle">
               <div v-for="(row, ri) in zone.rows" :key="ri" class="platform-row" :class="{ 'platform-row--offset': ri % 2 === 1 }">
-                <div v-for="node in row" :key="node.id" class="platform-item"
+                <div v-for="node in row" :key="node.id" class="platform-item" :class="nodeHighlightClass(node)"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon" :src="node.icon" :alt="node.label" />
                   <span class="platform-label">{{ node.label }}</span>
@@ -61,8 +61,8 @@
           <!-- 核心本体区域（中央） -->
           <div class="onto-zone onto-zone--core" :style="coreZone.style">
             <div class="platform-rows-wrapper" :style="coreZone.gridStyle">
-              <div class="platform-row">
-                <div v-for="node in coreNodes" :key="node.id" class="platform-item platform-item--core"
+              <div v-for="(row, ri) in coreRows" :key="'cr-'+ri" class="platform-row" :class="{ 'platform-row--offset': ri % 2 === 1 }">
+                <div v-for="node in row" :key="node.id" class="platform-item platform-item--core" :class="nodeHighlightClass(node)"
                   @click="onNodeClick(node)" @mouseenter="hoveredNode = node" @mouseleave="hoveredNode = null">
                   <img class="platform-icon platform-icon--core" :src="node.icon" :alt="node.label" />
                   <span class="platform-label">{{ node.label }}</span>
@@ -207,44 +207,117 @@ function toNode(e: EntityListItem): OntologyNode {
 const coreNodes = computed(() => entities.value.filter(e => coreNames.has(e.name) || e.tier === 1).map(toNode))
 const domainNodes = computed(() => entities.value.filter(e => !coreNames.has(e.name) && e.tier !== 1).map(toNode))
 
-// Split domain nodes into zones (up to 5 zones with trapezoid layout)
+function toBalancedRows<T>(items: T[], maxCols: number): T[][] {
+  if (!items.length) return []
+  const rowCount = Math.ceil(items.length / maxCols)
+  const cols = Math.ceil(items.length / rowCount)
+  const rows: T[][] = []
+  for (let i = 0; i < items.length; i += cols) rows.push(items.slice(i, i + cols))
+  return rows
+}
+
+const coreRows = computed(() => toBalancedRows(coreNodes.value, 4))
+
+// Split domain nodes into zones (up to 5 zones with balanced multi-row layout)
 const domainZones = computed(() => {
   const nodes = domainNodes.value
   if (!nodes.length) return []
-  const perZone = Math.ceil(nodes.length / Math.min(5, Math.max(1, Math.ceil(nodes.length / 4))))
   const zones: { style: Record<string, string>; gridStyle: Record<string, string>; rows: OntologyNode[][] }[] = []
+  const zoneCount = Math.min(5, Math.max(1, Math.ceil(nodes.length / 4)))
+  const perZone = Math.ceil(nodes.length / zoneCount)
 
   // Zone positions (percentage-based trapezoid layout)
   const zonePositions = [
-    { left: '5%', top: '16%', width: '22%', height: '42%' },
-    { left: '28%', top: '15%', width: '21%', height: '17%' },
-    { left: '51%', top: '15%', width: '21%', height: '17%' },
-    { left: '70%', top: '16%', width: '25%', height: '42%' },
-    { left: '19%', top: '35%', width: '62%', height: '25%' },
+    { style: { left: '4%', top: '16%', width: '23%', height: '39%' }, maxCols: 3, rowOffset: '0.35vw' },
+    { style: { left: '26.5%', top: '15%', width: '21%', height: '22%' }, maxCols: 3, rowOffset: '0.45vw' },
+    { style: { left: '49.5%', top: '15%', width: '21%', height: '22%' }, maxCols: 3, rowOffset: '0.45vw' },
+    { style: { left: '69%', top: '16%', width: '22.5%', height: '39%' }, maxCols: 3, rowOffset: '-0.35vw' },
+    { style: { left: '16.5%', top: '37%', width: '62.5%', height: '22%' }, maxCols: 6, rowOffset: '0.45vw' },
   ]
 
-  for (let i = 0; i < Math.min(5, Math.ceil(nodes.length / perZone)); i++) {
+  for (let i = 0; i < zoneCount; i++) {
     const chunk = nodes.slice(i * perZone, (i + 1) * perZone)
     if (!chunk.length) break
-    const cols = Math.min(chunk.length, i === 4 ? 5 : 3)
-    const row1 = chunk.slice(0, cols)
-    const row2 = chunk.slice(cols)
+    const zone = zonePositions[i] || zonePositions[0]
+    const rows = toBalancedRows(chunk, zone.maxCols)
+    const cols = Math.max(1, ...rows.map(row => row.length))
     zones.push({
-      style: zonePositions[i] || zonePositions[0],
-      gridStyle: { '--cols': String(cols), '--item-width': `${100 / cols}%` },
-      rows: row2.length ? [row1, row2] : [row1],
+      style: zone.style,
+      gridStyle: {
+        '--cols': String(cols),
+        '--item-width': `${100 / cols}%`,
+        '--row-gap': 'clamp(7px, 0.6vw, 13px)',
+        '--col-gap': 'clamp(8px, 0.75vw, 15px)',
+        '--row-offset': zone.rowOffset,
+      },
+      rows,
     })
   }
   return zones
 })
 
 const coreZone = computed(() => {
-  const n = coreNodes.value.length || 1
+  const cols = Math.max(1, ...coreRows.value.map(row => row.length))
   return {
-    style: { left: '26%', bottom: '5%', width: '48%', height: '30%' },
-    gridStyle: { '--cols': String(n), '--item-width': `${100 / n}%` },
+    style: { left: '22.5%', bottom: '5%', width: '52%', height: '29%' },
+    gridStyle: {
+      '--cols': String(cols),
+      '--item-width': `${100 / cols}%`,
+      '--row-gap': 'clamp(8px, 0.7vw, 15px)',
+      '--col-gap': 'clamp(10px, 0.9vw, 18px)',
+      '--row-offset': '0.45vw',
+    },
   }
 })
+
+const visibleNodeIds = computed(() => new Set([...coreNodes.value, ...domainNodes.value].map(n => n.id)))
+
+const highlightedNodeIds = computed(() => {
+  const rootId = hoveredNode.value?.id
+  if (!rootId) return new Set<string>()
+
+  const validIds = visibleNodeIds.value
+  const adjacency = new Map<string, Set<string>>()
+  for (const id of validIds) adjacency.set(id, new Set())
+
+  for (const r of relations.value) {
+    if (!validIds.has(r.from_entity_id) || !validIds.has(r.to_entity_id)) continue
+    adjacency.get(r.from_entity_id)?.add(r.to_entity_id)
+    adjacency.get(r.to_entity_id)?.add(r.from_entity_id)
+  }
+
+  const related = new Set<string>([rootId])
+  const queue = [rootId]
+  while (queue.length) {
+    const id = queue.shift()!
+    for (const next of adjacency.get(id) ?? []) {
+      if (related.has(next)) continue
+      related.add(next)
+      queue.push(next)
+    }
+  }
+  return related
+})
+
+const isHoverFiltering = computed(() => !!hoveredNode.value)
+
+function nodeHighlightClass(node: OntologyNode) {
+  if (!isHoverFiltering.value) return {}
+  const isRelated = highlightedNodeIds.value.has(node.id)
+  return {
+    'platform-item--focus': hoveredNode.value?.id === node.id,
+    'platform-item--related': isRelated && hoveredNode.value?.id !== node.id,
+    'platform-item--hidden': !isRelated,
+  }
+}
+
+function linkHighlightClass(link: { highlighted: boolean }) {
+  if (!isHoverFiltering.value) return {}
+  return {
+    'onto-link--highlighted': link.highlighted,
+    'onto-link--hidden': !link.highlighted,
+  }
+}
 
 /* ── SVG connections ── */
 const svgW = 1920
@@ -290,7 +363,13 @@ const svgLinks = computed(() => {
       const lc = linkColors[type]
       const dx = t.x - f.x, dy = t.y - f.y
       const path = `M${f.x},${f.y} C${f.x + dx * 0.05},${f.y + dy * 0.3} ${t.x - dx * 0.05},${t.y - dy * 0.3} ${t.x},${t.y}`
-      return { id: r.id, path, color: lc.color, particleColor: lc.particleColor, dur: 1.8 + (idx % 5) * 0.15 }
+      const activeIds = highlightedNodeIds.value
+      const highlighted = !isHoverFiltering.value || (activeIds.has(r.from_entity_id) && activeIds.has(r.to_entity_id))
+      return {
+        id: r.id, path, color: lc.color, particleColor: lc.particleColor,
+        dur: 1.8 + (idx % 5) * 0.15,
+        highlighted,
+      }
     })
 })
 
@@ -488,46 +567,89 @@ const bottomCards = computed(() => allCards.value.slice(3))
 
 /* ── 本体层 ── */
 .onto-layer {
-  position: relative; width: 96.15vw; margin: 0 auto;
-  flex: 1; min-height: 300px;
+  position: relative; width: 96.15%; max-width: 100%; margin: 0 auto;
+  flex: 1; min-height: 300px; overflow: visible;
 }
 .onto-layer__bg { width: 100%; height: auto; display: block; }
 .onto-layer__svg {
   position: absolute; inset: 0; width: 100%; height: 100%;
   pointer-events: none; z-index: 1;
 }
-.onto-zones { position: absolute; inset: 0; z-index: 2; }
+.onto-link {
+  transition: opacity .18s ease, filter .18s ease;
+}
+.onto-link--hidden {
+  opacity: 0;
+}
+.onto-link--highlighted .onto-link__line {
+  stroke-width: 1.2;
+  opacity: 0.9;
+}
+.onto-link--highlighted .onto-link__particle {
+  opacity: 1;
+}
+.onto-zones { position: absolute; inset: 0; z-index: 2; overflow: visible; }
 
-.onto-zone { position: absolute; z-index: 6; }
+.onto-zone { position: absolute; z-index: 6; overflow: visible; }
 .onto-zone--core { z-index: 7; }
 
 .platform-rows-wrapper {
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  display: flex; flex-direction: column; align-items: center;
-  width: 100%;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  width: 100%; height: 100%;
+  gap: var(--row-gap, clamp(7px, 0.6vw, 13px));
 }
-.platform-row { display: flex; justify-content: center; }
-.platform-row--offset { margin-left: 0; }
+.platform-row {
+  display: flex; justify-content: center; align-items: flex-end;
+  gap: var(--col-gap, clamp(8px, 0.75vw, 15px));
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 0 0.5vw;
+  overflow: visible;
+}
+.platform-row--offset { transform: translateX(var(--row-offset, 0.75vw)); }
 
 .platform-item {
   display: flex; flex-direction: column; align-items: center;
-  padding: 0 4px; cursor: pointer; position: relative;
+  padding: 0; cursor: pointer; position: relative;
   transition: opacity .15s, filter .15s, transform .15s;
   user-select: none; z-index: 1;
-  width: 80px;
+  flex: 0 0 auto;
+  width: clamp(64px, 4.25vw, 82px);
+  height: clamp(54px, 3.8vw, 70px);
 }
 .platform-item:hover {
   z-index: 200;
   filter: brightness(1.05) drop-shadow(0 2px 8px rgba(0, 50, 145, 0.25));
   transform: scale(1.06);
 }
-.platform-item--core { width: 90px; }
+.platform-item--focus {
+  z-index: 230;
+  filter: brightness(1.12) drop-shadow(0 0 14px rgba(0, 80, 234, 0.45));
+  transform: scale(1.1);
+}
+.platform-item--related {
+  z-index: 210;
+  filter: brightness(1.08) drop-shadow(0 0 10px rgba(0, 80, 234, 0.28));
+  transform: scale(1.04);
+}
+.platform-item--hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.96);
+}
+.platform-item--core {
+  width: clamp(74px, 5vw, 96px);
+  height: clamp(64px, 4.45vw, 82px);
+}
 
 .platform-icon {
-  width: 50px; height: auto; flex-shrink: 0;
+  width: clamp(42px, 2.35vw, 50px); height: auto; flex-shrink: 0;
 }
-.platform-icon--core { width: 65px; }
+.platform-icon--core { width: clamp(52px, 3vw, 62px); }
 
 .platform-label {
   color: var(--semantic-900);

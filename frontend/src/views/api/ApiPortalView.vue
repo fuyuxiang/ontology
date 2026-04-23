@@ -250,14 +250,18 @@ async function copy(text: string) {
 }
 
 const requestSchema = `{
+  "question": "你好",        // 直接提问
+  // 或使用 messages 格式：
   "messages": [
     { "role": "user", "content": "你好" }
-  ],
-  "stream": true   // 可选，默认 true（SSE 流式）
+  ]
 }`
 
 const responseSchema = `// SSE 流式响应，每行格式：
-data: <文本片段>
+data: {"type": "tool_start", "tool": "[节点名]", "arguments": {...}}
+data: {"type": "tool_result", "tool": "[节点名]", "summary": "...", "resultCount": N}
+data: {"type": "content", "content": "回答文本片段"}
+data: {"type": "done", "suggestions": ["建议1", "建议2"], "actions": [...]}
 
 data: [DONE]   // 结束标志`
 
@@ -269,23 +273,26 @@ const codeExample = computed(() => {
   if (codeLang.value === 'curl') return `curl -X POST "${ep}" \\
   -H "Content-Type: application/json" \\
   -H "X-Agent-Key: ${key}" \\
-  -d '{"messages": [{"role": "user", "content": "你好"}]}'`
+  -d '{"question": "你好"}'`
 
-  if (codeLang.value === 'Python') return `import requests
+  if (codeLang.value === 'Python') return `import requests, json
 
 url = "${ep}"
 headers = {
     "Content-Type": "application/json",
     "X-Agent-Key": "${key}"
 }
-payload = {"messages": [{"role": "user", "content": "你好"}]}
+payload = {"question": "你好"}
 
 with requests.post(url, json=payload, headers=headers, stream=True) as r:
     for line in r.iter_lines():
         if line.startswith(b"data: "):
             chunk = line[6:].decode()
-            if chunk != "[DONE]":
-                print(chunk, end="", flush=True)`
+            if chunk == "[DONE]":
+                break
+            event = json.loads(chunk)
+            if event.get("type") == "content":
+                print(event["content"], end="", flush=True)`
 
   if (codeLang.value === 'JavaScript') return `const resp = await fetch("${ep}", {
   method: "POST",
@@ -293,7 +300,7 @@ with requests.post(url, json=payload, headers=headers, stream=True) as r:
     "Content-Type": "application/json",
     "X-Agent-Key": "${key}"
   },
-  body: JSON.stringify({ messages: [{ role: "user", content: "你好" }] })
+  body: JSON.stringify({ question: "你好" })
 })
 
 const reader = resp.body.getReader()
@@ -303,15 +310,17 @@ while (true) {
   if (done) break
   const text = decoder.decode(value)
   for (const line of text.split("\\n")) {
-    if (line.startsWith("data: ") && line.slice(6) !== "[DONE]")
-      process.stdout.write(line.slice(6))
+    if (line.startsWith("data: ") && line.slice(6) !== "[DONE]") {
+      const event = JSON.parse(line.slice(6))
+      if (event.type === "content") process.stdout.write(event.content)
+    }
   }
 }`
 
   return `// Java (OkHttp)
 OkHttpClient client = new OkHttpClient();
 RequestBody body = RequestBody.create(
-    "{\\"messages\\":[{\\"role\\":\\"user\\",\\"content\\":\\"你好\\"}]}",
+    "{\\"question\\":\\"你好\\"}",
     MediaType.get("application/json")
 );
 Request request = new Request.Builder()
@@ -379,7 +388,7 @@ async function sendTry() {
         'Content-Type': 'application/json',
         'X-Agent-Key': apiInfo.value.api_key,
       },
-      body: JSON.stringify({ messages: tryMessages.value.slice(0, -1) }),
+      body: JSON.stringify({ question: text }),
     })
     const reader = resp.body!.getReader()
     const decoder = new TextDecoder()
@@ -390,7 +399,14 @@ async function sendTry() {
         if (!line.startsWith('data: ')) continue
         const d = line.slice(6).trim()
         if (d === '[DONE]') continue
-        tryMessages.value[idx].content += d
+        try {
+          const event = JSON.parse(d)
+          if (event.type === 'content') {
+            tryMessages.value[idx].content += event.content
+          }
+        } catch {
+          tryMessages.value[idx].content += d
+        }
         await nextTick()
         tryMsgRef.value?.scrollTo({ top: tryMsgRef.value.scrollHeight, behavior: 'smooth' })
       }

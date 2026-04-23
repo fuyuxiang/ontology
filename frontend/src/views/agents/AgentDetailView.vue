@@ -42,11 +42,11 @@
           <div class="harness__node-lib">
             <template v-for="group in nodeGroups" :key="group.label">
               <div class="harness__node-group-label">{{ group.label }}</div>
-              <div v-for="nt in group.nodes" :key="nt.type"
+              <div v-for="nt in group.nodes" :key="nt.skillId || nt.type"
                 class="harness__node-item"
                 draggable="true"
-                @dragstart="onDragStart($event, nt.type)"
-                @click="addNodeToCenter(nt.type)"
+                @dragstart="onDragStart($event, nt.type, nt)"
+                @click="addNodeToCenter(nt.type, nt)"
                 :title="`点击添加 ${nt.label}`">
                 <span class="harness__node-item-icon" :style="{ color: nt.color }" v-html="nt.icon"></span>
                 <span class="harness__node-item-label">{{ nt.label }}</span>
@@ -128,6 +128,23 @@
                 <option value="email">邮件</option>
               </select>
             </div>
+            <template v-if="selectedNode.type === 'skill'">
+              <div class="harness__field">
+                <label>选择技能</label>
+                <select class="harness__input" v-model="selectedNode.data.skill_id" @change="onSkillSelect(selectedNode)">
+                  <option value="">请选择...</option>
+                  <option v-for="s in skills" :key="s.id" :value="s.id">{{ s.name }}</option>
+                </select>
+              </div>
+              <div class="harness__field" v-if="selectedNode.data.skill_id">
+                <label>技能说明</label>
+                <div style="font-size:11px;color:var(--h-text-4);line-height:1.5">{{ getSkillDesc(selectedNode.data.skill_id) }}</div>
+              </div>
+              <div class="harness__field" v-for="p in getSkillParams(selectedNode.data.skill_id)" :key="p.name">
+                <label>{{ p.description || p.name }}</label>
+                <input class="harness__input" v-model="selectedNode.data.input_mapping[p.name]" @input="isDirty = true" :placeholder="`如 {question} 或固定值`" />
+              </div>
+            </template>
             <div class="harness__panel-actions">
               <button class="harness__btn harness__btn--danger harness__btn--sm" @click="deleteNode(selectedNodeId)">
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -198,11 +215,13 @@ import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 import WorkflowNode from '../../components/harness/nodes/WorkflowNode.vue'
 import { agentsApi, modelsApi } from '../../api/agents'
+import { skillsApi, type SkillItem } from '../../api/skills'
 
 const route = useRoute()
 const router = useRouter()
 const current = ref<any>(null)
 const models = ref<any[]>([])
+const skills = ref<SkillItem[]>([])
 const saving = ref(false)
 const publishing = ref(false)
 const isDirty = ref(false)
@@ -223,6 +242,12 @@ const nodeTypes_: Record<string, any> = {
   'rule-evaluate': markRaw(WorkflowNode), 'datasource': markRaw(WorkflowNode),
   'variable-assign': markRaw(WorkflowNode), 'parallel': markRaw(WorkflowNode),
   'llm-inference': markRaw(WorkflowNode), 'ml-model': markRaw(WorkflowNode),
+  'voice-audit': markRaw(WorkflowNode), 'condition': markRaw(WorkflowNode),
+  'loop': markRaw(WorkflowNode), 'merge': markRaw(WorkflowNode),
+  'rule-engine': markRaw(WorkflowNode), 'notification': markRaw(WorkflowNode),
+  'human-approval': markRaw(WorkflowNode), 'write-back': markRaw(WorkflowNode),
+  'api-response': markRaw(WorkflowNode), 'skill': markRaw(WorkflowNode),
+}
   'voice-audit': markRaw(WorkflowNode), 'condition': markRaw(WorkflowNode),
   'loop': markRaw(WorkflowNode), 'merge': markRaw(WorkflowNode),
   'rule-engine': markRaw(WorkflowNode), 'notification': markRaw(WorkflowNode),
@@ -253,15 +278,28 @@ const nodeTypes = [
   { type: 'human-approval', label: '人工审批', color: '#f97316', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'write-back', label: '结果写回', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
   { type: 'api-response', label: 'API 响应', color: '#2e5bff', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'skill', label: '业务技能', color: '#e11d48', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4l2-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>` },
 ]
 
-const nodeGroups = [
+const skillNodeItems = computed(() =>
+  skills.value.map(s => ({
+    type: 'skill' as const,
+    label: s.name,
+    color: '#e11d48',
+    icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4l2-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
+    skillId: s.id,
+    skillName: s.name,
+  }))
+)
+
+const nodeGroups = computed(() => [
   { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
   { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
   { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','voice-audit'].includes(n.type)) },
   { label: '流程控制', nodes: nodeTypes.filter(n => ['condition','loop','merge','rule-engine'].includes(n.type)) },
   { label: '触达输出', nodes: nodeTypes.filter(n => ['notification','human-approval','write-back','api-response'].includes(n.type)) },
-]
+  { label: '业务技能', nodes: skillNodeItems.value.length > 0 ? skillNodeItems.value : [nodeTypes.find(n => n.type === 'skill')!] },
+])
 
 const selectedNode = computed(() => flowNodes.value.find(n => n.id === selectedNodeId.value) ?? null)
 function nodeTypeColor(type: string) { return nodeTypes.find(n => n.type === type)?.color ?? '#94a3b8' }
@@ -271,26 +309,54 @@ function miniMapColor(node: any) { return nodeTypeColor(node.type) }
 function onNodeClick({ node }: any) { selectedNodeId.value = node.id; showSettings.value = false }
 
 let dragType = ''
-function onDragStart(e: DragEvent, type: string) { dragType = type; e.dataTransfer!.effectAllowed = 'move' }
+let dragSkillMeta: { skillId?: string; skillName?: string } = {}
+function onDragStart(e: DragEvent, type: string, extra?: any) {
+  dragType = type
+  dragSkillMeta = extra?.skillId ? { skillId: extra.skillId, skillName: extra.skillName } : {}
+  e.dataTransfer!.effectAllowed = 'move'
+}
 function onDrop(e: DragEvent) {
   if (!dragType || !canvasWrap.value) return
   const rect = canvasWrap.value.getBoundingClientRect()
-  addNode(dragType, { x: e.clientX - rect.left - 80, y: e.clientY - rect.top - 30 })
+  addNode(dragType, { x: e.clientX - rect.left - 80, y: e.clientY - rect.top - 30 }, dragSkillMeta)
   dragType = ''
+  dragSkillMeta = {}
 }
-function addNodeToCenter(type: string) {
+function addNodeToCenter(type: string, extra?: any) {
   const i = flowNodes.value.length
-  addNode(type, { x: 80 + (i % 4) * 220, y: 80 + Math.floor(i / 4) * 120 })
+  addNode(type, { x: 80 + (i % 4) * 220, y: 80 + Math.floor(i / 4) * 120 }, extra)
 }
-function addNode(type: string, position: { x: number; y: number }) {
+function addNode(type: string, position: { x: number; y: number }, extra?: { skillId?: string; skillName?: string }) {
   const meta = nodeTypes.find(n => n.type === type)
-  flowNodes.value.push({ id: `node-${Date.now()}`, type, position, data: { label: meta?.label || type, execState: 'pending' } })
+  const nodeData: any = { label: extra?.skillName || meta?.label || type, execState: 'pending' }
+  if (type === 'skill' && extra?.skillId) {
+    nodeData.skill_id = extra.skillId
+    nodeData.skill_name = extra.skillName
+    nodeData.input_mapping = {}
+  }
+  flowNodes.value.push({ id: `node-${Date.now()}`, type, position, data: nodeData })
   isDirty.value = true
 }
 function deleteNode(id: string) {
   flowNodes.value = flowNodes.value.filter(n => n.id !== id)
   flowEdges.value = flowEdges.value.filter(e => e.source !== id && e.target !== id)
   selectedNodeId.value = null; isDirty.value = true
+}
+function onSkillSelect(node: any) {
+  const s = skills.value.find(sk => sk.id === node.data.skill_id)
+  if (s) {
+    node.data.skill_name = s.name
+    node.data.label = s.name
+    node.data.input_mapping = node.data.input_mapping || {}
+  }
+  isDirty.value = true
+}
+function getSkillDesc(skillId: string): string {
+  return skills.value.find(s => s.id === skillId)?.description || ''
+}
+function getSkillParams(skillId: string): Array<{ name: string; type: string; description: string }> {
+  const s = skills.value.find(sk => sk.id === skillId)
+  return (s?.config_json?.params as any[]) || []
 }
 async function saveAgent() {
   saving.value = true
@@ -308,8 +374,8 @@ async function publishAgent() {
 }
 onMounted(async () => {
   const id = route.params.id as string
-  const [agentRes, modelRes] = await Promise.all([agentsApi.get(id), modelsApi.list()])
-  current.value = agentRes; models.value = modelRes
+  const [agentRes, modelRes, skillRes] = await Promise.all([agentsApi.get(id), modelsApi.list(), skillsApi.list()])
+  current.value = agentRes; models.value = modelRes; skills.value = skillRes
   form.value = {
     name: agentRes.name || '', description: agentRes.description || '',
     model_id: agentRes.model_id || null, system_prompt: agentRes.system_prompt || '',
