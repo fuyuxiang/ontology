@@ -510,13 +510,14 @@ const allCards = computed(() => {
       ...(other.length ? [`携号转网(${other.length}表)`, ...other.slice(0, 3).map((d: any) => d.name)] : []),
       ...(!dsList.length ? ['暂无数据源'] : []),
     ]
+    const activeRules = stats.value ? stats.value.top_rules.slice(0, 4).map((r: any) => r.name) : []
     return [
-      { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: stats.value ? [`${stats.value.entity_count} 个实体`, `${stats.value.relation_count} 条关系`, `${stats.value.rule_count} 条规则`, `${stats.value.active_rule_count} 条活跃规则`] : ['加载中...'] },
-      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: stats.value ? [...(stats.value.top_rules.slice(0, 4).map((r: any) => r.name)), ...(stats.value.top_rules.length === 0 ? ['暂无规则'] : [])] : ['加载中...'] },
-      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway'] },
-      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, icon: ICON_MAP.datasources, items: dsItems.slice(0, 8) },
-      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, icon: ICON_MAP.logic, items: (stats.value as any)?.rule_priority?.length ? (stats.value as any).rule_priority.map((r: any) => `${r.priority} 优先级: ${r.count}`) : ['暂无规则'] },
-      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, icon: ICON_MAP.actions, items: (stats.value as any)?.recent_activities?.length ? (stats.value as any).recent_activities.slice(0, 5).map((a: any) => a.description || a.name) : ['暂无动态'] },
+      { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: ['客户360画像', '区域热力分析', '波次时间线', '绩效仪表盘', '趋势分析'] },
+      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: activeRules.length ? activeRules : ['携号转网预警', 'FTTR续约策划', '宽带退单稽核', '政企根因分析'] },
+      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway', 'TypeScript/Python SDK'] },
+      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, icon: ICON_MAP.datasources, items: dsItems.length ? dsItems.slice(0, 8) : ['BSS', 'CRM', 'GIS', '精准营销平台'] },
+      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, icon: ICON_MAP.logic, items: ['规则引擎', 'LLM话术生成', '营销策类', '顶天预测', '产品承接器', '触点视频'] },
+      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, icon: ICON_MAP.actions, items: ['装维工单', 'CRM短信', '短信网关', '企业微信', '吉警通知', '外呼中心'] },
     ]
   }
   return cards.filter(c => c.enabled).map(c => ({
