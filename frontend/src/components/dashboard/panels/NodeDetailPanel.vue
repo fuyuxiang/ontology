@@ -218,64 +218,64 @@ async function handleDelete() {
 <style scoped>
 .node-panel-overlay {
   position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.15);
   display: flex; align-items: center; justify-content: flex-end;
   padding-right: 24px;
 }
 .node-panel {
   width: 340px; max-height: 85vh; overflow-y: auto;
-  background: rgba(0, 18, 68, 0.95);
-  border: 1px solid rgba(0, 80, 234, 0.4);
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(76, 110, 245, 0.2);
   border-radius: 12px;
   padding: 24px;
-  color: var(--semantic-100);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  color: var(--neutral-800);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.1);
   position: relative;
 }
 .node-panel__close {
   position: absolute; top: 12px; right: 16px;
-  background: none; border: none; color: var(--neutral-500); font-size: var(--text-h2-size); cursor: pointer;
+  background: none; border: none; color: var(--neutral-400); font-size: var(--text-h2-size); cursor: pointer;
 }
-.node-panel__close:hover { color: var(--semantic-100); }
+.node-panel__close:hover { color: var(--neutral-700); }
 .node-panel__header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
 .node-panel__icon { width: 48px; height: auto; }
 .node-panel__name { font-size: var(--text-h3-size); font-weight: 700; }
-.node-panel__desc { font-size: var(--text-code-size); color: rgba(200, 220, 255, 0.6); margin-top: 2px; }
+.node-panel__desc { font-size: var(--text-code-size); color: var(--neutral-500); margin-top: 2px; }
 .node-panel__grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
-.node-panel__stat { text-align: center; background: rgba(0, 50, 145, 0.2); border: 1px solid rgba(0, 80, 234, 0.15); border-radius: 8px; padding: 10px 4px; }
-.stat-val { font-size: var(--text-h2-size); font-weight: 800; color: var(--semantic-400); }
-.stat-lbl { font-size: var(--text-caption-upper-size); color: rgba(200, 220, 255, 0.5); margin-top: 2px; }
+.node-panel__stat { text-align: center; background: var(--semantic-50); border: 1px solid rgba(76, 110, 245, 0.12); border-radius: 8px; padding: 10px 4px; }
+.stat-val { font-size: var(--text-h2-size); font-weight: 800; color: var(--semantic-600); }
+.stat-lbl { font-size: var(--text-caption-upper-size); color: var(--neutral-500); margin-top: 2px; }
 .status--active { color: var(--dynamic-500); }
 .status--warning { color: var(--kinetic-500); }
 .status--error { color: var(--status-error); }
 .node-panel__section { margin-bottom: 16px; }
-.section-title { font-size: var(--text-caption-size); font-weight: 700; color: rgba(200, 220, 255, 0.5); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
+.section-title { font-size: var(--text-caption-size); font-weight: 700; color: var(--neutral-500); letter-spacing: .08em; text-transform: uppercase; margin-bottom: 8px; }
 .rel-row { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: var(--text-code-size); }
-.rel-name { color: rgba(200, 220, 255, 0.85); }
-.rel-card { color: var(--semantic-400); font-size: var(--text-caption-upper-size); font-weight: 600; }
+.rel-name { color: var(--neutral-700); }
+.rel-card { color: var(--semantic-600); font-size: var(--text-caption-upper-size); font-weight: 600; }
 .node-panel__actions { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
 .panel-btn-row { display: flex; gap: 8px; }
 .panel-btn {
   flex: 1; padding: 9px;
-  background: rgba(0, 80, 234, 0.3); border: 1px solid rgba(0, 80, 234, 0.5);
-  border-radius: 8px; color: var(--semantic-100); font-size: var(--text-code-size); font-weight: 600;
+  background: rgba(76, 110, 245, 0.1); border: 1px solid rgba(76, 110, 245, 0.25);
+  border-radius: 8px; color: var(--semantic-700); font-size: var(--text-code-size); font-weight: 600;
   cursor: pointer; transition: background .15s;
 }
-.panel-btn:hover:not(:disabled) { background: rgba(0, 80, 234, 0.5); }
+.panel-btn:hover:not(:disabled) { background: rgba(76, 110, 245, 0.2); }
 .panel-btn:disabled { opacity: .5; cursor: not-allowed; }
-.panel-btn--secondary { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.15); }
-.panel-btn--secondary:hover:not(:disabled) { background: rgba(255,255,255,0.12); }
-.panel-btn--danger { background: rgba(239,68,68,0.2); border-color: rgba(239,68,68,0.4); color: var(--status-error); }
-.panel-btn--danger:hover:not(:disabled) { background: rgba(239,68,68,0.35); }
-.node-panel__form-title { font-size: var(--text-body-size); font-weight: 700; margin-bottom: 16px; color: var(--semantic-100); }
+.panel-btn--secondary { background: var(--neutral-50); border-color: var(--neutral-200); color: var(--neutral-700); }
+.panel-btn--secondary:hover:not(:disabled) { background: var(--neutral-100); }
+.panel-btn--danger { background: rgba(76, 110, 245, 0.06); border-color: rgba(76, 110, 245, 0.15); color: var(--semantic-600); }
+.panel-btn--danger:hover:not(:disabled) { background: rgba(76, 110, 245, 0.12); }
+.node-panel__form-title { font-size: var(--text-body-size); font-weight: 700; margin-bottom: 16px; color: var(--neutral-900); }
 .np-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
-.np-field label { font-size: var(--text-caption-size); font-weight: 600; color: rgba(200,220,255,0.6); }
+.np-field label { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-600); }
 .np-input {
   padding: 7px 10px; border-radius: 6px; font-size: var(--text-code-size);
-  border: 1px solid rgba(0,80,234,0.3); background: rgba(0,18,68,0.6);
-  color: var(--semantic-100); outline: none; width: 100%; box-sizing: border-box; font-family: inherit;
+  border: 1px solid var(--neutral-200); background: var(--neutral-0);
+  color: var(--neutral-800); outline: none; width: 100%; box-sizing: border-box; font-family: inherit;
 }
-.np-input:focus { border-color: rgba(0,80,234,0.7); }
+.np-input:focus { border-color: var(--semantic-500); }
 .np-input--ta { resize: vertical; min-height: 56px; }
 .np-req { color: var(--status-error); }
 .np-err { margin-top: 8px; font-size: var(--text-caption-size); color: var(--status-error); }
