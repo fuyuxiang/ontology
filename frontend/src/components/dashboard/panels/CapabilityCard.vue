@@ -3,13 +3,10 @@
     <img class="cap-card__bg" :src="bg" alt="" />
     <div class="cap-card__content" :class="{ 'cap-card__content--icon-grid': iconItems?.length }">
       <div v-if="iconItems?.length" class="cap-card__icon-grid">
-        <template v-for="(item, index) in iconItems" :key="item.label">
-          <span v-if="index === 2" class="cap-card__icon-break" aria-hidden="true"></span>
-          <div class="cap-card__icon-item">
+        <div v-for="item in iconItems" :key="item.label" class="cap-card__icon-item">
           <img class="cap-card__icon-item-img" :src="item.icon" :alt="item.label" />
           <span class="cap-card__icon-item-label">{{ item.label }}</span>
-          </div>
-        </template>
+        </div>
       </div>
       <template v-else>
         <img v-if="icon" class="cap-card__icon" :src="icon" alt="" />
@@ -52,7 +49,7 @@ defineProps<{
   gap: 8px;
 }
 .cap-card__content--icon-grid {
-  inset: 5% 7% 20.5% 7%;
+  inset: 0 7% 43% 7%;
   justify-content: center;
 }
 .cap-card__icon {
@@ -83,25 +80,24 @@ defineProps<{
 }
 .cap-card__icon-grid {
   width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.1vw 0.2vw;
-  align-items: flex-end;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  row-gap: 0.02vw;
+  column-gap: 0.2vw;
+  align-items: end;
 }
 .cap-card__icon-item {
   min-width: 0;
-  flex: 0 0 26%;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.06vw;
 }
-.cap-card__icon-break {
-  flex-basis: 100%;
-  width: 0;
-  height: 0;
-}
+.cap-card__icon-item:nth-child(1) { grid-column: 2 / span 2; grid-row: 1; }
+.cap-card__icon-item:nth-child(2) { grid-column: 4 / span 2; grid-row: 1; }
+.cap-card__icon-item:nth-child(3) { grid-column: 1 / span 2; grid-row: 2; }
+.cap-card__icon-item:nth-child(4) { grid-column: 3 / span 2; grid-row: 2; }
+.cap-card__icon-item:nth-child(5) { grid-column: 5 / span 2; grid-row: 2; }
 .cap-card__icon-item-img {
   width: clamp(16px, 1.8vw, 36px);
   height: auto;
