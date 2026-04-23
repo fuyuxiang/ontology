@@ -113,8 +113,19 @@ async function load() {
   }
 }
 
-function goCreate() {
-  router.push('/harness')
+const creating = ref(false)
+
+async function goCreate() {
+  if (creating.value) return
+  creating.value = true
+  try {
+    const agent = await agentsApi.create({ name: '未命名智能体' })
+    router.push(`/agents/${agent.id}`)
+  } catch (e) {
+    console.error('创建智能体失败', e)
+  } finally {
+    creating.value = false
+  }
 }
 
 function goEdit(a: AgentItem) {

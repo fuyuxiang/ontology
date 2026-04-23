@@ -17,10 +17,10 @@ from app.models.rule import EntityAction
 logger = logging.getLogger(__name__)
 
 
-def get_llm_client() -> OpenAI:
+def get_llm_client(api_key: str | None = None, api_base: str | None = None) -> OpenAI:
     client_kwargs = {
-        "api_key": settings.LLM_API_KEY,
-        "base_url": settings.LLM_API_BASE,
+        "api_key": api_key or settings.LLM_API_KEY,
+        "base_url": api_base or settings.LLM_API_BASE,
     }
     try:
         return OpenAI(**client_kwargs)
