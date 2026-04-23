@@ -60,6 +60,7 @@ import DataNode from '../../components/canvas/DataNode.vue'
 import CanvasEdgeLabel from '../../components/canvas/CanvasEdgeLabel.vue'
 import { entityApi } from '../../api/ontology'
 import type { Node, Edge } from '@vue-flow/core'
+import type { AxiosError } from 'axios'
 
 const store = useOntologyStore()
 const router = useRouter()
@@ -87,11 +88,18 @@ function miniMapNodeColor(node: Node) {
 
 onMounted(async () => {
   loading.value = true
-  if (store.entities.length === 0) await store.fetchEntities()
-  const [_, dataItems] = await Promise.all([store.fetchGraph(), entityApi.dataLayer()])
-  dataLayerItems.value = dataItems
-  loading.value = false
-  doLayout()
+  try {
+    if (store.entities.length === 0) await store.fetchEntities()
+    const dataItemsPromise = entityApi.dataLayer().catch((e: unknown) => {
+      console.warn('Failed to load ontology data layer', getErrorMessage(e))
+      return []
+    })
+    const [, dataItems] = await Promise.all([store.fetchGraph(), dataItemsPromise])
+    dataLayerItems.value = dataItems
+    doLayout()
+  } finally {
+    loading.value = false
+  }
 })
 
 watch(() => store.graphData, () => { if (store.graphData) doLayout() })
@@ -175,6 +183,11 @@ function onDrop(event: DragEvent) {
 }
 
 function goDetail(id: string) { router.push(`/ontology/${id}`) }
+
+function getErrorMessage(error: unknown) {
+  const axiosError = error as AxiosError<{ detail?: string }>
+  return axiosError.response?.data?.detail || axiosError.message || String(error)
+}
 </script>
 
 <style scoped>
