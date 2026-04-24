@@ -115,7 +115,6 @@ const navGroups = [
   { label: '工作台', items: [
     { path: '/dashboard', label: '平台总览', icon: ico.dashboard, exact: true },
     { path: '/todo', label: '我的待办', icon: ico.todo },
-    { path: '/changes', label: '最近变更', icon: ico.changes },
   ]},
   { label: '本体管理', items: [
     { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },

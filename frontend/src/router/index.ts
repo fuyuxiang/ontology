@@ -11,7 +11,6 @@ const router = createRouter({
     // 工作台
     { path: '/dashboard', name: 'dashboard', component: () => import('../views/dashboard/DashboardView.vue'), meta: { title: '平台总览' } },
     { path: '/todo', name: 'todo', component: () => import('../views/todo/TodoView.vue'), meta: { title: '我的待办' } },
-    { path: '/changes', name: 'changes', component: Placeholder, meta: { title: '最近变更' } },
 
     // 本体管理
     {
