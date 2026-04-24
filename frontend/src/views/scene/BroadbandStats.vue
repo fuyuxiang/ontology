@@ -178,7 +178,7 @@ const causeColors: Record<string, string> = {
   '用户原因': '#339af0', '施工原因': '#f59f00', '资源原因': '#fa5252', '业务原因': '#20c997',
 }
 const statusColors: Record<string, string> = {
-  '待稽核': '#f59f00', '推理中': '#339af0', '待补全回访': '#e67700', '强制回访待核实': '#e67700', '待人工审核': '#fa5252', '已归档': '#12b886',
+  '待稽核': '#f59f00', '稽核中': '#339af0', '挂起': '#e67700', '完成': '#12b886', '失败': '#fa5252',
 }
 
 const kpis = computed(() => {
@@ -187,8 +187,8 @@ const kpis = computed(() => {
   return [
     { label: '总退单数', value: o.total, color: 'var(--neutral-900)' },
     { label: '待稽核', value: o.pending, color: '#f59f00' },
-    { label: '待人工审核', value: o.manual_review, color: '#fa5252' },
-    { label: '已归档', value: o.archived, color: '#12b886' },
+    { label: '挂起', value: o.pending_todo, color: '#e67700' },
+    { label: '完成', value: o.completed, color: '#12b886' },
     { label: '平均置信度', value: (o.avg_confidence * 100).toFixed(1) + '%', color: 'var(--semantic-600)' },
     { label: '稽核准确率', value: (o.accuracy_rate * 100).toFixed(1) + '%', color: 'var(--semantic-600)' },
   ]

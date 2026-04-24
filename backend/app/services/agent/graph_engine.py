@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.services.copilot import get_llm_client
 from app.services.agent.tool_router import ToolRouter
-from app.services.skill_executor import execute_skill
+from app.services.skill_executor import execute_skill, has_skill_stream, execute_skill_stream
 from app.models.skill import Skill
 
 logger = logging.getLogger(__name__)
@@ -58,6 +58,105 @@ class GraphEngine:
             ntype = node.get("type", "")
             data = node.get("data", {})
             label = data.get("label", ntype)
+
+            # Skill nodes with streaming support: yield per-step events
+            if ntype == "skill" and data.get("skill_id"):
+                skill = self.db.get(Skill, data["skill_id"])
+                if skill and has_skill_stream(skill.code_ref):
+                    input_mapping = data.get("input_mapping", {})
+                    params = {}
+                    for param_name, source in input_mapping.items():
+                        if source == "{question}":
+                            params[param_name] = question
+                        elif source.startswith("{") and source.endswith("}"):
+                            params[param_name] = context.get(source[1:-1], "")
+                        else:
+                            params[param_name] = source
+
+                    # Auto-bind question to first required param if input_mapping is empty
+                    if not params and skill.config_json:
+                        skill_params = (skill.config_json or {}).get("params", [])
+                        if skill_params:
+                            first_param = skill_params[0].get("name", "")
+                            if first_param:
+                                params[first_param] = question
+
+                    last_data = {}
+                    last_summary = ""
+                    for step_event in execute_skill_stream(skill.code_ref, params, self.db):
+                        step = step_event.get("step", "")
+                        status = step_event.get("status", "")
+                        step_label = step_event.get("label", label)
+                        step_summary = step_event.get("summary", "")
+                        step_data = step_event.get("data")
+
+                        if step == "error":
+                            yield {"type": "tool_start", "tool": f"[{label}]", "arguments": {"node_type": ntype, "node_id": node_id}}
+                            yield {"type": "tool_result", "tool": f"[{label}]", "summary": step_event.get("message", "错误"), "resultCount": 0, "detail": None}
+                            tool_runs.append({"tool": f"[{label}]", "arguments": {"node_type": ntype}, "summary": step_event.get("message", "错误"), "resultCount": 0})
+                            break
+                        elif step == "result":
+                            last_data = step_event.get("data", {})
+                            last_summary = step_summary
+                        else:
+                            yield {"type": "tool_start", "tool": f"[{step_label}]", "arguments": {"node_type": "skill_step", "node_id": node_id, "step": step}}
+                            yield {"type": "tool_result", "tool": f"[{step_label}]", "summary": step_summary, "resultCount": 1, "detail": step_data}
+                            tool_runs.append({"tool": f"[{step_label}]", "arguments": {"node_type": "skill_step", "step": step}, "summary": step_summary, "resultCount": 1})
+
+                    context[node_id] = last_data
+                    continue
+
+            # Agent nodes with streaming skill: yield per-step events then LLM post-process
+            if ntype == "agent" and data.get("skill_id"):
+                skill = self.db.get(Skill, data["skill_id"])
+                if skill and has_skill_stream(skill.code_ref):
+                    # Resolve params from upstream context
+                    params = {}
+                    input_mapping = data.get("input_mapping", {})
+                    for param_name, source in input_mapping.items():
+                        if source == "{question}":
+                            params[param_name] = question
+                        elif source.startswith("{") and source.endswith("}"):
+                            params[param_name] = context.get(source[1:-1], "")
+                        else:
+                            params[param_name] = source
+
+                    if not params:
+                        skill_params = (skill.config_json or {}).get("params", [])
+                        for sp in skill_params:
+                            pname = sp.get("name", "")
+                            if not pname:
+                                continue
+                            for nid, val in context.items():
+                                if nid in ("question", "system_prompt"):
+                                    continue
+                                if isinstance(val, dict) and pname in val:
+                                    params[pname] = str(val[pname])
+                                    break
+                            if pname not in params:
+                                params[pname] = question
+
+                    last_data = {}
+                    for step_event in execute_skill_stream(skill.code_ref, params, self.db):
+                        step = step_event.get("step", "")
+                        step_label = step_event.get("label", label)
+                        step_summary = step_event.get("summary", "")
+                        step_data = step_event.get("data")
+
+                        if step == "error":
+                            yield {"type": "tool_start", "tool": f"[{label}]", "arguments": {"node_type": ntype, "node_id": node_id}}
+                            yield {"type": "tool_result", "tool": f"[{label}]", "summary": step_event.get("message", "错误"), "resultCount": 0, "detail": None}
+                            tool_runs.append({"tool": f"[{label}]", "arguments": {"node_type": ntype}, "summary": step_event.get("message", ""), "resultCount": 0})
+                            break
+                        elif step == "result":
+                            last_data = step_event.get("data", {})
+                        else:
+                            yield {"type": "tool_start", "tool": f"[{step_label}]", "arguments": {"node_type": "skill_step", "node_id": node_id, "step": step}}
+                            yield {"type": "tool_result", "tool": f"[{step_label}]", "summary": step_summary, "resultCount": 1, "detail": step_data}
+                            tool_runs.append({"tool": f"[{step_label}]", "arguments": {"node_type": "skill_step", "step": step}, "summary": step_summary, "resultCount": 1})
+
+                    context[node_id] = {"skill_data": last_data}
+                    continue
 
             yield {"type": "tool_start", "tool": f"[{label}]", "arguments": {"node_type": ntype, "node_id": node_id}}
 
@@ -111,6 +210,9 @@ class GraphEngine:
             "datasource": self._exec_datasource,
             "llm-inference": self._exec_llm_inference,
             "skill": self._exec_skill,
+            "intent-recognition": self._exec_intent_recognition,
+            "agent": self._exec_agent,
+            "output": self._exec_output,
             "condition": self._exec_condition,
             "loop": self._exec_loop,
             "merge": self._exec_merge,
@@ -242,8 +344,121 @@ class GraphEngine:
             else:
                 params[param_name] = source
 
+        # Auto-bind question to first required param if input_mapping is empty
+        if not params and skill.config_json:
+            skill_params = (skill.config_json or {}).get("params", [])
+            if skill_params:
+                first_param = skill_params[0].get("name", "")
+                if first_param:
+                    params[first_param] = question
+
         result = execute_skill(skill.code_ref, params, self.db)
         return result.get("data", {}), result.get("summary", "skill 执行完成")
+
+    def _exec_intent_recognition(self, data: dict, context: dict, question: str):
+        extract_fields = data.get("extract_fields", "churn_id")
+        prompt = (
+            f"从用户输入中提取以下字段: {extract_fields}\n"
+            f"用户输入: {question}\n\n"
+            "请以JSON格式返回提取结果。如果用户输入本身就是一个ID，直接作为对应字段的值。"
+            "如果无法提取某个字段，值设为null。只返回JSON，不要其他内容。"
+        )
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        try:
+            resp = self._client.chat.completions.create(
+                model=self.model_name, messages=messages,
+                temperature=0.1, max_tokens=500,
+            )
+            raw = resp.choices[0].message.content or "{}"
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+            parsed = json.loads(raw.strip())
+            return parsed, f"意图识别完成: {json.dumps(parsed, ensure_ascii=False)}"
+        except Exception as e:
+            # Fallback: treat entire question as the first field value
+            fields = [f.strip() for f in extract_fields.split(",")]
+            fallback = {fields[0]: question} if fields else {"input": question}
+            return fallback, f"意图识别回退: {json.dumps(fallback, ensure_ascii=False)}"
+
+    def _exec_agent(self, data: dict, context: dict, question: str):
+        """Agent 节点：接收上游参数，调度绑定的 skill，对结果做 LLM 加工"""
+        skill_id = data.get("skill_id", "")
+        if not skill_id:
+            return {"error": "Agent 节点未绑定技能"}, "未绑定技能"
+
+        skill = self.db.get(Skill, skill_id)
+        if not skill:
+            return {"error": f"Skill {skill_id} 不存在"}, "Skill 不存在"
+
+        # Build params from upstream context (intent-recognition output)
+        params = {}
+        input_mapping = data.get("input_mapping", {})
+        for param_name, source in input_mapping.items():
+            if source == "{question}":
+                params[param_name] = question
+            elif source.startswith("{") and source.endswith("}"):
+                key = source[1:-1]
+                params[param_name] = context.get(key, "")
+            else:
+                params[param_name] = source
+
+        # Auto-resolve from upstream nodes if not explicitly mapped
+        if not params:
+            skill_params = (skill.config_json or {}).get("params", [])
+            for sp in skill_params:
+                pname = sp.get("name", "")
+                if not pname:
+                    continue
+                for nid, val in context.items():
+                    if nid in ("question", "system_prompt"):
+                        continue
+                    if isinstance(val, dict) and pname in val:
+                        params[pname] = str(val[pname])
+                        break
+                if pname not in params:
+                    params[pname] = question
+
+        result = execute_skill(skill.code_ref, params, self.db)
+        skill_data = result.get("data", {})
+
+        # LLM post-processing
+        agent_prompt = data.get("agent_prompt", "")
+        if not agent_prompt:
+            agent_prompt = (
+                "你是一个智能分析助手。请基于以下技能执行结果，用中文给出清晰、结构化的分析报告。\n\n"
+                "用户问题: {question}\n"
+                "技能执行结果:\n{skill_result}\n\n"
+                "请给出完整的分析结论。"
+            )
+        agent_prompt = agent_prompt.replace("{question}", question)
+        agent_prompt = agent_prompt.replace("{skill_result}", json.dumps(skill_data, ensure_ascii=False, default=str)[:3000])
+
+        messages = []
+        if self.system_prompt:
+            messages.append({"role": "system", "content": self.system_prompt})
+        messages.append({"role": "user", "content": agent_prompt})
+
+        try:
+            resp = self._client.chat.completions.create(
+                model=self.model_name, messages=messages,
+                temperature=self.model_config.get("temperature", 0.7),
+                max_tokens=self.model_config.get("max_tokens", 2048),
+            )
+            answer = resp.choices[0].message.content or ""
+            return {"answer": answer, "skill_data": skill_data}, f"Agent 分析完成 ({len(answer)} 字)"
+        except Exception as e:
+            return {"skill_data": skill_data, "error": str(e)}, f"Agent LLM 加工失败: {e}"
+
+    def _exec_output(self, data: dict, context: dict, question: str):
+        """输出节点：汇总上游结果，格式化最终输出"""
+        output_format = data.get("output_format", "text")
+        upstream = self._collect_upstream_data(context)
+        return {"output": upstream, "format": output_format}, "输出节点完成"
 
     def _exec_condition(self, data: dict, context: dict, question: str):
         expr = data.get("condition_expr", "")
