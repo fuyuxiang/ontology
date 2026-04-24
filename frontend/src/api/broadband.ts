@@ -3,11 +3,10 @@ import { get, post } from './client'
 export interface BroadbandOverview {
   total: number
   pending: number
-  reasoning: number
-  callback_pending: number
-  mandatory_callback: number
-  manual_review: number
-  archived: number
+  analyzing: number
+  pending_todo: number
+  completed: number
+  error_count: number
   accuracy_rate: number
   avg_confidence: number
   today_new: number
@@ -118,7 +117,7 @@ export interface AuditAction {
   action_name: string
   description: string | null
   priority: 'high' | 'medium' | 'low'
-  status: 'pending_approval' | 'approved' | 'rejected' | 'executing' | 'completed' | 'failed'
+  status: 'pending_confirm' | 'pending_feedback' | 'feedback_submitted' | 'rejected'
   assignee: string | null
   created_at: string
   approved_at: string | null

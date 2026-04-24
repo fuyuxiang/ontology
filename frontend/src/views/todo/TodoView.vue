@@ -30,9 +30,10 @@
         <option value="low">低</option>
       </select>
       <select v-model="filters.status" class="todo-select" @change="doSearch">
-        <option value="pending_approval">待审批</option>
+        <option value="pending_confirm">待确认</option>
         <option value="">全部状态</option>
-        <option value="approved">已审批</option>
+        <option value="pending_feedback">待反馈</option>
+        <option value="feedback_submitted">已反馈</option>
         <option value="rejected">已驳回</option>
       </select>
       <input v-model="filters.assignee" class="todo-input" placeholder="指派人..." @keyup.enter="doSearch" />
@@ -71,11 +72,11 @@
             <td>{{ row.assignee || '-' }}</td>
             <td>{{ fmt(row.created_at) }}</td>
             <td>
-              <div class="todo-row-actions" v-if="row.status === 'pending_approval'">
-                <button class="todo-btn todo-btn--success todo-btn--sm" @click="doApprove(row)">通过</button>
+              <div class="todo-row-actions" v-if="row.status === 'pending_confirm'">
+                <button class="todo-btn todo-btn--success todo-btn--sm" @click="doApprove(row)">确认</button>
                 <button class="todo-btn todo-btn--warning todo-btn--sm" @click="doReject(row)">驳回</button>
               </div>
-              <span v-else class="todo-muted">-</span>
+              <span v-else class="todo-muted">{{ statusLabel(row.status) }}</span>
             </td>
           </tr>
         </tbody>
@@ -108,11 +109,11 @@ const page = ref(1)
 const pageSize = 20
 const selected = ref<string[]>([])
 
-const filters = reactive({ action_type: '', priority: '', assignee: '', status: 'pending_approval' })
+const filters = reactive({ action_type: '', priority: '', assignee: '', status: 'pending_confirm' })
 
 const kpis = computed(() => ({
-  pending: list.value.filter(i => i.status === 'pending_approval').length,
-  high: list.value.filter(i => i.priority === 'high' && i.status === 'pending_approval').length,
+  pending: list.value.filter(i => i.status === 'pending_confirm').length,
+  high: list.value.filter(i => i.priority === 'high' && i.status === 'pending_confirm').length,
 }))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
@@ -122,12 +123,10 @@ const actionTypes = [
   { code: 'resource_check', label: '资源核实' },
   { code: 'followup_call', label: '回访核实' },
   { code: 'secondary_marketing', label: '二次营销' },
-  { code: 'engineer_training', label: '工程师培训' },
-  { code: 'manual_review', label: '人工审核' },
 ]
 
 function statusLabel(s: string) {
-  const m: Record<string, string> = { pending_approval: '待审批', approved: '已审批', rejected: '已驳回', executing: '执行中', completed: '已完成', failed: '失败' }
+  const m: Record<string, string> = { pending_confirm: '待确认', pending_feedback: '待反馈', feedback_submitted: '已反馈', rejected: '已驳回' }
   return m[s] || s
 }
 
@@ -235,12 +234,10 @@ onMounted(fetchList)
 .todo-priority--low { background: var(--neutral-100); color: var(--neutral-600); }
 
 .todo-status { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--text-caption-size); font-weight: 500; }
-.todo-status--pending_approval { background: var(--status-warning-bg); color: var(--kinetic-700); }
-.todo-status--approved { background: var(--status-success-bg); color: var(--status-success); }
+.todo-status--pending_confirm { background: var(--status-warning-bg); color: var(--kinetic-700); }
+.todo-status--pending_feedback { background: var(--status-info-bg); color: var(--status-info); }
+.todo-status--feedback_submitted { background: var(--status-success-bg); color: var(--status-success); }
 .todo-status--rejected { background: var(--status-error-bg); color: var(--status-error); }
-.todo-status--executing { background: var(--status-info-bg); color: var(--status-info); }
-.todo-status--completed { background: var(--status-success-bg); color: var(--status-success); }
-.todo-status--failed { background: var(--status-error-bg); color: var(--status-error); }
 
 .todo-cause { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--text-caption-size); background: var(--neutral-100); color: var(--neutral-600); }
 .todo-row-actions { display: flex; gap: 6px; }

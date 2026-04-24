@@ -62,11 +62,10 @@ def _ser(row: dict) -> dict:
 class OverviewResp(BaseModel):
     total: int = 0
     pending: int = 0
-    reasoning: int = 0
-    callback_pending: int = 0
-    mandatory_callback: int = 0
-    manual_review: int = 0
-    archived: int = 0
+    analyzing: int = 0
+    pending_todo: int = 0
+    completed: int = 0
+    error_count: int = 0
     accuracy_rate: float = 0.0
     avg_confidence: float = 0.0
     today_new: int = 0
@@ -99,16 +98,16 @@ def broadband_overview():
     )
     sc = {r["audit_status"]: r["cnt"] for r in status_counts}
 
-    archived = sc.get("已归档", 0)
+    completed = sc.get("完成", 0)
     avg_conf = _scalar(
         "SELECT COALESCE(AVG(root_cause_confidence), 0) FROM bb_install_churn "
         "WHERE root_cause_confidence IS NOT NULL"
     )
     high_conf = _scalar(
         "SELECT COUNT(*) FROM bb_install_churn "
-        "WHERE root_cause_confidence >= 0.85 AND audit_status='已归档'"
+        "WHERE root_cause_confidence >= 0.85 AND audit_status='完成'"
     )
-    accuracy = round(high_conf / archived, 4) if archived > 0 else 0
+    accuracy = round(high_conf / completed, 4) if completed > 0 else 0
 
     today_new = _scalar(
         "SELECT COUNT(*) FROM bb_install_churn WHERE DATE(churn_time) = CURDATE()"
@@ -117,11 +116,10 @@ def broadband_overview():
     return OverviewResp(
         total=total,
         pending=sc.get("待稽核", 0),
-        reasoning=sc.get("推理中", 0),
-        callback_pending=sc.get("待补全回访", 0),
-        mandatory_callback=sc.get("强制回访待核实", 0),
-        manual_review=sc.get("待人工审核", 0),
-        archived=archived,
+        analyzing=sc.get("稽核中", 0),
+        pending_todo=sc.get("挂起", 0),
+        completed=completed,
+        error_count=sc.get("失败", 0),
         accuracy_rate=round(accuracy, 4),
         avg_confidence=round(float(avg_conf), 4),
         today_new=today_new,
@@ -370,7 +368,7 @@ def broadband_audit_action(churn_id: str, req: AuditActionReq):
         with conn.cursor() as cur:
             if req.action == "archive":
                 cur.execute(
-                    "UPDATE bb_install_churn SET audit_status='已归档', "
+                    "UPDATE bb_install_churn SET audit_status='完成', "
                     "manual_review_status='审核通过', archive_time=NOW(), "
                     "audit_completed_time=NOW() WHERE churn_id=%s",
                     (churn_id,)
@@ -379,7 +377,7 @@ def broadband_audit_action(churn_id: str, req: AuditActionReq):
                 cur.execute(
                     "UPDATE bb_install_churn SET manual_review_status='已覆盖', "
                     "manual_override_label=%s, root_cause_confidence=1.0, "
-                    "audit_status='已归档', archive_time=NOW(), "
+                    "audit_status='完成', archive_time=NOW(), "
                     "audit_completed_time=NOW() WHERE churn_id=%s",
                     (req.override_label, churn_id)
                 )
@@ -523,13 +521,13 @@ def approve_action(churn_id: str, action_id: str, req: ApproveReq):
     action = _query_one("SELECT * FROM bb_audit_action WHERE action_id=%s AND churn_id=%s", (action_id, churn_id))
     if not action:
         raise HTTPException(404, "动作不存在")
-    if action["status"] != "pending_approval":
-        raise HTTPException(400, f"当前状态 {action['status']} 不可审批")
+    if action["status"] != "pending_confirm":
+        raise HTTPException(400, f"当前状态 {action['status']} 不可确认")
     _execute(
-        "UPDATE bb_audit_action SET status='approved', approved_at=NOW(), approved_by=%s WHERE action_id=%s",
+        "UPDATE bb_audit_action SET status='pending_feedback', approved_at=NOW(), approved_by=%s WHERE action_id=%s",
         (req.approved_by, action_id)
     )
-    _insert_trail(churn_id, "action_approved", f"审批通过动作 {action['action_name']}", req.approved_by)
+    _insert_trail(churn_id, "action_confirmed", f"确认接受动作 {action['action_name']}", req.approved_by)
     return {"ok": True}
 
 
@@ -544,7 +542,7 @@ def reject_action(churn_id: str, action_id: str, req: RejectReq):
     action = _query_one("SELECT * FROM bb_audit_action WHERE action_id=%s AND churn_id=%s", (action_id, churn_id))
     if not action:
         raise HTTPException(404, "动作不存在")
-    if action["status"] != "pending_approval":
+    if action["status"] != "pending_confirm":
         raise HTTPException(400, f"当前状态 {action['status']} 不可驳回")
     _execute(
         "UPDATE bb_audit_action SET status='rejected', rejected_at=NOW(), rejected_by=%s, reject_reason=%s WHERE action_id=%s",
@@ -561,10 +559,10 @@ def confirm_action(churn_id: str, action_id: str):
     action = _query_one("SELECT * FROM bb_audit_action WHERE action_id=%s AND churn_id=%s", (action_id, churn_id))
     if not action:
         raise HTTPException(404, "动作不存在")
-    if action["status"] not in ("pending_approval", "approved"):
+    if action["status"] != "pending_confirm":
         raise HTTPException(400, f"当前状态 {action['status']} 不可确认")
     _execute(
-        "UPDATE bb_audit_action SET status='executing', approved_at=NOW(), approved_by='user' WHERE action_id=%s",
+        "UPDATE bb_audit_action SET status='pending_feedback', approved_at=NOW(), approved_by='user' WHERE action_id=%s",
         (action_id,)
     )
     _insert_trail(churn_id, "action_confirmed", f"确认执行动作 {action['action_name']}", "user")
@@ -583,7 +581,7 @@ def submit_feedback(churn_id: str, action_id: str, req: FeedbackReq):
     action = _query_one("SELECT * FROM bb_audit_action WHERE action_id=%s AND churn_id=%s", (action_id, churn_id))
     if not action:
         raise HTTPException(404, "动作不存在")
-    if action["status"] not in ("executing", "approved", "pending_approval"):
+    if action["status"] != "pending_feedback":
         raise HTTPException(400, f"当前状态 {action['status']} 不可提交反馈")
     feedback_data = {
         "type": req.feedback_type,
@@ -591,11 +589,26 @@ def submit_feedback(churn_id: str, action_id: str, req: FeedbackReq):
         "text": req.feedback_text,
     }
     _execute(
-        "UPDATE bb_audit_action SET status='completed', params_json=%s WHERE action_id=%s",
-        (json.dumps(feedback_data, ensure_ascii=False), action_id)
+        "UPDATE bb_audit_action SET status='feedback_submitted', "
+        "feedback_data=%s, feedback_time=NOW(), params_json=%s WHERE action_id=%s",
+        (json.dumps(feedback_data, ensure_ascii=False),
+         json.dumps(feedback_data, ensure_ascii=False), action_id)
     )
     _insert_trail(churn_id, "action_feedback",
                   f"动作 {action['action_name']} 反馈: {req.feedback_type}={req.feedback_value}", "user")
+
+    # 检查该退单下所有待办是否都已处理，自动流转稽核状态
+    remaining = _scalar(
+        "SELECT COUNT(*) FROM bb_audit_action WHERE churn_id=%s AND status NOT IN ('feedback_submitted','rejected')",
+        (churn_id,)
+    )
+    if remaining == 0:
+        _execute(
+            "UPDATE bb_install_churn SET audit_status='完成', archive_time=NOW() WHERE churn_id=%s",
+            (churn_id,)
+        )
+        _insert_trail(churn_id, "audit_completed", "所有待办已处理，稽核自动完成", "system")
+
     return {"ok": True, "feedback_data": feedback_data}
 
 
@@ -608,7 +621,7 @@ def re_attribute(churn_id: str):
         raise HTTPException(404, "退单记录不存在")
 
     completed_actions = _query(
-        "SELECT * FROM bb_audit_action WHERE churn_id=%s AND status='completed'", (churn_id,))
+        "SELECT * FROM bb_audit_action WHERE churn_id=%s AND status='feedback_submitted'", (churn_id,))
     if not completed_actions:
         raise HTTPException(400, "暂无已完成的动作反馈，无法触发二次归因")
 
@@ -666,7 +679,7 @@ def inbox_list(
     action_type: str = Query(default=""),
     priority: str = Query(default=""),
     assignee: str = Query(default=""),
-    status: str = Query(default="pending_approval"),
+    status: str = Query(default="pending_confirm"),
 ):
     where = ["1=1"]
     args: list = []
@@ -718,13 +731,13 @@ def batch_approve(req: BatchApproveReq):
         raise HTTPException(400, "action_ids不能为空")
     count = 0
     for aid in req.action_ids:
-        action = _query_one("SELECT * FROM bb_audit_action WHERE action_id=%s AND status='pending_approval'", (aid,))
+        action = _query_one("SELECT * FROM bb_audit_action WHERE action_id=%s AND status='pending_confirm'", (aid,))
         if action:
             _execute(
-                "UPDATE bb_audit_action SET status='approved', approved_at=NOW(), approved_by=%s WHERE action_id=%s",
+                "UPDATE bb_audit_action SET status='pending_feedback', approved_at=NOW(), approved_by=%s WHERE action_id=%s",
                 (req.approved_by, aid)
             )
-            _insert_trail(action["churn_id"], "action_approved", f"批量审批通过 {action['action_name']}", req.approved_by)
+            _insert_trail(action["churn_id"], "action_confirmed", f"批量确认接受 {action['action_name']}", req.approved_by)
             count += 1
     return {"ok": True, "approved_count": count}
 
@@ -737,7 +750,7 @@ def workbench_list(
     page_size: int = Query(default=20, ge=1, le=100),
     status: str = Query(default=""),
 ):
-    where = ["a.status IN ('approved','executing','completed','failed')"]
+    where = ["a.status IN ('pending_feedback','feedback_submitted','rejected')"]
     args: list = []
     if status:
         where.append("a.status = %s")
@@ -835,7 +848,7 @@ def _make_todos(churn_id: str, churn: dict, evidence: list[dict],
             "action_name": f"地址网络资源核实 — {address_text}",
             "description": "系统预判有资源，工程师反馈现场无资源，需人工核实地址库数据与现场实际是否一致。",
             "priority": "medium",
-            "status": "pending_approval",
+            "status": "pending_confirm",
             "trigger_rule": "E28(预判有资源) AND (E1|E2)(工程师反馈无资源) AND address.resource_status == null",
             "expected_effect": "核实结果回写地址对象 → 若实际无资源则R类假设激活 → 根因可能变更",
             "support_evidences": [
@@ -860,7 +873,7 @@ def _make_todos(churn_id: str, churn: dict, evidence: list[dict],
             "action_name": "中台外呼回访 — 退单原因核实",
             "description": f"退单原因为「{churn_category or '未填写'}」，稽核推理根因为「{root_cause_l1}」，两者不一致，需中台回访客户核实真实退单原因。",
             "priority": "high",
-            "status": "pending_approval",
+            "status": "pending_confirm",
             "trigger_rule": "attribution.root_cause ≠ churn.reported_reason → TRIGGER_CALLBACK",
             "expected_effect": "回访结果回写 → 触发增量推理 → 提升置信度可靠性",
             "support_evidences": [
@@ -890,7 +903,7 @@ def _make_todos(churn_id: str, churn: dict, evidence: list[dict],
             "action_name": "二次营销 — 客户挽留",
             "description": "检测到客户存在异网通话记录，存在携转风险，建议进行二次营销挽留。",
             "priority": "low",
-            "status": "pending_approval",
+            "status": "pending_confirm",
             "trigger_rule": "E36(异网通话频次高) → TRIGGER_MARKETING",
             "expected_effect": "营销外呼 → 客户挽留 → 降低携转流失率",
             "support_evidences": [
@@ -913,6 +926,8 @@ def _analysis_stream(churn_id: str):
     if not churn:
         yield _sse_event("error", "error", "退单记录不存在")
         return
+
+    _execute("UPDATE bb_install_churn SET audit_status='稽核中' WHERE churn_id=%s", (churn_id,))
 
     # ── Step 1: 感知 — 数据采集 ──
     yield _sse_event("perception", "start", "开始数据采集...")
@@ -1063,12 +1078,11 @@ def _analysis_stream(churn_id: str):
             else:
                 root_cause_code = None
 
-        # 写回数据库
+        # 写回数据库（只写根因字段，状态由 todo 生成结果决定）
         if root_cause_l1:
             _execute(
                 "UPDATE bb_install_churn SET root_cause_code=%s, root_cause_level_one=%s, "
-                "root_cause_level_two=%s, root_cause_confidence=%s, audit_status='已归档', "
-                "archive_time=NOW() WHERE churn_id=%s",
+                "root_cause_level_two=%s, root_cause_confidence=%s WHERE churn_id=%s",
                 (root_cause_code, root_cause_l1, root_cause_l2, confidence, churn_id)
             )
 
@@ -1114,10 +1128,11 @@ def _analysis_stream(churn_id: str):
         try:
             _execute(
                 "INSERT INTO bb_audit_action "
-                "(action_id, churn_id, action_type_code, action_name, description, "
+                "(action_id, churn_id, action_type_code, todo_type, action_name, description, "
                 "priority, status, assignee, params_json) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
                 (todo["action_id"], churn_id, todo["action_type_code"],
+                 todo.get("todo_type", todo["action_type_code"]),
                  todo["action_name"], todo["description"],
                  todo["priority"], todo["status"], todo.get("assignee"),
                  json.dumps(todo.get("params_json"), ensure_ascii=False) if todo.get("params_json") else None)
@@ -1131,13 +1146,25 @@ def _analysis_stream(churn_id: str):
                      f"共生成 {len(todos)} 个推荐动作" if todos else "无需生成动作",
                      {"todos": todos, "count": len(todos)})
 
+    if todos:
+        _execute("UPDATE bb_install_churn SET audit_status='挂起' WHERE churn_id=%s", (churn_id,))
+    else:
+        _execute("UPDATE bb_install_churn SET audit_status='完成', archive_time=NOW() WHERE churn_id=%s", (churn_id,))
+
     yield _sse_event("done", "complete", "分析完成")
 
 
 @router.post("/analyze/{churn_id}")
 def analyze_churn(churn_id: str):
+    def _safe_stream():
+        try:
+            yield from _analysis_stream(churn_id)
+        except Exception as e:
+            logger.exception("分析流程异常: %s", e)
+            _execute("UPDATE bb_install_churn SET audit_status='失败' WHERE churn_id=%s", (churn_id,))
+            yield _sse_event("error", "error", f"分析异常: {e}")
     return StreamingResponse(
-        _analysis_stream(churn_id),
+        _safe_stream(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

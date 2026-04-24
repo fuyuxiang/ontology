@@ -1,8 +1,8 @@
 <template>
-  <div class="cap-card" :style="{ flex: flex }">
+  <div class="cap-card" :style="{ flex: flex }" :data-card-key="cardKey">
     <img class="cap-card__bg" :src="bg" alt="" />
     <div class="cap-card__content" :class="{ 'cap-card__content--icon-grid': iconItems?.length }">
-      <div v-if="iconItems?.length" class="cap-card__icon-grid">
+      <div v-if="iconItems?.length" class="cap-card__icon-grid" :class="{ 'cap-card__icon-grid--row': iconItems.length <= 3, 'cap-card__icon-grid--six': iconItems.length >= 6 }">
         <div v-for="item in iconItems" :key="item.label" class="cap-card__icon-item">
           <img class="cap-card__icon-item-img" :src="item.icon" :alt="item.label" />
           <span class="cap-card__icon-item-label">{{ item.label }}</span>
@@ -21,6 +21,7 @@
 <script setup lang="ts">
 defineProps<{
   title: string
+  cardKey?: string
   bg: string
   icon?: string
   flex: number
@@ -98,6 +99,25 @@ defineProps<{
 .cap-card__icon-item:nth-child(3) { grid-column: 1 / span 2; grid-row: 2; }
 .cap-card__icon-item:nth-child(4) { grid-column: 3 / span 2; grid-row: 2; }
 .cap-card__icon-item:nth-child(5) { grid-column: 5 / span 2; grid-row: 2; }
+/* 6-item layout: 3+3 grid */
+.cap-card__icon-item:nth-child(6) { grid-column: 5 / span 2; grid-row: 2; }
+.cap-card__icon-item:nth-child(6) ~ .placeholder { display: none; }
+.cap-card__icon-grid--six .cap-card__icon-item:nth-child(1) { grid-column: 1 / span 2; grid-row: 1; }
+.cap-card__icon-grid--six .cap-card__icon-item:nth-child(2) { grid-column: 3 / span 2; grid-row: 1; }
+.cap-card__icon-grid--six .cap-card__icon-item:nth-child(3) { grid-column: 5 / span 2; grid-row: 1; }
+.cap-card__icon-grid--six .cap-card__icon-item:nth-child(4) { grid-column: 1 / span 2; grid-row: 2; }
+.cap-card__icon-grid--six .cap-card__icon-item:nth-child(5) { grid-column: 3 / span 2; grid-row: 2; }
+.cap-card__icon-grid--six .cap-card__icon-item:nth-child(6) { grid-column: 5 / span 2; grid-row: 2; }
+.cap-card__icon-grid--row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 1.2vw;
+}
+.cap-card__icon-grid--row .cap-card__icon-item {
+  grid-column: unset;
+  grid-row: unset;
+}
 .cap-card__icon-item-img {
   width: clamp(16px, 1.8vw, 36px);
   height: auto;

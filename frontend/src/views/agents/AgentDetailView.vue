@@ -145,6 +145,35 @@
                 <input class="harness__input" v-model="selectedNode.data.input_mapping[p.name]" @input="isDirty = true" :placeholder="`如 {question} 或固定值`" />
               </div>
             </template>
+            <div class="harness__field" v-if="selectedNode.type === 'intent-recognition'">
+              <label>提取字段</label>
+              <input class="harness__input" v-model="selectedNode.data.extract_fields" @input="isDirty = true" placeholder="如 churn_id, user_id（逗号分隔）" />
+            </div>
+            <template v-if="selectedNode.type === 'agent'">
+              <div class="harness__field">
+                <label>绑定技能</label>
+                <select class="harness__input" v-model="selectedNode.data.skill_id" @change="onSkillSelect(selectedNode)">
+                  <option value="">请选择...</option>
+                  <option v-for="s in skills" :key="s.id" :value="s.id">{{ s.name }}</option>
+                </select>
+              </div>
+              <div class="harness__field" v-if="selectedNode.data.skill_id">
+                <label>技能说明</label>
+                <div style="font-size:11px;color:var(--h-text-4);line-height:1.5">{{ getSkillDesc(selectedNode.data.skill_id) }}</div>
+              </div>
+              <div class="harness__field">
+                <label>Agent 加工 Prompt</label>
+                <textarea class="harness__input harness__input--ta" v-model="selectedNode.data.agent_prompt" @input="isDirty = true" placeholder="可选，用于对技能结果做二次加工。支持 {question} {skill_result}" rows="4"></textarea>
+              </div>
+            </template>
+            <div class="harness__field" v-if="selectedNode.type === 'output'">
+              <label>输出格式</label>
+              <select class="harness__input" v-model="selectedNode.data.output_format" @change="isDirty = true">
+                <option value="text">文本</option>
+                <option value="json">JSON</option>
+                <option value="markdown">Markdown</option>
+              </select>
+            </div>
             <div class="harness__panel-actions">
               <button class="harness__btn harness__btn--danger harness__btn--sm" @click="deleteNode(selectedNodeId)">
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -247,6 +276,8 @@ const nodeTypes_: Record<string, any> = {
   'rule-engine': markRaw(WorkflowNode), 'notification': markRaw(WorkflowNode),
   'human-approval': markRaw(WorkflowNode), 'write-back': markRaw(WorkflowNode),
   'api-response': markRaw(WorkflowNode), 'skill': markRaw(WorkflowNode),
+  'intent-recognition': markRaw(WorkflowNode), 'agent': markRaw(WorkflowNode),
+  'output': markRaw(WorkflowNode),
 }
 const defaultEdgeOptions = {
   type: 'smoothstep', markerEnd: MarkerType.ArrowClosed,
@@ -272,6 +303,9 @@ const nodeTypes = [
   { type: 'write-back', label: '结果写回', color: '#64748b', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 3v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>` },
   { type: 'api-response', label: 'API 响应', color: '#2e5bff', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
   { type: 'skill', label: '业务技能', color: '#e11d48', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4l2-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>` },
+  { type: 'intent-recognition', label: '意图识别', color: '#0891b2', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2z" stroke="currentColor" stroke-width="1.5"/><path d="M6 7h4M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'agent', label: '智能体', color: '#7c3aed', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
+  { type: 'output', label: '结果输出', color: '#059669', icon: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 8h7M7 5l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3v10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>` },
 ]
 
 const skillNodeItems = computed(() =>
@@ -286,6 +320,7 @@ const skillNodeItems = computed(() =>
 )
 
 const nodeGroups = computed(() => [
+  { label: '智能编排', nodes: nodeTypes.filter(n => ['intent-recognition','agent','output'].includes(n.type)) },
   { label: '本体推理', nodes: nodeTypes.filter(n => ['ontology-query','ontology-relation','rule-evaluate'].includes(n.type)) },
   { label: '数据处理', nodes: nodeTypes.filter(n => ['datasource','variable-assign','parallel'].includes(n.type)) },
   { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','voice-audit'].includes(n.type)) },
