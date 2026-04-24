@@ -27,7 +27,7 @@ const router = createRouter({
     // 数据接入
     { path: '/datasource', name: 'datasource', component: () => import('../views/datasource/DataSourceView.vue'), meta: { title: '数据源' } },
     { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射' } },
-    { path: '/data/resolution', name: 'data-resolution', component: Placeholder, meta: { title: '实体解析' } },
+    { path: '/data/resolution', name: 'data-resolution', component: () => import('../views/resolution/ResolutionView.vue'), meta: { title: '实体解析' } },
 
     // 智能编排
     { path: '/orchestration/semantic', name: 'orch-semantic', component: Placeholder, meta: { title: '语义封装' } },
