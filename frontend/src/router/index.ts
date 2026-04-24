@@ -10,7 +10,7 @@ const router = createRouter({
 
     // 工作台
     { path: '/dashboard', name: 'dashboard', component: () => import('../views/dashboard/DashboardView.vue'), meta: { title: '平台总览' } },
-    { path: '/todo', name: 'todo', component: Placeholder, meta: { title: '我的待办' } },
+    { path: '/todo', name: 'todo', component: () => import('../views/todo/TodoView.vue'), meta: { title: '我的待办' } },
     { path: '/changes', name: 'changes', component: Placeholder, meta: { title: '最近变更' } },
 
     // 本体管理
@@ -29,7 +29,6 @@ const router = createRouter({
     { path: '/datasource', name: 'datasource', component: () => import('../views/datasource/DataSourceView.vue'), meta: { title: '数据源' } },
     { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射' } },
     { path: '/data/resolution', name: 'data-resolution', component: Placeholder, meta: { title: '实体解析' } },
-    { path: '/data/lineage', name: 'data-lineage', component: Placeholder, meta: { title: '血缘分析' } },
 
     // 智能编排
     { path: '/orchestration/semantic', name: 'orch-semantic', component: Placeholder, meta: { title: '语义封装' } },
