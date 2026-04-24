@@ -124,7 +124,6 @@ const navGroups = [
   { label: '数据接入', items: [
     { path: '/datasource', label: '数据源', icon: ico.datasource },
     { path: '/data/mapping', label: '本体映射', icon: ico.mapping },
-    { path: '/data/lineage', label: '血缘分析', icon: ico.lineage },
   ]},
   { label: '智能编排', items: [
     { path: '/agents', label: '智能体管理', icon: ico.harness },
