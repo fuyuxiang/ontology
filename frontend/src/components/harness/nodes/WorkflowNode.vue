@@ -138,6 +138,26 @@ const NODE_META: Record<string, { label: string; icon: string; color: string; gr
     gradient: 'linear-gradient(135deg, #84cc16 0%, #a3e635 100%)',
     icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 3v4l4 3 4-3V3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   },
+  'skill': {
+    label: '业务技能', color: '#e11d48',
+    gradient: 'linear-gradient(135deg, #e11d48 0%, #f43f5e 100%)',
+    icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1l2 4h4l-3 3 1 4-4-2-4 2 1-4-3-3h4l2-4z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
+  },
+  'intent-recognition': {
+    label: '意图识别', color: '#0891b2',
+    gradient: 'linear-gradient(135deg, #0891b2 0%, #22d3ee 100%)',
+    icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2z" stroke="currentColor" stroke-width="1.5"/><path d="M6 7h4M8 5v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  },
+  'agent': {
+    label: '智能体', color: '#7c3aed',
+    gradient: 'linear-gradient(135deg, #7c3aed 0%, #a78bfa 100%)',
+    icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  },
+  'output': {
+    label: '结果输出', color: '#059669',
+    gradient: 'linear-gradient(135deg, #059669 0%, #34d399 100%)',
+    icon: `<svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M3 8h7M7 5l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3v10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  },
 }
 
 const meta = computed(() => NODE_META[nodeType.value] || NODE_META['ontology-query'])
@@ -159,6 +179,10 @@ const bodyExtra = computed(() => {
   if (nodeType.value === 'voice-audit') return props.data.scenario || ''
   if (nodeType.value === 'notification') return props.data.notify_type || ''
   if (nodeType.value === 'api-response') return props.data.format || 'JSON'
+  if (nodeType.value === 'skill') return props.data.skill_name || ''
+  if (nodeType.value === 'intent-recognition') return props.data.extract_fields || ''
+  if (nodeType.value === 'agent') return props.data.skill_name || ''
+  if (nodeType.value === 'output') return props.data.output_format || 'text'
   return ''
 })
 
@@ -173,6 +197,10 @@ const bodyExtraKey = computed(() => {
   if (nodeType.value === 'voice-audit') return '场景'
   if (nodeType.value === 'notification') return '方式'
   if (nodeType.value === 'api-response') return '格式'
+  if (nodeType.value === 'skill') return '技能'
+  if (nodeType.value === 'intent-recognition') return '提取字段'
+  if (nodeType.value === 'agent') return '技能'
+  if (nodeType.value === 'output') return '格式'
   return ''
 })
 

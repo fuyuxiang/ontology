@@ -35,6 +35,33 @@ def execute_skill(code_ref: str, params: dict, db: Session) -> dict:
         return {"success": False, "summary": f"执行失败: {e}", "data": {}}
 
 
+SKILL_STREAM_REGISTRY: dict[str, callable] = {}
+
+
+def register_skill_stream(code_ref: str):
+    def decorator(fn):
+        SKILL_STREAM_REGISTRY[code_ref] = fn
+        return fn
+    return decorator
+
+
+def has_skill_stream(code_ref: str) -> bool:
+    return code_ref in SKILL_STREAM_REGISTRY
+
+
+def execute_skill_stream(code_ref: str, params: dict, db: Session):
+    fn = SKILL_STREAM_REGISTRY.get(code_ref)
+    if not fn:
+        result = execute_skill(code_ref, params, db)
+        yield {"step": "result", "status": "complete", "summary": result.get("summary", ""), "data": result.get("data", {})}
+        return
+    try:
+        yield from fn(params, db)
+    except Exception as e:
+        logger.error(f"Skill stream {code_ref} 执行失败: {e}")
+        yield {"step": "error", "status": "error", "message": str(e)}
+
+
 # ── 携号转网风险评估 ──────────────────────────────────────
 
 _NS = "s5"
@@ -344,6 +371,152 @@ def broadband_audit(params: dict, db: Session) -> dict:
         f"命中证据 {hit_count}/{len(evidences)} 条"
     )
     return {"success": True, "summary": summary, "data": data}
+
+
+@register_skill_stream("broadband_audit")
+def broadband_audit_stream(params: dict, db: Session):
+    """流式版宽带退单稽核 — yield 5 步分析事件，与场景验证 _analysis_stream 对齐"""
+    churn_id = params.get("churn_id", "")
+    if not churn_id:
+        yield {"step": "error", "status": "error", "message": "缺少 churn_id 参数"}
+        return
+
+    import pymysql
+    try:
+        conn = pymysql.connect(
+            host="123.56.188.16", port=3306, user="bonc", password="bonc123",
+            database="mnp_risk_warning", charset="utf8mb4",
+            cursorclass=pymysql.cursors.DictCursor,
+        )
+    except Exception as e:
+        yield {"step": "error", "status": "error", "message": f"无法连接数据库: {e}"}
+        return
+
+    from datetime import date, datetime as dt
+    from decimal import Decimal
+
+    def ser(row: dict) -> dict:
+        out = {}
+        for k, v in row.items():
+            if isinstance(v, (date, dt)):
+                out[k] = v.isoformat()
+            elif isinstance(v, Decimal):
+                out[k] = float(v)
+            else:
+                out[k] = v
+        return out
+
+    def q(sql):
+        with conn.cursor() as cur:
+            cur.execute(sql)
+            return [ser(r) for r in cur.fetchall()]
+
+    try:
+        # Step 1: 感知 · 数据采集
+        churn = q(f"""
+            SELECT c.*, o.product_name, o.biz_type, o.install_address,
+                   o.cust_id, o.engineer_id
+            FROM bb_install_churn c
+            LEFT JOIN bb_install_order o ON c.related_order_no = o.order_no
+            WHERE c.churn_id = '{churn_id}'
+        """)
+        if not churn:
+            yield {"step": "error", "status": "error", "message": f"退单 {churn_id} 不存在"}
+            return
+        churn = churn[0]
+        order_no = churn.get("related_order_no", "")
+        cust_id = churn.get("cust_id", "")
+
+        source_types = {}
+        for label, sql_tpl in [
+            ("工单", f"SELECT 1 FROM bb_install_order WHERE order_no='{order_no}' LIMIT 1"),
+            ("客户", f"SELECT 1 FROM bb_customer WHERE customer_id='{cust_id}' LIMIT 1"),
+            ("工程师", f"SELECT 1 FROM bb_engineer WHERE engineer_id='{churn.get('engineer_id', '')}' LIMIT 1"),
+        ]:
+            if q(sql_tpl):
+                source_types[label] = 1
+
+        eng_calls = q(f"SELECT call_id FROM bb_engineer_call WHERE related_order_no='{order_no}'")
+        cb_calls = q(f"SELECT call_id FROM bb_callback_call WHERE related_order_no='{order_no}'")
+        comp_calls = q(f"SELECT call_id FROM bb_competitor_call WHERE customer_id='{cust_id}'") if cust_id else []
+        if eng_calls:
+            source_types["工程师通话"] = len(eng_calls)
+        if cb_calls:
+            source_types["回访通话"] = len(cb_calls)
+        if comp_calls:
+            source_types["异网通话"] = len(comp_calls)
+
+        yield {
+            "step": "perception", "status": "complete",
+            "label": "感知·数据采集",
+            "summary": f"采集完成，共 {sum(source_types.values())} 条数据源",
+            "data": {"type": "broadband_perception", "source_types": source_types, "total_sources": sum(source_types.values())},
+        }
+
+        # Step 2: 识别 · 证据提取
+        evidence = q(f"SELECT * FROM bb_evidence WHERE churn_id='{churn_id}'")
+        nlp_ev = [e for e in evidence if e.get("evidence_type") == "nlp"]
+        rule_ev = [e for e in evidence if e.get("evidence_type") == "rule"]
+        hit_count = sum(1 for e in evidence if e.get("hit"))
+
+        yield {
+            "step": "recognition", "status": "complete",
+            "label": "识别·证据提取",
+            "summary": f"NLP证据 {len(nlp_ev)} 条，规则证据 {len(rule_ev)} 条，命中 {hit_count} 条",
+            "data": {"type": "broadband_recognition", "nlp_count": len(nlp_ev), "rule_count": len(rule_ev),
+                     "hit_count": hit_count, "total": len(evidence),
+                     "hit_codes": [e.get("evidence_code") for e in evidence if e.get("hit")]},
+        }
+
+        # Step 3: 推理 · 逻辑命中
+        logic_hits = q(f"SELECT * FROM bb_logic_hit WHERE churn_id='{churn_id}' ORDER BY executed_at")
+        lf_names = list({lh.get("logic_function_name", lh.get("logic_function_id", "")) for lh in logic_hits})
+
+        yield {
+            "step": "reasoning", "status": "complete",
+            "label": "推理·逻辑命中",
+            "summary": f"逻辑推理完成，命中 {len(logic_hits)} 条规则",
+            "data": {"type": "broadband_reasoning", "hit_count": len(logic_hits),
+                     "logic_functions": lf_names[:10]},
+        }
+
+        # Step 4: 归因 · 结论输出
+        root_cause_l1 = churn.get("root_cause_level_one", "")
+        root_cause_l2 = churn.get("root_cause_level_two", "")
+        confidence = float(churn["root_cause_confidence"]) if churn.get("root_cause_confidence") else 0
+
+        yield {
+            "step": "attribution", "status": "complete",
+            "label": "归因·结论输出",
+            "summary": f"根因: {root_cause_l1 or '未知'} / {root_cause_l2 or '-'}，置信度: {confidence*100:.1f}%",
+            "data": {"type": "broadband_attribution",
+                     "root_cause_level_one": root_cause_l1, "root_cause_level_two": root_cause_l2,
+                     "confidence": confidence, "audit_status": churn.get("audit_status", "")},
+        }
+
+        # Step 5: 动作 · 推荐生成
+        actions = q(f"SELECT action_name, priority, status FROM bb_audit_action WHERE churn_id='{churn_id}' ORDER BY created_at")
+
+        yield {
+            "step": "todo", "status": "complete",
+            "label": "动作·推荐生成",
+            "summary": f"共 {len(actions)} 个推荐动作" if actions else "无需生成动作",
+            "data": {"type": "broadband_todo", "action_count": len(actions),
+                     "actions": [a.get("action_name", "") for a in actions[:5]]},
+        }
+
+        # Final result
+        yield {
+            "step": "result", "status": "complete",
+            "summary": f"退单 {churn_id}: 根因={root_cause_l1 or '未知'}，置信度={confidence:.2f}，命中证据 {hit_count}/{len(evidence)} 条",
+            "data": {
+                "churn_id": churn_id, "churn": churn, "evidences": evidence,
+                "audit_status": churn.get("audit_status", ""),
+                "root_cause_level_one": root_cause_l1, "root_cause_confidence": confidence,
+            },
+        }
+    finally:
+        conn.close()
 
 
 def _broadband_audit_via_conn(conn, churn_id: str) -> dict:

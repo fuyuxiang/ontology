@@ -6,6 +6,7 @@
 import random
 import uuid
 import hashlib
+import json
 from datetime import datetime, timedelta
 
 import pymysql
@@ -57,8 +58,8 @@ ARREARS = ["正常","欠费停机","历史欠费已缴清"]
 ID_CARD = ["已实名","未实名","证件过期","证件信息不全"]
 ADDR_LEVEL = ["到室","到楼道","到楼栋","到小区","到村","未覆盖"]
 RES_STATUS = ["资源充足","资源紧张","资源不足","建设中","未覆盖"]
-AUDIT_STATUS = ["待稽核","推理中","待补全回访","强制回访待核实","待人工审核","已归档"]
-AUDIT_WEIGHTS = [15, 5, 10, 5, 15, 50]
+AUDIT_STATUS = ["待稽核", "稽核中", "挂起", "完成", "失败"]
+AUDIT_WEIGHTS = [15, 5, 20, 50, 10]
 L1_CAUSES = ["用户原因","施工原因","资源原因","业务原因"]
 L1_WEIGHTS = [30, 25, 25, 20]
 L2_MAP = {
@@ -812,36 +813,57 @@ def generate_evidence_and_actions(churns):
                 "operator": "system", "created_at": churn_time,
             })
 
-        # ── 稽核动作 ──
+        # ── 稽核动作（对齐 poc-service-api 待办状态机）──
         actions_for_churn = []
-        if a_status == "已归档":
-            actions_for_churn.append(("ACT-002", "completed"))
-            cause_acts = CAUSE_ACTION_MAP.get(l1, [])
-            for act_code in cause_acts[:random.randint(1, len(cause_acts))]:
-                actions_for_churn.append((act_code, random.choice(["completed", "executing"])))
-        elif a_status == "待人工审核":
-            actions_for_churn.append(("ACT-003", "pending_approval"))
-        elif a_status in ("待补全回访", "强制回访待核实"):
-            act_code = "ACT-008" if a_status == "强制回访待核实" else "ACT-007"
-            actions_for_churn.append((act_code, random.choice(["pending_approval", "approved", "executing"])))
-        elif a_status == "推理中":
-            actions_for_churn.append(("ACT-001", "executing"))
+        if a_status == "完成":
+            # 已完成的退单：生成已反馈的待办
+            cause_todos = {
+                "用户原因": [("followup_call", "中台外呼回访 — 退单原因核实")],
+                "施工原因": [("followup_call", "中台外呼回访 — 退单原因核实")],
+                "资源原因": [("resource_check", "地址网络资源核实")],
+                "业务原因": [("followup_call", "中台外呼回访 — 退单原因核实")],
+            }
+            for todo_type, todo_name in cause_todos.get(l1, []):
+                actions_for_churn.append((todo_type, todo_name, "feedback_submitted"))
+            if random.random() < 0.3:
+                actions_for_churn.append(("secondary_marketing", "二次营销 — 客户挽留", "feedback_submitted"))
+        elif a_status == "挂起":
+            # 挂起的退单：生成待确认或待反馈的待办
+            todo_choices = [
+                ("resource_check", "地址网络资源核实"),
+                ("followup_call", "中台外呼回访 — 退单原因核实"),
+            ]
+            todo_type, todo_name = random.choice(todo_choices)
+            todo_status = random.choice(["pending_confirm", "pending_feedback"])
+            actions_for_churn.append((todo_type, todo_name, todo_status))
+            if random.random() < 0.3:
+                actions_for_churn.append(("secondary_marketing", "二次营销 — 客户挽留", "pending_confirm"))
 
-        for act_code, act_status in actions_for_churn:
+        for todo_type, todo_name, act_status in actions_for_churn:
             aid = f"ACT{uid()}"
             assignee = random.choice(ASSIGNEES)
             created = churn_time
             approved_at = None
             approved_by = None
-            if act_status in ("approved", "executing", "completed"):
+            if act_status in ("pending_feedback", "feedback_submitted"):
                 approved_at = churn_time
                 approved_by = random.choice(ASSIGNEES)
 
+            feedback_data = None
+            feedback_time = None
+            if act_status == "feedback_submitted":
+                feedback_time = churn_time
+                if todo_type == "resource_check":
+                    feedback_data = json.dumps({"type": "resource_check", "value": random.choice(["有资源", "无资源"]), "text": "现场核实完成"}, ensure_ascii=False)
+                elif todo_type == "followup_call":
+                    feedback_data = json.dumps({"type": "followup_call", "value": random.choice(["确认用户原因", "实际为施工原因", "实际为资源原因"]), "text": "回访完成"}, ensure_ascii=False)
+
             all_actions.append({
                 "action_id": aid, "churn_id": cid,
-                "action_type_code": act_code,
-                "action_name": ACTION_TYPES.get(act_code, act_code),
-                "description": f"针对退单{cid}执行{ACTION_TYPES.get(act_code, '')}",
+                "action_type_code": todo_type,
+                "todo_type": todo_type,
+                "action_name": todo_name,
+                "description": f"针对退单{cid}执行{todo_name}",
                 "priority": random.choice(["high", "medium", "low"]),
                 "status": act_status,
                 "assignee": assignee,
@@ -850,50 +872,32 @@ def generate_evidence_and_actions(churns):
                 "approved_by": approved_by,
                 "rejected_at": None, "rejected_by": None, "reject_reason": None,
                 "params_json": None,
+                "feedback_data": feedback_data,
+                "feedback_time": feedback_time,
             })
 
             all_trail.append({
                 "trail_id": f"TRL{uid()}", "churn_id": cid,
                 "event_type": "action_created",
-                "event_detail": f"创建动作 {ACTION_TYPES.get(act_code, act_code)}",
+                "event_detail": f"创建待办 {todo_name}",
                 "operator": "system", "created_at": created,
             })
 
-            if act_status in ("approved", "executing", "completed"):
+            if act_status in ("pending_feedback", "feedback_submitted"):
                 all_trail.append({
                     "trail_id": f"TRL{uid()}", "churn_id": cid,
-                    "event_type": "action_approved",
-                    "event_detail": f"审批通过 {ACTION_TYPES.get(act_code, '')}",
+                    "event_type": "action_confirmed",
+                    "event_detail": f"确认接受 {todo_name}",
                     "operator": approved_by, "created_at": approved_at,
                 })
 
-            # ── 执行记录 ──
-            if act_status in ("executing", "completed"):
-                steps = EXEC_STEPS.get(act_code, [("执行", "执行动作")])
-                for j, (step_name, step_desc) in enumerate(steps):
-                    if act_status == "completed":
-                        s_status = "completed"
-                    else:
-                        s_status = "completed" if j < len(steps) - 1 else "executing"
-                    all_executions.append({
-                        "execution_id": f"EX{uid()}", "action_id": aid,
-                        "step_name": step_name,
-                        "status": s_status,
-                        "result_text": step_desc if s_status == "completed" else None,
-                        "writeback_content": f"已完成{step_name}" if s_status == "completed" else None,
-                        "started_at": created,
-                        "completed_at": created if s_status == "completed" else None,
-                        "executor": assignee,
-                        "log_text": f"[{created}] {step_name}: {step_desc}" if s_status == "completed" else f"[{created}] {step_name}: 执行中...",
-                    })
-
-                    if s_status == "completed":
-                        all_trail.append({
-                            "trail_id": f"TRL{uid()}", "churn_id": cid,
-                            "event_type": "action_executed",
-                            "event_detail": f"执行步骤完成: {step_name}",
-                            "operator": assignee, "created_at": created,
-                        })
+            if act_status == "feedback_submitted":
+                all_trail.append({
+                    "trail_id": f"TRL{uid()}", "churn_id": cid,
+                    "event_type": "action_feedback",
+                    "event_detail": f"提交反馈 {todo_name}",
+                    "operator": assignee, "created_at": feedback_time,
+                })
 
         # ── 状态变更追踪 ──
         all_trail.append({
