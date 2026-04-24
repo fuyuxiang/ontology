@@ -705,7 +705,8 @@ def inbox_list(
 
     offset = (page - 1) * page_size
     rows = _query(f"""
-        SELECT a.*, c.churn_time, c.churn_reason_text, c.root_cause_level_one,
+        SELECT a.*, c.churn_time, c.churn_reason_text, c.churn_category_l1,
+               c.root_cause_level_one, c.root_cause_level_two,
                c.root_cause_confidence, cu.customer_name
         FROM bb_audit_action a
         LEFT JOIN bb_install_churn c ON a.churn_id = c.churn_id
@@ -1120,25 +1121,46 @@ def _analysis_stream(churn_id: str):
     yield _sse_event("todo", "start", "正在生成推荐动作...")
     time.sleep(0.3)
 
+    _execute("DELETE FROM bb_audit_action WHERE churn_id=%s", (churn_id,))
+
     evidence_raw = _query("SELECT * FROM bb_evidence WHERE churn_id=%s", (churn_id,))
     todos = _make_todos(churn_id, churn, [_ser(e) for e in evidence_raw],
                         root_cause_l1, order, customer, address)
 
     for todo in todos:
+        params_val = json.dumps(todo.get("params_json"), ensure_ascii=False) if todo.get("params_json") else None
+        inserted = False
         try:
             _execute(
                 "INSERT INTO bb_audit_action "
                 "(action_id, churn_id, action_type_code, todo_type, action_name, description, "
-                "priority, status, assignee, params_json) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                "priority, status, assignee, params_json, created_at) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, NOW())",
                 (todo["action_id"], churn_id, todo["action_type_code"],
                  todo.get("todo_type", todo["action_type_code"]),
                  todo["action_name"], todo["description"],
-                 todo["priority"], todo["status"], todo.get("assignee"),
-                 json.dumps(todo.get("params_json"), ensure_ascii=False) if todo.get("params_json") else None)
+                 todo["priority"], todo["status"], todo.get("assignee"), params_val)
             )
+            inserted = True
         except Exception:
-            pass
+            try:
+                _execute(
+                    "INSERT INTO bb_audit_action "
+                    "(action_id, churn_id, action_type_code, action_name, description, "
+                    "priority, status, assignee, params_json, created_at) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s, NOW())",
+                    (todo["action_id"], churn_id, todo["action_type_code"],
+                     todo["action_name"], todo["description"],
+                     todo["priority"], todo["status"], todo.get("assignee"), params_val)
+                )
+                inserted = True
+            except Exception as e2:
+                logger.exception("插入推荐动作失败 churn_id=%s action_id=%s: %s", churn_id, todo["action_id"], e2)
+                yield _sse_event("todo", "error", f"动作写入失败：{todo['action_name']}", {"error": str(e2)})
+                continue
+        if inserted:
+            _insert_trail(churn_id, "action_created",
+                          f"生成推荐动作 {todo['action_name']}（{todo['priority']}）", "system")
         yield _sse_event("todo", "progress", f"待办：{todo['action_name']}", todo)
         time.sleep(0.15)
 
