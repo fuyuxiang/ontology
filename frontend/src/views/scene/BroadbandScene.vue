@@ -61,7 +61,7 @@
             <span class="bb-list-item__phase" v-if="row.churn_phase">{{ row.churn_phase }}</span>
           </div>
           <div class="bb-list-item__actions">
-            <button v-if="row.audit_status === '待稽核'" class="bb-link bb-link--analyze" @click.stop="startAnalyze(row)">分析</button>
+            <button v-if="row.audit_status === '待稽核' || row.audit_status === '失败'" class="bb-link bb-link--analyze" @click.stop="startAnalyze(row)">分析</button>
           </div>
         </div>
         <div v-if="!loading && list.length === 0" class="bb-empty">暂无退单数据</div>
@@ -174,22 +174,31 @@
 
           <!-- 原因对比 -->
           <div v-if="analysisDone && attributionData" class="bb-reason-compare">
-            <div class="bb-reason-compare__title">原因对比</div>
+            <div class="bb-reason-compare__header">
+              <span class="bb-reason-compare__title">原因对比</span>
+              <span v-if="reasonMatch !== null" class="bb-reason-match" :class="reasonMatch ? 'bb-reason-match--yes' : 'bb-reason-match--no'">
+                {{ reasonMatch ? '一致' : '不一致' }}
+              </span>
+            </div>
             <div class="bb-reason-compare__cards">
               <div class="bb-reason-card bb-reason-card--original">
-                <div class="bb-reason-card__label">退单原因</div>
-                <div class="bb-reason-card__value">{{ attributionData.churn_reason_text || selected?.churn_category_l1 || '未填写' }}</div>
-                <div class="bb-reason-card__sub" v-if="attributionData.churn_category_l1">{{ attributionData.churn_category_l1 }}<span v-if="attributionData.churn_category_l2"> / {{ attributionData.churn_category_l2 }}</span></div>
+                <div class="bb-reason-card__label">上报原因</div>
+                <div class="bb-reason-card__value">{{ attributionData.churn_category_l1 || '未填写' }}</div>
+                <div class="bb-reason-card__sub" v-if="attributionData.churn_category_l2">{{ attributionData.churn_category_l2 }}</div>
+                <div class="bb-reason-card__detail" v-if="attributionData.churn_reason_text">{{ attributionData.churn_reason_text }}</div>
               </div>
               <div class="bb-reason-compare__arrow">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </div>
-              <div class="bb-reason-card bb-reason-card--audit">
-                <div class="bb-reason-card__label">稽核后原因</div>
+              <div class="bb-reason-card" :class="reasonMatch === false ? 'bb-reason-card--mismatch' : 'bb-reason-card--audit'">
+                <div class="bb-reason-card__label">稽核原因</div>
                 <div class="bb-reason-card__value">{{ attributionData.root_cause_level_one || '未确定' }}</div>
                 <div class="bb-reason-card__sub" v-if="attributionData.root_cause_level_two">{{ attributionData.root_cause_level_two }}</div>
                 <div class="bb-reason-card__conf" v-if="attributionData.root_cause_confidence != null">置信度 {{ (attributionData.root_cause_confidence * 100).toFixed(1) }}%</div>
               </div>
+            </div>
+            <div v-if="reasonMatch === false" class="bb-reason-compare__hint">
+              上报原因与稽核推理结果不一致，建议关注推荐动作中的回访核实
             </div>
           </div>
 
@@ -213,11 +222,11 @@
 
               <!-- 动作操作区 -->
               <div class="bb-todo-card__actions">
-                <template v-if="todo.status === 'pending_approval'">
-                  <button class="bb-btn bb-btn--primary bb-btn--sm" @click="confirmTodo(todo)">执行</button>
+                <template v-if="todo.status === 'pending_confirm'">
+                  <button class="bb-btn bb-btn--primary bb-btn--sm" @click="confirmTodo(todo)">确认</button>
                   <button class="bb-btn bb-btn--sm" @click="rejectTodo(todo)">驳回</button>
                 </template>
-                <template v-else-if="todo.status === 'executing'">
+                <template v-else-if="todo.status === 'pending_feedback'">
                   <!-- resource_check 反馈 -->
                   <div v-if="todo.todo_type === 'resource_check'" class="bb-todo-feedback">
                     <select v-model="todo._feedbackValue" class="bb-select bb-select--sm">
@@ -241,11 +250,11 @@
                     <button class="bb-btn bb-btn--primary bb-btn--sm" :disabled="!todo._feedbackValue" @click="submitTodoFeedback(todo)">提交反馈</button>
                   </div>
                   <div v-else class="bb-todo-feedback">
-                    <span class="bb-todo-card__status bb-todo-card__status--executing">执行中</span>
+                    <span class="bb-todo-card__status bb-todo-card__status--pending_feedback">待反馈</span>
                   </div>
                 </template>
-                <template v-else-if="todo.status === 'completed'">
-                  <span class="bb-todo-card__status bb-todo-card__status--completed">已完成</span>
+                <template v-else-if="todo.status === 'feedback_submitted'">
+                  <span class="bb-todo-card__status bb-todo-card__status--feedback_submitted">已反馈</span>
                 </template>
               </div>
             </div>
@@ -325,7 +334,7 @@ const total = ref(0)
 const page = ref(1)
 const pageSize = 20
 const filters = reactive({ keyword: '', start_time: '', end_time: '', audit_status: '', root_cause_level_one: '' })
-const auditStatuses = ['待稽核', '推理中', '待补全回访', '强制回访待核实', '待人工审核', '已归档']
+const auditStatuses = ['待稽核', '稽核中', '挂起', '完成', '失败']
 const causeOptions = ['用户原因', '施工原因', '资源原因', '业务原因']
 
 const ALL_EVIDENCE_CODES: { code: string; name: string; type: 'nlp' | 'rule' }[] = [
@@ -403,12 +412,19 @@ const attributionData = ref<{
 } | null>(null)
 const reAttributing = ref(false)
 const reAttrResult = ref<string | null>(null)
-const hasCompletedTodos = computed(() => analysisTodos.value.some(t => t.status === 'completed'))
+const hasCompletedTodos = computed(() => analysisTodos.value.some(t => t.status === 'feedback_submitted'))
+const reasonMatch = computed<boolean | null>(() => {
+  if (!attributionData.value) return null
+  const reported = attributionData.value.churn_category_l1
+  const audited = attributionData.value.root_cause_level_one
+  if (!reported || !audited) return null
+  return reported === audited
+})
 
 function todoStatusLabel(status: string) {
   const m: Record<string, string> = {
-    pending_approval: '待确认', approved: '已批准', executing: '执行中',
-    completed: '已完成', failed: '失败', rejected: '已驳回',
+    pending_confirm: '待确认', pending_feedback: '待反馈',
+    feedback_submitted: '已反馈', rejected: '已驳回',
   }
   return m[status] || status
 }
@@ -417,7 +433,7 @@ async function confirmTodo(todo: TodoWithUI) {
   if (!selected.value) return
   try {
     await broadbandApi.confirmAction(selected.value.churn_id, todo.action_id)
-    todo.status = 'executing'
+    todo.status = 'pending_feedback'
   } catch { /* silent */ }
 }
 
@@ -437,7 +453,7 @@ async function submitTodoFeedback(todo: TodoWithUI) {
       feedback_value: todo._feedbackValue,
       feedback_text: todo._feedbackText || '',
     })
-    todo.status = 'completed'
+    todo.status = 'feedback_submitted'
   } catch { /* silent */ }
 }
 
@@ -475,11 +491,17 @@ const graphNodeR = 28
 const kpis = computed(() => {
   const o = overview.value
   if (!o) return []
-  return [
+  const items = [
     { label: '总退单', value: o.total, cls: '' },
     { label: '待稽核', value: o.pending, cls: 'bb-kpi--warning' },
-    { label: '推理中', value: o.reasoning, cls: 'bb-kpi--info' },
-    { label: '已归档', value: o.archived, cls: 'bb-kpi--success' },
+    { label: '稽核中', value: o.analyzing, cls: 'bb-kpi--info' },
+    { label: '挂起', value: o.pending_todo, cls: 'bb-kpi--warning' },
+    { label: '完成', value: o.completed, cls: 'bb-kpi--success' },
+    { label: '失败', value: o.error_count, cls: 'bb-kpi--error' },
+  ]
+  const always = ['总退单', '待稽核', '完成']
+  return [
+    ...items.filter(i => always.includes(i.label) || (i.value as number) > 0),
     { label: '准确率', value: ((o.accuracy_rate || 0) * 100).toFixed(1) + '%', cls: 'bb-kpi--accent' },
   ]
 })
@@ -514,7 +536,7 @@ const graphEdges = computed(() => {
 // ── Helpers ──
 function formatTime(t: string | null) { return t ? t.replace('T', ' ').slice(0, 16) : '-' }
 function statusClass(s: string | null) {
-  const m: Record<string, string> = { '待稽核': 'pending', '推理中': 'info', '待补全回访': 'warning', '强制回访待核实': 'warning', '待人工审核': 'error', '已归档': 'success' }
+  const m: Record<string, string> = { '待稽核': 'pending', '稽核中': 'info', '挂起': 'warning', '完成': 'success', '失败': 'error' }
   return m[s || ''] || 'default'
 }
 function causeClass(c: string | null) {
@@ -863,15 +885,22 @@ onUnmounted(() => { abortCtrl?.abort() })
 
 /* ── Reason comparison ── */
 .bb-reason-compare { margin-top: 16px; padding: 16px; background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); }
-.bb-reason-compare__title { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); margin-bottom: 12px; }
+.bb-reason-compare__header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.bb-reason-compare__title { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); }
+.bb-reason-match { display: inline-block; padding: 2px 10px; border-radius: var(--radius-full); font-size: var(--text-caption-size); font-weight: 600; }
+.bb-reason-match--yes { background: var(--status-success-bg); color: var(--status-success); }
+.bb-reason-match--no { background: var(--status-error-bg); color: var(--status-error); }
 .bb-reason-compare__cards { display: flex; align-items: stretch; gap: 12px; }
 .bb-reason-compare__arrow { display: flex; align-items: center; color: var(--neutral-400); flex-shrink: 0; }
+.bb-reason-compare__hint { margin-top: 10px; padding: 8px 12px; border-radius: var(--radius-sm); background: var(--status-error-bg); color: var(--status-error); font-size: var(--text-code-size); }
 .bb-reason-card { flex: 1; padding: 12px; border-radius: var(--radius-md); }
 .bb-reason-card--original { background: var(--status-warning-bg); border: 1px solid var(--kinetic-200); }
 .bb-reason-card--audit { background: var(--status-success-bg); border: 1px solid var(--dynamic-300); }
+.bb-reason-card--mismatch { background: var(--status-error-bg); border: 1px solid var(--status-error); }
 .bb-reason-card__label { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-500); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 .bb-reason-card__value { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-900); }
 .bb-reason-card__sub { font-size: var(--text-code-size); color: var(--neutral-600); margin-top: 4px; }
+.bb-reason-card__detail { font-size: var(--text-caption-size); color: var(--neutral-500); margin-top: 6px; font-style: italic; line-height: 1.4; }
 .bb-reason-card__conf { font-size: var(--text-caption-size); font-weight: 600; color: var(--status-success); margin-top: 4px; }
 
 /* ── Todo / Action cards ── */

@@ -5,10 +5,35 @@
     <img class="screen-bottom" src="/images/ontology/bottom.png" alt="" />
 
     <!-- 主内容（可拖拽缩放） -->
-    <div class="content" :style="contentTransform">
+    <div class="content" ref="contentRef" :style="contentTransform">
+      <!-- ═══ 跨层数据流线 ═══ -->
+      <svg class="cross-layer-svg" :viewBox="`0 0 ${crossSvgW} ${crossSvgH}`" preserveAspectRatio="none">
+        <defs>
+          <filter id="cl-particle-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+          <filter id="cl-line-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <g v-for="link in crossLayerLinks" :key="link.id" class="onto-link">
+          <path :id="'cl-'+link.id" :d="link.path" fill="none" stroke="none" />
+          <path class="onto-link__line" :d="link.path" fill="none" :stroke="link.color" stroke-width="1" stroke-opacity="0.35" filter="url(#cl-line-glow)" />
+          <path class="onto-link__line-dash" :d="link.path" fill="none" :stroke="link.color" stroke-width="0.6" stroke-dasharray="6 4" stroke-opacity="0.6" />
+          <circle v-for="p in 4" :key="p" class="onto-link__particle" :r="2" :fill="link.particleColor" filter="url(#cl-particle-glow)">
+            <animateMotion :dur="link.dur+'s'" :begin="(-p * link.dur / 4)+'s'" repeatCount="indefinite">
+              <mpath :href="'#cl-'+link.id" />
+            </animateMotion>
+            <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.9;1" :dur="link.dur+'s'" :begin="(-p * link.dur / 4)+'s'" repeatCount="indefinite" />
+          </circle>
+        </g>
+      </svg>
+
       <!-- ═══ 顶部能力层 ═══ -->
       <div class="row row-top">
-        <CapabilityCard v-for="card in topCards" :key="card.title" v-bind="card" />
+        <CapabilityCard v-for="card in topCards" :key="card.title" v-bind="card" :card-key="card.key" />
       </div>
 
       <!-- ═══ 中间本体层 ═══ -->
@@ -84,7 +109,7 @@
 
       <!-- ═══ 底部数据层 ═══ -->
       <div class="row row-bottom">
-        <CapabilityCard v-for="card in bottomCards" :key="card.title" v-bind="card" />
+        <CapabilityCard v-for="card in bottomCards" :key="card.title" v-bind="card" :card-key="card.key" />
       </div>
     </div>
 
@@ -330,6 +355,9 @@ function linkHighlightClass(link: { highlighted: boolean }) {
 const ontoLayerRef = ref<HTMLElement | null>(null)
 const svgW = 1920
 const svgH = 600
+const crossSvgW = 1920
+const crossSvgH = 1080
+const contentRef = ref<HTMLElement | null>(null)
 const domPositionTick = ref(0)
 
 function recalcPositions() {
@@ -395,6 +423,82 @@ const svgLinks = computed(() => {
         highlighted,
       }
     })
+})
+
+/* ── Cross-layer flow lines (cards ↔ onto-layer) ── */
+const CROSS_LAYER_CONNECTIONS: { cardKey: string; direction: 'up' | 'down'; count: number }[] = [
+  { cardKey: 'datasources', direction: 'up', count: 6 },
+  { cardKey: 'logic', direction: 'up', count: 5 },
+  { cardKey: 'actions', direction: 'down', count: 5 },
+  { cardKey: 'analytics', direction: 'down', count: 5 },
+  { cardKey: 'automations', direction: 'down', count: 6 },
+  { cardKey: 'products', direction: 'down', count: 5 },
+]
+
+const crossLayerLinks = computed(() => {
+  domPositionTick.value
+  const content = contentRef.value
+  if (!content) return []
+  const cRect = content.getBoundingClientRect()
+  if (!cRect.width || !cRect.height) return []
+
+  const layer = ontoLayerRef.value
+  if (!layer) return []
+  const lRect = layer.getBoundingClientRect()
+
+  const links: { id: string; path: string; color: string; particleColor: string; dur: number }[] = []
+
+  for (const conn of CROSS_LAYER_CONNECTIONS) {
+    const cardEl = content.querySelector(`[data-card-key="${conn.cardKey}"]`) as HTMLElement | null
+    if (!cardEl) continue
+    const cardRect = cardEl.getBoundingClientRect()
+
+    const isBottom = ['datasources', 'logic', 'actions'].includes(conn.cardKey)
+
+    for (let i = 0; i < conn.count; i++) {
+      const t = (i + 1) / (conn.count + 1)
+      const cardX = cardRect.left + cardRect.width * t - cRect.left
+      const layerX = lRect.left + lRect.width * (0.15 + 0.7 * t) - cRect.left
+
+      let cardY: number, layerY: number
+      if (isBottom) {
+        cardY = cardRect.top - cRect.top
+        layerY = lRect.bottom - cRect.top
+      } else {
+        cardY = cardRect.bottom - cRect.top
+        layerY = lRect.top - cRect.top
+      }
+
+      const sx = (cardX / cRect.width) * crossSvgW
+      const sy = (cardY / cRect.height) * crossSvgH
+      const ex = (layerX / cRect.width) * crossSvgW
+      const ey = (layerY / cRect.height) * crossSvgH
+
+      const mx = (sx + ex) / 2
+      const my = (sy + ey) / 2
+      const spread = (i - (conn.count - 1) / 2) * 12
+      const cx1 = mx + spread
+      const cy1 = my
+
+      const fromX = conn.direction === 'up' ? sx : ex
+      const fromY = conn.direction === 'up' ? sy : ey
+      const toX = conn.direction === 'up' ? ex : ey === ey ? ex : sx
+      const toY = conn.direction === 'up' ? ey : sy
+
+      const path = conn.direction === 'up'
+        ? `M${sx},${sy} Q${cx1},${cy1} ${ex},${ey}`
+        : `M${ex},${ey} Q${cx1},${cy1} ${sx},${sy}`
+
+      links.push({
+        id: `cl-${conn.cardKey}-${i}`,
+        path,
+        color: '#91a7ff',
+        particleColor: '#bac8ff',
+        dur: 2.0 + (i % 4) * 0.15,
+      })
+    }
+  }
+  return links
 })
 
 const nodeRelations = computed(() => {
@@ -499,6 +603,41 @@ const WORKFLOW_CARD_ITEMS = [
   { icon: WORKFLOW_ICON, label: '异网分析' },
   { icon: WORKFLOW_ICON, label: '仪表盘' },
 ]
+const AUTOMATION_ICON_ITEMS = [
+  { icon: WORKFLOW_ICON, label: '合约到期提醒' },
+  { icon: WORKFLOW_ICON, label: '异常预警' },
+  { icon: WORKFLOW_ICON, label: '本体优化建议' },
+]
+const PRODUCT_ICON_ITEMS = [
+  { icon: WORKFLOW_ICON, label: '智能问答' },
+  { icon: WORKFLOW_ICON, label: '场景验证' },
+]
+const DATASOURCE_ICON_ITEMS = [
+  { icon: WORKFLOW_ICON, label: 'CBSS' },
+  { icon: WORKFLOW_ICON, label: '外呼录音' },
+  { icon: WORKFLOW_ICON, label: '地址库' },
+  { icon: WORKFLOW_ICON, label: '待装库' },
+  { icon: WORKFLOW_ICON, label: '通话记录' },
+  { icon: WORKFLOW_ICON, label: '客户信息' },
+]
+const LOGIC_ICON_ITEMS = [
+  { icon: WORKFLOW_ICON, label: 'Deepseekv3' },
+  { icon: WORKFLOW_ICON, label: 'ASR' },
+  { icon: WORKFLOW_ICON, label: 'Qwen2.5-VL' },
+]
+const ACTIONS_ICON_ITEMS = [
+  { icon: WORKFLOW_ICON, label: '二次营销外呼' },
+  { icon: WORKFLOW_ICON, label: '维挽' },
+  { icon: WORKFLOW_ICON, label: '员工培训' },
+]
+const ICON_ITEMS_MAP: Record<string, { icon: string; label: string }[]> = {
+  analytics: WORKFLOW_CARD_ITEMS,
+  automations: AUTOMATION_ICON_ITEMS,
+  products: PRODUCT_ICON_ITEMS,
+  datasources: DATASOURCE_ICON_ITEMS,
+  logic: LOGIC_ICON_ITEMS,
+  actions: ACTIONS_ICON_ITEMS,
+}
 const FLEX_MAP: Record<string, number> = {
   analytics: 479, automations: 537, products: 470,
   datasources: 514, logic: 514, actions: 441,
@@ -550,11 +689,11 @@ const allCards = computed(() => {
     const activeRules = stats.value ? stats.value.top_rules.slice(0, 4).map((r: any) => r.name) : []
     return [
       { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: [], iconItems: WORKFLOW_CARD_ITEMS },
-      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: stats.value ? [...(stats.value.top_rules.slice(0, 4).map((r: any) => r.name)), ...(stats.value.top_rules.length === 0 ? ['暂无规则'] : [])] : ['加载中...'] },
-      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: ['Ontology Center', 'AI Copilot', 'AIP Workflow', 'API Gateway'] },
-      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, icon: ICON_MAP.datasources, items: dsItems.slice(0, 8) },
-      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, icon: ICON_MAP.logic, items: (stats.value as any)?.rule_priority?.length ? (stats.value as any).rule_priority.map((r: any) => `${r.priority} 优先级: ${r.count}`) : ['暂无规则'] },
-      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, icon: ICON_MAP.actions, items: (stats.value as any)?.recent_activities?.length ? (stats.value as any).recent_activities.slice(0, 5).map((a: any) => a.description || a.name) : ['暂无动态'] },
+      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: [], iconItems: AUTOMATION_ICON_ITEMS },
+      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: [], iconItems: PRODUCT_ICON_ITEMS },
+      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, items: [], iconItems: DATASOURCE_ICON_ITEMS },
+      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, items: [], iconItems: LOGIC_ICON_ITEMS },
+      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, items: [], iconItems: ACTIONS_ICON_ITEMS },
     ]
   }
   return cards.filter(c => c.enabled).map(c => ({
@@ -562,8 +701,8 @@ const allCards = computed(() => {
     flex: FLEX_MAP[c.key] ?? 470,
     bg: BG_MAP[c.key] ?? BG_MAP.analytics,
     icon: ICON_MAP[c.key],
-    items: c.key === 'analytics' ? [] : resolveCardItems(c),
-    iconItems: c.key === 'analytics' ? WORKFLOW_CARD_ITEMS : undefined,
+    items: ICON_ITEMS_MAP[c.key] ? [] : resolveCardItems(c),
+    iconItems: ICON_ITEMS_MAP[c.key],
   }))
 })
 

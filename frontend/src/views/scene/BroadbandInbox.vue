@@ -31,9 +31,10 @@
         <option value="low">低</option>
       </select>
       <select v-model="filters.status" class="ib-select" @change="doSearch">
-        <option value="pending_approval">待审批</option>
+        <option value="pending_confirm">待确认</option>
         <option value="">全部状态</option>
-        <option value="approved">已审批</option>
+        <option value="pending_feedback">待反馈</option>
+        <option value="feedback_submitted">已反馈</option>
         <option value="rejected">已驳回</option>
       </select>
       <input v-model="filters.assignee" class="ib-input" placeholder="指派人..." @keyup.enter="doSearch" />
@@ -74,11 +75,11 @@
             <td>{{ row.assignee || '-' }}</td>
             <td>{{ fmt(row.created_at) }}</td>
             <td>
-              <div class="ib-row-actions" v-if="row.status === 'pending_approval'">
-                <button class="ib-btn ib-btn--success ib-btn--sm" @click="doApprove(row)">通过</button>
+              <div class="ib-row-actions" v-if="row.status === 'pending_confirm'">
+                <button class="ib-btn ib-btn--success ib-btn--sm" @click="doApprove(row)">确认</button>
                 <button class="ib-btn ib-btn--warning ib-btn--sm" @click="doReject(row)">驳回</button>
               </div>
-              <span v-else class="ib-muted">-</span>
+              <span v-else class="ib-muted">{{ statusLabel(row.status) }}</span>
             </td>
           </tr>
         </tbody>
@@ -111,26 +112,25 @@ const page = ref(1)
 const pageSize = 20
 const selected = ref<string[]>([])
 
-const filters = reactive({ action_type: '', priority: '', assignee: '', status: 'pending_approval' })
+const filters = reactive({ action_type: '', priority: '', assignee: '', status: 'pending_confirm' })
 
 const kpis = computed(() => ({
-  pending: list.value.filter(i => i.status === 'pending_approval').length,
-  high: list.value.filter(i => i.priority === 'high' && i.status === 'pending_approval').length,
+  pending: list.value.filter(i => i.status === 'pending_confirm').length,
+  high: list.value.filter(i => i.priority === 'high' && i.status === 'pending_confirm').length,
 }))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)))
-const allSelected = computed(() => list.value.length > 0 && list.value.filter(r => r.status === 'pending_approval').every(r => selected.value.includes(r.action_id)))
+const allSelected = computed(() => list.value.length > 0 && list.value.filter(r => r.status === 'pending_confirm').every(r => selected.value.includes(r.action_id)))
 
 const actionTypes = [
-  { code: 'ACT-003', label: '转入人工审核' }, { code: 'ACT-005', label: '人工资源核实' },
-  { code: 'ACT-007', label: '创建补全回访' }, { code: 'ACT-008', label: '创建强制回访' },
-  { code: 'ACT-010', label: '写入工程师培训记录' }, { code: 'ACT-011', label: '发起资源派修' },
-  { code: 'ACT-012', label: '创建营销外呼记录' },
+  { code: 'resource_check', label: '资源核实' },
+  { code: 'followup_call', label: '回访核实' },
+  { code: 'secondary_marketing', label: '二次营销' },
 ]
 
 function fmt(t: string | null) { return t ? t.replace('T', ' ').slice(0, 16) : '-' }
 function statusLabel(s: string) {
-  const m: Record<string, string> = { pending_approval: '待审批', approved: '已审批', rejected: '已驳回', executing: '执行中', completed: '已完成', failed: '失败' }
+  const m: Record<string, string> = { pending_confirm: '待确认', pending_feedback: '待反馈', feedback_submitted: '已反馈', rejected: '已驳回' }
   return m[s] || s
 }
 function toggleSelect(id: string) {
@@ -139,7 +139,7 @@ function toggleSelect(id: string) {
   else selected.value.push(id)
 }
 function toggleAll() {
-  const pending = list.value.filter(r => r.status === 'pending_approval').map(r => r.action_id)
+  const pending = list.value.filter(r => r.status === 'pending_confirm').map(r => r.action_id)
   if (allSelected.value) selected.value = []
   else selected.value = [...pending]
 }
@@ -226,12 +226,10 @@ onMounted(fetchData)
 .ib-priority--low { background: var(--neutral-100); color: var(--neutral-600); }
 
 .ib-status { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--text-caption-size); font-weight: 500; }
-.ib-status--pending_approval { background: var(--status-warning-bg); color: var(--kinetic-700); }
-.ib-status--approved { background: var(--status-success-bg); color: var(--status-success); }
+.ib-status--pending_confirm { background: var(--status-warning-bg); color: var(--kinetic-700); }
+.ib-status--pending_feedback { background: var(--status-info-bg); color: var(--status-info); }
+.ib-status--feedback_submitted { background: var(--status-success-bg); color: var(--status-success); }
 .ib-status--rejected { background: var(--status-error-bg); color: var(--status-error); }
-.ib-status--executing { background: var(--status-info-bg); color: var(--status-info); }
-.ib-status--completed { background: var(--status-success-bg); color: var(--status-success); }
-.ib-status--failed { background: var(--status-error-bg); color: var(--status-error); }
 
 .ib-cause { display: inline-block; padding: 2px 8px; border-radius: var(--radius-sm); font-size: var(--text-caption-size); background: var(--neutral-100); color: var(--neutral-600); }
 .ib-row-actions { display: flex; gap: 6px; }

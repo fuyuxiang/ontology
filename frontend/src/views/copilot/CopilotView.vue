@@ -226,6 +226,13 @@ const TOOL_TYPE_MAP: Record<string, { type: ReasoningStep['type']; label: string
   evaluate_all_rules: { type: 'rule', label: '全量规则评估' },
   screen_users_by_rule: { type: 'rule', label: '规则筛选用户' },
   execute_action: { type: 'output', label: '执行动作' },
+  '[感知·数据采集]': { type: 'ontology', label: '感知·数据采集' },
+  '[识别·证据提取]': { type: 'rule', label: '识别·证据提取' },
+  '[推理·逻辑命中]': { type: 'rule', label: '推理·逻辑命中' },
+  '[归因·结论输出]': { type: 'output', label: '归因·结论输出' },
+  '[动作·推荐生成]': { type: 'output', label: '动作·推荐生成' },
+  '[意图识别]': { type: 'ontology', label: '意图识别' },
+  '[结果输出]': { type: 'output', label: '结果输出' },
 }
 
 const messages = ref<Message[]>([])
@@ -384,6 +391,36 @@ function extractDetailLines(detail: Record<string, unknown>): string[] {
     const effects = detail.effects as Array<Record<string, unknown>> || []
     for (const e of effects) {
       lines.push(`  效果: ${e.operation} ${e.target}`)
+    }
+  } else if (t === 'broadband_perception') {
+    const sources = detail.source_types as Record<string, number> || {}
+    lines.push(`数据源采集: 共 ${detail.total_sources} 条`)
+    for (const [src, cnt] of Object.entries(sources)) {
+      lines.push(`  ${src}: ${cnt}`)
+    }
+  } else if (t === 'broadband_recognition') {
+    lines.push(`NLP证据: ${detail.nlp_count} 条 | 规则证据: ${detail.rule_count} 条`)
+    lines.push(`命中: ${detail.hit_count} / ${detail.total} 条`)
+    const codes = detail.hit_codes as string[] || []
+    if (codes.length > 0) {
+      lines.push(`命中编码: ${codes.join(', ')}`)
+    }
+  } else if (t === 'broadband_reasoning') {
+    lines.push(`逻辑规则命中: ${detail.hit_count} 条`)
+    const fns = detail.logic_functions as string[] || []
+    if (fns.length > 0) {
+      lines.push(`逻辑函数: ${fns.join(', ')}`)
+    }
+  } else if (t === 'broadband_attribution') {
+    lines.push(`根因类别: ${detail.root_cause_level_one || '未知'}`)
+    lines.push(`根因细类: ${detail.root_cause_level_two || '-'}`)
+    lines.push(`置信度: ${((detail.confidence as number || 0) * 100).toFixed(1)}%`)
+    lines.push(`稽核状态: ${detail.audit_status || '-'}`)
+  } else if (t === 'broadband_todo') {
+    lines.push(`推荐动作: ${detail.action_count} 个`)
+    const acts = detail.actions as string[] || []
+    for (const a of acts) {
+      lines.push(`  · ${a}`)
     }
   }
 
