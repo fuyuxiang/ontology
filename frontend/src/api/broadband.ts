@@ -184,7 +184,9 @@ export interface AuditChain {
 export interface InboxItem extends AuditAction {
   churn_time: string | null
   churn_reason_text: string | null
+  churn_category_l1: string | null
   root_cause_level_one: string | null
+  root_cause_level_two: string | null
   root_cause_confidence: number | null
   customer_name: string | null
 }
