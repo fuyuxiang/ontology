@@ -76,22 +76,71 @@
             <stop offset="0%" stop-color="#3b82f6" stop-opacity=".6"/>
             <stop offset="100%" stop-color="#10b981" stop-opacity=".3"/>
           </linearGradient>
+          <linearGradient id="lg-up-analytics" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#10b981" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#3b82f6" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="lg-up-workflows" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#10b981" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#818cf8" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="lg-up-integrations" x1="0" y1="1" x2="0" y2="0">
+            <stop offset="0%" stop-color="#10b981" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#f59e0b" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="lg-dn-data" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#3b82f6" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity=".4"/>
+          </linearGradient>
+          <linearGradient id="lg-dn-models" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#f59e0b" stop-opacity=".5"/>
+            <stop offset="100%" stop-color="#10b981" stop-opacity=".4"/>
+          </linearGradient>
         </defs>
-        <!-- 中→顶 连线束 -->
-        <g :opacity="activeStage === 'wield' ? 0.7 : 0.15">
-          <path v-for="(p,i) in upperConnectors" :key="'uc'+i"
-            :d="p" fill="none" stroke="url(#lg-up)" stroke-width=".3"
-            :stroke-dasharray="activeStage === 'wield' ? '2 2' : '1 3'"
-            :class="{ 'conn-anim': activeStage === 'wield' }"
-            :style="{ animationDelay: (i * 0.05) + 's' }"/>
-        </g>
-        <!-- 底→中 连线束 -->
+
+        <!-- 底→中：DataSource(数据基座) → 本体层 -->
         <g :opacity="activeStage === 'hydrate' ? 0.7 : 0.15">
-          <path v-for="(p,i) in lowerConnectors" :key="'lc'+i"
-            :d="p" fill="none" stroke="url(#lg-dn)" stroke-width=".3"
-            :stroke-dasharray="activeStage === 'hydrate' ? '2 2' : '1 3'"
+          <path v-for="(p,i) in dataToOntologyPaths" :key="'dto'+i"
+            :d="p" fill="none" stroke="url(#lg-dn-data)" stroke-width=".35"
+            :stroke-dasharray="activeStage === 'hydrate' ? '2.5 1.5' : '1 3'"
             :class="{ 'conn-anim': activeStage === 'hydrate' }"
-            :style="{ animationDelay: (i * 0.05) + 's' }"/>
+            :style="{ animationDelay: (i * 0.12) + 's' }"/>
+        </g>
+
+        <!-- 底→中：LogicSource(规则模型) → 本体层 -->
+        <g :opacity="activeStage === 'hydrate' ? 0.7 : 0.15">
+          <path v-for="(p,i) in modelsToOntologyPaths" :key="'mto'+i"
+            :d="p" fill="none" stroke="url(#lg-dn-models)" stroke-width=".35"
+            :stroke-dasharray="activeStage === 'hydrate' ? '2.5 1.5' : '1 3'"
+            :class="{ 'conn-anim': activeStage === 'hydrate' }"
+            :style="{ animationDelay: (i * 0.12 + 0.06) + 's' }"/>
+        </g>
+
+        <!-- 中→顶：本体层 → Analytics(分析视角) -->
+        <g :opacity="activeStage === 'wield' ? 0.7 : 0.15">
+          <path v-for="(p,i) in ontologyToAnalyticsPaths" :key="'ota'+i"
+            :d="p" fill="none" stroke="url(#lg-up-analytics)" stroke-width=".35"
+            :stroke-dasharray="activeStage === 'wield' ? '2.5 1.5' : '1 3'"
+            :class="{ 'conn-anim': activeStage === 'wield' }"
+            :style="{ animationDelay: (i * 0.12) + 's' }"/>
+        </g>
+
+        <!-- 中→顶：本体层 → Automations(流程编排) -->
+        <g :opacity="activeStage === 'wield' ? 0.7 : 0.15">
+          <path v-for="(p,i) in ontologyToWorkflowsPaths" :key="'otw'+i"
+            :d="p" fill="none" stroke="url(#lg-up-workflows)" stroke-width=".35"
+            :stroke-dasharray="activeStage === 'wield' ? '2.5 1.5' : '1 3'"
+            :class="{ 'conn-anim': activeStage === 'wield' }"
+            :style="{ animationDelay: (i * 0.12 + 0.06) + 's' }"/>
+        </g>
+
+        <!-- 中→顶：本体层 → Products(集成出口) -->
+        <g :opacity="activeStage === 'wield' ? 0.7 : 0.15">
+          <path v-for="(p,i) in ontologyToIntegrationsPaths" :key="'oti'+i"
+            :d="p" fill="none" stroke="url(#lg-up-integrations)" stroke-width=".35"
+            :stroke-dasharray="activeStage === 'wield' ? '2.5 1.5' : '1 3'"
+            :class="{ 'conn-anim': activeStage === 'wield' }"
+            :style="{ animationDelay: (i * 0.12 + 0.12) + 's' }"/>
         </g>
       </svg>
     </div>
@@ -163,17 +212,77 @@ function platformStyle(layer: 'top' | 'mid' | 'bot') {
   return { transform: `translateY(${offsets[layer]}px)` }
 }
 
-// 连线束（SVG viewBox 0-100）
-function buildConnectors(topAnchors: number[], n: number, y1: number, y2: number) {
-  return Array.from({ length: n }, (_, i) => {
-    const bx = 5 + i * (90 / (n - 1))
-    const ax = topAnchors[i % topAnchors.length]
-    const my = (y1 + y2) / 2
-    return `M${bx},${y1} C${bx},${my} ${ax},${my} ${ax},${y2}`
-  })
+// 层间连线：模仿本体层实体间的曲线风格
+// 底层 grid 2列: 数据基座(左25%) 规则模型(右75%)
+// 中层本体锚点散布在 y=50 附近
+// 顶层 grid 3列: 分析视角(左17%) 流程编排(中50%) 集成出口(右83%)
+
+function buildCurvedPaths(
+  sources: { x: number; y: number }[],
+  targets: { x: number; y: number }[],
+  count: number,
+  curvature = 0.15,
+) {
+  const paths: string[] = []
+  for (let i = 0; i < count; i++) {
+    const s = sources[i % sources.length]
+    const t = targets[i % targets.length]
+    const jx = (i - count / 2) * 1.8
+    const jy = (i % 3 - 1) * 2.5
+    const sx = s.x + jx
+    const sy = s.y + jy * 0.3
+    const tx = t.x + jx * 0.6
+    const ty = t.y - jy * 0.3
+    const dx = tx - sx
+    const dy = ty - sy
+    const cx1 = sx + dx * 0.35 + dy * curvature
+    const cy1 = sy + dy * 0.35 - dx * curvature * 0.5
+    const cx2 = sx + dx * 0.65 - dy * curvature
+    const cy2 = sy + dy * 0.65 + dx * curvature * 0.5
+    paths.push(`M${sx.toFixed(1)},${sy.toFixed(1)} C${cx1.toFixed(1)},${cy1.toFixed(1)} ${cx2.toFixed(1)},${cy2.toFixed(1)} ${tx.toFixed(1)},${ty.toFixed(1)}`)
+  }
+  return paths
 }
-const upperConnectors = computed(() => buildConnectors([25, 50, 75], 16, 62, 38))
-const lowerConnectors = computed(() => buildConnectors([25, 50, 75], 16, 88, 64))
+
+const ontoAnchors = [
+  { x: 30, y: 50 }, { x: 42, y: 48 }, { x: 50, y: 51 },
+  { x: 58, y: 49 }, { x: 70, y: 50 }, { x: 36, y: 52 },
+]
+
+// 底→中: DataSource(数据基座, 左列) → 本体层
+const dataToOntologyPaths = computed(() => buildCurvedPaths(
+  [{ x: 20, y: 88 }, { x: 25, y: 87 }, { x: 30, y: 89 }, { x: 18, y: 88 }, { x: 28, y: 87 }, { x: 22, y: 89 }],
+  [ontoAnchors[0], ontoAnchors[1], ontoAnchors[2], ontoAnchors[5], ontoAnchors[3], ontoAnchors[4]],
+  6, 0.12,
+))
+
+// 底→中: LogicSource(规则模型, 右列) → 本体层
+const modelsToOntologyPaths = computed(() => buildCurvedPaths(
+  [{ x: 70, y: 88 }, { x: 75, y: 87 }, { x: 80, y: 89 }, { x: 72, y: 88 }, { x: 78, y: 87 }, { x: 68, y: 89 }],
+  [ontoAnchors[4], ontoAnchors[3], ontoAnchors[2], ontoAnchors[1], ontoAnchors[0], ontoAnchors[5]],
+  6, 0.12,
+))
+
+// 中→顶: 本体层 → Analytics(分析视角, 左列)
+const ontologyToAnalyticsPaths = computed(() => buildCurvedPaths(
+  [ontoAnchors[0], ontoAnchors[1], ontoAnchors[5], ontoAnchors[2], ontoAnchors[0], ontoAnchors[1]],
+  [{ x: 14, y: 38 }, { x: 18, y: 37 }, { x: 16, y: 39 }, { x: 20, y: 38 }, { x: 12, y: 37 }, { x: 22, y: 39 }],
+  6, 0.12,
+))
+
+// 中→顶: 本体层 → Workflows(流程编排, 中列)
+const ontologyToWorkflowsPaths = computed(() => buildCurvedPaths(
+  [ontoAnchors[2], ontoAnchors[1], ontoAnchors[3], ontoAnchors[5], ontoAnchors[2], ontoAnchors[3]],
+  [{ x: 47, y: 38 }, { x: 50, y: 37 }, { x: 53, y: 39 }, { x: 48, y: 38 }, { x: 52, y: 37 }, { x: 50, y: 39 }],
+  6, 0.10,
+))
+
+// 中→顶: 本体层 → Integrations(集成出口, 右列)
+const ontologyToIntegrationsPaths = computed(() => buildCurvedPaths(
+  [ontoAnchors[4], ontoAnchors[3], ontoAnchors[2], ontoAnchors[4], ontoAnchors[3], ontoAnchors[2]],
+  [{ x: 80, y: 38 }, { x: 84, y: 37 }, { x: 82, y: 39 }, { x: 86, y: 38 }, { x: 78, y: 37 }, { x: 88, y: 39 }],
+  6, 0.12,
+))
 
 function screenSvg(key: string): string {
   const m: Record<string, string> = {
@@ -368,9 +477,9 @@ function dsIcon(key: string): string {
 }
 
 .conn-anim {
-  animation: dash-flow 1.8s linear infinite;
+  animation: dash-flow 2.2s linear infinite;
 }
-@keyframes dash-flow { to { stroke-dashoffset: -8; } }
+@keyframes dash-flow { to { stroke-dashoffset: -10; } }
 
 /* ── Hint ── */
 .iso-hint {
