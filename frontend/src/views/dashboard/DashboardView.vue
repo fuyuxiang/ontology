@@ -9,24 +9,28 @@
       <!-- ═══ 跨层数据流线 ═══ -->
       <svg class="cross-layer-svg" :viewBox="`0 0 ${crossSvgW} ${crossSvgH}`" preserveAspectRatio="none">
         <defs>
-          <filter id="cl-particle-glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge><feMergeNode in="blur" /><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          <filter id="cl-particle-glow" x="-80%" y="-80%" width="260%" height="260%">
+            <feGaussianBlur stdDeviation="4" result="blur1" />
+            <feGaussianBlur stdDeviation="1.5" in="SourceGraphic" result="blur2" />
+            <feMerge><feMergeNode in="blur1" /><feMergeNode in="blur1" /><feMergeNode in="blur2" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
           <filter id="cl-line-glow" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="1.5" result="blur" />
+            <feGaussianBlur stdDeviation="2" result="blur" />
             <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
           </filter>
         </defs>
-        <g v-for="link in crossLayerLinks" :key="link.id" class="onto-link">
+        <g v-for="link in crossLayerLinks" :key="link.id" class="onto-link cl-link">
           <path :id="'cl-'+link.id" :d="link.path" fill="none" stroke="none" />
-          <path class="onto-link__line" :d="link.path" fill="none" :stroke="link.color" stroke-width="1" stroke-opacity="0.35" filter="url(#cl-line-glow)" />
-          <path class="onto-link__line-dash" :d="link.path" fill="none" :stroke="link.color" stroke-width="0.6" stroke-dasharray="6 4" stroke-opacity="0.6" />
-          <circle v-for="p in 4" :key="p" class="onto-link__particle" :r="2" :fill="link.particleColor" filter="url(#cl-particle-glow)">
-            <animateMotion :dur="link.dur+'s'" :begin="(-p * link.dur / 4)+'s'" repeatCount="indefinite">
+          <path class="onto-link__line cl-line" :d="link.path" fill="none" :stroke="link.color" stroke-width="1.2" stroke-opacity="0.2" filter="url(#cl-line-glow)" />
+          <path class="onto-link__line-dash" :d="link.path" fill="none" :stroke="link.color" stroke-width="0.7" stroke-dasharray="8 6" stroke-opacity="0.45">
+            <animate attributeName="stroke-dashoffset" from="0" to="28" :dur="(link.dur * 0.8)+'s'" repeatCount="indefinite" />
+          </path>
+          <circle v-for="p in link.particles" :key="p" class="onto-link__particle cl-particle" :r="link.rArr[p-1]" :fill="link.particleColor" filter="url(#cl-particle-glow)">
+            <animateMotion :dur="link.dur+'s'" :begin="(-p * link.dur / link.particles)+'s'" repeatCount="indefinite" calcMode="spline" keyPoints="0;1" keyTimes="0;1" keySplines="0.4 0 0.6 1">
               <mpath :href="'#cl-'+link.id" />
             </animateMotion>
-            <animate attributeName="opacity" values="0;1;1;0" keyTimes="0;0.05;0.9;1" :dur="link.dur+'s'" :begin="(-p * link.dur / 4)+'s'" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="0;0.6;1;1;0.6;0" keyTimes="0;0.08;0.25;0.75;0.92;1" :dur="link.dur+'s'" :begin="(-p * link.dur / link.particles)+'s'" repeatCount="indefinite" />
+            <animate attributeName="r" :values="`${link.rArr[p-1]*0.6};${link.rArr[p-1]};${link.rArr[p-1]*1.2};${link.rArr[p-1]};${link.rArr[p-1]*0.6}`" keyTimes="0;0.2;0.5;0.8;1" :dur="link.dur+'s'" :begin="(-p * link.dur / link.particles)+'s'" repeatCount="indefinite" />
           </circle>
         </g>
       </svg>
@@ -426,14 +430,19 @@ const svgLinks = computed(() => {
 })
 
 /* ── Cross-layer flow lines (cards ↔ onto-layer) ── */
-const CROSS_LAYER_CONNECTIONS: { cardKey: string; direction: 'up' | 'down'; count: number }[] = [
-  { cardKey: 'datasources', direction: 'up', count: 6 },
-  { cardKey: 'logic', direction: 'up', count: 5 },
-  { cardKey: 'actions', direction: 'down', count: 5 },
-  { cardKey: 'analytics', direction: 'down', count: 5 },
-  { cardKey: 'automations', direction: 'down', count: 6 },
-  { cardKey: 'products', direction: 'down', count: 5 },
+const CROSS_LAYER_CONNECTIONS: { cardKey: string; direction: 'up' | 'down'; count: number; hue: number }[] = [
+  { cardKey: 'datasources', direction: 'up', count: 6, hue: 210 },
+  { cardKey: 'logic', direction: 'up', count: 5, hue: 260 },
+  { cardKey: 'actions', direction: 'down', count: 5, hue: 170 },
+  { cardKey: 'analytics', direction: 'down', count: 5, hue: 230 },
+  { cardKey: 'automations', direction: 'down', count: 6, hue: 280 },
+  { cardKey: 'products', direction: 'down', count: 5, hue: 200 },
 ]
+
+function seededRand(seed: number) {
+  const x = Math.sin(seed * 9301 + 49297) * 49297
+  return x - Math.floor(x)
+}
 
 const crossLayerLinks = computed(() => {
   domPositionTick.value
@@ -446,7 +455,7 @@ const crossLayerLinks = computed(() => {
   if (!layer) return []
   const lRect = layer.getBoundingClientRect()
 
-  const links: { id: string; path: string; color: string; particleColor: string; dur: number }[] = []
+  const links: { id: string; path: string; color: string; particleColor: string; dur: number; particles: number; rArr: number[] }[] = []
 
   for (const conn of CROSS_LAYER_CONNECTIONS) {
     const cardEl = content.querySelector(`[data-card-key="${conn.cardKey}"]`) as HTMLElement | null
@@ -455,10 +464,18 @@ const crossLayerLinks = computed(() => {
 
     const isBottom = ['datasources', 'logic', 'actions'].includes(conn.cardKey)
 
+    const cardCenterX = cardRect.left + cardRect.width / 2 - cRect.left
+    const cardCenterRatio = cardCenterX / cRect.width
+    const layerPad = 0.06
+    const slotW = cardRect.width * 0.7 / cRect.width
+
     for (let i = 0; i < conn.count; i++) {
       const t = (i + 1) / (conn.count + 1)
       const cardX = cardRect.left + cardRect.width * t - cRect.left
-      const layerX = lRect.left + lRect.width * (0.15 + 0.7 * t) - cRect.left
+
+      const layerRatio = cardCenterRatio - slotW / 2 + slotW * t
+      const layerXClamped = Math.max(layerPad, Math.min(1 - layerPad, layerRatio))
+      const layerX = lRect.left + lRect.width * layerXClamped - cRect.left
 
       let cardY: number, layerY: number
       if (isBottom) {
@@ -474,27 +491,35 @@ const crossLayerLinks = computed(() => {
       const ex = (layerX / cRect.width) * crossSvgW
       const ey = (layerY / cRect.height) * crossSvgH
 
-      const mx = (sx + ex) / 2
-      const my = (sy + ey) / 2
-      const spread = (i - (conn.count - 1) / 2) * 12
-      const cx1 = mx + spread
-      const cy1 = my
+      const seed = conn.hue * 100 + i
+      const sway = (seededRand(seed) - 0.5) * 40
+      const bulge = (seededRand(seed + 1) - 0.5) * 20
 
-      const fromX = conn.direction === 'up' ? sx : ex
-      const fromY = conn.direction === 'up' ? sy : ey
-      const toX = conn.direction === 'up' ? ex : ey === ey ? ex : sx
-      const toY = conn.direction === 'up' ? ey : sy
+      const dy = ey - sy
+      const c1x = sx + sway
+      const c1y = sy + dy * 0.3 + bulge
+      const c2x = ex - sway * 0.6
+      const c2y = sy + dy * 0.7 - bulge
 
       const path = conn.direction === 'up'
-        ? `M${sx},${sy} Q${cx1},${cy1} ${ex},${ey}`
-        : `M${ex},${ey} Q${cx1},${cy1} ${sx},${sy}`
+        ? `M${sx},${sy} C${c1x},${c1y} ${c2x},${c2y} ${ex},${ey}`
+        : `M${ex},${ey} C${c2x},${c2y} ${c1x},${c1y} ${sx},${sy}`
+
+      const sat = 70 + seededRand(seed + 2) * 20
+      const light = 68 + seededRand(seed + 3) * 10
+      const color = `hsl(${conn.hue}, ${sat}%, ${light}%)`
+      const particleColor = `hsl(${conn.hue}, ${sat + 10}%, ${light + 12}%)`
+
+      const pCount = 3 + Math.round(seededRand(seed + 4) * 2)
+      const rArr: number[] = []
+      for (let p = 0; p < pCount; p++) rArr.push(1.5 + seededRand(seed + 10 + p) * 2)
 
       links.push({
         id: `cl-${conn.cardKey}-${i}`,
-        path,
-        color: '#91a7ff',
-        particleColor: '#bac8ff',
-        dur: 2.0 + (i % 4) * 0.15,
+        path, color, particleColor,
+        dur: 2.2 + seededRand(seed + 5) * 1.6,
+        particles: pCount,
+        rArr,
       })
     }
   }
@@ -735,6 +760,22 @@ const bottomCards = computed(() => allCards.value.slice(3))
   padding: 3.5vw 60px 40px;
   box-sizing: border-box;
   transition: transform 0.05s linear;
+}
+
+.cross-layer-svg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 3;
+  overflow: visible;
+}
+.cl-line {
+  animation: cl-breathe 3s ease-in-out infinite alternate;
+}
+.cl-particle {
+  mix-blend-mode: screen;
+}
+@keyframes cl-breathe {
+  0%   { stroke-opacity: 0.15; stroke-width: 0.8; }
+  100% { stroke-opacity: 0.35; stroke-width: 1.4; }
 }
 
 .row { display: flex; justify-content: space-between; align-items: center; gap: 16px; width: 100%; }
