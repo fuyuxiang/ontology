@@ -1,0 +1,16 @@
+fastapi==0.115.*
+uvicorn[standard]==0.34.*
+sqlalchemy==2.0.*
+alembic==1.14.*
+psycopg2-binary==2.9.*
+pydantic==2.11.*
+pydantic-settings==2.9.*
+python-jose[cryptography]==3.4.*
+passlib[bcrypt]==1.7.*
+bcrypt==4.0.*
+python-multipart==0.0.*
+redis==5.2.*
+openai>=1.0
+neo4j==5.27.*
+rdflib>=7.0
+boto3>=1.34

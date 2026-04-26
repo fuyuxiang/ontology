@@ -1,0 +1,286 @@
+<template>
+  <div class="logic-page">
+    <div class="logic-page__header">
+      <div>
+        <h1 class="text-display">业务逻辑</h1>
+        <p class="text-caption" style="margin-top: 4px;">规则引擎管理 · 条件匹配 · 动作执行</p>
+      </div>
+      <div class="logic-page__actions">
+        <button class="btn-primary" @click="showAdd = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          新建规则
+        </button>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="logic-page__stats">
+      <div class="stat-card stat-card--semantic">
+        <div class="stat-card__value">{{ store.stats.total }}</div>
+        <div class="stat-card__label">总规则数</div>
+      </div>
+      <div class="stat-card stat-card--dynamic">
+        <div class="stat-card__value">{{ store.stats.active }}</div>
+        <div class="stat-card__label">活跃规则</div>
+      </div>
+      <div class="stat-card stat-card--kinetic">
+        <div class="stat-card__value">{{ store.stats.warning }}</div>
+        <div class="stat-card__label">需关注</div>
+      </div>
+      <div class="stat-card stat-card--error">
+        <div class="stat-card__value">{{ store.stats.disabled }}</div>
+        <div class="stat-card__label">已禁用</div>
+      </div>
+    </div>
+
+    <!-- 筛选栏 -->
+    <div class="logic-page__filter">
+      <input v-model="search" class="logic-search" placeholder="搜索规则名称或条件..." />
+      <div class="logic-filter-tags">
+        <button
+          v-for="f in filters"
+          :key="f.value"
+          class="filter-tag"
+          :class="{ 'filter-tag--active': activeFilter === f.value }"
+          @click="activeFilter = f.value"
+        >{{ f.label }}</button>
+      </div>
+    </div>
+
+    <!-- 规则列表 -->
+    <div class="logic-page__list">
+      <div
+        v-for="rule in filteredRules"
+        :key="rule.id"
+        class="rule-card"
+        :class="{ 'rule-card--expanded': expandedId === rule.id }"
+        @click="expandedId = expandedId === rule.id ? null : rule.id"
+      >
+        <div class="rule-card__header">
+          <span class="rule-card__status" :class="`rule-card__status--${rule.status}`"></span>
+          <code class="rule-card__id text-code">{{ rule.id }}</code>
+          <span class="rule-card__name text-body-medium">{{ rule.name }}</span>
+          <span class="rule-card__entity text-caption">{{ rule.entity }}</span>
+          <span class="rule-card__priority" :class="`priority--${rule.priority}`">{{ rule.priority }}</span>
+        </div>
+        <div v-if="expandedId === rule.id" class="rule-card__detail">
+          <div class="rule-detail-row">
+            <span class="rule-detail-label">触发条件</span>
+            <code class="text-code">{{ rule.condition }}</code>
+          </div>
+          <div class="rule-detail-row">
+            <span class="rule-detail-label">执行动作</span>
+            <span>{{ rule.action }}</span>
+          </div>
+          <div class="rule-detail-row">
+            <span class="rule-detail-label">触发次数</span>
+            <span>{{ rule.triggerCount }} 次（近30天）</span>
+          </div>
+          <div class="rule-detail-row">
+            <span class="rule-detail-label">最后触发</span>
+            <span>{{ rule.lastTriggered }}</span>
+          </div>
+          <div class="rule-card__actions">
+            <button class="btn-sm-exec" @click.stop="handleExecute(rule.id)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor"/></svg>
+              执行
+            </button>
+            <button class="btn-sm-edit" @click.stop="openEdit(rule)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 1l2 2-6 6H3V7l6-6z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              编辑
+            </button>
+            <button class="btn-sm-del" @click.stop="handleDelete(rule.id, rule.name)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4 3V2h4v1M3 3v7h6V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              删除
+            </button>
+          </div>
+        </div>
+      </div>
+      <div v-if="filteredRules.length === 0" class="logic-empty">
+        <p class="text-caption">无匹配规则</p>
+      </div>
+    </div>
+
+    <RuleCreateForm :visible="showAdd" @close="showAdd = false" @created="store.fetchRules()" />
+
+    <!-- 编辑规则弹窗 -->
+    <ModalDialog :visible="showEdit" title="编辑规则" width="560px" @close="showEdit = false">
+      <form v-if="editForm" class="rule-form" @submit.prevent="handleSaveEdit">
+        <div class="form-row"><label class="form-label">规则名称</label><input v-model="editForm.name" class="form-input" /></div>
+        <div class="form-row"><label class="form-label">触发条件</label><input v-model="editForm.condition_expr" class="form-input form-input--code" /></div>
+        <div class="form-row"><label class="form-label">执行动作</label><input v-model="editForm.action_desc" class="form-input" /></div>
+        <div class="form-row-inline">
+          <div class="form-row" style="flex:1"><label class="form-label">优先级</label>
+            <select v-model="editForm.priority" class="form-input"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select>
+          </div>
+          <div class="form-row" style="flex:1"><label class="form-label">状态</label>
+            <select v-model="editForm.status" class="form-input"><option value="active">活跃</option><option value="warning">警告</option><option value="disabled">禁用</option></select>
+          </div>
+        </div>
+      </form>
+      <template #footer>
+        <button class="btn-secondary" @click="showEdit = false">取消</button>
+        <button class="btn-primary" @click="handleSaveEdit">保存</button>
+      </template>
+    </ModalDialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useRulesStore } from '../../store/rules'
+import RuleCreateForm from '../../components/common/RuleCreateForm.vue'
+import ModalDialog from '../../components/common/ModalDialog.vue'
+import { ruleApi } from '../../api/rules'
+import { useToast } from '../../composables/useToast'
+
+const store = useRulesStore()
+const toast = useToast()
+const expandedId = ref<string | null>(null)
+const showAdd = ref(false)
+const showEdit = ref(false)
+const editForm = reactive({ id: '', name: '', condition_expr: '', action_desc: '', priority: 'medium', status: 'active' })
+
+function openEdit(rule: { id: string; name: string; condition: string; action: string; priority: string; status: string }) {
+  editForm.id = rule.id
+  editForm.name = rule.name
+  editForm.condition_expr = rule.condition
+  editForm.action_desc = rule.action
+  editForm.priority = rule.priority
+  editForm.status = rule.status
+  showEdit.value = true
+}
+
+async function handleSaveEdit() {
+  try {
+    await ruleApi.update(editForm.id, {
+      name: editForm.name, condition_expr: editForm.condition_expr,
+      action_desc: editForm.action_desc, priority: editForm.priority, status: editForm.status,
+    } as never)
+    showEdit.value = false
+    toast.success('规则保存成功')
+    store.fetchRules()
+  } catch (e) { toast.error(`保存失败: ${(e as Error).message}`) }
+}
+
+async function handleDelete(id: string, name: string) {
+  if (!confirm(`确定删除规则 "${name}"？`)) return
+  try {
+    await ruleApi.remove(id)
+    toast.success('规则已删除')
+    expandedId.value = null
+    store.fetchRules()
+  } catch (e) { toast.error(`删除失败: ${(e as Error).message}`) }
+}
+
+async function handleExecute(id: string) {
+  const result = await store.executeRule(id)
+  if (result) {
+    toast.success(result.message)
+    store.fetchRules()
+  }
+}
+
+onMounted(() => { store.fetchRules() })
+
+const search = computed({
+  get: () => store.filter.search,
+  set: (v: string) => { store.filter.search = v },
+})
+const activeFilter = computed({
+  get: () => store.filter.status,
+  set: (v: string) => { store.filter.status = v as 'all' | 'active' | 'warning' | 'disabled' },
+})
+
+const filters = [
+  { label: '全部', value: 'all' },
+  { label: '活跃', value: 'active' },
+  { label: '需关注', value: 'warning' },
+  { label: '已禁用', value: 'disabled' },
+]
+
+// 映射后端字段到模板需要的格式
+const filteredRules = computed(() =>
+  store.filtered.map(r => ({
+    id: r.id,
+    name: r.name,
+    entity: r.entityName,
+    condition: r.condition,
+    action: r.action,
+    status: r.status as 'active' | 'warning' | 'disabled',
+    priority: r.priority as 'high' | 'medium' | 'low',
+    triggerCount: r.triggerCount,
+    lastTriggered: r.lastTriggered || '—',
+  }))
+)
+</script>
+
+<style scoped>
+.logic-page { padding: 24px; }
+.logic-page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+.logic-page__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+
+.stat-card { padding: 16px; border-radius: var(--radius-lg); text-align: center; border: 1px solid var(--neutral-200); background: var(--neutral-0); }
+.stat-card__value { font-size: var(--text-display-size); font-weight: 700; line-height: 1; }
+.stat-card__label { font-size: var(--text-caption-size); color: var(--neutral-600); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.3px; }
+.stat-card--semantic .stat-card__value { color: var(--semantic-600); }
+.stat-card--dynamic .stat-card__value { color: var(--dynamic-600); }
+.stat-card--kinetic .stat-card__value { color: var(--kinetic-600); }
+.stat-card--error .stat-card__value { color: var(--neutral-400); }
+
+.logic-page__filter { display: flex; gap: 12px; align-items: center; margin-bottom: 16px; }
+.logic-search { flex: 1; padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: var(--text-body-size); background: var(--neutral-0); color: var(--neutral-700); outline: none; }
+.logic-search:focus { border-color: var(--semantic-500); }
+.logic-filter-tags { display: flex; gap: 6px; }
+.filter-tag { padding: 5px 12px; border-radius: var(--radius-full); border: 1px solid var(--neutral-200); background: var(--neutral-0); font-size: var(--text-code-size); color: var(--neutral-600); cursor: pointer; transition: all var(--transition-fast); }
+.filter-tag:hover { border-color: var(--semantic-400); color: var(--semantic-600); }
+.filter-tag--active { background: var(--semantic-50); border-color: var(--semantic-500); color: var(--semantic-600); font-weight: 500; }
+
+.logic-page__list { display: flex; flex-direction: column; gap: 6px; }
+.rule-card { background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); cursor: pointer; transition: border-color var(--transition-fast), box-shadow var(--transition-fast); }
+.rule-card:hover { border-color: var(--semantic-300); }
+.rule-card--expanded { border-color: var(--semantic-400); box-shadow: var(--shadow-sm); }
+.rule-card__header { display: flex; align-items: center; gap: 10px; padding: 12px 16px; }
+.rule-card__status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.rule-card__status--active { background: var(--status-success); }
+.rule-card__status--warning { background: var(--status-warning); }
+.rule-card__status--disabled { background: var(--neutral-300); }
+.rule-card__id { font-size: var(--text-caption-size); color: var(--neutral-500); }
+.rule-card__name { flex: 1; font-size: var(--text-body-size); }
+.rule-card__entity { font-size: var(--text-caption-size); color: var(--neutral-500); }
+.rule-card__priority { font-size: var(--text-caption-upper-size); font-weight: 600; padding: 2px 8px; border-radius: var(--radius-full); text-transform: uppercase; }
+.priority--high { background: var(--status-error-bg); color: var(--status-error); }
+.priority--medium { background: var(--status-warning-bg); color: var(--kinetic-700); }
+.priority--low { background: var(--neutral-100); color: var(--neutral-500); }
+.rule-card__detail { padding: 0 16px 16px; border-top: 1px solid var(--neutral-100); padding-top: 12px; }
+.rule-detail-row { display: flex; gap: 12px; padding: 4px 0; font-size: var(--text-code-size); color: var(--neutral-700); }
+.rule-detail-label { width: 80px; flex-shrink: 0; font-weight: 500; color: var(--neutral-500); }
+.logic-empty { padding: 40px; text-align: center; }
+
+.rule-card__actions { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--neutral-100); }
+.btn-sm-exec, .btn-sm-edit, .btn-sm-del {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px; border-radius: var(--radius-md); font-size: var(--text-caption-size); font-weight: 500; cursor: pointer; border: 1px solid;
+}
+.btn-sm-exec { border-color: var(--kinetic-400); background: var(--kinetic-50); color: var(--kinetic-700); }
+.btn-sm-exec:hover { background: var(--kinetic-500); color: var(--neutral-0); }
+.btn-sm-edit { border-color: var(--semantic-400); background: var(--semantic-50); color: var(--semantic-600); }
+.btn-sm-edit:hover { background: var(--semantic-500); color: var(--neutral-0); }
+.btn-sm-del { border-color: var(--status-error); background: var(--status-error-bg); color: var(--status-error); }
+.btn-sm-del:hover { background: var(--status-error); color: var(--neutral-0); }
+
+.rule-form { display: flex; flex-direction: column; gap: 14px; }
+.form-row { display: flex; flex-direction: column; gap: 4px; }
+.form-row-inline { display: flex; gap: 12px; }
+.form-label { font-size: var(--text-code-size); font-weight: 500; color: var(--neutral-600); }
+.form-input { padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); font-size: var(--text-body-size); color: var(--neutral-800); background: var(--neutral-0); outline: none; }
+.form-input:focus { border-color: var(--semantic-500); }
+.form-input--code { font-family: var(--font-mono); font-size: var(--text-code-size); }
+
+.btn-primary { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500; cursor: pointer; transition: background var(--transition-fast); }
+.btn-primary:hover { background: var(--semantic-700); }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-panel { background: var(--neutral-0); border-radius: var(--radius-xl); padding: 24px; min-width: 360px; box-shadow: var(--shadow-xl); }
+</style>
