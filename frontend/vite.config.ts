@@ -1,16 +1,20 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import { templateCompilerOptions } from '@tresjs/core'
 
+// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [vue({ ...templateCompilerOptions })],
+  optimizeDeps: { include: ['dagre', 'marked'] },
   server: {
-    host: "0.0.0.0",
-    port: 5173,
+    host: '127.0.0.1',
+    port: Number(process.env.FRONTEND_PORT || 5177),
+    allowedHosts: ['ontology.ojlab.com'],
     proxy: {
-      "/api": {
-        target: "http://127.0.0.1:8088",
+      '/api': {
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:8001',
         changeOrigin: true,
       },
     },
   },
-});
+})
