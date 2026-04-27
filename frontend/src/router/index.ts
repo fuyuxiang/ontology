@@ -31,7 +31,7 @@ const router = createRouter({
 
     // 智能编排
     { path: '/orchestration/semantic', name: 'orch-semantic', component: Placeholder, meta: { title: '语义封装' } },
-    { path: '/orchestration/prompts', name: 'orch-prompts', component: Placeholder, meta: { title: 'Prompt模板' } },
+    { path: '/orchestration/prompts', name: 'orch-prompts', component: () => import('../views/orchestration/PromptTemplatesView.vue'), meta: { title: 'Prompt模板' } },
     { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '智能体创建' } },
     { path: '/orchestration/models', name: 'orch-models', component: () => import('../views/models/ModelManageView.vue'), meta: { title: '模型管理' } },
     { path: '/agents', name: 'agents', component: () => import('../views/agents/AgentView.vue'), meta: { title: '智能体管理' } },
@@ -56,7 +56,7 @@ const router = createRouter({
     { path: '/governance', name: 'governance', component: () => import('../views/governance/GovernanceView.vue'), meta: { title: '系统设置' },
       children: [
         { path: 'permissions', name: 'gov-permissions', component: Placeholder, meta: { title: '权限控制' } },
-        { path: 'audit', name: 'gov-audit', component: Placeholder, meta: { title: '审计日志' } },
+        { path: 'audit', name: 'gov-audit', component: () => import('../views/governance/AuditLogView.vue'), meta: { title: '审计日志' } },
         { path: 'glossary', name: 'gov-glossary', component: Placeholder, meta: { title: '帮助文档' } },
       ]
     },

@@ -107,6 +107,8 @@ from app.api.v1.models import router as models_router
 from app.api.v1.agents import router as agents_router, open_router as agents_open_router
 from app.api.v1.skills import router as skills_router
 from app.api.v1.resolution import router as resolution_router
+from app.api.v1.governance import router as governance_router
+from app.api.v1.prompt_templates import router as prompt_templates_router
 
 logger = logging.getLogger(__name__)
 
@@ -241,6 +243,8 @@ app.include_router(agents_router, prefix="/api/v1")
 app.include_router(agents_open_router, prefix="/api/v1")
 app.include_router(skills_router, prefix="/api/v1")
 app.include_router(resolution_router, prefix="/api/v1")
+app.include_router(governance_router, prefix="/api/v1")
+app.include_router(prompt_templates_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
