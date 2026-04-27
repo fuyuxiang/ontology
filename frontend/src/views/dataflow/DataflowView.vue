@@ -32,6 +32,19 @@
           <div class="canvas-loading__spinner"></div>
           <span>加载图谱数据...</span>
         </div>
+
+        <!-- 层级图例 -->
+        <div class="tier-legend">
+          <div class="tier-legend__item tier-legend__item--t1">
+            <span class="tier-legend__dot"></span>T1 核心对象
+          </div>
+          <div class="tier-legend__item tier-legend__item--t2">
+            <span class="tier-legend__dot"></span>T2 领域对象
+          </div>
+          <div class="tier-legend__item tier-legend__item--t3">
+            <span class="tier-legend__dot"></span>T3 场景对象
+          </div>
+        </div>
       </div>
 
       <CanvasConfigPanel
@@ -204,6 +217,19 @@ function getErrorMessage(error: unknown) {
   border-top-color: #4f6ef7; border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
+
+.tier-legend {
+  position: absolute; top: 12px; left: 12px; z-index: 10;
+  display: flex; flex-direction: column; gap: 6px;
+  background: rgba(255,255,255,0.92); backdrop-filter: blur(4px);
+  border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.tier-legend__item { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: #334155; }
+.tier-legend__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.tier-legend__item--t1 .tier-legend__dot { background: #4f6ef7; }
+.tier-legend__item--t2 .tier-legend__dot { background: #8b5cf6; }
+.tier-legend__item--t3 .tier-legend__dot { background: #10b981; }
 @keyframes spin { to { transform: rotate(360deg); } }
 :deep(.vue-flow__background) { background: #f8fafc; }
 :deep(.vue-flow__controls) { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
