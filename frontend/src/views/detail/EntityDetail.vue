@@ -123,6 +123,73 @@
         </div>
       </template>
 
+      <!-- 数据实例 -->
+      <template v-else-if="activeTab === '数据实例'">
+        <div v-if="instanceLoading" class="instance-loading">
+          <svg class="spin" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="var(--neutral-300)" stroke-width="2"/><path d="M10 2a8 8 0 018 8" stroke="var(--semantic-500)" stroke-width="2" stroke-linecap="round"/></svg>
+          <span class="text-caption">加载数据实例...</span>
+        </div>
+        <div v-else-if="!instancePreview || !instancePreview.source_table" class="placeholder-tab">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <rect x="8" y="8" width="24" height="24" rx="4" stroke="var(--neutral-300)" stroke-width="2"/>
+            <path d="M14 20h12M14 15h8M14 25h6" stroke="var(--neutral-300)" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p class="text-caption">该实体尚未映射数据源，请先在「本体映射」中配置字段映射</p>
+        </div>
+        <template v-else>
+          <!-- 数据源信息头 -->
+          <div class="instance-header">
+            <div class="instance-source-info">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4A2 2 0 014 2h6a2 2 0 012 2v0a2 2 0 01-2 2H4a2 2 0 01-2-2zm0 6a2 2 0 012-2h6a2 2 0 012 2v0a2 2 0 01-2 2H4a2 2 0 01-2-2z" stroke="var(--status-info)" stroke-width="1.2"/></svg>
+              <span class="instance-source-label">数据源</span>
+              <code class="instance-source-name">{{ instancePreview.datasource_name }}</code>
+              <span class="instance-source-sep">·</span>
+              <span class="instance-source-label">表</span>
+              <code class="instance-source-name">{{ instancePreview.source_table }}</code>
+              <span class="instance-total">共 {{ instancePreview.total }} 条记录</span>
+            </div>
+            <!-- 字段覆盖率 -->
+            <div class="instance-coverage" v-if="instanceFields.length">
+              <span class="instance-coverage-label">字段映射覆盖率</span>
+              <div class="instance-coverage-bar">
+                <div class="instance-coverage-fill" :style="{ width: coveragePct + '%' }"></div>
+              </div>
+              <span class="instance-coverage-pct">{{ coveragePct }}%</span>
+            </div>
+          </div>
+
+          <!-- 数据表格 -->
+          <div class="instance-table-wrap">
+            <table class="data-table instance-table">
+              <thead>
+                <tr>
+                  <th v-for="col in instancePreview.columns" :key="col">
+                    <div class="instance-col-head">
+                      <span class="instance-col-field">{{ col }}</span>
+                      <span v-if="fieldAttrMap[col]" class="instance-col-attr">{{ fieldAttrMap[col] }}</span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(row, i) in instancePreview.rows" :key="i">
+                  <td v-for="col in instancePreview.columns" :key="col">
+                    <span class="instance-cell">{{ row[col] ?? '—' }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- 分页 -->
+          <div class="instance-pagination" v-if="instancePreview.total > instancePreview.page_size">
+            <button class="page-btn" :disabled="instancePage === 1" @click="instancePage--">‹ 上一页</button>
+            <span class="page-info">第 {{ instancePage }} 页 / 共 {{ Math.ceil(instancePreview.total / instancePreview.page_size) }} 页</span>
+            <button class="page-btn" :disabled="instancePage >= Math.ceil(instancePreview.total / instancePreview.page_size)" @click="instancePage++">下一页 ›</button>
+          </div>
+        </template>
+      </template>
+
       <!-- 血缘 -->
       <template v-else-if="activeTab === '血缘'">
         <EntityLineageGraph :entity-id="entityId" />
@@ -149,11 +216,13 @@ import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
 import MetricCard from '../../components/common/MetricCard.vue'
 import EntityLineageGraph from '../../components/canvas/EntityLineageGraph.vue'
 import { useOntologyStore } from '../../store/ontology'
+import { resolutionApi } from '../../api/resolution'
+import type { SourceDataPreview, SourceField } from '../../api/resolution'
 
 const route = useRoute()
 const store = useOntologyStore()
 const activeTab = ref('属性')
-const tabs = ['属性', '关系', '规则', '动作', '血缘']
+const tabs = ['属性', '关系', '规则', '动作', '数据实例', '血缘']
 
 const entityId = computed(() => route.params.id as string)
 
@@ -223,6 +292,46 @@ const actions = computed(() =>
     id: a.id, name: a.name, type: a.type, status: a.status,
   })) ?? []
 )
+
+// 数据实例
+const instancePreview = ref<SourceDataPreview | null>(null)
+const instanceFields = ref<SourceField[]>([])
+const instanceLoading = ref(false)
+const instancePage = ref(1)
+
+async function loadInstances() {
+  if (!entityId.value) return
+  instanceLoading.value = true
+  try {
+    const [preview, fields] = await Promise.all([
+      resolutionApi.preview(entityId.value, { page: instancePage.value }),
+      resolutionApi.getFields(entityId.value),
+    ])
+    instancePreview.value = preview
+    instanceFields.value = fields
+  } catch {
+    instancePreview.value = null
+  } finally {
+    instanceLoading.value = false
+  }
+}
+
+watch(activeTab, (tab) => { if (tab === '数据实例') loadInstances() })
+watch(instancePage, () => { if (activeTab.value === '数据实例') loadInstances() })
+
+const fieldAttrMap = computed(() => {
+  const map: Record<string, string> = {}
+  for (const f of instanceFields.value) {
+    if (f.source_field && f.attr_name) map[f.source_field] = f.attr_name
+  }
+  return map
+})
+
+const coveragePct = computed(() => {
+  if (!instanceFields.value.length) return 0
+  const mapped = instanceFields.value.filter(f => f.source_field).length
+  return Math.round((mapped / instanceFields.value.length) * 100)
+})
 </script>
 
 <style scoped>
@@ -403,4 +512,49 @@ const actions = computed(() =>
   gap: 12px;
   color: var(--neutral-400);
 }
+
+/* 数据实例 */
+.instance-loading {
+  display: flex; align-items: center; gap: 8px; padding: 40px 0; justify-content: center; color: var(--neutral-500);
+}
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.instance-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 14px; background: var(--status-info-bg);
+  border: 1px solid var(--neutral-200); border-radius: var(--radius-md);
+  margin-bottom: 14px; flex-wrap: wrap; gap: 10px;
+}
+.instance-source-info { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.instance-source-label { font-size: var(--text-caption-size); color: var(--neutral-500); }
+.instance-source-name { font-size: var(--text-caption-size); font-family: var(--font-mono); color: var(--status-info); background: var(--neutral-0); padding: 1px 6px; border-radius: 3px; }
+.instance-source-sep { color: var(--neutral-300); }
+.instance-total { font-size: var(--text-caption-size); color: var(--neutral-500); margin-left: 8px; }
+
+.instance-coverage { display: flex; align-items: center; gap: 8px; }
+.instance-coverage-label { font-size: var(--text-caption-size); color: var(--neutral-500); white-space: nowrap; }
+.instance-coverage-bar { width: 80px; height: 6px; background: var(--neutral-200); border-radius: 3px; overflow: hidden; }
+.instance-coverage-fill { height: 100%; background: var(--status-success); border-radius: 3px; transition: width 0.3s; }
+.instance-coverage-pct { font-size: var(--text-caption-size); font-weight: 600; color: var(--status-success); min-width: 32px; }
+
+.instance-table-wrap { overflow-x: auto; }
+.instance-table { min-width: 600px; }
+.instance-col-head { display: flex; flex-direction: column; gap: 2px; }
+.instance-col-field { font-family: var(--font-mono); font-size: var(--text-caption-size); color: var(--neutral-700); }
+.instance-col-attr { font-size: 10px; color: var(--semantic-500); font-weight: 500; }
+.instance-cell { font-size: var(--text-caption-size); font-family: var(--font-mono); color: var(--neutral-700); }
+
+.instance-pagination {
+  display: flex; align-items: center; justify-content: center; gap: 16px;
+  margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--neutral-100);
+}
+.page-btn {
+  padding: 4px 12px; border-radius: var(--radius-md); border: 1px solid var(--neutral-200);
+  background: var(--neutral-0); color: var(--neutral-700); font-size: var(--text-caption-size);
+  cursor: pointer; transition: all var(--transition-fast);
+}
+.page-btn:hover:not(:disabled) { border-color: var(--semantic-400); color: var(--semantic-600); }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.page-info { font-size: var(--text-caption-size); color: var(--neutral-500); }
 </style>
