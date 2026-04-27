@@ -1,6 +1,14 @@
 backend/venv/
 
 # Local databases
+# Python
+__pycache__/
+*.pyc
+# Node
+node_modules/
+dist/
+dist-ssr/
+# Database
 *.db
 *.db-*
 *.sqlite
@@ -20,3 +28,25 @@ backend/venv/
 # OS/editor noise
 .DS_Store
 .idea/
+# Environment variables
+.env
+.env.*
+*.local
+# Logs
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+# Upload & temp files
+backend/uploads/
+tmp/
+# IDE / editor
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS
+# AI workspace
