@@ -1,9 +1,5 @@
-import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
 import { MarkerType, Position, type Node, type Edge } from '@vue-flow/core'
 import type { GraphData } from '../types'
-
-interface SimNode { id: string; x: number; y: number; tier: number }
-interface SimLink { source: string; target: string }
 
 export interface DataLayerItem {
   entity_id: string; entity_name_cn: string; table_name: string
@@ -12,39 +8,45 @@ export interface DataLayerItem {
 
 export function useGraphLayout() {
   function transformGraphData(data: GraphData, _direction: 'LR' | 'TB' = 'LR') {
-    const simNodes: SimNode[] = data.nodes.map(n => ({
-      id: n.id, x: Math.random() * 800, y: Math.random() * 600, tier: n.tier,
-    }))
+    // 按 tier 分组
+    const byTier: Record<number, typeof data.nodes> = { 1: [], 2: [], 3: [] }
+    for (const n of data.nodes) {
+      const t = n.tier as 1 | 2 | 3
+      if (byTier[t]) byTier[t].push(n)
+      else byTier[3].push(n)
+    }
 
-    const simLinks: SimLink[] = data.edges.map(e => ({
-      source: e.from_id, target: e.to_id,
-    }))
+    const NODE_W = 160
+    const NODE_H = 80
+    const H_GAP = 60
+    const V_GAP = 120
+    const TIER_Y: Record<number, number> = { 1: 0, 2: NODE_H + V_GAP, 3: (NODE_H + V_GAP) * 2 }
 
-    const nodeCount = simNodes.length
-    const strength = nodeCount > 30 ? -600 : nodeCount > 15 ? -400 : -300
+    const posMap = new Map<string, { x: number; y: number }>()
 
-    const sim = forceSimulation(simNodes as any)
-      .force('link', forceLink(simLinks as any).id((d: any) => d.id).distance(240).strength(0.25))
-      .force('charge', forceManyBody().strength(strength * 1.5))
-      .force('center', forceCenter(0, 0))
-      .force('collide', forceCollide(80))
-      .stop()
+    for (const tier of [1, 2, 3]) {
+      const group = byTier[tier]
+      const totalW = group.length * NODE_W + (group.length - 1) * H_GAP
+      const startX = -totalW / 2
+      group.forEach((n, i) => {
+        posMap.set(n.id, { x: startX + i * (NODE_W + H_GAP), y: TIER_Y[tier] })
+      })
+    }
 
-    for (let i = 0; i < 400; i++) sim.tick()
-
-    const nodes: Node[] = data.nodes.map((n, i) => ({
+    const nodes: Node[] = data.nodes.map(n => ({
       id: n.id,
       type: 'ontologyNode',
-      position: { x: (simNodes[i] as any).x, y: (simNodes[i] as any).y },
+      position: posMap.get(n.id) ?? { x: 0, y: 0 },
       data: {
         name: n.name,
         nameCn: n.name_cn,
         tier: n.tier,
         status: n.status,
         relCount: n.relation_count,
+        attrCount: (n as any).attr_count ?? 0,
       },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
     }))
 
     const edges: Edge[] = data.edges.map(e => ({
