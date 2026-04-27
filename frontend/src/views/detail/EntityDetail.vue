@@ -190,6 +190,63 @@
         </template>
       </template>
 
+      <!-- 智能体 -->
+      <template v-else-if="activeTab === '智能体'">
+        <div v-if="agentLoading" class="instance-loading">
+          <svg class="spin" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="var(--neutral-300)" stroke-width="2"/><path d="M10 2a8 8 0 018 8" stroke="var(--semantic-500)" stroke-width="2" stroke-linecap="round"/></svg>
+          <span class="text-caption">加载智能体...</span>
+        </div>
+        <div v-else-if="linkedAgents.length === 0" class="placeholder-tab">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <path d="M20 8L34 16v8L20 32 6 24v-8L20 8z" stroke="var(--neutral-300)" stroke-width="2" stroke-linejoin="round"/>
+            <path d="M20 16v8M14 19l6 3 6-3" stroke="var(--neutral-300)" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p class="text-caption">暂无智能体引用该本体对象</p>
+        </div>
+        <div v-else class="agent-chain-list">
+          <div v-for="agent in linkedAgents" :key="agent.id" class="agent-chain-card">
+            <!-- 链路头 -->
+            <div class="agent-chain-header">
+              <div class="agent-chain-icon">{{ agent.name.charAt(0) }}</div>
+              <div class="agent-chain-meta">
+                <span class="agent-chain-name">{{ agent.name }}</span>
+                <span class="agent-chain-desc">{{ agent.description }}</span>
+              </div>
+              <span class="agent-chain-status" :class="agent.status === 'published' ? 'agent-chain-status--pub' : 'agent-chain-status--draft'">
+                {{ agent.status === 'published' ? '已发布' : '草稿' }}
+              </span>
+            </div>
+            <!-- 链路可视化: 本体 → 智能体 → 结论 -->
+            <div class="agent-chain-flow">
+              <div class="agent-chain-step agent-chain-step--ont">
+                <span class="agent-chain-step-icon">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="6" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </span>
+                <span>{{ entity.nameCn }}</span>
+              </div>
+              <svg class="agent-chain-arrow" width="24" height="12" viewBox="0 0 24 12"><path d="M0 6h20M16 2l4 4-4 4" stroke="var(--neutral-300)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div class="agent-chain-step agent-chain-step--agent">
+                <span class="agent-chain-step-icon">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 4v4l-6 4-6-4V6l6-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                </span>
+                <span>{{ agent.name }}</span>
+              </div>
+              <svg class="agent-chain-arrow" width="24" height="12" viewBox="0 0 24 12"><path d="M0 6h20M16 2l4 4-4 4" stroke="var(--neutral-300)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <div class="agent-chain-step agent-chain-step--result">
+                <span class="agent-chain-step-icon">
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+                <span>{{ agent.conclusionLabel }}</span>
+              </div>
+            </div>
+            <!-- 节点列表 -->
+            <div class="agent-chain-nodes" v-if="agent.nodes.length">
+              <span v-for="n in agent.nodes" :key="n.id" class="agent-chain-node-tag" :style="{ borderColor: n.color + '60', color: n.color, background: n.color + '12' }">{{ n.label }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+
       <!-- 血缘 -->
       <template v-else-if="activeTab === '血缘'">
         <EntityLineageGraph :entity-id="entityId" />
@@ -211,18 +268,20 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
 import MetricCard from '../../components/common/MetricCard.vue'
 import EntityLineageGraph from '../../components/canvas/EntityLineageGraph.vue'
 import { useOntologyStore } from '../../store/ontology'
 import { resolutionApi } from '../../api/resolution'
+import { get } from '../../api/client'
 import type { SourceDataPreview, SourceField } from '../../api/resolution'
 
 const route = useRoute()
+const router = useRouter()
 const store = useOntologyStore()
 const activeTab = ref('属性')
-const tabs = ['属性', '关系', '规则', '动作', '数据实例', '血缘']
+const tabs = ['属性', '关系', '规则', '动作', '数据实例', '智能体', '血缘']
 
 const entityId = computed(() => route.params.id as string)
 
@@ -316,7 +375,6 @@ async function loadInstances() {
   }
 }
 
-watch(activeTab, (tab) => { if (tab === '数据实例') loadInstances() })
 watch(instancePage, () => { if (activeTab.value === '数据实例') loadInstances() })
 
 const fieldAttrMap = computed(() => {
@@ -331,6 +389,51 @@ const coveragePct = computed(() => {
   if (!instanceFields.value.length) return 0
   const mapped = instanceFields.value.filter(f => f.source_field).length
   return Math.round((mapped / instanceFields.value.length) * 100)
+})
+
+// 智能体链路
+const linkedAgents = ref<any[]>([])
+const agentLoading = ref(false)
+
+const nodeColorMap: Record<string, string> = {
+  'ontology-query': '#3b82f6', 'ontology-relation': '#6366f1', 'rule-evaluate': '#f59e0b',
+  'datasource': '#8b5cf6', 'llm-inference': '#10b981', 'ml-model': '#06b6d4',
+  'voice-audit': '#7c3aed', 'condition': '#a855f7', 'merge': '#0ea5e9',
+  'rule-engine': '#f59e0b', 'notification': '#ef4444', 'human-approval': '#f97316',
+  'write-back': '#64748b', 'api-response': '#22c55e',
+}
+
+async function loadAgents() {
+  agentLoading.value = true
+  try {
+    const all = await get<any[]>('/agents')
+    const entityName = entity.value.name
+    linkedAgents.value = all
+      .filter(a => {
+        const ids: string[] = a.entity_ids || []
+        const nodes: any[] = a.nodes_json || []
+        return ids.includes(entityId.value) || nodes.some((n: any) => n.data?.ontology_type === entityName)
+      })
+      .map(a => {
+        const nodes = (a.nodes_json || []).map((n: any) => ({
+          id: n.id,
+          label: n.data?.label || n.type,
+          color: nodeColorMap[n.type] || '#94a3b8',
+        }))
+        const lastNode = nodes[nodes.length - 1]
+        const conclusionLabel = lastNode?.label || '输出结论'
+        return { id: a.id, name: a.name, description: a.description || '', status: a.status, nodes, conclusionLabel }
+      })
+  } catch {
+    linkedAgents.value = []
+  } finally {
+    agentLoading.value = false
+  }
+}
+
+watch(activeTab, (tab) => {
+  if (tab === '数据实例') loadInstances()
+  if (tab === '智能体') loadAgents()
 })
 </script>
 
@@ -557,4 +660,46 @@ const coveragePct = computed(() => {
 .page-btn:hover:not(:disabled) { border-color: var(--semantic-400); color: var(--semantic-600); }
 .page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .page-info { font-size: var(--text-caption-size); color: var(--neutral-500); }
+
+.agent-chain-list { display: flex; flex-direction: column; gap: 16px; }
+.agent-chain-card {
+  border: 1px solid var(--neutral-200); border-radius: var(--radius-lg);
+  padding: 16px; display: flex; flex-direction: column; gap: 12px;
+  background: var(--neutral-0);
+}
+.agent-chain-header { display: flex; align-items: center; gap: 12px; }
+.agent-chain-icon {
+  width: 36px; height: 36px; border-radius: var(--radius-md);
+  background: var(--semantic-100); color: var(--semantic-700);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 700; flex-shrink: 0;
+}
+.agent-chain-meta { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.agent-chain-name { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); }
+.agent-chain-desc { font-size: var(--text-caption-size); color: var(--neutral-500); }
+.agent-chain-status { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: var(--radius-full); }
+.agent-chain-status--pub { background: var(--status-success-bg); color: var(--status-success); }
+.agent-chain-status--draft { background: var(--neutral-100); color: var(--neutral-500); }
+
+.agent-chain-flow {
+  display: flex; align-items: center; gap: 4px;
+  padding: 10px 14px; background: var(--neutral-50); border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+.agent-chain-step {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: var(--radius-md);
+  font-size: var(--text-caption-size); font-weight: 500;
+}
+.agent-chain-step--ont { background: #eff6ff; color: #3b82f6; }
+.agent-chain-step--agent { background: #f5f3ff; color: #6366f1; }
+.agent-chain-step--result { background: #f0fdf4; color: #22c55e; }
+.agent-chain-step-icon { display: flex; align-items: center; }
+.agent-chain-arrow { flex-shrink: 0; }
+
+.agent-chain-nodes { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-chain-node-tag {
+  font-size: 11px; font-weight: 500; padding: 2px 8px;
+  border-radius: var(--radius-full); border: 1px solid;
+}
 </style>
