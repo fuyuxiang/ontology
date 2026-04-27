@@ -209,33 +209,8 @@
       </div>
     </transition>
 
-    <!-- 新建场景对话框 -->
-    <div class="harness__dialog-mask" v-if="showNewDialog" @click.self="showNewDialog = false">
-      <div class="harness__dialog">
-        <div class="harness__dialog-header">
-          <span class="harness__dialog-title">新建场景</span>
-          <button class="harness__icon-btn" @click="showNewDialog = false">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-          </button>
-        </div>
-        <div class="harness__field">
-          <label>场景名称 <span class="harness__required">*</span></label>
-          <input class="harness__input" v-model="newForm.name" placeholder="如：续约智能策划" autofocus />
-        </div>
-        <div class="harness__field">
-          <label>描述</label>
-          <textarea class="harness__input harness__input--ta" v-model="newForm.description" placeholder="场景目标和说明" rows="2"></textarea>
-        </div>
-        <div class="harness__field">
-          <label>本体命名空间</label>
-          <input class="harness__input" v-model="newForm.namespace" placeholder="如 s1" />
-        </div>
-        <div class="harness__dialog-footer">
-          <button class="harness__btn" @click="showNewDialog = false">取消</button>
-          <button class="harness__btn harness__btn--primary" @click="handleCreate" :disabled="!newForm.name">创建场景</button>
-        </div>
-      </div>
-    </div>
+    <!-- 新建场景向导 -->
+    <SceneWizard v-if="showNewDialog" @close="showNewDialog = false" @created="handleWizardCreate" />
   </div>
 </template>
 
@@ -250,6 +225,7 @@ import '@vue-flow/core/dist/style.css'
 import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 import WorkflowNode from '../../components/harness/nodes/WorkflowNode.vue'
+import SceneWizard from '../../components/harness/SceneWizard.vue'
 import { useHarnessStore } from '../../store/harness'
 
 const store = useHarnessStore()
@@ -383,6 +359,30 @@ function deleteNode(id: string) {
   store.selectNode(null); store.markDirty()
 }
 function miniMapColor(node: any) { return nodeTypeColor(node.type) }
+
+async function handleWizardCreate(name: string, description: string, namespace: string, entityIds: string[], dsIds: string[], agentId: string) {
+  await store.createWorkflow(name, description, namespace)
+  showNewDialog.value = false
+
+  // 预置本体查询节点
+  let x = 60
+  for (const eid of entityIds) {
+    const entity = (await import('../../store/ontology')).useOntologyStore().entities.find(e => e.id === eid)
+    if (entity) {
+      flowNodes.value.push({ id: `node-${Date.now()}-${eid}`, type: 'ontology-query', position: { x, y: 80 }, data: { label: `查询${entity.name_cn}`, execState: 'pending', ontology_type: entity.name } })
+      x += 220
+    }
+  }
+
+  // 预置数据源节点
+  for (const dsId of dsIds) {
+    flowNodes.value.push({ id: `node-ds-${Date.now()}-${dsId}`, type: 'datasource', position: { x, y: 80 }, data: { label: '数据源查询', execState: 'pending' } })
+    x += 220
+  }
+
+  if (flowNodes.value.length > 0) store.markDirty()
+}
+
 function eventLabel(e: string) {
   return { workflow_start: '开始', node_start: '启动', node_result: '完成', node_error: '错误', workflow_done: '结束' }[e] || e
 }
