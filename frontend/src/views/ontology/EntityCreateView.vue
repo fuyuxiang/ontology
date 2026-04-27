@@ -143,6 +143,8 @@
                     <label v-for="t in [1,2,3]" :key="t" class="tier-option" :class="{ 'tier-option--active': selectedEntity.tier === t, [`tier-option--t${t}`]: selectedEntity.tier === t }">
                       <input type="radio" :value="t" v-model="selectedEntity.tier" style="display:none" />
                       <span class="tier-option-label">T{{ t }}</span>
+                      <span class="tier-option-name">{{ { 1:'核心对象', 2:'领域对象', 3:'场景对象' }[t] }}</span>
+                      <span class="tier-option-hint">{{ { 1:'跨场景复用', 2:'领域内共享', 3:'场景专属' }[t] }}</span>
                     </label>
                   </div>
                 </div>
@@ -150,6 +152,22 @@
               <div class="form-row">
                 <label class="form-label">描述</label>
                 <input v-model="selectedEntity.description" class="form-input" placeholder="业务含义描述" />
+              </div>
+              <div class="edit-fields-row">
+                <div class="form-row" style="flex:1">
+                  <label class="form-label">关联数据源</label>
+                  <select v-model="selectedEntity.datasource_id" class="form-input" @change="loadTables(selectedEntity.datasource_id); selectedEntity.table_name = ''">
+                    <option value="">不关联</option>
+                    <option v-for="ds in datasources" :key="ds.id" :value="ds.id">{{ ds.name }}</option>
+                  </select>
+                </div>
+                <div class="form-row" style="flex:1" v-if="selectedEntity.datasource_id">
+                  <label class="form-label">关联表</label>
+                  <select v-model="selectedEntity.table_name" class="form-input">
+                    <option value="">请选择表</option>
+                    <option v-for="t in (dsTableMap[selectedEntity.datasource_id] || [])" :key="t" :value="t">{{ t }}</option>
+                  </select>
+                </div>
               </div>
             </div>
 
@@ -274,13 +292,28 @@
               <label v-for="t in [1,2,3]" :key="t" class="tier-option" :class="{ 'tier-option--active': form.tier === t }">
                 <input type="radio" :value="t" v-model="form.tier" style="display:none" />
                 <span class="tier-option-label">T{{ t }}</span>
-                <span class="tier-option-name">{{ { 1:'核心', 2:'领域', 3:'场景' }[t] }}</span>
+                <span class="tier-option-name">{{ { 1:'核心对象', 2:'领域对象', 3:'场景对象' }[t] }}</span>
+                <span class="tier-option-hint">{{ { 1:'跨场景复用', 2:'领域内共享', 3:'场景专属' }[t] }}</span>
               </label>
             </div>
           </div>
           <div class="form-row form-row--full">
             <label class="form-label">描述</label>
             <textarea v-model="form.description" class="form-textarea" rows="3" placeholder="描述该对象的业务含义" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">关联数据源</label>
+            <select v-model="form.datasource_id" class="form-input" @change="loadTables(form.datasource_id); form.table_name = ''">
+              <option value="">不关联（稍后配置）</option>
+              <option v-for="ds in datasources" :key="ds.id" :value="ds.id">{{ ds.name }}</option>
+            </select>
+          </div>
+          <div class="form-row" v-if="form.datasource_id">
+            <label class="form-label">关联表</label>
+            <select v-model="form.table_name" class="form-input">
+              <option value="">请选择表</option>
+              <option v-for="t in (dsTableMap[form.datasource_id] || [])" :key="t" :value="t">{{ t }}</option>
+            </select>
           </div>
         </div>
         <div class="attrs-section">
@@ -378,13 +411,14 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
 import { entityApi } from '../../api/ontology'
 import { relationApi } from '../../api/relations'
 import { post } from '../../api/client'
 import { useToast } from '../../composables/useToast'
+import { listDataSources, getTableList } from '../../api/datasource'
 import type { FileImportResult } from '../../types'
 
 const router = useRouter()
@@ -401,6 +435,26 @@ const attrTypes = ['string', 'number', 'boolean', 'date', 'ref', 'computed', 'en
 const relTypes = ['has', 'belongs_to', 'references', 'triggers', 'produces', 'consumes']
 const cardinalities = ['1:1', '1:N', 'N:1', 'N:N']
 const submitting = ref(false)
+
+// ── 数据源 ──
+interface DsOption { id: string; name: string; table_name: string }
+const datasources = ref<DsOption[]>([])
+const dsTableMap = ref<Record<string, string[]>>({})
+
+onMounted(async () => {
+  try {
+    const list = await listDataSources({ status: 'active' })
+    datasources.value = list.map((d: any) => ({ id: d.id, name: d.name, table_name: d.table_name || '' }))
+  } catch { /* 数据源加载失败不阻塞 */ }
+})
+
+async function loadTables(dsId: string) {
+  if (!dsId || dsTableMap.value[dsId]) return
+  try {
+    const res = await getTableList(dsId)
+    dsTableMap.value[dsId] = res.tables || []
+  } catch { dsTableMap.value[dsId] = [] }
+}
 
 const tierColors: Record<number, { bg: string; fg: string }> = {
   1: { bg: 'var(--tier1-bg)', fg: 'var(--tier1-text)' },
@@ -450,6 +504,7 @@ const templates = [
 // ── 手动创建 ──
 const form = reactive({
   name: '', name_cn: '', tier: 1, description: '',
+  datasource_id: '', table_name: '',
   attributes: [] as { name: string; type: string; description: string; required: boolean }[],
 })
 function addAttr() { form.attributes.push({ name: '', type: 'string', description: '', required: false }) }
@@ -457,7 +512,8 @@ async function handleSubmit() {
   if (!form.name || !form.name_cn) return
   submitting.value = true
   try {
-    await entityApi.create({ name: form.name, name_cn: form.name_cn, tier: form.tier, description: form.description, attributes: form.attributes.filter(a => a.name) } as never)
+    const schema_json = form.datasource_id ? { datasource_id: form.datasource_id, table_name: form.table_name } : undefined
+    await entityApi.create({ name: form.name, name_cn: form.name_cn, tier: form.tier, description: form.description, schema_json, attributes: form.attributes.filter(a => a.name) } as never)
     toast.success('对象创建成功')
     router.push('/browser')
   } catch (e) { toast.error(`创建失败: ${(e as Error).message}`) }
@@ -502,7 +558,7 @@ async function handleFileImport() {
 
 // ── AI 智能创建 ──
 interface AiAttr { name: string; type: string; description: string; required: boolean }
-interface AiEntity { name: string; name_cn: string; tier: number; description: string; attributes: AiAttr[]; selected: boolean }
+interface AiEntity { name: string; name_cn: string; tier: number; description: string; attributes: AiAttr[]; selected: boolean; datasource_id: string; table_name: string }
 interface AiRelation { from_entity: string; to_entity: string; name: string; rel_type: string; cardinality: string }
 interface AiResult { entities: AiEntity[]; relations: AiRelation[] }
 
@@ -554,6 +610,8 @@ async function handleAiExtract() {
     }
     data.entities.forEach(e => {
       e.selected = true
+      e.datasource_id = ''
+      e.table_name = ''
       e.attributes = (e.attributes || []).map(a => ({ ...a, required: false }))
     })
     aiResult.value = data
@@ -571,7 +629,8 @@ async function handleAiCreate() {
     const selected = aiResult.value.entities.filter(e => e.selected)
     const created: Record<string, string> = {}
     for (const entity of selected) {
-      const res = await entityApi.create({ name: entity.name, name_cn: entity.name_cn, tier: entity.tier as any, description: entity.description, attributes: entity.attributes.map(a => ({ id: '', name: a.name, type: a.type as any, description: a.description, required: a.required })) } as any)
+      const schema_json = entity.datasource_id ? { datasource_id: entity.datasource_id, table_name: entity.table_name } : undefined
+      const res = await entityApi.create({ name: entity.name, name_cn: entity.name_cn, tier: entity.tier as any, description: entity.description, schema_json, attributes: entity.attributes.map(a => ({ id: '', name: a.name, type: a.type as any, description: a.description, required: a.required })) } as any)
       created[entity.name] = res.id
     }
     for (const rel of selectedRelations.value) {
@@ -704,7 +763,8 @@ async function handleAiCreate() {
 .tier-option:hover { border-color: var(--neutral-400); }
 .tier-option--active { border-color: var(--semantic-400); background: var(--semantic-50); }
 .tier-option-label { font-size: 13px; font-weight: 700; color: var(--neutral-700); }
-.tier-option-name { font-size: 10px; color: var(--neutral-500); }
+.tier-option-name { font-size: 11px; color: var(--neutral-600); }
+.tier-option-hint { font-size: 10px; color: var(--neutral-400); }
 
 .attrs-section { margin-bottom: 4px; }
 .attrs-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
