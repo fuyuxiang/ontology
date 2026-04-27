@@ -305,6 +305,27 @@
     <!-- 从文件导入 -->
     <div v-if="mode === 'import'" class="single-panel">
       <div class="entity-form">
+        <!-- 模板下载 -->
+        <div class="tpl-download">
+          <div class="tpl-download__info">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="var(--status-info)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>下载 JSON 模板参考（宽带退单稽核场景 V1.1 规范）</span>
+          </div>
+          <a href="/ontology_template.json" download="ontology_template.json" class="btn-sm">下载模板</a>
+        </div>
+
+        <!-- 格式说明 -->
+        <div class="schema-hint">
+          <div class="schema-hint__title">JSON 文件结构说明</div>
+          <div class="schema-hint__fields">
+            <div class="schema-field"><code>scenario</code><span>场景元数据（名称、命名空间、描述）</span></div>
+            <div class="schema-field"><code>object_types</code><span>实体定义列表，含 tier、properties、datasource_ref</span></div>
+            <div class="schema-field"><code>link_types</code><span>关系定义列表，含 source_type、target_type、cardinality</span></div>
+            <div class="schema-field"><code>action_types</code><span>动作定义列表，含 trigger、parameters、effects</span></div>
+            <div class="schema-field"><code>business_rules</code><span>业务规则列表，含 conditions、applicable_objects</span></div>
+          </div>
+        </div>
+
         <div class="form-row">
           <label class="form-label">文件格式</label>
           <div class="format-selector">
@@ -700,6 +721,16 @@ async function handleAiCreate() {
 .import-preview__title { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-600); margin-bottom: 6px; }
 .import-preview__stats { display: flex; gap: 16px; flex-wrap: wrap; font-size: var(--text-caption-size); color: var(--neutral-700); }
 .import-result { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--status-success-bg); border-radius: var(--radius-md); font-size: var(--text-body-size); color: var(--status-success); }
+
+.tpl-download { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--status-info-bg); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); }
+.tpl-download__info { display: flex; align-items: center; gap: 8px; font-size: var(--text-body-size); color: var(--status-info); }
+
+.schema-hint { background: var(--neutral-50); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: 12px 14px; }
+.schema-hint__title { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-600); margin-bottom: 8px; }
+.schema-hint__fields { display: flex; flex-direction: column; gap: 4px; }
+.schema-field { display: flex; align-items: baseline; gap: 10px; font-size: var(--text-caption-size); }
+.schema-field code { font-family: var(--font-mono); color: var(--semantic-600); background: var(--neutral-0); padding: 1px 6px; border-radius: 3px; border: 1px solid var(--neutral-200); min-width: 130px; }
+.schema-field span { color: var(--neutral-500); }
 
 .btn-primary { padding: 8px 20px; border-radius: var(--radius-md); border: none; background: var(--semantic-600); color: #fff; font-size: var(--text-body-size); font-weight: 500; cursor: pointer; transition: background var(--transition-fast); display: inline-flex; align-items: center; gap: 6px; }
 .btn-primary:hover:not(:disabled) { background: var(--semantic-700); }
