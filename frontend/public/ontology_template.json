@@ -1,0 +1,3996 @@
+{
+  "scenario": {
+    "scenario_id": "s1",
+    "scenario_name": "宽带装机订单退单稽核分析",
+    "scenario_short_name": "退单稽核",
+    "owner": "许国杰",
+    "namespace": "s1",
+    "description": "宽带装机订单退单后，基于工单信息、派单记录、地址资源库、待装库、多路外呼通话录音等多源数据，通过假设树推理与大模型协同，自动判断退单根因（施工质量/网络资源/用户原因/业务原因），输出证据链与置信度，驱动培训/资源修复/挽回外呼等后续执行动作，并将结果沉淀为组织知识。",
+    "business_goal": "提升退单稽核准确率与效率，识别工程师虚假退单/责任转嫁，降低装机失败率，提升客户装机体验和服务质量，形成分析-执行-沉淀的闭环管理。",
+    "pilot_region": "待定",
+    "status": "development"
+  },
+  "object_types": [
+    {
+      "name": "InstallOrder",
+      "display_name": "宽带装机工单",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "宽带新装/移装业务受理后产生的服务交付工单，记录从受理到完工的全生命周期状态。工单是整个装机服务的业务主体，退单事件依附于工单存在。推理引擎以工单关联的退单时间为基准，向前回溯72小时构建事件链。",
+      "primary_key": "order_no",
+      "properties": [
+        {
+          "name": "order_no",
+          "display_name": "工单编号",
+          "attr_code": "installOrder.orderNo",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "工单的全局唯一业务标识，贯穿整个装机生命周期，是与外部系统对接的关联主键",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "cust_order_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "cust_id",
+          "display_name": "客户ID",
+          "attr_code": "installOrder.custId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "关联客户本体主键",
+          "source_table": "cBss业务台账主表(日)",
+          "source_field": "cust_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "accept_time",
+          "display_name": "受理时间",
+          "attr_code": "installOrder.acceptTime",
+          "type": "datetime",
+          "format": "datetime",
+          "required": true,
+          "description": "工单在业务系统中被受理创建的时间，是事件链回溯的外边界参考点",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "accept_time",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "order_status",
+          "display_name": "工单状态",
+          "attr_code": "installOrder.orderStatus",
+          "type": "enum",
+          "enum_values": [
+            "待派单",
+            "已派单",
+            "施工中",
+            "已完工",
+            "已退单",
+            "已撤单"
+          ],
+          "enum_labels": [
+            "待派单",
+            "已派单",
+            "施工中",
+            "已完工",
+            "已退单",
+            "已撤单"
+          ],
+          "required": true,
+          "description": "当前工单所处的生命周期阶段，推理引擎据此判断退单发生在哪个装维环节",
+          "source_table": "无条件受理明细",
+          "source_field": "order_state",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "biz_type",
+          "display_name": "业务类型",
+          "attr_code": "installOrder.bizType",
+          "type": "enum",
+          "enum_values": [
+            "新装",
+            "移装",
+            "改装",
+            "迁移"
+          ],
+          "enum_labels": [
+            "新装",
+            "移装",
+            "改装",
+            "迁移"
+          ],
+          "required": true,
+          "description": "本次工单的业务操作类型，不同场景下施工质量根因的推理规则权重不同",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "action_content",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "product_type",
+          "display_name": "产品类型",
+          "attr_code": "installOrder.productType",
+          "type": "enum",
+          "enum_values": [
+            "FTTH",
+            "FTTR",
+            "FTTB",
+            "ComboAPON"
+          ],
+          "enum_labels": [
+            "FTTH",
+            "FTTR",
+            "FTTB",
+            "ComboAPON"
+          ],
+          "description": "客户订购的宽带接入产品类型，影响施工质量根因的判断阈值",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "prod_type",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "product_id",
+          "display_name": "产品编码",
+          "attr_code": "installOrder.productId",
+          "type": "string",
+          "description": "客户订购的具体产品编码，关联产品本体",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "iom_product_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "product_name",
+          "display_name": "产品名称",
+          "attr_code": "installOrder.productName",
+          "type": "string",
+          "description": "客户订购的具体产品套餐名称",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "iom_product_name",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "channel_id",
+          "display_name": "受理渠道",
+          "attr_code": "installOrder.channelId",
+          "type": "string",
+          "description": "客户订购宽带的受理渠道，关联渠道本体ID",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "install_address_id",
+          "display_name": "装机地址ID",
+          "attr_code": "installOrder.installAddressId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "关联地址本体ID",
+          "source_table": "无条件受理明细",
+          "source_field": "address_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "install_address",
+          "display_name": "装机地址",
+          "attr_code": "installOrder.installAddress",
+          "type": "string",
+          "required": true,
+          "description": "客户要求安装宽带的服务地址全称，是待装库查询的检索键",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "stand_addr_detail",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "finish_time",
+          "display_name": "竣工时间",
+          "attr_code": "installOrder.finishTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "工单标记完工的时间，未完工时为空",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "bss_finish_date",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "speed_test_result",
+          "display_name": "测速结果",
+          "attr_code": "installOrder.speedTestResult",
+          "type": "number",
+          "precision": 1,
+          "description": "工程师施工完成后的实际测速值(Mbps)，与套餐标称速率对比验证施工质量",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "speed_test",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "optical_power_db",
+          "display_name": "光功率测试值",
+          "attr_code": "installOrder.opticalPowerDb",
+          "type": "number",
+          "precision": 1,
+          "description": "工程师施工后测量的光功率值(dBm)，是施工质量的核心技术指标，正常范围通常为-8~-27dBm",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "light_test",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "satisfaction_score",
+          "display_name": "客户满意度",
+          "attr_code": "installOrder.satisfactionScore",
+          "type": "number",
+          "min": 1,
+          "max": 5,
+          "description": "客户对本次装机服务的满意度打分(1-5)，低分是工单完成质量的辅助信号",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "satisfaction",
+          "data_status": "已确认来源"
+        }
+      ],
+      "datasource_ref": "ds_iom_order"
+    },
+    {
+      "name": "Customer",
+      "display_name": "客户",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "申请宽带装机服务的自然人或法人。客户在工单之前独立存在，在工单关闭后继续存在，代表服务关系的长期主体。提供用户敏感度画像，支撑用户原因根因假设的证据权重计算。",
+      "primary_key": "customer_id",
+      "properties": [
+        {
+          "name": "customer_id",
+          "display_name": "客户编号",
+          "attr_code": "customer.customerId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "客户在CRM/BSS系统中的唯一标识",
+          "source_table": "Bss业务台账主表(日)",
+          "source_field": "cust_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "customer_name",
+          "display_name": "客户姓名",
+          "attr_code": "customer.customerName",
+          "type": "string",
+          "description": "客户的真实姓名（脱敏处理）",
+          "source_table": "Bss业务台账主表(日)",
+          "source_field": "cust_name",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "contact_phone",
+          "display_name": "联系电话",
+          "attr_code": "customer.contactPhone",
+          "type": "string",
+          "description": "客户的主要联系手机号（脱敏），是发起外呼Action的目标号码",
+          "source_table": "Bss业务台账主表(日)",
+          "source_field": "contact_phone",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "customer_level",
+          "display_name": "客户星级",
+          "attr_code": "customer.customerLevel",
+          "type": "enum",
+          "enum_values": [
+            "普通",
+            "二星",
+            "四星",
+            "五星",
+            "六星",
+            "SVIP"
+          ],
+          "enum_labels": [
+            "普通",
+            "二星",
+            "四星",
+            "五星",
+            "六星",
+            "SVIP"
+          ],
+          "description": "客户在运营商体系中的价值分级，高星级客户退单触发更紧急的处理响应",
+          "source_table": "cBss高星级长高用户清单(月)",
+          "source_field": "cust_level",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "network_age",
+          "display_name": "入网时长",
+          "attr_code": "customer.networkAge",
+          "type": "number",
+          "description": "客户从首次开户至今的月数，长期客户突然退单根因倾向于施工质量或网络资源",
+          "source_table": "cBss用户欠费信息表(日)",
+          "source_field": "open_date",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "hist_complaint_count",
+          "display_name": "历史投诉次数",
+          "attr_code": "customer.histComplaintCount",
+          "type": "number",
+          "description": "客户近12个月在客服系统中提交的有效投诉工单数量",
+          "source_table": "投诉工单场景(日)",
+          "source_field": "sheet_no聚合",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "hist_churn_count",
+          "display_name": "历史退单次数",
+          "attr_code": "customer.histChurnCount",
+          "type": "number",
+          "description": "客户历史上发生的装机退单总次数，多次退单可能揭示系统性问题",
+          "source_table": "cBss业务台账主表(日)",
+          "source_field": "聚合计算",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "is_blacklist",
+          "display_name": "是否黑灰名单",
+          "attr_code": "customer.isBlacklist",
+          "type": "boolean",
+          "description": "客户是否被标记为风险客户（黑灰名单），需区别对待",
+          "source_table": "黑灰名单信息(日)",
+          "source_field": "is_black",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "arrears_status",
+          "display_name": "欠费状态",
+          "attr_code": "customer.arrearsStatus",
+          "type": "enum",
+          "enum_values": [
+            "正常",
+            "欠费停机",
+            "欠费预警"
+          ],
+          "enum_labels": [
+            "正常",
+            "欠费停机",
+            "欠费预警"
+          ],
+          "description": "客户当前账户欠费状态，欠费导致服务中断是业务原因根因的直接证据",
+          "source_table": "cBss用户欠费信息表(日)",
+          "source_field": "oew_fee",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "id_card_status",
+          "display_name": "证件状态",
+          "attr_code": "customer.idCardStatus",
+          "type": "enum",
+          "enum_values": [
+            "正常",
+            "异常"
+          ],
+          "enum_labels": [
+            "正常",
+            "异常"
+          ],
+          "description": "客户证件是否存在问题，证件问题会直接导致业务办理是否成功",
+          "data_status": "未确认来源"
+        }
+      ],
+      "datasource_ref": "ds_bss_customer"
+    },
+    {
+      "name": "Engineer",
+      "display_name": "工程师",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "承接宽带装机工单上门施工任务的技术服务人员，包含自有员工、劳务派遣及社会化人员。提供工程师历史绩效画像，支撑施工质量根因假设的先验权重；培训Action的执行结果回写此对象，形成能力进化闭环。",
+      "primary_key": "engineer_id",
+      "properties": [
+        {
+          "name": "engineer_id",
+          "display_name": "工程师编号",
+          "attr_code": "engineer.engineerId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "工程师在系统中的唯一登录账号",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "i0004_staff_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "engineer_name",
+          "display_name": "工程师姓名",
+          "attr_code": "engineer.engineerName",
+          "type": "string",
+          "description": "工程师的真实姓名（脱敏）",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "i0004_staff_name",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "tech_level",
+          "display_name": "技术级别",
+          "attr_code": "engineer.techLevel",
+          "type": "enum",
+          "enum_values": [
+            "初级",
+            "中级",
+            "高级",
+            "专家级"
+          ],
+          "enum_labels": [
+            "初级",
+            "中级",
+            "高级",
+            "专家级"
+          ],
+          "description": "工程师的技术能力认证级别，初级工程师处理复杂工单时施工质量假设权重上调",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "deal_level",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "employment_type",
+          "display_name": "用工类型",
+          "attr_code": "engineer.employmentType",
+          "type": "enum",
+          "enum_values": [
+            "自有员工",
+            "劳务派遣",
+            "社会化人员"
+          ],
+          "enum_labels": [
+            "自有员工",
+            "劳务派遣",
+            "社会化人员"
+          ],
+          "description": "工程师的劳动关系类型，是根因推理的背景因子",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "deal_type",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "team_name",
+          "display_name": "所属班组",
+          "attr_code": "engineer.teamName",
+          "type": "string",
+          "description": "工程师归属的管理班组或网格单元，同一班组的退单率异常可触发批量稽核",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "banzu_flag",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "skill_tags",
+          "display_name": "技能标签",
+          "attr_code": "engineer.skillTags",
+          "type": "array",
+          "item_type": "string",
+          "description": "工程师经过认证的施工技能类型列表，如FTTR组网、光纤熔接等",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "churn_rate_90d",
+          "display_name": "近90日退单率",
+          "attr_code": "engineer.churnRate90d",
+          "type": "number",
+          "min": 0,
+          "max": 1,
+          "precision": 4,
+          "description": "工程师近90天内退单工单数占总受理工单数的比例，是施工质量根因假设的核心先验权重输入",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "聚合计算",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "on_time_rate_90d",
+          "display_name": "近90日准时率",
+          "attr_code": "engineer.onTimeRate90d",
+          "type": "number",
+          "min": 0,
+          "max": 1,
+          "precision": 4,
+          "description": "工程师近90天内实际到达时间不晚于预约时间的工单比例",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "聚合计算",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "optical_qualify_rate",
+          "display_name": "光衰合格率",
+          "attr_code": "engineer.opticalQualifyRate",
+          "type": "number",
+          "min": 0,
+          "max": 1,
+          "precision": 4,
+          "description": "工程师历史工单中光功率测试值在合格范围内的比例，是施工工艺质量的量化指标",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "聚合计算",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "training_status",
+          "display_name": "培训完成情况",
+          "attr_code": "engineer.trainingStatus",
+          "type": "string",
+          "description": "工程师已完成的培训课程及完成时间列表（JSON数组格式），是培训Action（ACT-010）执行后的回写字段。格式：[{churnId, trainingType, triggerRootCause, initiateTime}, ...]",
+          "data_status": "未确认来源"
+        }
+      ],
+      "datasource_ref": "ds_iom_order"
+    },
+    {
+      "name": "Address",
+      "display_name": "地址",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "装机服务的标准地址实体，包含地理位置、资源覆盖情况、无条件受理状态等。地址独立于单次工单存在，可被多张工单复用，是网络资源状态的载体。提供地址级别的网络资源状态，支撑网络资源/业务原因根因假设。",
+      "primary_key": "address_id",
+      "properties": [
+        {
+          "name": "address_id",
+          "display_name": "地址编号",
+          "attr_code": "address.addressId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "标准化地址的全局唯一标识",
+          "source_table": "固网装机资源订单表(日)",
+          "source_field": "address_id",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "standard_address_name",
+          "display_name": "标准地址名称",
+          "attr_code": "address.standardAddressName",
+          "type": "string",
+          "required": true,
+          "description": "经过标准化处理的地址全名，包含省市区街道小区门牌层级",
+          "source_table": "固网装机资源订单表(日)",
+          "source_field": "address_info",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "address_level",
+          "display_name": "地址等级",
+          "attr_code": "address.addressLevel",
+          "type": "enum",
+          "enum_values": [
+            "到室",
+            "到楼道",
+            "到楼栋",
+            "到小区",
+            "到村",
+            "未覆盖"
+          ],
+          "enum_labels": [
+            "到室",
+            "到楼道",
+            "到楼栋",
+            "到小区",
+            "到村",
+            "未覆盖"
+          ],
+          "description": "地址的网络资源覆盖深度等级，直接决定装机是否需要建设资源",
+          "source_table": "固网装机资源订单表(日)",
+          "source_field": "address_level",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "is_unconditional_accept",
+          "display_name": "是否无条件受理",
+          "attr_code": "address.isUnconditionalAccept",
+          "type": "boolean",
+          "required": true,
+          "description": "该地址是否属于无条件受理区域，无需预先确认资源可用性即可接单",
+          "source_table": "无条件受理明细",
+          "source_field": "无条件受理区域",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "open_time_limit_days",
+          "display_name": "开通时限要求",
+          "attr_code": "address.openTimeLimitDays",
+          "type": "number",
+          "description": "该地址的装机服务承诺完成天数（几日通），超出时限是业务原因根因的直接证据",
+          "source_table": "无条件受理明细",
+          "source_field": "开通时限",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "resource_status",
+          "display_name": "资源覆盖状态",
+          "attr_code": "address.resourceStatus",
+          "type": "enum",
+          "enum_values": [
+            "资源充足",
+            "资源紧张",
+            "资源不足",
+            "建设中",
+            "未覆盖"
+          ],
+          "enum_labels": [
+            "资源充足",
+            "资源紧张",
+            "资源不足",
+            "建设中",
+            "未覆盖"
+          ],
+          "description": "当前地址的网络资源实际可用状态。ACT-005（人工资源核实）和ACT-011（发起资源派修）会回写此字段，触发相关工单推理重算",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "hist_churn_rate",
+          "display_name": "历史退单率",
+          "attr_code": "address.histChurnRate",
+          "type": "number",
+          "min": 0,
+          "max": 1,
+          "precision": 4,
+          "description": "该地址上历史装机工单中发生退单的比例，是地址级资源质量问题的时序证据",
+          "source_table": "无条件受理明细",
+          "source_field": "聚合计算",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "community_name",
+          "display_name": "关联社会小区名称",
+          "attr_code": "address.communityName",
+          "type": "string",
+          "description": "地址所属社会小区的名称，是待装库查询和跨工单传染图分析的关联维度",
+          "source_table": "无条件受理明细",
+          "source_field": "社会小区名称",
+          "data_status": "未确认来源"
+        }
+      ],
+      "datasource_ref": "ds_address_library"
+    },
+    {
+      "name": "InstallChurn",
+      "display_name": "宽带装机退单",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "宽带装机工单在完工前发起的退单事件，同时承载稽核推理的最终输出。退单是稽核的直接对象，独立于工单存在，支持一张工单多次退单的场景。退单时间是事件链的核心时间锚点，退单原因文本是NLP事实抽取的原始输入。稽核结果（根因标签、置信度、推理路径快照及触发Action类型）作为退单本体的扩展属性存在，与退单1:1强绑定，不独立存储为单独对象。",
+      "primary_key": "churn_id",
+      "properties": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "attr_code": "installChurn.churnId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "退单记录的唯一标识，是稽核结果、证据链的关联主键",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "related_order_no",
+          "display_name": "关联工单编号",
+          "attr_code": "installChurn.relatedOrderNo",
+          "type": "reference",
+          "ref_object": "InstallOrder",
+          "required": true,
+          "indexed": true,
+          "description": "该退单所属的装机工单引用",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "iom_order_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "churn_time",
+          "display_name": "退单时间",
+          "attr_code": "installChurn.churnTime",
+          "type": "datetime",
+          "format": "datetime",
+          "required": true,
+          "description": "退单请求发生的精确时间，是推理事件链的核心时间锚点，以此向前回溯72小时",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "cancel_reason_date",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "churn_phase",
+          "display_name": "退单发生环节",
+          "attr_code": "installChurn.churnPhase",
+          "type": "enum",
+          "enum_values": [
+            "预约等待",
+            "工程师在途",
+            "施工中",
+            "施工完成待验收"
+          ],
+          "enum_labels": [
+            "预约等待",
+            "工程师在途",
+            "施工中",
+            "施工完成待验收"
+          ],
+          "description": "退单发生时工单所处的装维阶段，不同环节对应不同的根因假设优先级",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "churn_reason_text",
+          "display_name": "退单原因文本",
+          "attr_code": "installChurn.churnReasonText",
+          "type": "string",
+          "required": true,
+          "description": "客户或营业员填写的退单原因自然语言描述，是NLP事实抽取的原始输入",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "cancel_reason_desc",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "churn_category_l1",
+          "display_name": "退单一级原因",
+          "attr_code": "installChurn.churnCategoryL1",
+          "type": "enum",
+          "enum_values": [
+            "施工质量",
+            "网络资源",
+            "用户原因",
+            "业务原因",
+            "其他"
+          ],
+          "enum_labels": [
+            "施工质量",
+            "网络资源",
+            "用户原因",
+            "业务原因",
+            "其他"
+          ],
+          "description": "系统或人工对退单原因的一级分类标签，作为推理引擎的初始假设触发条件",
+          "source_table": "无条件受理明细",
+          "source_field": "cb_cancel_reason_1",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "churn_category_l2",
+          "display_name": "退单二级原因",
+          "attr_code": "installChurn.churnCategoryL2",
+          "type": "string",
+          "description": "退单原因的二级细分分类，直接决定后续Action的精准路由",
+          "source_table": "无条件受理明细",
+          "source_field": "cb_cancel_reason_2",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "audit_status",
+          "display_name": "稽核状态",
+          "attr_code": "installChurn.auditStatus",
+          "type": "enum",
+          "enum_values": [
+            "待稽核",
+            "推理中",
+            "待补全回访",
+            "强制回访待核实",
+            "待人工审核",
+            "已归档"
+          ],
+          "enum_labels": [
+            "待稽核",
+            "推理中",
+            "待补全回访",
+            "强制回访待核实",
+            "待人工审核",
+            "已归档"
+          ],
+          "required": true,
+          "default": "待稽核",
+          "description": "当前退单的稽核处理进度状态，由系统根据推理流程自动更新。枚举值与v4 Action清单保持一致",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "audit_start_time",
+          "display_name": "稽核开始时间",
+          "attr_code": "installChurn.auditStartTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "ACT-001受理退单稽核时写入的开始时间戳",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "escalate_time",
+          "display_name": "转人工审核时间",
+          "attr_code": "installChurn.escalateTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "ACT-003转入人工审核时写入的时间戳",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "escalate_reason",
+          "display_name": "转人工审核原因",
+          "attr_code": "installChurn.escalateReason",
+          "type": "enum",
+          "enum_values": [
+            "置信度不足",
+            "双锁定冲突"
+          ],
+          "enum_labels": [
+            "置信度不足",
+            "双锁定冲突"
+          ],
+          "description": "ACT-003转入人工审核时写入的原因，置信度<0.60或双锁定冲突",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "evidence_e35",
+          "display_name": "E35实际资源核实结果",
+          "attr_code": "installChurn.evidenceE35",
+          "type": "enum",
+          "enum_values": [
+            "核实无资源",
+            "核实有资源"
+          ],
+          "enum_labels": [
+            "核实无资源",
+            "核实有资源"
+          ],
+          "description": "ACT-005人工资源核实结果（E35证据），写入后自动触发推理重算",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "evidence_e35_basis",
+          "display_name": "E35核实依据",
+          "attr_code": "installChurn.evidenceE35Basis",
+          "type": "string",
+          "description": "ACT-005填写的人工核实依据说明",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "evidence_e35_time",
+          "display_name": "E35核实时间",
+          "attr_code": "installChurn.evidenceE35Time",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "ACT-005人工核实完成的时间戳",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "root_cause_code",
+          "display_name": "根因编码",
+          "attr_code": "auditResult.rootCauseCode",
+          "type": "string",
+          "description": "推理引擎判定的退单根因结构化编码（如U1、R1等），是根因标签的机器可读形式",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "root_cause_level_one",
+          "display_name": "根因一级标签",
+          "attr_code": "auditResult.rootCauseLevelOne",
+          "type": "enum",
+          "enum_values": [
+            "用户原因",
+            "施工原因",
+            "资源原因",
+            "业务原因"
+          ],
+          "enum_labels": [
+            "用户原因",
+            "施工原因",
+            "资源原因",
+            "业务原因"
+          ],
+          "description": "退单根因的顶层分类标签，用于宏观趋势分析与管理层报表",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "root_cause_level_two",
+          "display_name": "根因二级标签",
+          "attr_code": "auditResult.rootCauseLevelTwo",
+          "type": "string",
+          "description": "退单根因的细化子类标签，直接决定派修、培训等执行Action的触发策略",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "root_cause_confidence",
+          "display_name": "根因置信度",
+          "attr_code": "auditResult.rootCauseConfidence",
+          "type": "number",
+          "min": 0,
+          "max": 1,
+          "precision": 4,
+          "description": "推理引擎对主根因判断的置信度评分。≥0.85直接归档；0.60~0.85触发补全回访；<0.60转人工审核",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "secondary_cause_label",
+          "display_name": "次要根因标签",
+          "attr_code": "auditResult.secondaryCauseLabel",
+          "type": "string",
+          "description": "置信度第二高的根因假设标签，用于识别复合根因场景",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "evidence_chain_summary",
+          "display_name": "证据链摘要",
+          "attr_code": "auditResult.evidenceChainSummary",
+          "type": "string",
+          "description": "支持本次根因判断的关键证据列表引用及可读摘要，是稽核报告的核心内容",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "reasoning_path_snapshot",
+          "display_name": "推理路径快照",
+          "attr_code": "auditResult.reasoningPathSnapshot",
+          "type": "string",
+          "description": "本次推理过程中激活的规则序列及各节点置信度变化的完整记录（JSON格式）。人工纠偏时以追加方式写入黄金标注数据，格式：{ai_snapshot, human_snapshot, justification, operatorID, overrideTime}",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "triggered_action_type",
+          "display_name": "触发Action类型",
+          "attr_code": "auditResult.triggeredActionType",
+          "type": "enum",
+          "enum_values": [
+            "工程师培训",
+            "网络资源派修",
+            "中台回访",
+            "挽回外呼",
+            "直接归档",
+            "人工审核"
+          ],
+          "enum_labels": [
+            "工程师培训",
+            "网络资源派修",
+            "中台回访",
+            "挽回外呼",
+            "直接归档",
+            "人工审核"
+          ],
+          "description": "基于根因标签和置信度路由确定的后续执行动作类型",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "manual_review_status",
+          "display_name": "人工审核状态",
+          "attr_code": "auditResult.manualReviewStatus",
+          "type": "enum",
+          "enum_values": [
+            "无需审核",
+            "待审核",
+            "审核通过",
+            "已修正"
+          ],
+          "enum_labels": [
+            "无需审核",
+            "待审核",
+            "审核通过",
+            "已修正"
+          ],
+          "description": "人工介入审核的处理状态，中低置信度结果须经人工确认后方可触发执行Action",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "audit_completed_time",
+          "display_name": "稽核完成时间",
+          "attr_code": "auditResult.auditCompletedTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "稽核结果最终确认的时间",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "callback_verified",
+          "display_name": "用户原因回访核查状态",
+          "attr_code": "auditResult.callbackVerified",
+          "type": "enum",
+          "enum_values": [
+            "待回访",
+            "已核查通过"
+          ],
+          "enum_labels": [
+            "待回访",
+            "已核查通过"
+          ],
+          "description": "仅当rootCauseLevelOne=用户原因时有意义。推理引擎在确认用户原因根因后、归档前，自动检查是否存在已完成回访记录：有则直接置为已核查通过并归档；无则置为待回访触发ACT-008强制回访",
+          "data_status": "未确认来源"
+        }
+      ],
+      "datasource_ref": "ds_iom_order"
+    },
+    {
+      "name": "DispatchRecord",
+      "display_name": "派单记录",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "工单向工程师发起派单的记录，包含预约时间、实际到达时间、派单状态等。一张工单可产生多条派单记录（如重派），每条记录独立存在。预约时间与到达时间的差值直接触发履约异常推理规则。",
+      "primary_key": "dispatch_id",
+      "properties": [
+        {
+          "name": "dispatch_id",
+          "display_name": "派单编号",
+          "attr_code": "dispatch.dispatchId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "派单记录的唯一标识",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "deal_gd_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "related_order_no",
+          "display_name": "关联工单编号",
+          "attr_code": "dispatch.relatedOrderNo",
+          "type": "reference",
+          "ref_object": "InstallOrder",
+          "required": true,
+          "indexed": true,
+          "description": "该派单所属装机工单的引用",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "iom_order_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "related_engineer_id",
+          "display_name": "关联工程师编号",
+          "attr_code": "dispatch.relatedEngineerId",
+          "type": "reference",
+          "ref_object": "Engineer",
+          "required": true,
+          "indexed": true,
+          "description": "被派单工程师的引用",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "i0004_staff_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "appointment_time",
+          "display_name": "预约上门时间",
+          "attr_code": "dispatch.appointmentTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "与客户约定的工程师上门时间，是计算准时率的基准",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "book_time",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "actual_arrival_time",
+          "display_name": "实际到达时间",
+          "attr_code": "dispatch.actualArrivalTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "工程师实际抵达客户现场的时间，与预约时间的差值触发履约异常推理规则",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "arrive_time",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "finish_time",
+          "display_name": "竣工时间",
+          "attr_code": "dispatch.finishTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "工单标记完工的时间",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "iom_finish_date",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "wait_duration_minutes",
+          "display_name": "派单等待时长",
+          "attr_code": "dispatch.waitDurationMinutes",
+          "type": "number",
+          "description": "从工单受理到工程师首次接单的等待时间（分钟）",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "first_assign_time计算",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "late_duration_minutes",
+          "display_name": "延误时长",
+          "attr_code": "dispatch.lateDurationMinutes",
+          "type": "number",
+          "description": "工程师实际到达时间晚于预约时间的分钟数（负值表示早到），超过阈值激活履约异常推理节点",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "arrive_time - book_time",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "transfer_count",
+          "display_name": "转派次数",
+          "attr_code": "dispatch.transferCount",
+          "type": "number",
+          "min": 0,
+          "description": "本次工单被转派给其他工程师的次数，高转派次数表明派单异常",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "trans_num",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "suspend_reason",
+          "display_name": "挂单原因",
+          "attr_code": "dispatch.suspendReason",
+          "type": "string",
+          "description": "工程师在派单过程中主动挂起工单的原因描述，揭示施工障碍或资源问题",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "hang_reason",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "appointment_change_count",
+          "display_name": "预约变更次数",
+          "attr_code": "dispatch.appointmentChangeCount",
+          "type": "number",
+          "min": 0,
+          "description": "客户或工程师要求变更预约时间的次数，多次变更是服务协调困难的信号",
+          "source_table": "装移机装维工单数据(日)",
+          "source_field": "book_chg_srv_cnt",
+          "data_status": "已确认来源"
+        }
+      ],
+      "datasource_ref": "ds_iom_order"
+    },
+    {
+      "name": "PendingPool",
+      "display_name": "待装地址",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "特定地址因网络资源不足或建设未完成，导致宽带订单无法即时派单而进入等待队列的库存记录。待装库以地址为维度积压，记录积压量和历史趋势，是业务/资源原因根因假设的时序证据来源。",
+      "primary_key": "record_id",
+      "properties": [
+        {
+          "name": "record_id",
+          "display_name": "待装记录编号",
+          "attr_code": "pendingPool.recordId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "待装库记录的唯一标识",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "order_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "related_address_id",
+          "display_name": "关联地址编号",
+          "attr_code": "pendingPool.relatedAddressId",
+          "type": "reference",
+          "ref_object": "Address",
+          "required": true,
+          "indexed": true,
+          "description": "该待装记录对应地址的引用",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "小区id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "order_no",
+          "display_name": "关联工单号",
+          "attr_code": "pendingPool.orderNo",
+          "type": "string",
+          "indexed": true,
+          "description": "待装库中对应的运营平台订单号",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "trade_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "entry_time",
+          "display_name": "受理时间",
+          "attr_code": "pendingPool.entryTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "订单进入待装库的受理时间，是计算积压时长的起点",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "accept_date",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "pending_reason",
+          "display_name": "积压原因",
+          "attr_code": "pendingPool.pendingReason",
+          "type": "enum",
+          "enum_values": [
+            "资源不足",
+            "建设中",
+            "需求待确认",
+            "其他"
+          ],
+          "enum_labels": [
+            "资源不足",
+            "建设中",
+            "需求待确认",
+            "其他"
+          ],
+          "description": "订单进入待装库的根本原因，直接支持根因假设分类",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "not_create_reason",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "current_backlog_count",
+          "display_name": "当前积压量",
+          "attr_code": "pendingPool.currentBacklogCount",
+          "type": "number",
+          "min": 0,
+          "description": "当前地址/小区维度正在等待的宽带订单总数，反映资源紧张程度",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "聚合计数",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "backlog_duration_days",
+          "display_name": "积压时长",
+          "attr_code": "pendingPool.backlogDurationDays",
+          "type": "number",
+          "min": 0,
+          "description": "从进库时间到当前的等待天数，超出开通时限要求构成SLA违约证据",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "计算字段",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "hist_backlog_frequency",
+          "display_name": "历史积压频次",
+          "attr_code": "pendingPool.histBacklogFrequency",
+          "type": "number",
+          "min": 0,
+          "description": "该地址/小区近12个月进入待装库的历史次数，是地址长期资源不足的时序证据",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "历史聚合计算",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "construction_status",
+          "display_name": "建设状态",
+          "attr_code": "pendingPool.constructionStatus",
+          "type": "enum",
+          "enum_values": [
+            "未发起",
+            "建设中",
+            "已完工",
+            "不建设"
+          ],
+          "enum_labels": [
+            "未发起",
+            "建设中",
+            "已完工",
+            "不建设"
+          ],
+          "description": "针对该地址资源不足发起建设需求后的进展状态",
+          "source_table": "无条件受理待装库明细",
+          "source_field": "开工时间/完工时间计算",
+          "data_status": "已确认来源"
+        }
+      ],
+      "datasource_ref": "ds_pending_install"
+    },
+    {
+      "name": "Product",
+      "display_name": "产品",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "客户订购的宽带接入产品实体，包含产品类型、套餐规格及资费信息。产品独立于单次工单存在，是工单产品字段的标准化引用对象。",
+      "primary_key": "product_id",
+      "properties": [
+        {
+          "name": "product_id",
+          "display_name": "产品编号",
+          "attr_code": "product.productId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "产品在系统中的唯一标识",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "iom_product_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "product_type",
+          "display_name": "产品类型",
+          "attr_code": "product.productType",
+          "type": "enum",
+          "enum_values": [
+            "FTTH",
+            "FTTR",
+            "LAN",
+            "FTTB",
+            "ComboAPON"
+          ],
+          "enum_labels": [
+            "FTTH",
+            "FTTR",
+            "LAN",
+            "FTTB",
+            "ComboAPON"
+          ],
+          "description": "产品的宽带接入技术类型分类，不同接入类型对应不同施工工艺和验收标准",
+          "source_table": "IOM合单信息(日)",
+          "source_field": "iom_product_name",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "product_name",
+          "display_name": "产品名称",
+          "attr_code": "product.productName",
+          "type": "string",
+          "required": true,
+          "description": "产品的业务套餐全称",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "speed_mbps",
+          "display_name": "套餐速率",
+          "attr_code": "product.speedMbps",
+          "type": "number",
+          "description": "产品标称的宽带下载速率(Mbps)，与工单实测测速结果对比验证施工质量",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "product_status",
+          "display_name": "产品状态",
+          "attr_code": "product.productStatus",
+          "type": "enum",
+          "enum_values": [
+            "在售",
+            "停售",
+            "下线"
+          ],
+          "enum_labels": [
+            "在售",
+            "停售",
+            "下线"
+          ],
+          "description": "产品当前的销售及运营状态",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "applicable_address_type",
+          "display_name": "适用地址范围",
+          "attr_code": "product.applicableAddressType",
+          "type": "enum",
+          "enum_values": [
+            "住宅",
+            "商企",
+            "农村"
+          ],
+          "enum_labels": [
+            "住宅",
+            "商企",
+            "农村"
+          ],
+          "description": "产品适用的地址类型限制，产品与地址类型不匹配是业务原因根因的直接证据",
+          "data_status": "已确认来源"
+        }
+      ],
+      "datasource_ref": "ds_iom_order"
+    },
+    {
+      "name": "Channel",
+      "display_name": "渠道",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "客户受理宽带装机工单时所通过的业务受理渠道。渠道类型影响客户期望与服务标准的基线设定，特定渠道的高退单率可触发渠道专项稽核。",
+      "primary_key": "channel_id",
+      "properties": [
+        {
+          "name": "channel_id",
+          "display_name": "渠道编号",
+          "attr_code": "channel.channelId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "渠道的唯一标识",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "channel_name",
+          "display_name": "渠道名称",
+          "attr_code": "channel.channelName",
+          "type": "string",
+          "description": "渠道的业务名称",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "channel_type",
+          "display_name": "渠道类型",
+          "attr_code": "channel.channelType",
+          "type": "enum",
+          "enum_values": [
+            "线上",
+            "线下",
+            "电话",
+            "合作方"
+          ],
+          "enum_labels": [
+            "线上",
+            "线下",
+            "电话",
+            "合作方"
+          ],
+          "description": "渠道的大类分类，影响回访策略的优先级排序",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "hist_churn_rate",
+          "display_name": "渠道历史退单率",
+          "attr_code": "channel.histChurnRate",
+          "type": "number",
+          "min": 0,
+          "max": 1,
+          "precision": 4,
+          "description": "该渠道近90天内受理工单的退单比例，高退单率渠道可触发渠道专项稽核",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "is_self_operated",
+          "display_name": "是否自营渠道",
+          "attr_code": "channel.isSelfOperated",
+          "type": "boolean",
+          "description": "标识该渠道是否为运营商自营，合作渠道受理的工单信息核实成本更高",
+          "data_status": "已确认来源"
+        }
+      ],
+      "datasource_ref": "ds_bss_customer"
+    },
+    {
+      "name": "CompetitorCall",
+      "display_name": "异网通话",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "客户与竞争运营商（移动、电信、广电等）之间发生的通话记录，通过客户号码在异网话单数据中匹配识别。退单前72小时内出现异网通话是客户主动转网的强信号，支持用户原因-转网意图根因假设（证据E36）。",
+      "primary_key": "call_id",
+      "properties": [
+        {
+          "name": "call_id",
+          "display_name": "通话ID",
+          "attr_code": "competitorCall.callId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "异网通话记录的唯一标识",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "customer_id",
+          "display_name": "客户ID",
+          "attr_code": "competitorCall.customerId",
+          "type": "reference",
+          "ref_object": "Customer",
+          "required": true,
+          "indexed": true,
+          "description": "该异网通话归属客户的引用",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "customer_phone",
+          "display_name": "客户号码",
+          "attr_code": "competitorCall.customerPhone",
+          "type": "string",
+          "description": "发起或接收该通话的客户手机号码（脱敏）",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "called_phone",
+          "display_name": "呼出号码",
+          "attr_code": "competitorCall.calledPhone",
+          "type": "string",
+          "description": "客户拨打的异网运营商号码（脱敏），如1008x、1000x等",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "call_time",
+          "display_name": "呼出时间",
+          "attr_code": "competitorCall.callTime",
+          "type": "datetime",
+          "format": "datetime",
+          "required": true,
+          "description": "异网通话发生的时间戳，退单前72小时内的异网通话是转网意图的强时序证据（E36）",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "competitor_type",
+          "display_name": "异网类型",
+          "attr_code": "competitorCall.competitorType",
+          "type": "enum",
+          "enum_values": [
+            "移动",
+            "电信",
+            "广电"
+          ],
+          "enum_labels": [
+            "移动",
+            "电信",
+            "广电"
+          ],
+          "description": "客户联系的竞争运营商类型，影响挽回策略的差异化设计",
+          "data_status": "已确认来源"
+        }
+      ],
+      "datasource_ref": "ds_competitor_call"
+    },
+    {
+      "name": "EngineerCall",
+      "display_name": "工程师外呼通话",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "工程师与客户之间发生的通话记录，包含录音转写文本和情绪分析结果。主要发生在施工协调、预约确认等场景，是LF-002通话录音语义证据提取（E1~E25、E37共26条NLP类证据）的核心数据来源。",
+      "primary_key": "call_id",
+      "properties": [
+        {
+          "name": "call_id",
+          "display_name": "通话编号",
+          "attr_code": "engineerCall.callId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "通话记录的唯一标识",
+          "source_table": "语音转文本采集表(日)",
+          "source_field": "contact_id",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "related_order_no",
+          "display_name": "关联工单编号",
+          "attr_code": "callbackCall.relatedOrderNo",
+          "type": "reference",
+          "ref_object": "InstallOrder",
+          "required": true,
+          "indexed": true,
+          "description": "该通话关联的装机工单引用，通过工程师手机号与工单字段匹配建立关联",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "call_start_time",
+          "display_name": "通话开始时间",
+          "attr_code": "engineerCall.callStartTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "通话正式接通的开始时间戳",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "call_end_time",
+          "display_name": "通话结束时间",
+          "attr_code": "engineerCall.callEndTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "通话挂断的结束时间戳",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "connect_status",
+          "display_name": "接通状态",
+          "attr_code": "engineerCall.connectStatus",
+          "type": "enum",
+          "enum_values": [
+            "已接通",
+            "未接通",
+            "占线",
+            "无人接听"
+          ],
+          "enum_labels": [
+            "已接通",
+            "未接通",
+            "占线",
+            "无人接听"
+          ],
+          "description": "标识本次外呼是否成功接通，未接通记录是工程师沟通缺失的直接证据",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "is_effective_cop",
+          "display_name": "是否有效COP",
+          "attr_code": "engineerCall.isEffectiveCop",
+          "type": "boolean",
+          "description": "判断本次通话是否为有效COP（振铃时长>9秒），是统计工程师外呼行为质量的基础指标",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "duration_seconds",
+          "display_name": "通话时长",
+          "attr_code": "engineerCall.durationSeconds",
+          "type": "number",
+          "min": 0,
+          "description": "通话持续时间（秒），极短通话是沟通异常的信号",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "asr_text",
+          "display_name": "通话转写文本",
+          "attr_code": "engineerCall.asrText",
+          "type": "string",
+          "description": "语音识别转写的对话文本（JSON格式含角色标记），是LF-002 NLP证据提取的原始输入（覆盖E1~E25、E37共26条NLP类证据）",
+          "source_table": "语音转文本采集表(日)",
+          "source_field": "asr_text",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "customer_emotion_tag",
+          "display_name": "客户情绪标签",
+          "attr_code": "engineerCall.customerEmotionTag",
+          "type": "enum",
+          "enum_values": [
+            "平静",
+            "轻微不满",
+            "明显不满",
+            "愤怒",
+            "拒绝沟通"
+          ],
+          "enum_labels": [
+            "平静",
+            "轻微不满",
+            "明显不满",
+            "愤怒",
+            "拒绝沟通"
+          ],
+          "description": "从通话转写文本中NLP分析得出的客户情绪状态，支持施工质量或服务态度根因推理",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "complaint_intent_flag",
+          "display_name": "投诉意图识别",
+          "attr_code": "engineerCall.complaintIntentFlag",
+          "type": "boolean",
+          "description": "从通话转写文本中识别是否存在明确的投诉意图表达",
+          "data_status": "未确认来源"
+        }
+      ],
+      "datasource_ref": "ds_engineer_call"
+    },
+    {
+      "name": "CallbackCall",
+      "display_name": "中台回访外呼通话",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "中台对退单客户发起的回访外呼通话。分两类：①补全回访（ACT-007，置信度0.60~0.85时触发，isMandatory=false）；②强制核实回访（ACT-008，根因为用户原因时强制触发，isMandatory=true）。回访结果通过ACT-009回填，自动触发推理引擎增量重算。",
+      "primary_key": "call_id",
+      "properties": [
+        {
+          "name": "call_id",
+          "display_name": "通话编号",
+          "attr_code": "callbackCall.callId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "回访外呼通话的唯一标识",
+          "source_table": "人工坐席接触记录信息(日)",
+          "source_field": "contact_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "related_order_no",
+          "display_name": "关联工单编号",
+          "attr_code": "callbackCall.relatedOrderNo",
+          "type": "reference",
+          "ref_object": "InstallOrder",
+          "required": true,
+          "indexed": true,
+          "description": "该通话关联的装机工单引用",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "trigger_hypothesis",
+          "display_name": "触发假设",
+          "attr_code": "callbackCall.triggerHypothesis",
+          "type": "enum",
+          "enum_values": [
+            "H1施工质量",
+            "H2网络资源",
+            "H3用户原因",
+            "H4业务原因"
+          ],
+          "enum_labels": [
+            "H1施工质量",
+            "H2网络资源",
+            "H3用户原因",
+            "H4业务原因"
+          ],
+          "description": "触发本次回访外呼的推理假设编码，记录是哪个假设因置信度不足而需要补充信息",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "call_start_time",
+          "display_name": "通话开始时间",
+          "attr_code": "callbackCall.callStartTime",
+          "type": "datetime",
+          "format": "datetime",
+          "source_table": "人工坐席接触记录信息(日)",
+          "source_field": "start_time",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "call_end_time",
+          "display_name": "通话结束时间",
+          "attr_code": "callbackCall.callEndTime",
+          "type": "datetime",
+          "format": "datetime",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "connect_status",
+          "display_name": "接通状态",
+          "attr_code": "callbackCall.connectStatus",
+          "type": "enum",
+          "enum_values": [
+            "已接通",
+            "未接通",
+            "占线",
+            "无人接听"
+          ],
+          "enum_labels": [
+            "已接通",
+            "未接通",
+            "占线",
+            "无人接听"
+          ],
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "duration_seconds",
+          "display_name": "通话时长",
+          "attr_code": "callbackCall.durationSeconds",
+          "type": "number",
+          "min": 0,
+          "source_table": "人工坐席接触记录信息(日)",
+          "source_field": "contact_length",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "asr_text",
+          "display_name": "通话转写文本",
+          "attr_code": "callbackCall.asrText",
+          "type": "string",
+          "description": "回访通话的语音转写文本，是补全推理信息的核心数据源",
+          "source_table": "语音转文本采集表(日)",
+          "source_field": "asr_text",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "callback_target",
+          "display_name": "回访目标",
+          "attr_code": "callbackCall.callbackTarget",
+          "type": "enum",
+          "enum_values": [
+            "信息核实",
+            "原因确认",
+            "维系挽留"
+          ],
+          "enum_labels": [
+            "信息核实",
+            "原因确认",
+            "维系挽留"
+          ],
+          "description": "本次中台回访所设定的目标，决定回访话术策略及后续推理路径。信息核实=补全回访，原因确认=强制回访",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "callback_strategy_type",
+          "display_name": "挽回策略类型",
+          "attr_code": "callbackCall.callbackStrategyType",
+          "type": "enum",
+          "enum_values": [
+            "价格优惠",
+            "优先派单",
+            "资源优化承诺",
+            "主动致歉"
+          ],
+          "enum_labels": [
+            "价格优惠",
+            "优先派单",
+            "资源优化承诺",
+            "主动致歉"
+          ],
+          "description": "本次外呼采用的挽回策略分类",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "callback_result",
+          "display_name": "回访结果",
+          "attr_code": "callbackCall.callbackResult",
+          "type": "enum",
+          "enum_values": [
+            "信息已补全",
+            "客户未接听",
+            "客户申请撤单",
+            "无法核实"
+          ],
+          "enum_labels": [
+            "信息已补全",
+            "客户未接听",
+            "客户申请撤单",
+            "无法核实"
+          ],
+          "description": "回访结束后的处理结论，由ACT-009回填，触发推理引擎增量重算",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "supplement_info",
+          "display_name": "补全关键信息",
+          "attr_code": "callbackCall.supplementInfo",
+          "type": "string",
+          "description": "回访中获取的、用于补全推理上下文的关键信息摘要，由ACT-009写入后自动触发推理引擎增量重算",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "is_mandatory",
+          "display_name": "是否强制回访",
+          "attr_code": "callbackCall.isMandatory",
+          "type": "boolean",
+          "description": "true=强制回访（ACT-008，用户原因时触发，业务合规要求100%执行）；false=补全回访（ACT-007，置信度0.60~0.85时触发）",
+          "data_status": "未确认来源"
+        }
+      ],
+      "datasource_ref": "ds_callback_call"
+    },
+    {
+      "name": "MarketingCall",
+      "display_name": "中台营销外呼通话",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "中台对有挽回潜力客户发起的营销外呼通话（ACT-012触发），目的是重新激活客户需求、促进复装。通话录音是LF-008营销外呼需求识别的数据来源，NLP从文本中识别客户复装意愿、需求类型和强度信号。",
+      "primary_key": "call_id",
+      "properties": [
+        {
+          "name": "call_id",
+          "display_name": "通话编号",
+          "attr_code": "marketingCall.callId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "营销外呼通话的唯一标识",
+          "source_table": "人工坐席接触记录信息(日)",
+          "source_field": "contact_id",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "related_order_no",
+          "display_name": "关联工单编号",
+          "attr_code": "marketingCall.relatedOrderNo",
+          "type": "reference",
+          "ref_object": "InstallOrder",
+          "indexed": true,
+          "description": "该通话关联的装机工单引用",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "related_customer_id",
+          "display_name": "关联客户编号",
+          "attr_code": "marketingCall.relatedCustomerId",
+          "type": "reference",
+          "ref_object": "Customer",
+          "required": true,
+          "indexed": true,
+          "description": "本次营销外呼目标客户的引用",
+          "source_table": "人工坐席接触记录信息(日)",
+          "source_field": "user_code",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "call_start_time",
+          "display_name": "通话开始时间",
+          "attr_code": "marketingCall.callStartTime",
+          "type": "datetime",
+          "format": "datetime",
+          "source_table": "人工坐席接触记录信息(日)",
+          "source_field": "start_time",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "call_end_time",
+          "display_name": "通话结束时间",
+          "attr_code": "marketingCall.callEndTime",
+          "type": "datetime",
+          "format": "datetime",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "connect_status",
+          "display_name": "接通状态",
+          "attr_code": "marketingCall.connectStatus",
+          "type": "enum",
+          "enum_values": [
+            "已接通",
+            "未接通",
+            "占线",
+            "无人接听"
+          ],
+          "enum_labels": [
+            "已接通",
+            "未接通",
+            "占线",
+            "无人接听"
+          ],
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "asr_text",
+          "display_name": "通话转写文本",
+          "attr_code": "marketingCall.asrText",
+          "type": "string",
+          "description": "营销外呼通话的语音转写文本，是LF-008需求识别的核心数据来源",
+          "source_table": "语音转文本采集表(日)",
+          "source_field": "asr_text",
+          "data_status": "已确认来源"
+        }
+      ],
+      "datasource_ref": "ds_callback_call"
+    },
+    {
+      "name": "UserDemand",
+      "display_name": "用户需求",
+      "tier": 3,
+      "namespace": "s1",
+      "description": "客户对宽带装机服务的主观意愿和需求状态。需求独立于工单存在，工单关闭后需求可继续存活，有独立的状态机。退单后挽回策略的核心依据，需求强度和需求状态联合决定是否触发挽回Action（ACT-012）。",
+      "primary_key": "demand_id",
+      "properties": [
+        {
+          "name": "demand_id",
+          "display_name": "需求编号",
+          "attr_code": "userDemand.demandId",
+          "type": "string",
+          "required": true,
+          "indexed": true,
+          "description": "用户需求记录的唯一标识",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "related_customer_id",
+          "display_name": "关联客户编号",
+          "attr_code": "userDemand.relatedCustomerId",
+          "type": "reference",
+          "ref_object": "Customer",
+          "required": true,
+          "indexed": true,
+          "description": "该需求归属客户的引用",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "related_order_no",
+          "display_name": "关联工单编号",
+          "attr_code": "userDemand.relatedOrderNo",
+          "type": "reference",
+          "ref_object": "InstallOrder",
+          "indexed": true,
+          "description": "最近一次关联的装机工单引用",
+          "data_status": "已确认来源"
+        },
+        {
+          "name": "demand_type",
+          "display_name": "需求类型",
+          "attr_code": "userDemand.demandType",
+          "type": "enum",
+          "enum_values": [
+            "宽带新装",
+            "宽带提速",
+            "全屋组网",
+            "宽带+电视",
+            "其他"
+          ],
+          "enum_labels": [
+            "宽带新装",
+            "宽带提速",
+            "全屋组网",
+            "宽带+电视",
+            "其他"
+          ],
+          "description": "客户的具体服务需求类型，是策略路由的核心维度",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "demand_status",
+          "display_name": "需求状态",
+          "attr_code": "userDemand.demandStatus",
+          "type": "enum",
+          "enum_values": [
+            "活跃",
+            "冷却",
+            "再激活",
+            "已满足",
+            "已流失"
+          ],
+          "enum_labels": [
+            "活跃",
+            "冷却",
+            "再激活",
+            "已满足",
+            "已流失"
+          ],
+          "description": "需求当前所处的生命周期状态，由外呼结果、行为信号等事件驱动转换。ACT-012（营销外呼）触发后状态→活跃",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "demand_intensity",
+          "display_name": "需求强度",
+          "attr_code": "userDemand.demandIntensity",
+          "type": "enum",
+          "enum_values": [
+            "强烈",
+            "一般",
+            "被动",
+            "观望"
+          ],
+          "enum_labels": [
+            "强烈",
+            "一般",
+            "被动",
+            "观望"
+          ],
+          "description": "基于多源信号推理得出的客户需求迫切程度，高强度需求优先触发挽回Action",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "discovery_source",
+          "display_name": "需求发现来源",
+          "attr_code": "userDemand.discoverySource",
+          "type": "enum",
+          "enum_values": [
+            "营销外呼NLP识别",
+            "退单原因分析",
+            "历史咨询记录",
+            "客服投诉推断"
+          ],
+          "enum_labels": [
+            "营销外呼NLP识别",
+            "退单原因分析",
+            "历史咨询记录",
+            "客服投诉推断"
+          ],
+          "description": "记录需求是通过哪种途径被识别和创建的",
+          "data_status": "未确认来源"
+        },
+        {
+          "name": "last_contact_time",
+          "display_name": "最后触达时间",
+          "attr_code": "userDemand.lastContactTime",
+          "type": "datetime",
+          "format": "datetime",
+          "description": "最近一次通过外呼或推送方式触达该需求对应客户的时间，控制触达频率。ACT-012执行后更新此字段",
+          "data_status": "未确认来源"
+        }
+      ],
+      "datasource_ref": "ds_audit_result"
+    }
+  ],
+  "link_types": [
+    {
+      "name": "order_has_churn",
+      "display_name": "装机工单产生退单",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "InstallChurn",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [
+        {
+          "name": "churn_sequence",
+          "display_name": "退单序号",
+          "type": "number",
+          "description": "同一工单多次退单时的顺序编号"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "conditional",
+          "rule": "仅当工单状态为已退单时，该关联关系存在"
+        }
+      ],
+      "description": "一个装机工单可产生一次或多次退单记录"
+    },
+    {
+      "name": "order_has_dispatch",
+      "display_name": "装机工单产生派单",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "DispatchRecord",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [
+        {
+          "name": "dispatch_sequence",
+          "display_name": "派单序号",
+          "type": "number",
+          "description": "同一订单多次派单时的顺序编号"
+        }
+      ],
+      "constraints": [],
+      "description": "一个受理订单可对应一次或多次派单（重新派单场景）"
+    },
+    {
+      "name": "order_has_engineer_call",
+      "display_name": "装机工单关联装维外呼",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "EngineerCall",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [
+        {
+          "name": "call_sequence",
+          "display_name": "通话顺序",
+          "type": "number",
+          "description": "按时间排序的通话顺序编号"
+        }
+      ],
+      "constraints": [
+        {
+          "type": "temporal",
+          "rule": "通话记录的外呼时间应在订单受理时间之后"
+        }
+      ],
+      "description": "一个装机工单关联工程师与客户的多次外呼通话（LF-001数据采集层读取此关联）"
+    },
+    {
+      "name": "order_has_callback_call",
+      "display_name": "装机工单关联回访外呼",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "CallbackCall",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "一个装机工单可关联多次中台回访外呼通话记录（ACT-007、ACT-008创建，ACT-009回填结果）"
+    },
+    {
+      "name": "order_at_address",
+      "display_name": "装机工单关联地址",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "Address",
+      "target_namespace": "s1",
+      "cardinality": "many_to_one",
+      "directionality": "directed",
+      "properties": [
+        {
+          "name": "address_match_type",
+          "display_name": "地址匹配方式",
+          "type": "enum",
+          "enum_values": [
+            "exact",
+            "fuzzy",
+            "not_found"
+          ],
+          "enum_labels": [
+            "精确匹配",
+            "模糊匹配",
+            "未匹配"
+          ],
+          "description": "装机地址与地址库的匹配类型"
+        }
+      ],
+      "constraints": [],
+      "description": "装机订单对应的服务地址"
+    },
+    {
+      "name": "address_has_pending",
+      "display_name": "地址关联待装记录",
+      "source_type": "Address",
+      "source_namespace": "s1",
+      "target_type": "PendingPool",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "地址下的待装库积压记录，用于判断资源类退单原因（E29证据来源）"
+    },
+    {
+      "name": "customer_has_competitor_call",
+      "display_name": "客户关联异网通话",
+      "source_type": "Customer",
+      "source_namespace": "s1",
+      "target_type": "CompetitorCall",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "客户与竞争运营商的通话记录，支持转网意图根因假设（E36证据来源）"
+    },
+    {
+      "name": "customer_has_demand",
+      "display_name": "客户关联用户需求",
+      "source_type": "Customer",
+      "source_namespace": "s1",
+      "target_type": "UserDemand",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "客户的宽带服务需求，退单后挽回策略的核心依据（ACT-012触发后创建/更新）"
+    },
+    {
+      "name": "order_customer",
+      "display_name": "工单关联客户",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "Customer",
+      "target_namespace": "s1",
+      "cardinality": "many_to_one",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "装机工单关联的申请客户"
+    },
+    {
+      "name": "order_product",
+      "display_name": "工单关联产品",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "Product",
+      "target_namespace": "s1",
+      "cardinality": "many_to_one",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "装机工单关联的订购产品"
+    },
+    {
+      "name": "order_channel",
+      "display_name": "工单关联受理渠道",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "Channel",
+      "target_namespace": "s1",
+      "cardinality": "many_to_one",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "装机工单的业务受理渠道"
+    },
+    {
+      "name": "order_has_marketing_call",
+      "display_name": "工单关联营销外呼",
+      "source_type": "InstallOrder",
+      "source_namespace": "s1",
+      "target_type": "MarketingCall",
+      "target_namespace": "s1",
+      "cardinality": "one_to_many",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "装机工单关联的中台营销外呼通话（ACT-012创建，根因=用户原因且已归档时触发）"
+    },
+    {
+      "name": "dispatch_engineer",
+      "display_name": "派单关联工程师",
+      "source_type": "DispatchRecord",
+      "source_namespace": "s1",
+      "target_type": "Engineer",
+      "target_namespace": "s1",
+      "cardinality": "many_to_one",
+      "directionality": "directed",
+      "properties": [],
+      "constraints": [],
+      "description": "派单记录关联的执行工程师"
+    }
+  ],
+  "action_types": [
+    {
+      "name": "AcceptCancellationAudit",
+      "display_name": "受理退单稽核",
+      "trigger": "manual",
+      "description": "稽核入口，只做状态写入。推理由Automate异步触发，与受理解耦，支持回访等待后重新推理的场景。Automate监听auditStatus变为推理中后触发LF-001数据采集。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true,
+          "description": "待稽核的退单记录ID"
+        },
+        {
+          "name": "operator_id",
+          "display_name": "操作人员ID",
+          "type": "string",
+          "required": true,
+          "description": "触发稽核的操作人员标识"
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.auditStatus == '待稽核'",
+          "error_message": "退单状态不为待稽核"
+        },
+        {
+          "expression": "churnId对应退单记录存在",
+          "error_message": "退单记录不存在"
+        }
+      ],
+      "effects": [
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "audit_status",
+            "audit_start_time"
+          ],
+          "description": "auditStatus→推理中；auditStartTime=now()"
+        }
+      ],
+      "side_effects": "【内部流转】Automate监听InstallChurn.auditStatus变为推理中→触发LF-001数据采集",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核岗人员",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "ArchiveAuditAutomatic",
+      "display_name": "系统自动归档（高置信度路径）",
+      "trigger": "automatic",
+      "description": "由Automate监听推理完成信号触发，函数内部校验置信度≥0.85时才执行写入。权限仅赋予System User，不在Workshop前端暴露。v4从ACT-002拆出。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true,
+          "description": "由系统传入，无人工填写"
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "rootCauseConfidence >= 0.85",
+          "error_message": "置信度不足0.85，不满足自动归档条件"
+        }
+      ],
+      "effects": [
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "root_cause_code",
+            "root_cause_level_one",
+            "root_cause_level_two",
+            "root_cause_confidence",
+            "secondary_cause_label",
+            "evidence_chain_summary",
+            "reasoning_path_snapshot",
+            "triggered_action_type",
+            "manual_review_status",
+            "audit_completed_time",
+            "audit_status"
+          ],
+          "description": "写入完整稽核结果；manualReviewStatus→无需审核；auditCompletedTime=now()；auditStatus→已归档"
+        },
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "callback_verified"
+          ],
+          "description": "仅当rootCauseLevelOne=用户原因时：callbackVerified→已核查通过"
+        }
+      ],
+      "side_effects": "【内部流转】Automate监听auditStatus变为已归档→触发LF-007执行动作路由",
+      "reasoning_mode": "hybrid",
+      "permissions": [
+        {
+          "role": "System User",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "ArchiveAuditManual",
+      "display_name": "人工确认归档（人工审核路径）",
+      "trigger": "manual",
+      "description": "权限赋予稽核专家用户组，在Workshop前端暴露为按钮。人工审核完成后点击提交，只做状态流转，不重跑推理。v4从ACT-002拆出。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "justification",
+          "display_name": "归档说明",
+          "type": "string",
+          "required": true,
+          "description": "归档说明，必填"
+        },
+        {
+          "name": "operator_id",
+          "display_name": "操作人员ID",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.auditStatus == '待人工审核'",
+          "error_message": "退单状态不为待人工审核"
+        },
+        {
+          "expression": "justification IS NOT NULL",
+          "error_message": "归档说明不能为空"
+        },
+        {
+          "expression": "operatorID属于稽核专家角色组",
+          "error_message": "操作人员无稽核专家权限"
+        }
+      ],
+      "effects": [
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "manual_review_status",
+            "audit_completed_time",
+            "audit_status"
+          ],
+          "description": "manualReviewStatus→审核通过；auditCompletedTime=now()；auditStatus→已归档"
+        }
+      ],
+      "side_effects": "【内部流转】Automate监听auditStatus变为已归档→触发LF-007执行动作路由",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核岗人员",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 730
+      }
+    },
+    {
+      "name": "EscalateToManualReview",
+      "display_name": "转入人工审核",
+      "trigger": "automatic",
+      "description": "置信度<0.60或双锁定冲突时，由Automate监听推理结果触发。只做状态写入，无推理逻辑。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "escalate_reason",
+          "display_name": "转人工审核原因",
+          "type": "enum",
+          "enum_values": [
+            "置信度不足",
+            "双锁定冲突"
+          ],
+          "required": true
+        },
+        {
+          "name": "current_confidence",
+          "display_name": "当前置信度",
+          "type": "number",
+          "required": true
+        },
+        {
+          "name": "operator_id",
+          "display_name": "操作人员ID",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.auditStatus == '推理中'",
+          "error_message": "退单状态不为推理中"
+        }
+      ],
+      "effects": [
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "audit_status",
+            "manual_review_status",
+            "escalate_time",
+            "escalate_reason"
+          ],
+          "description": "auditStatus→待人工审核；manualReviewStatus→待审核；escalateTime=now()；escalateReason写入"
+        }
+      ],
+      "side_effects": "通知→发送至稽核专家角色组",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核系统",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "OverrideInferenceResult",
+      "display_name": "人工覆盖推理结论（黄金标注入口）",
+      "trigger": "manual",
+      "description": "人工纠偏的核心入口。黄金标注数据内嵌于reasoningPathSnapshot追加字段，不新建对象。覆盖后状态直接流转为已归档。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "override_root_cause_code",
+          "display_name": "覆盖根因编码",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "override_root_cause_level_one",
+          "display_name": "覆盖根因一级标签",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "override_root_cause_level_two",
+          "display_name": "覆盖根因二级标签",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "justification",
+          "display_name": "覆盖说明",
+          "type": "string",
+          "required": true,
+          "description": "必填，黄金标注依据"
+        },
+        {
+          "name": "operator_id",
+          "display_name": "操作人员ID",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.auditStatus == '待人工审核'",
+          "error_message": "退单状态不为待人工审核"
+        },
+        {
+          "expression": "justification IS NOT NULL",
+          "error_message": "覆盖说明不能为空"
+        },
+        {
+          "expression": "operatorID属于稽核专家角色组",
+          "error_message": "操作人员无稽核专家权限"
+        }
+      ],
+      "effects": [
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "root_cause_code",
+            "root_cause_level_one",
+            "root_cause_level_two",
+            "root_cause_confidence",
+            "manual_review_status",
+            "audit_completed_time",
+            "audit_status",
+            "reasoning_path_snapshot"
+          ],
+          "description": "覆盖根因字段；rootCauseConfidence=1.0；manualReviewStatus→审核通过；auditStatus→已归档；reasoningPathSnapshot追加{ai_snapshot, human_snapshot, justification, operatorID, overrideTime}"
+        }
+      ],
+      "side_effects": "【内部流转】Automate监听auditStatus变为已归档→触发LF-007执行动作路由",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核岗人员",
+          "level": "execute"
+        },
+        {
+          "role": "稽核主管",
+          "level": "approve"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 730
+      }
+    },
+    {
+      "name": "SubmitManualResourceVerification",
+      "display_name": "提交人工资源核实结果（E35）",
+      "trigger": "manual",
+      "description": "E35证据写入两个对象：①InstallChurn（证据状态）②Address.resourceStatus（地址资源状态更新）。写入后由Automate监听变化触发重新推理。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "verify_result",
+          "display_name": "核实结果",
+          "type": "enum",
+          "enum_values": [
+            "核实无资源",
+            "核实有资源"
+          ],
+          "required": true
+        },
+        {
+          "name": "verify_evidence",
+          "display_name": "核实依据",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "operator_id",
+          "display_name": "操作人员ID",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.auditStatus IN ('推理中', '待人工审核')",
+          "error_message": "退单状态不允许提交资源核实"
+        },
+        {
+          "expression": "operatorID属于稽核专家角色组",
+          "error_message": "操作人员无权限"
+        }
+      ],
+      "effects": [
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "evidence_e35",
+            "evidence_e35_basis",
+            "evidence_e35_time"
+          ],
+          "description": "写入E35核实结果、依据和时间"
+        },
+        {
+          "target": "Address",
+          "operation": "update",
+          "fields": [
+            "resource_status"
+          ],
+          "description": "更新地址资源状态"
+        }
+      ],
+      "side_effects": "【内部流转】Automate监听InstallChurn.evidenceE35属性变化→重新触发LF-004/LF-005推理",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核岗人员",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "FlagEvidenceAnomaly",
+      "display_name": "标记证据复核异常",
+      "trigger": "manual",
+      "description": "异常标记追加写入reasoningPathSnapshot，不新建对象。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "evidence_id",
+          "display_name": "证据编号",
+          "type": "string",
+          "required": true,
+          "description": "E1~E37范围内"
+        },
+        {
+          "name": "anomaly_type",
+          "display_name": "异常类型",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "remark",
+          "display_name": "备注说明",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.auditStatus IN ('推理中', '待人工审核')",
+          "error_message": "退单状态不允许标记证据异常"
+        },
+        {
+          "expression": "evidenceID在E1~E37范围内",
+          "error_message": "证据编号超出范围"
+        }
+      ],
+      "effects": [
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "reasoning_path_snapshot"
+          ],
+          "description": "追加异常标记{evidenceID, anomalyType, remark, operatorID, flagTime}"
+        }
+      ],
+      "side_effects": "【内部流转】Automate监听InstallChurn属性变化→重新触发推理（排除异常证据）",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核岗人员",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "CreateSupplementaryCallbackCall",
+      "display_name": "创建补全回访通话记录",
+      "trigger": "automatic",
+      "description": "置信度0.60~0.85时由Automate触发。回访完成后通过ACT-009写回结果，Automate再监听变化触发推理重算。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "trigger_hypothesis",
+          "display_name": "触发假设",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "expected_call_time",
+          "display_name": "预期回访时间",
+          "type": "datetime",
+          "required": false
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.auditStatus == '推理中'",
+          "error_message": "退单状态不为推理中"
+        },
+        {
+          "expression": "rootCauseConfidence >= 0.60 AND rootCauseConfidence < 0.85",
+          "error_message": "置信度不在0.60~0.85区间"
+        },
+        {
+          "expression": "不存在进行中的CallbackCall（同churnId）",
+          "error_message": "已存在进行中的回访任务"
+        }
+      ],
+      "effects": [
+        {
+          "target": "CallbackCall",
+          "operation": "create",
+          "fields": [
+            "call_id",
+            "related_order_no",
+            "callback_target",
+            "is_mandatory",
+            "trigger_hypothesis"
+          ],
+          "description": "callbackTarget=信息核实；isMandatory=false"
+        },
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "audit_status"
+          ],
+          "description": "auditStatus→待补全回访"
+        }
+      ],
+      "side_effects": "【外部交互】Webhook→中台坐席系统（分配外呼任务）",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核系统",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "CreateMandatoryCallbackCall",
+      "display_name": "创建强制核实回访通话记录",
+      "trigger": "automatic",
+      "description": "一级根因=用户原因时必须触发。callbackVerified置为待回访，ACT-002a的提交校验会检查此字段。",
+      "parameters": [
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "InstallChurn.root_cause_level_one == '用户原因'",
+          "error_message": "根因不为用户原因，无需强制回访"
+        },
+        {
+          "expression": "InstallChurn.callback_verified IS NULL OR InstallChurn.callback_verified == ''",
+          "error_message": "callbackVerified已有值，无需重复触发"
+        }
+      ],
+      "effects": [
+        {
+          "target": "CallbackCall",
+          "operation": "create",
+          "fields": [
+            "call_id",
+            "related_order_no",
+            "callback_target",
+            "is_mandatory",
+            "trigger_hypothesis"
+          ],
+          "description": "callbackTarget=原因确认；isMandatory=true；triggerHypothesis=H3"
+        },
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "callback_verified",
+            "audit_status"
+          ],
+          "description": "callbackVerified→待回访；auditStatus→强制回访待核实"
+        }
+      ],
+      "side_effects": "【外部交互】Webhook→中台坐席系统（高优先级外呼）",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核系统",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "WriteBackCallbackResult",
+      "display_name": "回填回访结果",
+      "trigger": "manual",
+      "description": "回访结果写入后，Automate监听状态变化，自动触发推理重算。",
+      "parameters": [
+        {
+          "name": "call_id",
+          "display_name": "回访通话ID",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "callback_result",
+          "display_name": "回访结果",
+          "type": "enum",
+          "enum_values": [
+            "信息已补全",
+            "客户未接听",
+            "客户申请撤单",
+            "无法核实"
+          ],
+          "required": true
+        },
+        {
+          "name": "supplement_info",
+          "display_name": "补全关键信息",
+          "type": "string",
+          "required": false
+        },
+        {
+          "name": "operator_id",
+          "display_name": "操作人员ID",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "callId对应CallbackCall存在",
+          "error_message": "回访记录不存在"
+        },
+        {
+          "expression": "CallbackCall.callbackResult IS NULL",
+          "error_message": "回访结果已填写，不可重复回填"
+        }
+      ],
+      "effects": [
+        {
+          "target": "CallbackCall",
+          "operation": "update",
+          "fields": [
+            "callback_result",
+            "supplement_info"
+          ]
+        },
+        {
+          "target": "InstallChurn",
+          "operation": "update",
+          "fields": [
+            "callback_verified",
+            "audit_status"
+          ],
+          "description": "若isMandatory=true且result=信息已补全：callbackVerified→已核查通过；auditStatus→推理中"
+        }
+      ],
+      "side_effects": "【内部流转】Automate监听InstallChurn.auditStatus变为推理中→重新触发推理引擎",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "中台外呼坐席",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "WriteEngineerTrainingRecord",
+      "display_name": "写入工程师培训记录",
+      "trigger": "event",
+      "description": "写入Engineer.trainingStatus（追加格式）。Webhook调用外部培训系统，归档后由LF-007路由触发（施工-S3类根因）。",
+      "parameters": [
+        {
+          "name": "engineer_id",
+          "display_name": "工程师编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "training_type",
+          "display_name": "培训类型",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "trigger_root_cause",
+          "display_name": "触发根因",
+          "type": "string",
+          "required": true,
+          "description": "必须属于S类（施工质量类）根因"
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "engineerId对应Engineer存在",
+          "error_message": "工程师记录不存在"
+        },
+        {
+          "expression": "triggerRootCause属于S类",
+          "error_message": "触发根因不属于施工质量类"
+        }
+      ],
+      "effects": [
+        {
+          "target": "Engineer",
+          "operation": "update",
+          "fields": [
+            "training_status"
+          ],
+          "description": "trainingStatus追加：{churnId, trainingType, triggerRootCause, initiateTime}"
+        }
+      ],
+      "side_effects": "【外部交互】Webhook→工程师培训管理系统",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核系统",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "InitiateResourceRepair",
+      "display_name": "发起资源派修",
+      "trigger": "event",
+      "description": "写入Address.resourceStatus。Webhook调用外部资源系统，状态变更后该地址其他待装工单可触发推理重算。归档后由LF-007路由触发（资源-R1/R4类根因）。",
+      "parameters": [
+        {
+          "name": "address_id",
+          "display_name": "地址编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "resource_type",
+          "display_name": "资源类型",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "fault_description",
+          "display_name": "故障描述",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "addressId对应Address存在",
+          "error_message": "地址记录不存在"
+        },
+        {
+          "expression": "Address.resourceStatus != '建设中'",
+          "error_message": "该地址已在建设中，无需重复派修"
+        }
+      ],
+      "effects": [
+        {
+          "target": "Address",
+          "operation": "update",
+          "fields": [
+            "resource_status"
+          ],
+          "description": "resourceStatus→建设中"
+        }
+      ],
+      "side_effects": "【外部交互】Webhook→网络资源管理系统（发起派修工单）",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核系统",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    },
+    {
+      "name": "CreateMarketingCallRecord",
+      "display_name": "创建营销外呼通话记录",
+      "trigger": "event",
+      "description": "Create MarketingCall新实例。Webhook调用外部CRM，归档后由LF-007路由触发（用户原因类根因）。",
+      "parameters": [
+        {
+          "name": "customer_id",
+          "display_name": "客户编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "churn_id",
+          "display_name": "退单编号",
+          "type": "string",
+          "required": true
+        },
+        {
+          "name": "campaign_type",
+          "display_name": "营销活动类型",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "preconditions": [
+        {
+          "expression": "customerId对应Customer存在",
+          "error_message": "客户记录不存在"
+        },
+        {
+          "expression": "InstallChurn.root_cause_level_one == '用户原因'",
+          "error_message": "根因不为用户原因，不触发营销外呼"
+        },
+        {
+          "expression": "InstallChurn.auditStatus == '已归档'",
+          "error_message": "退单未完成归档"
+        }
+      ],
+      "effects": [
+        {
+          "target": "MarketingCall",
+          "operation": "create",
+          "fields": [
+            "call_id",
+            "related_customer_id",
+            "related_order_no",
+            "callback_target"
+          ],
+          "description": "callbackTarget=维系挽留"
+        },
+        {
+          "target": "UserDemand",
+          "operation": "update",
+          "fields": [
+            "demand_status",
+            "last_contact_time"
+          ],
+          "description": "若UserDemand已存在：demandStatus→活跃；lastContactTime=now()"
+        }
+      ],
+      "side_effects": "【外部交互】Webhook→CRM营销系统（创建外呼任务）",
+      "reasoning_mode": "rule_engine",
+      "permissions": [
+        {
+          "role": "稽核系统",
+          "level": "execute"
+        }
+      ],
+      "audit": {
+        "enabled": true,
+        "retention_days": 365
+      }
+    }
+  ],
+  "data_sources": [
+    {
+      "source_id": "ds_iom_order",
+      "display_name": "IOM合单信息/装移机工单系统",
+      "system_name": "装维工单管理系统",
+      "description": "宽带装机工单全生命周期数据，含受理信息、派单记录、工程师信息、施工结果、测速等",
+      "tables": [
+        {
+          "table_name": "装移机装维工单数据(日)",
+          "display_name": "装移机装维工单主表",
+          "schema": "workorder",
+          "description": "装维工单的完整生命周期记录",
+          "key_fields": [
+            {
+              "field_name": "cust_order_id",
+              "field_type": "varchar(64)",
+              "is_primary_key": true,
+              "maps_to_property": "InstallOrder.order_no",
+              "description": "工单编号"
+            },
+            {
+              "field_name": "accept_time",
+              "field_type": "datetime",
+              "maps_to_property": "InstallOrder.accept_time",
+              "description": "受理时间"
+            },
+            {
+              "field_name": "order_state",
+              "field_type": "varchar(20)",
+              "maps_to_property": "InstallOrder.order_status",
+              "description": "工单状态"
+            },
+            {
+              "field_name": "action_content",
+              "field_type": "varchar(50)",
+              "maps_to_property": "InstallOrder.biz_type",
+              "description": "业务类型"
+            },
+            {
+              "field_name": "prod_type",
+              "field_type": "varchar(50)",
+              "maps_to_property": "InstallOrder.product_type",
+              "description": "产品类型"
+            },
+            {
+              "field_name": "speed_test",
+              "field_type": "decimal(10,1)",
+              "maps_to_property": "InstallOrder.speed_test_result",
+              "description": "测速结果"
+            },
+            {
+              "field_name": "light_test",
+              "field_type": "decimal(10,1)",
+              "maps_to_property": "InstallOrder.optical_power_db",
+              "description": "光功率测试值"
+            },
+            {
+              "field_name": "satisfaction",
+              "field_type": "int",
+              "maps_to_property": "InstallOrder.satisfaction_score",
+              "description": "客户满意度"
+            },
+            {
+              "field_name": "deal_gd_id",
+              "field_type": "varchar(64)",
+              "maps_to_property": "DispatchRecord.dispatch_id",
+              "description": "派单工单ID"
+            },
+            {
+              "field_name": "i0004_staff_id",
+              "field_type": "varchar(32)",
+              "maps_to_property": "Engineer.engineer_id",
+              "description": "工程师ID"
+            },
+            {
+              "field_name": "deal_level",
+              "field_type": "varchar(10)",
+              "maps_to_property": "Engineer.tech_level",
+              "description": "工程师技术级别"
+            },
+            {
+              "field_name": "deal_type",
+              "field_type": "varchar(20)",
+              "maps_to_property": "Engineer.employment_type",
+              "description": "用工类型"
+            },
+            {
+              "field_name": "book_time",
+              "field_type": "datetime",
+              "maps_to_property": "DispatchRecord.appointment_time",
+              "description": "预约时间"
+            },
+            {
+              "field_name": "arrive_time",
+              "field_type": "datetime",
+              "maps_to_property": "DispatchRecord.actual_arrival_time",
+              "description": "实际到达时间"
+            },
+            {
+              "field_name": "trans_num",
+              "field_type": "int",
+              "maps_to_property": "DispatchRecord.transfer_count",
+              "description": "转派次数"
+            },
+            {
+              "field_name": "hang_reason",
+              "field_type": "text",
+              "maps_to_property": "DispatchRecord.suspend_reason",
+              "description": "挂单原因"
+            },
+            {
+              "field_name": "book_chg_srv_cnt",
+              "field_type": "int",
+              "maps_to_property": "DispatchRecord.appointment_change_count",
+              "description": "预约变更次数"
+            },
+            {
+              "field_name": "td_time",
+              "field_type": "datetime",
+              "maps_to_property": "InstallChurn.churn_time",
+              "description": "退单时间"
+            },
+            {
+              "field_name": "td_reason",
+              "field_type": "text",
+              "maps_to_property": "InstallChurn.churn_reason_text",
+              "description": "退单原因文本"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 500000,
+          "sensitivity": "confidential"
+        },
+        {
+          "table_name": "IOM合单信息(日)",
+          "display_name": "IOM合单综合信息表",
+          "schema": "iom",
+          "description": "IOM系统汇聚的工单综合信息，含产品、地址等",
+          "key_fields": [
+            {
+              "field_name": "iom_order_id",
+              "field_type": "varchar(64)",
+              "is_primary_key": true,
+              "maps_to_property": "InstallOrder.order_no",
+              "description": "IOM工单ID"
+            },
+            {
+              "field_name": "iom_product_id",
+              "field_type": "varchar(32)",
+              "maps_to_property": "InstallOrder.product_id",
+              "description": "产品编码"
+            },
+            {
+              "field_name": "iom_product_name",
+              "field_type": "varchar(200)",
+              "maps_to_property": "InstallOrder.product_name",
+              "description": "产品名称"
+            },
+            {
+              "field_name": "stand_addr_detail",
+              "field_type": "varchar(500)",
+              "maps_to_property": "InstallOrder.install_address",
+              "description": "标准地址详情"
+            },
+            {
+              "field_name": "cancel_reason_date",
+              "field_type": "datetime",
+              "maps_to_property": "InstallChurn.churn_time",
+              "description": "退单时间"
+            },
+            {
+              "field_name": "cancel_reason_desc",
+              "field_type": "text",
+              "maps_to_property": "InstallChurn.churn_reason_text",
+              "description": "退单原因描述"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 500000,
+          "sensitivity": "confidential"
+        },
+        {
+          "table_name": "无条件受理明细",
+          "display_name": "无条件受理区域明细",
+          "schema": "resource",
+          "description": "无条件受理区域标准，含退单原因分类",
+          "key_fields": [
+            {
+              "field_name": "address_id",
+              "field_type": "varchar(64)",
+              "maps_to_property": "InstallOrder.install_address_id",
+              "description": "地址ID"
+            },
+            {
+              "field_name": "order_state",
+              "field_type": "varchar(20)",
+              "maps_to_property": "InstallOrder.order_status",
+              "description": "订单状态"
+            },
+            {
+              "field_name": "cb_cancel_reason_1",
+              "field_type": "varchar(50)",
+              "maps_to_property": "InstallChurn.churn_category_l1",
+              "description": "退单一级原因"
+            },
+            {
+              "field_name": "cb_cancel_reason_2",
+              "field_type": "varchar(100)",
+              "maps_to_property": "InstallChurn.churn_category_l2",
+              "description": "退单二级原因"
+            },
+            {
+              "field_name": "cb退撤单时间",
+              "field_type": "datetime",
+              "maps_to_property": "InstallChurn.churn_time",
+              "description": "退撤单时间"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 200000,
+          "sensitivity": "internal"
+        }
+      ],
+      "join_keys": [
+        {
+          "key_name": "cust_order_id",
+          "display_name": "工单编号",
+          "description": "跨工单/派单/退单/通话系统的主关联键",
+          "sensitivity": "internal"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    },
+    {
+      "source_id": "ds_bss_customer",
+      "display_name": "BSS客户管理系统",
+      "system_name": "cBSS业务支撑系统",
+      "description": "联通客户基础信息、星级、欠费状态、黑灰名单等",
+      "tables": [
+        {
+          "table_name": "Bss业务台账主表(日)",
+          "display_name": "客户基础信息表",
+          "schema": "bss",
+          "key_fields": [
+            {
+              "field_name": "cust_id",
+              "field_type": "varchar(64)",
+              "is_primary_key": true,
+              "maps_to_property": "Customer.customer_id",
+              "description": "客户ID（脱敏）"
+            },
+            {
+              "field_name": "cust_name",
+              "field_type": "varchar(100)",
+              "maps_to_property": "Customer.customer_name",
+              "description": "客户姓名（脱敏）"
+            },
+            {
+              "field_name": "contact_phone",
+              "field_type": "varchar(20)",
+              "maps_to_property": "Customer.contact_phone",
+              "description": "联系电话（脱敏）"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 10000000,
+          "sensitivity": "confidential"
+        },
+        {
+          "table_name": "黑灰名单信息(日)",
+          "display_name": "黑灰名单客户信息",
+          "schema": "risk",
+          "key_fields": [
+            {
+              "field_name": "is_black",
+              "field_type": "tinyint(1)",
+              "maps_to_property": "Customer.is_blacklist",
+              "description": "是否黑名单"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 100000,
+          "sensitivity": "confidential"
+        }
+      ],
+      "join_keys": [
+        {
+          "key_name": "cust_id",
+          "display_name": "客户ID",
+          "description": "脱敏后的用户唯一标识",
+          "sensitivity": "confidential"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    },
+    {
+      "source_id": "ds_engineer_call",
+      "display_name": "工程师外呼录音系统",
+      "system_name": "装维外呼录音平台/语音转文本采集",
+      "description": "工程师与客户通话的录音文件及ASR转写文本，是LF-002通话录音语义证据提取（E1~E25、E37）的核心数据来源",
+      "tables": [
+        {
+          "table_name": "语音转文本采集表(日)",
+          "display_name": "工程师外呼通话转写表",
+          "schema": "call_center",
+          "key_fields": [
+            {
+              "field_name": "contact_id",
+              "field_type": "varchar(64)",
+              "is_primary_key": true,
+              "maps_to_property": "EngineerCall.call_id",
+              "description": "通话记录ID"
+            },
+            {
+              "field_name": "asr_text",
+              "field_type": "text",
+              "maps_to_property": "EngineerCall.asr_text",
+              "description": "ASR转写文本（JSON含角色标记）"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "hourly",
+          "estimated_rows": 2000000,
+          "sensitivity": "confidential"
+        }
+      ],
+      "join_keys": [
+        {
+          "key_name": "caller_number",
+          "display_name": "工程师手机号",
+          "description": "通过工程师手机号与工单关联",
+          "sensitivity": "confidential"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    },
+    {
+      "source_id": "ds_callback_call",
+      "display_name": "人工坐席外呼系统",
+      "system_name": "中台人工坐席接触记录平台",
+      "description": "中台回访外呼及营销外呼的通话记录，含通话结果及转写文本",
+      "tables": [
+        {
+          "table_name": "人工坐席接触记录信息(日)",
+          "display_name": "坐席外呼接触记录表",
+          "schema": "call_center",
+          "key_fields": [
+            {
+              "field_name": "contact_id",
+              "field_type": "varchar(64)",
+              "is_primary_key": true,
+              "maps_to_property": "CallbackCall.call_id",
+              "description": "通话记录ID"
+            },
+            {
+              "field_name": "start_time",
+              "field_type": "datetime",
+              "maps_to_property": "CallbackCall.call_start_time",
+              "description": "通话开始时间"
+            },
+            {
+              "field_name": "contact_length",
+              "field_type": "int",
+              "maps_to_property": "CallbackCall.duration_seconds",
+              "description": "通话时长（秒）"
+            },
+            {
+              "field_name": "user_code",
+              "field_type": "varchar(64)",
+              "maps_to_property": "MarketingCall.related_customer_id",
+              "description": "客户编号"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 500000,
+          "sensitivity": "confidential"
+        }
+      ],
+      "join_keys": [
+        {
+          "key_name": "callee",
+          "display_name": "被叫号码",
+          "description": "通过被叫号码+时间窗口与工单关联",
+          "sensitivity": "confidential"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    },
+    {
+      "source_id": "ds_address_library",
+      "display_name": "地址资源库",
+      "system_name": "网络资源管理系统(NMS)/固网装机资源系统",
+      "description": "标准化地址库，记录地址级别、资源覆盖状态、无条件受理等信息",
+      "tables": [
+        {
+          "table_name": "固网装机资源订单表(日)",
+          "display_name": "固网装机资源地址表",
+          "schema": "nms",
+          "key_fields": [
+            {
+              "field_name": "address_id",
+              "field_type": "varchar(64)",
+              "is_primary_key": true,
+              "maps_to_property": "Address.address_id",
+              "description": "地址ID"
+            },
+            {
+              "field_name": "address_info",
+              "field_type": "varchar(500)",
+              "maps_to_property": "Address.standard_address_name",
+              "description": "标准地址名称"
+            },
+            {
+              "field_name": "address_level",
+              "field_type": "varchar(20)",
+              "maps_to_property": "Address.address_level",
+              "description": "地址等级"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 5000000,
+          "sensitivity": "internal"
+        }
+      ],
+      "join_keys": [
+        {
+          "key_name": "address_id",
+          "display_name": "地址ID",
+          "description": "与订单系统address_id的关联键",
+          "sensitivity": "internal"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    },
+    {
+      "source_id": "ds_pending_install",
+      "display_name": "待装审核库",
+      "system_name": "无条件受理待装库",
+      "description": "因网络资源不足进入等待队列的订单积压记录，以地址/小区维度汇聚",
+      "tables": [
+        {
+          "table_name": "无条件受理待装库明细",
+          "display_name": "待装库明细表",
+          "schema": "resource_plan",
+          "key_fields": [
+            {
+              "field_name": "order_id",
+              "field_type": "varchar(32)",
+              "is_primary_key": true,
+              "maps_to_property": "PendingPool.record_id",
+              "description": "待装记录ID"
+            },
+            {
+              "field_name": "trade_id",
+              "field_type": "varchar(32)",
+              "maps_to_property": "PendingPool.order_no",
+              "description": "关联工单号"
+            },
+            {
+              "field_name": "accept_date",
+              "field_type": "datetime",
+              "maps_to_property": "PendingPool.entry_time",
+              "description": "受理时间"
+            },
+            {
+              "field_name": "not_create_reason",
+              "field_type": "varchar(100)",
+              "maps_to_property": "PendingPool.pending_reason",
+              "description": "不建设原因"
+            }
+          ],
+          "sync_mode": "batch",
+          "sync_interval": "daily",
+          "estimated_rows": 100000,
+          "sensitivity": "internal"
+        }
+      ],
+      "join_keys": [
+        {
+          "key_name": "小区id",
+          "display_name": "小区ID",
+          "description": "与地址库关联的小区维度关联键",
+          "sensitivity": "internal"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    },
+    {
+      "source_id": "ds_competitor_call",
+      "display_name": "异网通话数据",
+      "system_name": "综采系统/话单系统",
+      "description": "客户与移动、电信、广电等竞争运营商的通话记录，通过客户号码匹配识别（E36证据来源）。暂不接入（per项目文档说明）。",
+      "tables": [],
+      "join_keys": [
+        {
+          "key_name": "customer_phone",
+          "display_name": "客户手机号",
+          "description": "通过客户手机号在异网话单中匹配识别",
+          "sensitivity": "confidential"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    },
+    {
+      "source_id": "ds_audit_result",
+      "display_name": "稽核结果存储",
+      "system_name": "退单稽核AI分析平台（本体平台内部）",
+      "description": "AI分析生成的退单稽核结论（现存储于InstallChurn扩展属性）、用户需求、操作审计日志等的持久化存储",
+      "tables": [
+        {
+          "table_name": "t_audit_result",
+          "display_name": "退单稽核结果表",
+          "schema": "audit",
+          "key_fields": [
+            {
+              "field_name": "churn_id",
+              "field_type": "varchar(64)",
+              "is_primary_key": true,
+              "maps_to_property": "InstallChurn.churn_id",
+              "description": "退单ID（稽核结果1:1挂载于退单对象）"
+            },
+            {
+              "field_name": "root_cause_code",
+              "field_type": "varchar(10)",
+              "maps_to_property": "InstallChurn.root_cause_code",
+              "description": "根因编码"
+            },
+            {
+              "field_name": "root_cause_confidence",
+              "field_type": "decimal(5,4)",
+              "maps_to_property": "InstallChurn.root_cause_confidence",
+              "description": "置信度"
+            },
+            {
+              "field_name": "evidence_chain_summary",
+              "field_type": "text",
+              "maps_to_property": "InstallChurn.evidence_chain_summary",
+              "description": "证据链摘要"
+            }
+          ],
+          "sync_mode": "cdc",
+          "sync_interval": "realtime",
+          "estimated_rows": 200000,
+          "sensitivity": "internal"
+        }
+      ],
+      "join_keys": [
+        {
+          "key_name": "churn_id",
+          "display_name": "退单记录ID",
+          "description": "与退单管理系统的关联键",
+          "sensitivity": "internal"
+        }
+      ],
+      "access_method": "jdbc",
+      "region": "待填写"
+    }
+  ],
+  "action_systems": [
+    {
+      "system_id": "as_workorder_update",
+      "display_name": "工单管理系统",
+      "system_name": "中台工单退单管理平台",
+      "description": "接收稽核结论，更新退单状态，并驱动后续流转",
+      "system_type": "work_order",
+      "triggered_by_actions": [
+        "ArchiveAuditAutomatic",
+        "ArchiveAuditManual",
+        "OverrideInferenceResult"
+      ],
+      "write_operations": [
+        {
+          "operation": "更新退单稽核状态",
+          "target_api": "PUT /api/churn/{churn_id}/status",
+          "data_format": "json",
+          "description": "将AI稽核结论或人工确认结果回写至退单稽核状态"
+        },
+        {
+          "operation": "追加稽核备注",
+          "target_api": "POST /api/churn/{churn_id}/notes",
+          "data_format": "json",
+          "description": "将分析依据摘要写入工单备注字段"
+        }
+      ],
+      "feedback_to_objects": [
+        "InstallChurn"
+      ],
+      "access_method": "rest_api",
+      "region": "待填写"
+    },
+    {
+      "system_id": "as_outbound_call",
+      "display_name": "外呼执行系统",
+      "system_name": "中台坐席外呼执行平台",
+      "description": "接收回访或营销外呼任务，由坐席发起外呼，结果回写通话对象",
+      "system_type": "notification",
+      "triggered_by_actions": [
+        "CreateSupplementaryCallbackCall",
+        "CreateMandatoryCallbackCall",
+        "CreateMarketingCallRecord"
+      ],
+      "write_operations": [
+        {
+          "operation": "创建补全回访外呼任务",
+          "target_api": "POST /api/outbound/callback-task",
+          "data_format": "json",
+          "description": "ACT-007触发，将补全回访任务下发给中台坐席"
+        },
+        {
+          "operation": "创建强制核实外呼任务",
+          "target_api": "POST /api/outbound/callback-task",
+          "data_format": "json",
+          "description": "ACT-008触发，高优先级外呼"
+        },
+        {
+          "operation": "创建营销外呼任务",
+          "target_api": "POST /api/outbound/marketing-task",
+          "data_format": "json",
+          "description": "ACT-012触发，将挽回营销任务下发给中台坐席"
+        }
+      ],
+      "feedback_to_objects": [
+        "CallbackCall",
+        "MarketingCall",
+        "UserDemand"
+      ],
+      "access_method": "rest_api",
+      "region": "待填写"
+    },
+    {
+      "system_id": "as_engineer_training",
+      "display_name": "工程师培训管理系统",
+      "system_name": "装维人员培训考核平台",
+      "description": "接收工程师培训任务（ACT-010触发），执行培训后将结果回写工程师培训完成情况",
+      "system_type": "crm",
+      "triggered_by_actions": [
+        "WriteEngineerTrainingRecord"
+      ],
+      "write_operations": [
+        {
+          "operation": "创建培训任务",
+          "target_api": "POST /api/training/task",
+          "data_format": "json",
+          "description": "针对施工质量根因的工程师，派发对应技能培训任务"
+        }
+      ],
+      "feedback_to_objects": [
+        "Engineer"
+      ],
+      "access_method": "rest_api",
+      "region": "待填写"
+    },
+    {
+      "system_id": "as_network_resource",
+      "display_name": "网络资源管理系统",
+      "system_name": "NMS网络资源管理系统",
+      "description": "接收资源派修指令（ACT-011触发），执行网络资源建设后回写地址资源状态",
+      "system_type": "oss",
+      "triggered_by_actions": [
+        "InitiateResourceRepair"
+      ],
+      "write_operations": [
+        {
+          "operation": "发起资源派修工单",
+          "target_api": "POST /api/resource/repair-task",
+          "data_format": "json",
+          "description": "向网络资源系统发起资源建设或维修任务"
+        }
+      ],
+      "feedback_to_objects": [
+        "Address"
+      ],
+      "access_method": "rest_api",
+      "region": "待填写"
+    }
+  ],
+  "logic_sources": [
+    {
+      "model_id": "lf_001_collect_order_context",
+      "display_name": "LF-001 工单上下文采集",
+      "model_type": "rule_engine",
+      "description": "以churnTime为锚点回溯72小时，聚合10类本体对象实例。由Automate监听auditStatus=推理中后触发。纯查询，不写任何本体对象。",
+      "used_in_actions": [
+        "AcceptCancellationAudit"
+      ],
+      "input_spec": "churnId: string; churnTime: DateTime",
+      "output_spec": "OrderContext结构体：{churn, order, customer, engineer, address, pendingPool[], dispatchRecords[], engineerCalls[], callbackCalls[], competitorCalls[]}",
+      "reads_objects": [
+        "InstallChurn",
+        "InstallOrder",
+        "Customer",
+        "Engineer",
+        "Address",
+        "PendingPool",
+        "DispatchRecord",
+        "EngineerCall",
+        "CallbackCall",
+        "CompetitorCall"
+      ],
+      "deployment": "private",
+      "provider": "自研",
+      "version": "1.0"
+    },
+    {
+      "model_id": "lf_002_extract_call_evidence",
+      "display_name": "LF-002 通话录音语义证据提取",
+      "model_type": "llm",
+      "description": "一次LLM调用覆盖所有NLP类证据（E1~E25+E37共26条）。纯计算，不写本体，输出供LF-004使用。",
+      "used_in_actions": [],
+      "input_spec": "engineerCalls: Engineer_CALL[]; callbackCalls: CallbackCall[]; evidenceConfig: EvidenceDef[]（E1~E25+E37）",
+      "output_spec": "NLPEvidenceResult[]：[{evidenceID, hit: boolean, rawText}]（26条NLP类证据）",
+      "reads_objects": [
+        "EngineerCall",
+        "CallbackCall"
+      ],
+      "deployment": "private",
+      "provider": "DeepSeek",
+      "version": "V3"
+    },
+    {
+      "model_id": "lf_003_compute_rule_evidence",
+      "display_name": "LF-003 规则类证据计算",
+      "model_type": "rule_engine",
+      "description": "纯规则计算，不调用LLM，不写本体。与LF-002并行执行后合并为37条证据集（E26~E36为规则类证据，共14条）。",
+      "used_in_actions": [],
+      "input_spec": "orderContext: OrderContext（LF-001输出）",
+      "output_spec": "RuleEvidenceResult[]：[{evidenceID, hit: boolean, gradeValue}]（14条Rule类证据）",
+      "reads_objects": [
+        "InstallOrder",
+        "Address",
+        "Customer",
+        "Engineer",
+        "PendingPool",
+        "EngineerCall",
+        "CallbackCall",
+        "CompetitorCall"
+      ],
+      "deployment": "private",
+      "provider": "自研",
+      "version": "1.0"
+    },
+    {
+      "model_id": "lf_004_evidence_causal_mapping",
+      "display_name": "LF-004 证据-原因映射推理",
+      "model_type": "rule_engine",
+      "description": "Step1矩阵查询/Step2加权求和+Sigmoid/Step3责任锁定检查。不读写任何本体对象（纯内存矩阵运算）。输出供LF-005编排调用。",
+      "used_in_actions": [],
+      "input_spec": "evidenceSnapshot: EvidenceResult[]（40条）; mappingMatrix: Matrix（40×24×8档）; weightConfig: {rule:1.2, nlp:1.0, manual:1.5}",
+      "output_spec": "CausalMappingResult：{secondaryCauseScores: {[causeID]: float}, lockFlags: {lockCause?, escalate?}, conflictList: ConflictItem[]}",
+      "reads_objects": [],
+      "deployment": "private",
+      "provider": "自研",
+      "version": "1.0"
+    },
+    {
+      "model_id": "lf_005_run_inference_engine",
+      "display_name": "LF-005 推理引擎主编排",
+      "model_type": "hybrid",
+      "description": "不直接写本体。输出routingDecision供Automate判断触发哪个Action（ACT-002a/003/007/008）。路径：Automate监听auditStatus=推理中→触发以LF-005为后端的Function-backed Action→LF-005内部调用LF-004/LF-006算出结论→输出routingDecision→Automate再根据routingDecision触发对应的Rules-based Action。",
+      "used_in_actions": [],
+      "input_spec": "churnId: string; evidenceSnapshot: EvidenceResult[]（40条）",
+      "output_spec": "InferenceResult：{rootCauseCode, rootCauseLevelOne, rootCauseLevelTwo, rootCauseConfidence, secondaryCauseLabel, evidenceChainSummary, reasoningPathSnapshot, routingDecision: enum（AutoArchive/Escalate/SupplementCallback/MandatoryCallback）, callbackVerifiedRequired: boolean}",
+      "reads_objects": [],
+      "deployment": "private",
+      "provider": "自研",
+      "version": "1.0"
+    },
+    {
+      "model_id": "lf_006_llm_semantic_refinement",
+      "display_name": "LF-006 大模型归因推理微调",
+      "model_type": "llm",
+      "description": "按需触发（LF-005检测到冲突证据时调用）。基于大模型能力修正归因分数，幅度硬限制±0.3。不读写任何本体对象（纯LLM计算）。",
+      "used_in_actions": [],
+      "input_spec": "conflictEvidenceList: ConflictItem[]; initialScores: {[causeID]: float}",
+      "output_spec": "RefinementVector: {[causeID]: delta}（|delta|≤0.3，硬限制）",
+      "reads_objects": [],
+      "deployment": "private",
+      "provider": "DeepSeek",
+      "version": "V3"
+    },
+    {
+      "model_id": "lf_007_route_execution_action",
+      "display_name": "LF-007 执行动作路由决策",
+      "model_type": "rule_engine",
+      "description": "归档后的下游执行路由：施工-S3→ACT-010；资源-R1/R4→ACT-011；用户原因→ACT-012。输出决策列表，由Automate监听归档事件后依次触发各Action。",
+      "used_in_actions": [
+        "ArchiveAuditAutomatic",
+        "ArchiveAuditManual",
+        "OverrideInferenceResult"
+      ],
+      "input_spec": "rootCauseLevelOne: enum; rootCauseLevelTwo: enum; churnId: string",
+      "output_spec": "ActionRouteDecision：{actions: [{actionType, targetObjectID, params}]}",
+      "reads_objects": [
+        "InstallChurn",
+        "InstallOrder",
+        "Engineer",
+        "Address",
+        "Customer"
+      ],
+      "deployment": "private",
+      "provider": "自研",
+      "version": "1.0"
+    },
+    {
+      "model_id": "lf_008_extract_demand_from_marketing",
+      "display_name": "LF-008 营销外呼需求识别",
+      "model_type": "llm",
+      "description": "从营销外呼录音中识别需求意愿和强度。输出供后续Action更新UserDemand。",
+      "used_in_actions": [
+        "CreateMarketingCallRecord"
+      ],
+      "input_spec": "marketingCallAsrText: string; existingDemand: UserDemand",
+      "output_spec": "DemandUpdate：{demandType, demandStatus, demandIntensity, discoverySource}",
+      "reads_objects": [
+        "MarketingCall",
+        "UserDemand"
+      ],
+      "deployment": "private",
+      "provider": "DeepSeek",
+      "version": "V3"
+    }
+  ]
+}
