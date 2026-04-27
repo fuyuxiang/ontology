@@ -129,7 +129,14 @@
             </div>
             <div class="harness__field" v-if="selectedNode.type === 'ontology-query'">
               <label>本体对象</label>
-              <input class="harness__input" v-model="selectedNode.data.ontology_type" @input="store.markDirty()" placeholder="如 InstallOrder" />
+              <select class="harness__input" v-model="selectedNode.data.ontology_type" @change="store.markDirty()">
+                <option value="">-- 选择本体对象 --</option>
+                <optgroup v-for="tier in [1,2,3]" :key="tier" :label="`T${tier} ${{ 1:'核心', 2:'领域', 3:'场景' }[tier]}`">
+                  <option v-for="e in ontologyStore.entities.filter(e => e.tier === tier)" :key="e.id" :value="e.name">
+                    {{ e.name_cn }}（{{ e.name }}）
+                  </option>
+                </optgroup>
+              </select>
             </div>
             <div class="harness__field" v-if="selectedNode.type === 'llm-inference'">
               <label>Prompt 模板</label>
@@ -227,8 +234,10 @@ import '@vue-flow/minimap/dist/style.css'
 import WorkflowNode from '../../components/harness/nodes/WorkflowNode.vue'
 import SceneWizard from '../../components/harness/SceneWizard.vue'
 import { useHarnessStore } from '../../store/harness'
+import { useOntologyStore } from '../../store/ontology'
 
 const store = useHarnessStore()
+const ontologyStore = useOntologyStore()
 const route = useRoute()
 const router = useRouter()
 const canvasWrap = ref<HTMLElement>()
@@ -313,6 +322,7 @@ watch(() => store.executionLog, (log) => {
 
 onMounted(async () => {
   await store.loadList()
+  if (ontologyStore.entities.length === 0) ontologyStore.fetchEntities()
   const id = route.query.id as string
   if (id) await store.loadWorkflow(id)
 })
