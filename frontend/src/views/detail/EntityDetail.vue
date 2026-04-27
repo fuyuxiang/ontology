@@ -129,7 +129,7 @@
           <svg class="spin" width="20" height="20" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="var(--neutral-300)" stroke-width="2"/><path d="M10 2a8 8 0 018 8" stroke="var(--semantic-500)" stroke-width="2" stroke-linecap="round"/></svg>
           <span class="text-caption">加载数据实例...</span>
         </div>
-        <div v-else-if="!instancePreview || !instancePreview.source_table" class="placeholder-tab">
+        <div v-else-if="!instancePreview || !instancePreview.table_name" class="placeholder-tab">
           <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
             <rect x="8" y="8" width="24" height="24" rx="4" stroke="var(--neutral-300)" stroke-width="2"/>
             <path d="M14 20h12M14 15h8M14 25h6" stroke="var(--neutral-300)" stroke-width="2" stroke-linecap="round"/>
@@ -145,8 +145,8 @@
               <code class="instance-source-name">{{ instancePreview.datasource_name }}</code>
               <span class="instance-source-sep">·</span>
               <span class="instance-source-label">表</span>
-              <code class="instance-source-name">{{ instancePreview.source_table }}</code>
-              <span class="instance-total">共 {{ instancePreview.total }} 条记录</span>
+              <code class="instance-source-name">{{ instancePreview.table_name }}</code>
+              <span class="instance-total">共 {{ instancePreview.total_rows }} 条记录</span>
             </div>
             <!-- 字段覆盖率 -->
             <div class="instance-coverage" v-if="instanceFields.length">
@@ -173,8 +173,8 @@
               </thead>
               <tbody>
                 <tr v-for="(row, i) in instancePreview.rows" :key="i">
-                  <td v-for="col in instancePreview.columns" :key="col">
-                    <span class="instance-cell">{{ row[col] ?? '—' }}</span>
+                  <td v-for="(col, ci) in instancePreview.columns" :key="col">
+                    <span class="instance-cell">{{ row[ci] ?? '—' }}</span>
                   </td>
                 </tr>
               </tbody>
@@ -182,10 +182,10 @@
           </div>
 
           <!-- 分页 -->
-          <div class="instance-pagination" v-if="instancePreview.total > instancePreview.page_size">
+          <div class="instance-pagination" v-if="instancePreview.total_rows > instancePreview.page_size">
             <button class="page-btn" :disabled="instancePage === 1" @click="instancePage--">‹ 上一页</button>
-            <span class="page-info">第 {{ instancePage }} 页 / 共 {{ Math.ceil(instancePreview.total / instancePreview.page_size) }} 页</span>
-            <button class="page-btn" :disabled="instancePage >= Math.ceil(instancePreview.total / instancePreview.page_size)" @click="instancePage++">下一页 ›</button>
+            <span class="page-info">第 {{ instancePage }} 页 / 共 {{ Math.ceil(instancePreview.total_rows / instancePreview.page_size) }} 页</span>
+            <button class="page-btn" :disabled="instancePage >= Math.ceil(instancePreview.total_rows / instancePreview.page_size)" @click="instancePage++">下一页 ›</button>
           </div>
         </template>
       </template>
@@ -322,7 +322,7 @@ watch(instancePage, () => { if (activeTab.value === '数据实例') loadInstance
 const fieldAttrMap = computed(() => {
   const map: Record<string, string> = {}
   for (const f of instanceFields.value) {
-    if (f.source_field && f.attr_name) map[f.source_field] = f.attr_name
+    if (f.source_field && f.attribute_name) map[f.source_field] = f.attribute_name
   }
   return map
 })
