@@ -1,18 +1,51 @@
-.DS_Store
-.idea/
-
-# Python cache and local environments
+# Python
 __pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.venv/
+*.pyc
+backend/venv/
 
-# Backend runtime artifacts
-.run/
-backend/runtime/*
-!backend/runtime/.gitkeep
+# Node
+node_modules/
+dist/
+dist-ssr/
 
-# Frontend install/build artifacts
-frontend/node_modules/
-frontend/dist/
+# Database
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Environment variables
+.env
+.env.*
+*.local
+
+# Logs
+*.log
+*.pid
+logs/
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Upload & temp files
+backend/uploads/
+tmp/
+
+# IDE / editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS
+.DS_Store
+
+# AI workspace
+.claude/
+.workbuddy/
