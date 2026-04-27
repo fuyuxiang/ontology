@@ -51,6 +51,13 @@
             <span class="form-hint">{{ aiText.length }} / 8000 字符</span>
           </div>
           <div v-else>
+            <div class="tpl-download" style="margin-bottom:10px">
+              <div class="tpl-download__info">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 11v1a1 1 0 001 1h8a1 1 0 001-1v-1" stroke="var(--status-info)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>不知道怎么写？下载描述模板参考</span>
+              </div>
+              <a href="/ontology_ai_template.md" download="ontology_ai_template.md" class="btn-sm">下载模板</a>
+            </div>
             <div class="file-picker" @click="aiFileRef?.click()">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 4v12M8 8l4-4 4 4M4 18h16" stroke="var(--neutral-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               <span v-if="aiFile" class="file-name">{{ aiFile.name }}</span>
