@@ -8,7 +8,7 @@
           <h2 class="explorer__summary-title">对象概览</h2>
           <p class="explorer__summary-subtitle">左侧仅展示 Tier 1 到 Tier 3 的对象数量</p>
         </div>
-        <button class="explorer__add-btn" @click="showCreateEntity = true">
+        <button class="explorer__add-btn" @click="router.push('/ontology/create')">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
@@ -310,6 +310,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import EntityCard, { type Entity } from '../../components/common/EntityCard.vue'
 import TierBadge from '../../components/common/TierBadge.vue'
 import EntityCreateForm from '../../components/common/EntityCreateForm.vue'
@@ -318,6 +319,8 @@ import ModalDialog from '../../components/common/ModalDialog.vue'
 import { relationApi } from '../../api/relations'
 import { useToast } from '../../composables/useToast'
 import { useOntologyStore } from '../../store/ontology'
+
+const router = useRouter()
 
 const store = useOntologyStore()
 const toast = useToast()
