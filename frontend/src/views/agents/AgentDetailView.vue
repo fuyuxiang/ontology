@@ -2,7 +2,7 @@
   <div class="harness">
     <div class="harness__topbar">
       <div class="harness__topbar-left">
-        <button class="harness__btn harness__btn--ghost" @click="router.push('/agents')" style="padding: 4px 8px">
+        <button class="harness__btn harness__btn--ghost" @click="router.push('/service/agent')" style="padding: 4px 8px">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           返回
         </button>

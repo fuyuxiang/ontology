@@ -193,7 +193,7 @@ const moduleCards = computed<ModuleCard[]>(() => {
       key: 'module:integrations', title: 'INTEGRATIONS', label: '集成出口',
       metric: String(recentActivityCount.value), metricLabel: '实时事件',
       description: '把场景结果推送到工单、外呼、短信或外部接口。',
-      route: '/copilot', secondaryRoute: '/datasource',
+      route: '/service/agent', secondaryRoute: '/datasource',
       primaryLabel: '打开智能对话', secondaryLabel: '查看数据工坊',
       placement: 'top', tone: 'kinetic', badge: '上层能力',
       stageAffinity: ['wield'],

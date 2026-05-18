@@ -136,7 +136,6 @@ const navGroups = [
   ]},
   { label: '系统设置', items: [
     { path: '/settings/models', label: '模型管理', icon: ico.model },
-    { path: '/settings/tools', label: '工具管理', icon: ico.tool },
     { path: '/governance/audit', label: '权限审计', icon: ico.audit },
     { path: '/settings/monitor', label: '运维监控', icon: ico.tracking },
     { path: '/settings/general', label: '系统配置', icon: ico.settings },
