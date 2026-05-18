@@ -83,7 +83,7 @@
                   <div class="platform-tooltip">
                     <div class="platform-tooltip-name">{{ node.label }}</div>
                     <div class="platform-tooltip-desc">{{ node.desc }}</div>
-                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }}</div>
+                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }} · 动作 {{ node.actionCount }}</div>
                   </div>
                 </div>
               </div>
@@ -102,7 +102,7 @@
                   <div class="platform-tooltip">
                     <div class="platform-tooltip-name">{{ node.label }}</div>
                     <div class="platform-tooltip-desc">{{ node.desc }}</div>
-                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }}</div>
+                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }} · 动作 {{ node.actionCount }}</div>
                   </div>
                 </div>
               </div>
@@ -646,9 +646,9 @@ const DATASOURCE_ICON_ITEMS = [
   { icon: WORKFLOW_ICON, label: '客户信息' },
 ]
 const LOGIC_ICON_ITEMS = [
-  { icon: WORKFLOW_ICON, label: 'Deepseekv3' },
-  { icon: WORKFLOW_ICON, label: 'ASR' },
-  { icon: WORKFLOW_ICON, label: 'Qwen2.5-VL' },
+  { icon: WORKFLOW_ICON, label: 'Actions' },
+  { icon: WORKFLOW_ICON, label: 'Functions' },
+  { icon: WORKFLOW_ICON, label: 'Rules' },
 ]
 const ACTIONS_ICON_ITEMS = [
   { icon: WORKFLOW_ICON, label: '二次营销外呼' },
@@ -690,10 +690,16 @@ function resolveCardItems(card: any): string[] {
       if (!dsList.length) items.push('暂无数据源')
     } else if (item.type === 'rule_priority') {
       const rp = s.rule_priority ?? []
-      items.push(...(rp.length ? rp.map((r: any) => `${r.priority} 优先级: ${r.count}`) : ['暂无规则']))
+      if (rp.length) {
+        items.push(...rp.map((r: any) => `${r.priority} 优先级: ${r.count}`))
+      } else {
+        items.push(`Actions: ${s.action_count ?? 0} (今日${s.today_action_executions ?? 0}次)`)
+        items.push(`Functions: ${s.function_count ?? 0} (今日${s.today_function_calls ?? 0}次)`)
+        items.push(`Rules: ${s.rule_count ?? 0} (告警${s.today_rule_alerts ?? 0}次)`)
+      }
     } else if (item.type === 'recent_activities') {
       const acts = s.recent_activities?.slice(0, item.count ?? 5) ?? []
-      items.push(...(acts.length ? acts.map((a: any) => a.description || a.name || a.target_name) : ['暂无动态']))
+      items.push(...(acts.length ? acts.map((a: any) => `${a.user_name || '系统'} ${a.action} ${a.target_name || a.target_type}`) : ['暂无动态']))
     }
   }
   return items.slice(0, 8)

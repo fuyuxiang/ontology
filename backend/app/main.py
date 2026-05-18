@@ -110,6 +110,14 @@ from app.api.v1.resolution import router as resolution_router
 from app.api.v1.governance import router as governance_router
 from app.api.v1.prompt_templates import router as prompt_templates_router
 from app.api.v1.ai_ontology import router as ai_ontology_router
+from app.api.v1.ontology_api import router as ontology_api_router
+from app.api.v1.osdk import router as osdk_router
+from app.api.v1.ontology_publish import router as ontology_publish_router
+from app.api.v1.traces import router as traces_router
+from app.api.v1.evals import router as evals_router
+from app.api.v1.actions import router as actions_router
+from app.api.v1.functions import router as functions_router
+from app.api.v1.monitor import router as monitor_router
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +255,14 @@ app.include_router(resolution_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
 app.include_router(prompt_templates_router, prefix="/api/v1")
 app.include_router(ai_ontology_router, prefix="/api/v1")
+app.include_router(ontology_api_router, prefix="/api/v1")
+app.include_router(osdk_router, prefix="/api/v1")
+app.include_router(ontology_publish_router, prefix="/api/v1")
+app.include_router(traces_router, prefix="/api/v1")
+app.include_router(evals_router, prefix="/api/v1")
+app.include_router(actions_router, prefix="/api/v1")
+app.include_router(functions_router, prefix="/api/v1")
+app.include_router(monitor_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

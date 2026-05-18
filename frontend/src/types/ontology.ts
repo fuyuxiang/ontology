@@ -82,6 +82,7 @@ export interface OntologyEntity {
   relations: EntityRelationDetail[]
   rules: RuleDetail[]
   actions: ActionDetail[]
+  functions: FunctionDetail[]
   created_at: string
   updated_at: string
   created_by: string | null
@@ -123,6 +124,23 @@ export interface ActionDetail {
   type: string
   status: string
   impact_count: number | null
+  parameters_json: any[] | null
+  preconditions_json: any[] | null
+  effects_json: any[] | null
+  action_meta_json: Record<string, any> | null
+  created_at: string | null
+}
+
+// 后端返回的函数详情
+export interface FunctionDetail {
+  id: string
+  name: string
+  description: string
+  return_type: string
+  logic_type: string
+  is_derived_property: boolean
+  status: string
+  execution_count: number
 }
 
 // ── 实体列表项（轻量版，匹配后端 snake_case）──
@@ -146,6 +164,9 @@ export interface GraphNode {
   tier: Tier
   status: EntityStatus
   relation_count: number
+  action_count: number
+  rule_count: number
+  function_count: number
 }
 
 export interface GraphEdge {

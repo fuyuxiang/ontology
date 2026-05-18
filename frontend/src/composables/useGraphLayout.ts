@@ -1,4 +1,5 @@
 import { MarkerType, Position, type Node, type Edge } from '@vue-flow/core'
+import { forceSimulation, forceLink, forceManyBody, forceCenter, forceCollide } from 'd3-force'
 import type { GraphData } from '../types'
 
 export interface DataLayerItem {
@@ -6,31 +7,44 @@ export interface DataLayerItem {
   field_count: number; record_count: number; datasource_name: string
 }
 
+interface SimNode {
+  id: string
+  x: number
+  y: number
+  tier: number
+}
+
+interface SimLink {
+  source: string
+  target: string
+}
+
 export function useGraphLayout() {
   function transformGraphData(data: GraphData, _direction: 'LR' | 'TB' = 'LR') {
-    // 按 tier 分组
-    const byTier: Record<number, typeof data.nodes> = { 1: [], 2: [], 3: [] }
-    for (const n of data.nodes) {
-      const t = n.tier as 1 | 2 | 3
-      if (byTier[t]) byTier[t].push(n)
-      else byTier[3].push(n)
-    }
+    const simNodes: SimNode[] = data.nodes.map(n => ({
+      id: n.id,
+      x: (Math.random() - 0.5) * 400,
+      y: (Math.random() - 0.5) * 400,
+      tier: n.tier as number,
+    }))
 
-    const NODE_W = 160
-    const NODE_H = 80
-    const H_GAP = 60
-    const V_GAP = 120
-    const TIER_Y: Record<number, number> = { 1: 0, 2: NODE_H + V_GAP, 3: (NODE_H + V_GAP) * 2 }
+    const simLinks: SimLink[] = data.edges.map(e => ({
+      source: e.from_id,
+      target: e.to_id,
+    }))
+
+    const simulation = forceSimulation(simNodes as any)
+      .force('link', forceLink(simLinks as any).id((d: any) => d.id).distance(160))
+      .force('charge', forceManyBody().strength(-500))
+      .force('center', forceCenter(0, 0))
+      .force('collide', forceCollide(60))
+      .stop()
+
+    for (let i = 0; i < 200; i++) simulation.tick()
 
     const posMap = new Map<string, { x: number; y: number }>()
-
-    for (const tier of [1, 2, 3]) {
-      const group = byTier[tier]
-      const totalW = group.length * NODE_W + (group.length - 1) * H_GAP
-      const startX = -totalW / 2
-      group.forEach((n, i) => {
-        posMap.set(n.id, { x: startX + i * (NODE_W + H_GAP), y: TIER_Y[tier] })
-      })
+    for (const n of simNodes) {
+      posMap.set(n.id, { x: n.x, y: n.y })
     }
 
     const nodes: Node[] = data.nodes.map(n => ({
@@ -44,9 +58,12 @@ export function useGraphLayout() {
         status: n.status,
         relCount: n.relation_count,
         attrCount: (n as any).attr_count ?? 0,
+        actionCount: (n as any).action_count ?? 0,
+        ruleCount: (n as any).rule_count ?? 0,
+        functionCount: (n as any).function_count ?? 0,
       },
-      sourcePosition: Position.Bottom,
-      targetPosition: Position.Top,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
     }))
 
     const edges: Edge[] = data.edges.map(e => ({
@@ -73,7 +90,7 @@ export function useGraphLayout() {
       nodes.push({
         id: dnId,
         type: 'dataNode',
-        position: { x: parent.position.x + 20, y: parent.position.y + 110 },
+        position: { x: parent.position.x + 20, y: parent.position.y + 100 },
         data: { ...item },
       })
       edges.push({

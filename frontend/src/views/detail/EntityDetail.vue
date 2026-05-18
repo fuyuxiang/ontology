@@ -113,6 +113,7 @@
             <div class="action-item__info">
               <span class="action-item__name text-body-medium">{{ act.name }}</span>
               <span class="action-item__type text-caption">{{ act.type }}</span>
+              <span v-if="act.impact_count" class="action-item__count text-caption">已执行 {{ act.impact_count }} 次</span>
             </div>
             <span class="action-status" :class="`action-status--${act.status}`">{{ act.status }}</span>
             <button class="action-exec-btn">
@@ -120,6 +121,32 @@
               执行
             </button>
           </div>
+        </div>
+      </template>
+
+      <!-- 函数 -->
+      <template v-else-if="activeTab === '函数'">
+        <table class="data-table" v-if="functions.length">
+          <thead>
+            <tr><th>函数名称</th><th>返回类型</th><th>逻辑类型</th><th>类别</th><th>调用次数</th><th>状态</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="fn in functions" :key="fn.id">
+              <td><code class="text-code">{{ fn.name }}</code></td>
+              <td><span class="type-tag">{{ fn.return_type }}</span></td>
+              <td class="text-caption">{{ fn.logic_type }}</td>
+              <td><span class="type-tag" :class="fn.is_derived_property ? 'type-tag--derived' : ''">{{ fn.is_derived_property ? '派生属性' : '独立函数' }}</span></td>
+              <td class="text-caption">{{ fn.execution_count }}</td>
+              <td><span class="status-dot" :class="fn.status === 'active' ? 'status-dot--success' : 'status-dot--warning'"></span></td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="placeholder-tab">
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <path d="M12 12l-4 8 4 8M28 12l4 8-4 8" stroke="var(--neutral-300)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M22 8L18 32" stroke="var(--neutral-300)" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <p class="text-caption">该实体暂无绑定函数</p>
         </div>
       </template>
 
@@ -281,7 +308,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useOntologyStore()
 const activeTab = ref('属性')
-const tabs = ['属性', '关系', '规则', '动作', '数据实例', '智能体', '血缘']
+const tabs = ['属性', '关系', '规则', '动作', '函数', '数据实例', '智能体', '血缘']
 
 const entityId = computed(() => route.params.id as string)
 
@@ -299,8 +326,9 @@ const entity = computed(() => detail.value ? {
   relations: detail.value.relations.length,
   rules: detail.value.rules.length,
   actions: detail.value.actions.length,
+  functions: detail.value.functions?.length ?? 0,
   status: detail.value.status as 'active' | 'warning' | 'error',
-} : { id: '', name: '加载中...', nameCn: '', tier: 1 as const, attrs: 0, relations: 0, rules: 0, actions: 0, status: 'active' as const })
+} : { id: '', name: '加载中...', nameCn: '', tier: 1 as const, attrs: 0, relations: 0, rules: 0, actions: 0, functions: 0, status: 'active' as const })
 
 const tierLabel = computed(() => ({ 1: '核心对象', 2: '领域对象', 3: '场景对象' }[entity.value.tier]))
 const statusLabel = computed(() => ({ active: '活跃', warning: '警告', error: '异常' }[entity.value.status]))
@@ -323,6 +351,7 @@ const metrics = computed(() => [
   { label: '关系', value: entity.value.relations, trend: 0 },
   { label: '规则', value: entity.value.rules, trend: 0 },
   { label: '动作', value: entity.value.actions, trend: 0 },
+  { label: '函数', value: entity.value.functions, trend: 0 },
 ])
 
 const attrs = computed(() =>
@@ -349,6 +378,16 @@ const rules = computed(() =>
 const actions = computed(() =>
   detail.value?.actions.map(a => ({
     id: a.id, name: a.name, type: a.type, status: a.status,
+    impact_count: a.impact_count, parameters_json: a.parameters_json,
+  })) ?? []
+)
+
+const functions = computed(() =>
+  detail.value?.functions?.map(f => ({
+    id: f.id, name: f.name, description: f.description,
+    return_type: f.return_type, logic_type: f.logic_type,
+    is_derived_property: f.is_derived_property, status: f.status,
+    execution_count: f.execution_count,
   })) ?? []
 )
 
