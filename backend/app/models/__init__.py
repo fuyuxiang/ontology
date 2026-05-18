@@ -11,6 +11,10 @@ from app.models.agent import ModelRegistry, Agent
 from app.models.prompt_template import PromptTemplate
 from app.models.trace import AgentTrace
 from app.models.eval import EvalSuite, EvalCase, EvalRun, EvalResult
+from app.models.version import (
+    OntologyVersion, OntologyVersionEntity,
+    OntologyVersionAttribute, OntologyVersionRelation,
+)
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
@@ -19,4 +23,6 @@ __all__ = [
     "DataSource", "Workflow", "WorkflowExecution", "DashboardConfig",
     "ModelRegistry", "Agent", "PromptTemplate",
     "AgentTrace", "EvalSuite", "EvalCase", "EvalRun", "EvalResult",
+    "OntologyVersion", "OntologyVersionEntity",
+    "OntologyVersionAttribute", "OntologyVersionRelation",
 ]
