@@ -68,7 +68,7 @@ function handleLogout() {
 
 function goGovernance() {
   emit('close')
-  router.push('/governance')
+  router.push('/governance/settings')
 }
 </script>
 
