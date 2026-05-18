@@ -22,7 +22,7 @@ const router = createRouter({
       ]
     },
     { path: '/browser/graph', name: 'browser-graph', component: () => import('../views/dataflow/DataflowView.vue'), meta: { title: '本体图谱' } },
-    { path: '/ontology/versions', name: 'ontology-versions', component: Placeholder, meta: { title: '版本发布' } },
+    { path: '/ontology/publish', name: 'ontology-publish', component: () => import('../views/ontology/OntologyPublishView.vue'), meta: { title: '本体发布' } },
     { path: '/ontology/create', name: 'ontology-create', component: () => import('../views/ontology/EntityCreateView.vue'), meta: { title: '新建本体对象' } },
     { path: '/ontology/:id', name: 'ontology-detail', component: () => import('../views/detail/EntityDetail.vue'), meta: { title: '实体详情' } },
 
@@ -32,21 +32,27 @@ const router = createRouter({
     { path: '/data/quality', name: 'data-quality', component: Placeholder, meta: { title: '数据质量' } },
     { path: '/data/resolution', name: 'data-resolution', component: () => import('../views/resolution/ResolutionView.vue'), meta: { title: '实体解析' } },
 
-    // 智能编排
-    { path: '/orchestration/semantic', name: 'orch-semantic', component: Placeholder, meta: { title: '语义封装' } },
-    { path: '/orchestration/prompts', name: 'orch-prompts', component: () => import('../views/orchestration/PromptTemplatesView.vue'), meta: { title: 'Prompt模板' } },
-    { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '智能体创建' } },
-    { path: '/orchestration/models', name: 'orch-models', component: () => import('../views/models/ModelManageView.vue'), meta: { title: '模型与工具' } },
-    { path: '/orchestration/rules', name: 'orch-rules', component: Placeholder, meta: { title: '规则动作编排' } },
-    { path: '/agents', name: 'agents', component: () => import('../views/agents/AgentView.vue'), meta: { title: '智能体管理' } },
-    { path: '/agents/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
+    // 逻辑中心
+    { path: '/logic/actions', name: 'logic-actions', component: () => import('../views/logic/ActionsView.vue'), meta: { title: 'Actions 管理' } },
+    { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/FunctionsView.vue'), meta: { title: 'Functions 管理' } },
+    { path: '/logic/rules', name: 'logic-rules', component: () => import('../views/logic/LogicView.vue'), meta: { title: 'Rules 管理' } },
 
-    { path: '/aip/lowcode', name: 'aip-lowcode', component: Placeholder, meta: { title: '低代码平台' } },
+    // 本体服务
+    { path: '/service/api', name: 'service-api', component: () => import('../views/service/ApiServiceView.vue'), meta: { title: 'API 服务' } },
+    { path: '/service/osdk', name: 'service-osdk', component: () => import('../views/service/OsdkView.vue'), meta: { title: 'OSDK 生成' } },
+    { path: '/service/agent', name: 'service-agent', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: 'Agent 交互' } },
+    { path: '/service/agent/:id', name: 'service-agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
+    { path: '/service/workflow', name: 'service-workflow', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '流程编排' } },
 
-    // 验证评测
-    { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景验证' } },
-    { path: '/sandbox', name: 'sandbox', component: Placeholder, meta: { title: '沙箱仿真' } },
-    { path: '/tracking', name: 'tracking', component: Placeholder, meta: { title: '运行追踪' } },
+    // 兼容旧路由
+    { path: '/agents', redirect: '/service/agent' },
+    { path: '/agents/:id', redirect: to => `/service/agent/${to.params.id}` },
+    { path: '/harness', redirect: '/service/workflow' },
+    { path: '/copilot', redirect: '/service/agent' },
+    { path: '/orchestration/models', redirect: '/settings/models' },
+
+    // 业务场景
+    { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景总览' } },
     { path: '/scene/fttr', name: 'scene-fttr', component: () => import('../views/scene/FttrScene.vue'), meta: { title: 'FTTR续约策划' } },
     { path: '/scene/broadband', name: 'scene-broadband', component: () => import('../views/scene/BroadbandScene.vue'), meta: { title: '宽带退单稽核' } },
     { path: '/scene/broadband/stats', name: 'scene-broadband-stats', component: () => import('../views/scene/BroadbandStats.vue'), meta: { title: '退单稽核统计' } },
@@ -55,15 +61,18 @@ const router = createRouter({
     { path: '/scene/enterprise', name: 'scene-enterprise', component: () => import('../views/scene/EnterpriseScene.vue'), meta: { title: '政企根因分析' } },
     { path: '/scene/mnp', name: 'scene-mnp', component: () => import('../views/scene/MnpWorkbench.vue'), meta: { title: '携号转网预警' } },
 
-    // 应用中心
-    { path: '/copilot', name: 'copilot', component: () => import('../views/copilot/CopilotView.vue'), meta: { title: '智能问答' } },
-    { path: '/app/scenes', name: 'app-scenes', component: Placeholder, meta: { title: '业务场景应用' } },
-    { path: '/app/alerts', name: 'app-alerts', component: Placeholder, meta: { title: '订阅预警' } },
+    // 运营观测
+    { path: '/ops/evals', name: 'ops-evals', component: () => import('../views/ops/AgentEvalsView.vue'), meta: { title: 'Agent 评测' } },
+    { path: '/ops/traces', name: 'ops-traces', component: () => import('../views/ops/AgentTracesView.vue'), meta: { title: '运行追踪' } },
 
-    // 开放治理
-    { path: '/app/api', name: 'app-api', component: () => import('../views/api/ApiPortalView.vue'), meta: { title: 'API开放平台' } },
+
+    // 系统设置
+    { path: '/settings/models', name: 'settings-models', component: () => import('../views/models/ModelManageView.vue'), meta: { title: '模型管理' } },
+    { path: '/settings/tools', name: 'settings-tools', component: () => import('../views/settings/ToolManageView.vue'), meta: { title: '工具管理' } },
+    { path: '/settings/monitor', name: 'settings-monitor', component: () => import('../views/settings/MonitorView.vue'), meta: { title: '运维监控' } },
+    { path: '/settings/general', name: 'settings-general', component: () => import('../views/governance/GovernanceView.vue'), meta: { title: '系统配置' } },
     { path: '/governance/audit', name: 'gov-audit', component: () => import('../views/governance/AuditLogView.vue'), meta: { title: '权限审计' } },
-    { path: '/governance/settings', name: 'gov-settings', component: () => import('../views/governance/GovernanceView.vue'), meta: { title: '系统配置' } },
+    { path: '/app/api', redirect: '/service/api' },
   ]
 })
 

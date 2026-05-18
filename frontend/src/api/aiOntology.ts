@@ -10,7 +10,7 @@ export interface AiOntologySession {
 }
 
 export interface AiOntologyEvent {
-  type: 'phase_change' | 'message' | 'suggestion' | 'build_progress' | 'build_result' | 'error'
+  type: 'phase_change' | 'message' | 'suggestion' | 'build_progress' | 'build_result' | 'thinking' | 'error'
   phase?: string
   content?: string
   done?: boolean

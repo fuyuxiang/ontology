@@ -20,10 +20,12 @@ class OntologyEntity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by: Mapped[str | None] = mapped_column(String(36))
+    publish_config: Mapped[dict | None] = mapped_column(JSON)
 
     attributes: Mapped[list["EntityAttribute"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
     rules: Mapped[list["BusinessRule"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
     actions: Mapped[list["EntityAction"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
+    functions: Mapped[list["OntologyFunction"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
 
 
 class EntityAttribute(Base):

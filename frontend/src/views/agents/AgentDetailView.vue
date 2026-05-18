@@ -326,7 +326,6 @@ const nodeGroups = computed(() => [
   { label: 'AI 能力', nodes: nodeTypes.filter(n => ['llm-inference','ml-model','voice-audit'].includes(n.type)) },
   { label: '流程控制', nodes: nodeTypes.filter(n => ['condition','loop','merge','rule-engine'].includes(n.type)) },
   { label: '触达输出', nodes: nodeTypes.filter(n => ['notification','human-approval','write-back','api-response'].includes(n.type)) },
-  { label: '业务技能', nodes: skillNodeItems.value.length > 0 ? skillNodeItems.value : [nodeTypes.find(n => n.type === 'skill')!] },
 ])
 
 const selectedNode = computed(() => flowNodes.value.find(n => n.id === selectedNodeId.value) ?? null)
