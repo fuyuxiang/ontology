@@ -151,8 +151,10 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
         raise HTTPException(404, "Agent not found")
 
     import json as _json
+    import time as _time
     from app.services.agent.orchestrator import AgentService
     from app.services.agent.graph_engine import GraphEngine
+    from app.models.trace import AgentTrace
 
     # Extract question from messages or direct field
     question = body.question or ""
@@ -184,6 +186,8 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
                 model_config.setdefault(k, a.tools_config[k])
 
     has_canvas = bool(a.nodes_json and len(a.nodes_json) > 0)
+    agent_id_for_trace = aid
+    question_for_trace = question
 
     if has_canvas:
         engine = GraphEngine(
@@ -196,12 +200,31 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
         )
 
         def event_stream():
+            t0 = _time.time()
+            chunks = []
+            status = "ok"
             try:
-                for event in engine.run(question):
+                for event in engine.run(question_for_trace):
+                    if event.get("type") == "answer" and event.get("content"):
+                        chunks.append(event["content"])
                     yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as e:
+                status = "error"
                 yield f"data: {_json.dumps({'type': 'answer', 'content': f'服务异常: {e}', 'suggestions': []}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
+            finally:
+                yield "data: [DONE]\n\n"
+                try:
+                    trace = AgentTrace(
+                        agent_id=agent_id_for_trace,
+                        input_text=question_for_trace,
+                        output_text="".join(chunks),
+                        latency_ms=int((_time.time() - t0) * 1000),
+                        status=status,
+                    )
+                    db.add(trace)
+                    db.commit()
+                except Exception:
+                    pass
     else:
         entity_id = (a.entity_ids or [None])[0] if a.entity_ids else None
         agent_svc = AgentService(
@@ -212,12 +235,31 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
         )
 
         def event_stream():
+            t0 = _time.time()
+            chunks = []
+            status = "ok"
             try:
-                for event in agent_svc.ask(question, entity_id):
+                for event in agent_svc.ask(question_for_trace, entity_id):
+                    if event.get("type") == "answer" and event.get("content"):
+                        chunks.append(event["content"])
                     yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as e:
+                status = "error"
                 yield f"data: {_json.dumps({'type': 'answer', 'content': f'服务异常: {e}', 'suggestions': []}, ensure_ascii=False)}\n\n"
-            yield "data: [DONE]\n\n"
+            finally:
+                yield "data: [DONE]\n\n"
+                try:
+                    trace = AgentTrace(
+                        agent_id=agent_id_for_trace,
+                        input_text=question_for_trace,
+                        output_text="".join(chunks),
+                        latency_ms=int((_time.time() - t0) * 1000),
+                        status=status,
+                    )
+                    db.add(trace)
+                    db.commit()
+                except Exception:
+                    pass
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 

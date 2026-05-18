@@ -94,6 +94,19 @@ class ActionOut(BaseModel):
     preconditions_json: list | None = None
     effects_json: list | None = None
     action_meta_json: dict | None = None
+    created_at: datetime | None = None
+    model_config = {"from_attributes": True}
+
+
+class FunctionBriefOut(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    return_type: str
+    logic_type: str
+    is_derived_property: bool = False
+    status: str
+    execution_count: int = 0
     model_config = {"from_attributes": True}
 
 
@@ -119,6 +132,7 @@ class EntityDetail(EntityBase):
     relations: list[RelationOut] = []
     rules: list[RuleOut] = []
     actions: list[ActionOut] = []
+    functions: list[FunctionBriefOut] = []
     created_at: datetime
     updated_at: datetime
     created_by: str | None = None
@@ -142,6 +156,9 @@ class GraphNode(BaseModel):
     tier: int
     status: str
     relation_count: int = 0
+    action_count: int = 0
+    rule_count: int = 0
+    function_count: int = 0
 
 
 class GraphEdge(BaseModel):

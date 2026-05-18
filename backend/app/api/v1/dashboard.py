@@ -3,11 +3,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel
 from typing import Any
+from datetime import datetime, timedelta
 
 from app.database import get_db
 from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction, AuditLog
+from app.models.function import OntologyFunction
 from app.models.datasource import DataSource
 from app.models.dashboard_config import DashboardConfig
+from app.models.agent import Agent
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -73,11 +76,34 @@ class DashboardRepository:
         rule_count = db.query(func.count(BusinessRule.id)).scalar() or 0
         active_rule_count = db.query(func.count(BusinessRule.id)).filter(BusinessRule.status == 'active').scalar() or 0
         action_count = db.query(func.count(EntityAction.id)).scalar() or 0
+        function_count = db.query(func.count(OntologyFunction.id)).scalar() or 0
         datasource_count = db.query(func.count(DataSource.id)).scalar() or 0
+
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+        today_action_executions = db.query(func.count(AuditLog.id)).filter(
+            AuditLog.target_type == "action",
+            AuditLog.action == "execute",
+            AuditLog.timestamp >= today_start,
+        ).scalar() or 0
+
+        today_rule_alerts = db.query(func.count(AuditLog.id)).filter(
+            AuditLog.target_type == "rule",
+            AuditLog.action.in_(["execute", "evaluate"]),
+            AuditLog.timestamp >= today_start,
+        ).scalar() or 0
+
+        today_function_calls = db.query(func.count(AuditLog.id)).filter(
+            AuditLog.target_type == "function",
+            AuditLog.timestamp >= today_start,
+        ).scalar() or 0
+
+        agent_count = db.query(func.count(Agent.id)).scalar() or 0
+        agent_active = db.query(func.count(Agent.id)).filter(Agent.status == "published").scalar() or 0
 
         top_rules = db.query(BusinessRule).order_by(BusinessRule.priority.desc()).limit(4).all()
         datasources = db.query(DataSource).limit(8).all()
-        recent_logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(5).all()
+        recent_logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(10).all()
 
         return {
             "entity_count": entity_count,
@@ -85,7 +111,13 @@ class DashboardRepository:
             "rule_count": rule_count,
             "active_rule_count": active_rule_count,
             "action_count": action_count,
+            "function_count": function_count,
             "datasource_count": datasource_count,
+            "today_action_executions": today_action_executions,
+            "today_rule_alerts": today_rule_alerts,
+            "today_function_calls": today_function_calls,
+            "agent_count": agent_count,
+            "agent_active": agent_active,
             "top_rules": [
                 {"id": r.id, "name": r.name, "priority": r.priority, "status": r.status}
                 for r in top_rules
@@ -95,7 +127,8 @@ class DashboardRepository:
                 for d in datasources
             ],
             "recent_activities": [
-                {"id": l.id, "action": l.action, "entity_type": l.target_type,
+                {"id": l.id, "action": l.action, "target_type": l.target_type,
+                 "target_name": l.target_name, "user_name": l.user_name,
                  "created_at": l.timestamp.isoformat() if l.timestamp else None}
                 for l in recent_logs
             ],

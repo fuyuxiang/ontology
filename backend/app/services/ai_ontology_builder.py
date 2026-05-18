@@ -324,6 +324,8 @@ class AIOntologyBuilder:
             yield {"type": "message", "content": data.get("message", ""), "done": True}
 
     def _generate_material_guidance(self, state: SessionState) -> Generator[dict, None, None]:
+        yield {"type": "thinking", "content": "正在为您准备材料收集引导..."}
+
         scenario_hint = ""
         if state.scenario in TELECOM_SCENARIOS:
             info = TELECOM_SCENARIOS[state.scenario]
@@ -381,6 +383,8 @@ class AIOntologyBuilder:
         yield from self._generate_clarify_question(state)
 
     def _generate_clarify_question(self, state: SessionState) -> Generator[dict, None, None]:
+        yield {"type": "thinking", "content": "正在分析材料，判断是否需要追问..."}
+
         materials_summary = self._summarize_materials(state.materials)
         prompt = _CLARIFY_PROMPT.format(
             scenario=state.scenario,
@@ -479,16 +483,27 @@ class AIOntologyBuilder:
     # ── 工具方法 ──
 
     def _call_llm(self, system: str, user: str, max_tokens: int = 4096) -> str:
-        resp = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            temperature=0,
-            max_tokens=max_tokens,
-        )
-        return resp.choices[0].message.content or ""
+        last_err = None
+        for attempt in range(3):
+            try:
+                resp = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    temperature=0,
+                    max_tokens=max_tokens,
+                    timeout=60,
+                )
+                return resp.choices[0].message.content or ""
+            except Exception as e:
+                last_err = e
+                logger.warning(f"LLM call attempt {attempt + 1} failed: {e}")
+                if attempt < 2:
+                    import time
+                    time.sleep(2)
+        raise last_err or RuntimeError("LLM call failed after 3 attempts")
 
     def _parse_json(self, text: str) -> dict:
         text = text.strip()

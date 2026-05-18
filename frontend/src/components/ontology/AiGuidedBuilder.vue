@@ -269,6 +269,9 @@ function triggerBuild() {
 function handleEvent(event: AiOntologyEvent) {
   switch (event.type) {
     case 'message':
+      if (messages.value.length && messages.value[messages.value.length - 1].content.startsWith('⏳')) {
+        messages.value.pop()
+      }
       if (event.content) {
         messages.value.push({ role: 'ai', content: event.content })
         scrollToBottom()
@@ -280,6 +283,11 @@ function handleEvent(event: AiOntologyEvent) {
         currentPhase.value = event.phase
         if (event.phase === 'materials') sessionData.value.scenario = messages.value.filter(m => m.role === 'user')[0]?.content || ''
       }
+      break
+    case 'thinking':
+      loading.value = true
+      messages.value.push({ role: 'ai', content: `⏳ ${event.content || '思考中...'}` })
+      scrollToBottom()
       break
     case 'suggestion':
       if (event.suggestions) suggestions.value = event.suggestions

@@ -85,9 +85,15 @@ const ico = {
   harness: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 5.5v5L8 14l-6-3.5v-5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6l2.5 1.5v3L8 12l-2.5-1.5v-3L8 6z" fill="currentColor" opacity=".3"/></svg>`,
   model: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.5"/><path d="M8 3v3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   rules: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v2H3V3zM3 7h7v2H3V7zM3 11h10v2H3v-2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/></svg>`,
+  workflow: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="7" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="11" y="3" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5h6M8 5.5v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`,
+  sdk: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l-2 4 2 4M12 4l2 4-2 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 2L7 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  agent: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="4" r="1.5" fill="currentColor" opacity="0.4"/></svg>`,
+  tool: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 2a3 3 0 00-2.83 4L3 10.17V13h2.83L10 8.83A3 3 0 1010 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+  settings: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   scene: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="5" cy="4" r="1.5" fill="currentColor"/><circle cx="11" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="12" r="1.5" fill="currentColor"/></svg>`,
   sandbox: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 10l6 3 6-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 7l6 3 6-3-6-3-6 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
   tracking: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 12l3-4 3 2 4-6 2 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="7" r="1.5" fill="currentColor"/></svg>`,
+  evals: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   copilot: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2z" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 9.5s.5 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="7" r="0.75" fill="currentColor"/><circle cx="10" cy="7" r="0.75" fill="currentColor"/></svg>`,
   bizApp: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6h12" stroke="currentColor" stroke-width="1.5"/><circle cx="4.5" cy="4.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="4.5" r="0.5" fill="currentColor"/></svg>`,
   api: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
@@ -99,32 +105,41 @@ const navGroups = [
     { path: '/dashboard', label: '平台总览', icon: ico.dashboard, exact: true },
   ]},
   { label: '本体中心', items: [
+    { path: '/datasource', label: '数据接入', icon: ico.datasource },
     { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },
     { path: '/browser/graph', label: '本体图谱', icon: ico.graph },
-    { path: '/ontology/versions', label: '版本发布', icon: ico.version },
-  ]},
-  { label: '数据中心', items: [
-    { path: '/datasource', label: '数据源', icon: ico.datasource },
     { path: '/data/mapping', label: '本体映射', icon: ico.mapping },
-    { path: '/data/quality', label: '数据质量', icon: ico.quality },
+    { path: '/ontology/publish', label: '本体发布', icon: ico.version },
   ]},
-  { label: '智能编排', items: [
-    { path: '/agents', label: '智能体管理', icon: ico.harness },
-    { path: '/orchestration/models', label: '模型与工具', icon: ico.model },
-    { path: '/orchestration/rules', label: '规则动作编排', icon: ico.rules },
+  { label: '逻辑中心', items: [
+    { path: '/logic/actions', label: 'Actions 管理', icon: ico.workflow },
+    { path: '/logic/functions', label: 'Functions 管理', icon: ico.sdk },
+    { path: '/logic/rules', label: 'Rules 管理', icon: ico.rules },
   ]},
-  { label: '验证评测', items: [
-    { path: '/scene', label: '场景验证', icon: ico.scene, exact: true },
-    { path: '/sandbox', label: '沙箱仿真', icon: ico.sandbox },
-    { path: '/tracking', label: '运行追踪', icon: ico.tracking },
+  { label: '本体服务', items: [
+    { path: '/service/api', label: 'API 服务', icon: ico.api },
+    { path: '/service/osdk', label: 'OSDK 生成', icon: ico.sdk },
+    { path: '/service/agent', label: 'Agent 交互', icon: ico.agent },
+    { path: '/service/workflow', label: '流程编排', icon: ico.workflow },
   ]},
-  { label: '应用中心', items: [
-    { path: '/copilot', label: '智能问答', icon: ico.copilot },
-    { path: '/app/scenes', label: '业务场景应用', icon: ico.bizApp },
+  { label: '业务场景', items: [
+    { path: '/scene', label: '场景总览', icon: ico.scene, exact: true, children: [
+      { path: '/scene/fttr', label: 'FTTR续约' },
+      { path: '/scene/broadband', label: '宽带退单' },
+      { path: '/scene/enterprise', label: '政企根因' },
+      { path: '/scene/mnp', label: '携号转网' },
+    ]},
   ]},
-  { label: '开放治理', items: [
-    { path: '/app/api', label: 'API开放平台', icon: ico.api },
+  { label: '运营观测', items: [
+    { path: '/ops/evals', label: 'Agent 评测', icon: ico.evals },
+    { path: '/ops/traces', label: '运行追踪', icon: ico.tracking },
+  ]},
+  { label: '系统设置', items: [
+    { path: '/settings/models', label: '模型管理', icon: ico.model },
+    { path: '/settings/tools', label: '工具管理', icon: ico.tool },
     { path: '/governance/audit', label: '权限审计', icon: ico.audit },
+    { path: '/settings/monitor', label: '运维监控', icon: ico.tracking },
+    { path: '/settings/general', label: '系统配置', icon: ico.settings },
   ]},
 ]
 </script>

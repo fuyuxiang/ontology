@@ -7,6 +7,7 @@ from app.models import OntologyEntity, EntityAttribute, EntityRelation, Business
 from app.schemas.entity import (
     EntityCreate, EntityUpdate, EntityDetail, EntityListItem,
     AttributeOut, AttributeMappingUpdate, RelationOut, RuleOut, ActionOut,
+    FunctionBriefOut,
     GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
     FileImportResult,
 )
@@ -136,6 +137,9 @@ def get_full_graph(db: Session = Depends(get_db)):
         nodes.append(GraphNode(
             id=e.id, name=e.name, name_cn=e.name_cn,
             tier=e.tier, status=e.status, relation_count=rc,
+            action_count=len(e.actions),
+            rule_count=len(e.rules),
+            function_count=len(e.functions),
         ))
 
     edges = []
@@ -390,6 +394,7 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
             trigger_count=r.trigger_count, last_triggered=r.last_triggered,
         ) for r in entity.rules],
         actions=[ActionOut.model_validate(a) for a in entity.actions],
+        functions=[FunctionBriefOut.model_validate(f) for f in entity.functions],
         created_at=entity.created_at, updated_at=entity.updated_at,
         created_by=entity.created_by,
     )
