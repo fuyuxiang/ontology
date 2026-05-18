@@ -20,10 +20,14 @@
           :edge-types="edgeTypes"
           :default-edge-options="defaultEdgeOptions"
           :fit-view-on-init="true"
+          :nodes-draggable="true"
+          :nodes-connectable="false"
           @node-click="onNodeClick"
+          @node-mouse-enter="onNodeHover"
+          @node-mouse-leave="onNodeLeave"
           @pane-click="onPaneClick"
         >
-          <Background :gap="24" pattern-color="#e8ecf1" :size="0.8" />
+          <Background :gap="28" pattern-color="rgba(0,0,0,0.03)" :size="1.2" variant="dots" />
           <Controls position="bottom-left" />
           <MiniMap position="bottom-right" :node-color="miniMapNodeColor" pannable zoomable />
         </VueFlow>
@@ -47,7 +51,9 @@
         </div>
       </div>
 
+      <!-- 右侧详情面板（点击节点时显示） -->
       <CanvasConfigPanel
+        v-if="selectedNodeId"
         :node="selectedNodeData"
         :in-edges="selectedInEdges"
         :out-edges="selectedOutEdges"
@@ -73,7 +79,6 @@ import DataNode from '../../components/canvas/DataNode.vue'
 import CanvasEdgeLabel from '../../components/canvas/CanvasEdgeLabel.vue'
 import { entityApi } from '../../api/ontology'
 import type { Node, Edge } from '@vue-flow/core'
-import type { AxiosError } from 'axios'
 
 const store = useOntologyStore()
 const router = useRouter()
@@ -94,7 +99,7 @@ const nodeTypes = { ontologyNode: markRaw(OntologyNode), dataNode: markRaw(DataN
 const edgeTypes = { ontologyEdge: markRaw(CanvasEdgeLabel) }
 const defaultEdgeOptions = { markerEnd: MarkerType.ArrowClosed, animated: false }
 
-const tierMiniColors: Record<number, string> = { 1: '#4c6ef5', 2: '#7950f2', 3: '#20c997' }
+const tierMiniColors: Record<number, string> = { 1: '#4f6ef7', 2: '#a855f7', 3: '#10b981' }
 function miniMapNodeColor(node: Node) {
   return tierMiniColors[node.data?.tier] || '#adb5bd'
 }
@@ -150,6 +155,43 @@ function onNodeClick(event: { node: Node }) {
   selectedNodeId.value = event.node.id
 }
 
+function onNodeHover(event: { node: Node }) {
+  applyHighlight(event.node.id)
+}
+
+function onNodeLeave() {
+  clearHighlight()
+}
+
+function applyHighlight(nodeId: string) {
+  const connectedIds = new Set<string>([nodeId])
+  flowEdges.value.forEach(e => {
+    if (e.source === nodeId) connectedIds.add(e.target)
+    if (e.target === nodeId) connectedIds.add(e.source)
+  })
+  flowNodes.value = flowNodes.value.map(n => ({
+    ...n,
+    data: { ...n.data, _dimmed: !connectedIds.has(n.id) },
+  }))
+  flowEdges.value = flowEdges.value.map(e => ({
+    ...e,
+    style: connectedIds.has(e.source) && connectedIds.has(e.target)
+      ? { stroke: '#64748b', strokeWidth: 2 }
+      : { stroke: '#e2e8f0', strokeWidth: 1, opacity: 0.4 },
+  }))
+}
+
+function clearHighlight() {
+  flowNodes.value = flowNodes.value.map(n => ({
+    ...n,
+    data: { ...n.data, _dimmed: false },
+  }))
+  flowEdges.value = flowEdges.value.map(e => ({
+    ...e,
+    style: undefined,
+  }))
+}
+
 function onPaneClick() {
   selectedNodeId.value = null
 }
@@ -197,9 +239,9 @@ function onDrop(event: DragEvent) {
 
 function goDetail(id: string) { router.push(`/ontology/${id}`) }
 
-function getErrorMessage(error: unknown) {
-  const axiosError = error as AxiosError<{ detail?: string }>
-  return axiosError.response?.data?.detail || axiosError.message || String(error)
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error) return (error as { message: string }).message
+  return String(error)
 }
 </script>
 
@@ -207,14 +249,17 @@ function getErrorMessage(error: unknown) {
 .canvas-page { display: flex; flex-direction: column; height: 100%; background: #f8fafc; }
 .canvas-page__body { display: flex; flex: 1; overflow: hidden; }
 .canvas-page__canvas { flex: 1; position: relative; }
+
 .canvas-loading {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 12px;
   background: rgba(248,250,252,0.9); z-index: 10; color: #64748b; font-size: 13px;
 }
 .canvas-loading__spinner {
-  width: 24px; height: 24px; border: 2px solid #e2e8f0;
-  border-top-color: #4f6ef7; border-radius: 50%;
+  width: 24px; height: 24px;
+  border: 2.5px solid #e2e8f0;
+  border-top-color: #4f6ef7;
+  border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
 
@@ -228,12 +273,15 @@ function getErrorMessage(error: unknown) {
 .tier-legend__item { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 500; color: #334155; }
 .tier-legend__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .tier-legend__item--t1 .tier-legend__dot { background: #4f6ef7; }
-.tier-legend__item--t2 .tier-legend__dot { background: #8b5cf6; }
+.tier-legend__item--t2 .tier-legend__dot { background: #a855f7; }
 .tier-legend__item--t3 .tier-legend__dot { background: #10b981; }
+
 @keyframes spin { to { transform: rotate(360deg); } }
+
 :deep(.vue-flow__background) { background: #f8fafc; }
 :deep(.vue-flow__controls) { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
 :deep(.vue-flow__controls-button) { background: #fff; border-color: #e2e8f0; color: #64748b; }
 :deep(.vue-flow__controls-button:hover) { background: #f1f5f9; color: #334155; }
 :deep(.vue-flow__minimap) { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; }
+:deep(.vue-flow__edge path) { transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.2s ease; }
 </style>
