@@ -2,112 +2,183 @@
   <div class="publish-page">
     <div class="publish-page__header">
       <h1 class="page-title">本体发布</h1>
-      <p class="page-desc">将本体实体封装为可消费的服务，发布后可被 API 服务、OSDK、Agent 和流程编排使用</p>
+      <p class="page-desc">版本化管理本体发布，支持一致性校验、审批流程和版本回滚</p>
     </div>
 
     <div class="publish-page__body">
-      <!-- 左侧：实体列表 -->
-      <div class="publish-sidebar">
-        <div class="publish-sidebar__stats">
-          <span class="stat-item"><strong>{{ publishedCount }}</strong> 已发布</span>
-          <span class="stat-item"><strong>{{ readyCount }}</strong> 就绪</span>
-          <span class="stat-item"><strong>{{ notReadyCount }}</strong> 未就绪</span>
-        </div>
-        <div class="publish-sidebar__list">
+      <!-- 左侧：版本时间线 -->
+      <div class="version-sidebar">
+        <button class="btn-primary btn-block" @click="showCreateDialog = true">创建新版本</button>
+        <div class="version-list">
           <div
-            v-for="item in entityList"
-            :key="item.id"
-            class="entity-row"
-            :class="{ 'entity-row--active': selectedId === item.id }"
-            @click="selectEntity(item)"
+            v-for="v in versions"
+            :key="v.id"
+            class="version-item"
+            :class="{ 'version-item--active': selectedVersionId === v.id }"
+            @click="selectVersion(v.id)"
           >
-            <span class="entity-row__status" :class="`entity-row__status--${item.status}`"></span>
-            <div class="entity-row__info">
-              <span class="entity-row__name">{{ item.name_cn }}</span>
-              <span class="entity-row__en">{{ item.name }}</span>
+            <div class="version-item__badge" :class="`version-item__badge--${v.status}`">
+              v{{ v.version_number }}
             </div>
-            <span class="entity-row__badge" :class="`entity-row__badge--${getStatusLabel(item).key}`">{{ getStatusLabel(item).text }}</span>
+            <div class="version-item__info">
+              <span class="version-item__name">{{ v.name }}</span>
+              <span class="version-item__meta">
+                {{ v.entity_count }} 个实体 · {{ formatStatus(v.status) }}
+              </span>
+            </div>
+            <span v-if="v.is_active" class="version-item__active">当前</span>
           </div>
+          <div v-if="!versions.length" class="version-empty">暂无版本</div>
         </div>
       </div>
 
-      <!-- 右侧：发布配置 -->
-      <div class="publish-main">
-        <template v-if="selected">
-          <!-- 就绪检查 -->
-          <div class="check-card">
-            <h3 class="section-title">就绪检查</h3>
-            <div class="check-items">
-              <div class="check-item" :class="selected.readiness.has_datasource ? 'check-item--pass' : 'check-item--fail'">
-                <span class="check-icon">{{ selected.readiness.has_datasource ? '✓' : '✗' }}</span>
-                <span>数据源绑定</span>
-              </div>
-              <div class="check-item" :class="selected.readiness.total_attrs > 0 ? 'check-item--pass' : 'check-item--fail'">
-                <span class="check-icon">{{ selected.readiness.total_attrs > 0 ? '✓' : '✗' }}</span>
-                <span>属性定义 ({{ selected.readiness.total_attrs }} 个)</span>
-              </div>
-              <div class="check-item" :class="selected.readiness.mapping_ratio >= 0.5 ? 'check-item--pass' : 'check-item--fail'">
-                <span class="check-icon">{{ selected.readiness.mapping_ratio >= 0.5 ? '✓' : '✗' }}</span>
-                <span>字段映射 ({{ selected.readiness.mapped_attrs }}/{{ selected.readiness.total_attrs }}, {{ Math.round(selected.readiness.mapping_ratio * 100) }}%)</span>
-              </div>
-              <div class="check-item" :class="selected.readiness.has_relations ? 'check-item--pass' : 'check-item--warn'">
-                <span class="check-icon">{{ selected.readiness.has_relations ? '✓' : '⚠' }}</span>
-                <span>关系定义 {{ selected.readiness.has_relations ? '' : '(可选)' }}</span>
-              </div>
+      <!-- 右侧：版本详情 -->
+      <div class="version-main">
+        <template v-if="detail">
+          <!-- 版本元信息 -->
+          <div class="meta-card">
+            <div class="meta-card__header">
+              <h2>v{{ detail.version_number }} — {{ detail.name }}</h2>
+              <span class="status-tag" :class="`status-tag--${detail.status}`">{{ formatStatus(detail.status) }}</span>
             </div>
-            <div v-if="selected.readiness.issues.length" class="check-issues">
-              <div v-for="issue in selected.readiness.issues" :key="issue" class="check-issue">{{ issue }}</div>
+            <p v-if="detail.description" class="meta-card__desc">{{ detail.description }}</p>
+            <div class="meta-card__timeline">
+              <span v-if="detail.created_at">创建: {{ formatTime(detail.created_at) }}</span>
+              <span v-if="detail.submitted_at">提交: {{ formatTime(detail.submitted_at) }}</span>
+              <span v-if="detail.published_at">发布: {{ formatTime(detail.published_at) }}</span>
+              <span v-if="detail.rejected_at">驳回: {{ formatTime(detail.rejected_at) }}</span>
+            </div>
+            <div v-if="detail.reject_reason" class="meta-card__reject">
+              驳回原因: {{ detail.reject_reason }}
+            </div>
+            <div v-if="detail.rollback_from" class="meta-card__rollback">
+              回滚自 v{{ detail.rollback_from }}
             </div>
           </div>
 
-          <!-- 能力配置 -->
-          <div class="config-card">
-            <h3 class="section-title">能力配置</h3>
-            <div class="capability-list">
-              <label class="cap-item" v-for="cap in capabilities" :key="cap.key">
-                <input type="checkbox" v-model="publishConfig.capabilities" :value="cap.key" />
-                <span class="cap-item__label">{{ cap.label }}</span>
-                <span class="cap-item__desc">{{ cap.desc }}</span>
-              </label>
+          <!-- 实体列表 -->
+          <div class="entity-card">
+            <div class="entity-card__header">
+              <h3>包含实体 ({{ detail.entities.length }})</h3>
+              <button v-if="detail.status === 'draft'" class="btn-sm" @click="showEntitySelector = true">添加实体</button>
             </div>
-
-            <div class="config-row">
-              <label class="config-label">访问级别</label>
-              <select v-model="publishConfig.access_level" class="config-select">
-                <option value="public">公开（无需认证）</option>
-                <option value="api_key">API Key 认证</option>
-                <option value="token">Token 认证</option>
-              </select>
+            <div class="entity-table" v-if="detail.entities.length">
+              <div class="entity-table__row entity-table__row--header">
+                <span class="col-name">实体名称</span>
+                <span class="col-tier">层级</span>
+                <span class="col-attrs">属性</span>
+                <span class="col-status">就绪</span>
+                <span class="col-action" v-if="detail.status === 'draft'">操作</span>
+              </div>
+              <div v-for="e in detail.entities" :key="e.id" class="entity-table__row">
+                <span class="col-name">
+                  <strong>{{ e.name_cn }}</strong>
+                  <small>{{ e.name }}</small>
+                </span>
+                <span class="col-tier">T{{ e.tier }}</span>
+                <span class="col-attrs">{{ e.mapped_count }}/{{ e.attribute_count }}</span>
+                <span class="col-status">
+                  <span v-if="e.readiness.ready" class="check-pass">✓</span>
+                  <span v-else class="check-fail">✗</span>
+                </span>
+                <span class="col-action" v-if="detail.status === 'draft'">
+                  <button class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)">移除</button>
+                </span>
+              </div>
             </div>
+            <div v-else class="entity-empty">暂未添加实体，点击上方按钮选择</div>
           </div>
 
-          <!-- 预览 -->
-          <div class="preview-card" v-if="selected.readiness.ready">
-            <h3 class="section-title">发布后将生成</h3>
-            <div class="preview-endpoints">
-              <div v-for="ep in previewEndpoints" :key="ep" class="preview-ep">
-                <span class="preview-ep__method">{{ ep.method }}</span>
-                <code>{{ ep.path }}</code>
+          <!-- 一致性检查 -->
+          <div class="check-card" v-if="checkResult">
+            <h3>一致性检查</h3>
+            <div class="check-card__summary" :class="checkResult.passed ? 'check-card__summary--pass' : 'check-card__summary--fail'">
+              {{ checkResult.summary }}
+            </div>
+            <div v-if="checkResult.entity_issues.length" class="check-card__issues">
+              <div v-for="ei in checkResult.entity_issues" :key="ei.entity_id" class="issue-item">
+                <strong>{{ ei.entity_name }}:</strong> {{ ei.issues.join('; ') }}
+              </div>
+            </div>
+            <div v-if="checkResult.relation_issues.length" class="check-card__issues">
+              <div v-for="ri in checkResult.relation_issues" :key="ri.relation_name" class="issue-item issue-item--rel">
+                {{ ri.issue }}
               </div>
             </div>
           </div>
 
           <!-- 操作按钮 -->
-          <div class="publish-actions">
-            <template v-if="selected.status === 'published'">
-              <button class="btn-danger" @click="unpublish">取消发布</button>
-              <span class="publish-hint">已发布，可被本体服务消费</span>
+          <div class="action-bar">
+            <template v-if="detail.status === 'draft'">
+              <button class="btn-secondary" @click="runCheck" :disabled="loading">一致性检查</button>
+              <button class="btn-primary" @click="submitForApproval" :disabled="loading || !detail.entities.length">提交审批</button>
+              <button class="btn-danger-outline" @click="deleteVersion">删除草稿</button>
             </template>
-            <template v-else>
-              <button class="btn-primary" @click="publish" :disabled="!selected.readiness.ready || publishing">
-                {{ publishing ? '发布中...' : '确认发布' }}
-              </button>
-              <span v-if="!selected.readiness.ready" class="publish-hint publish-hint--warn">请先完成就绪检查中的必要项</span>
+            <template v-else-if="detail.status === 'pending_approval'">
+              <button class="btn-primary" @click="approveVersion" :disabled="loading">审批通过</button>
+              <button class="btn-danger-outline" @click="showRejectDialog = true">驳回</button>
+            </template>
+            <template v-else-if="detail.status === 'published'">
+              <button class="btn-secondary" @click="rollbackVersion" :disabled="loading">回滚到此版本</button>
             </template>
           </div>
         </template>
-        <div v-else class="publish-empty">
-          <p>选择左侧实体查看发布状态</p>
+        <div v-else class="version-empty-main">
+          <p>选择左侧版本查看详情，或创建新版本</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 创建版本弹窗 -->
+    <div v-if="showCreateDialog" class="modal-overlay" @click.self="showCreateDialog = false">
+      <div class="modal-box">
+        <h3>创建新版本</h3>
+        <div class="form-group">
+          <label>版本名称</label>
+          <input v-model="newVersion.name" placeholder="例如：携号转网实体集" />
+        </div>
+        <div class="form-group">
+          <label>描述（可选）</label>
+          <textarea v-model="newVersion.description" rows="3" placeholder="本次发布的说明"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showCreateDialog = false">取消</button>
+          <button class="btn-primary" @click="createVersion" :disabled="!newVersion.name.trim()">创建</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 实体选择弹窗 -->
+    <div v-if="showEntitySelector" class="modal-overlay" @click.self="showEntitySelector = false">
+      <div class="modal-box modal-box--wide">
+        <h3>选择实体</h3>
+        <div class="selector-list">
+          <label v-for="e in availableEntities" :key="e.id" class="selector-item">
+            <input type="checkbox" v-model="selectedEntityIds" :value="e.id" />
+            <span class="selector-item__name">{{ e.name_cn }}</span>
+            <span class="selector-item__en">{{ e.name }}</span>
+            <span class="selector-item__tier">T{{ e.tier }}</span>
+          </label>
+          <div v-if="!availableEntities.length" class="entity-empty">所有实体已添加</div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showEntitySelector = false">取消</button>
+          <button class="btn-primary" @click="addEntities" :disabled="!selectedEntityIds.length">添加选中 ({{ selectedEntityIds.length }})</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 驳回弹窗 -->
+    <div v-if="showRejectDialog" class="modal-overlay" @click.self="showRejectDialog = false">
+      <div class="modal-box">
+        <h3>驳回版本</h3>
+        <div class="form-group">
+          <label>驳回原因</label>
+          <textarea v-model="rejectReason" rows="3" placeholder="请填写驳回原因"></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-secondary" @click="showRejectDialog = false">取消</button>
+          <button class="btn-danger" @click="rejectVersion" :disabled="!rejectReason.trim()">确认驳回</button>
         </div>
       </div>
     </div>
@@ -116,158 +187,260 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { get, post } from '../../api/client'
+import { get, post, put, del } from '../../api/client'
 
-interface Readiness { has_datasource: boolean; mapped_attrs: number; total_attrs: number; mapping_ratio: number; has_relations: boolean; issues: string[]; ready: boolean }
-interface EntityStatus { id: string; name: string; name_cn: string; tier: number; status: string; publish_config: any; readiness: Readiness }
+interface VersionSummary {
+  id: string; version_number: number; name: string; description: string | null
+  status: string; entity_count: number; created_by: string | null
+  created_at: string | null; submitted_at: string | null; published_at: string | null
+  is_active: boolean; rollback_from: number | null
+}
 
-const entityList = ref<EntityStatus[]>([])
-const selectedId = ref<string | null>(null)
-const publishing = ref(false)
+interface Readiness { has_datasource: boolean; mapped_attrs: number; total_attrs: number; mapping_ratio: number; issues: string[]; ready: boolean }
 
-const publishConfig = reactive({ capabilities: ['query', 'relations'] as string[], access_level: 'api_key' })
+interface VersionEntity {
+  id: string; source_entity_id: string; name: string; name_cn: string
+  tier: number; description: string | null; attribute_count: number; mapped_count: number
+  readiness: Readiness
+}
 
-const capabilities = [
-  { key: 'query', label: '查询', desc: '列表查询、详情获取、条件过滤' },
-  { key: 'relations', label: '关系遍历', desc: '获取关联实体、多跳遍历' },
-  { key: 'write', label: '写入', desc: '创建、更新实例数据' },
-  { key: 'rules', label: '规则执行', desc: '执行绑定的业务规则' },
-]
+interface VersionDetail extends VersionSummary {
+  rejected_at: string | null; reject_reason: string | null; approved_by: string | null
+  entities: VersionEntity[]; relations: any[]
+}
 
-const selected = computed(() => entityList.value.find(e => e.id === selectedId.value) || null)
-const publishedCount = computed(() => entityList.value.filter(e => e.status === 'published').length)
-const readyCount = computed(() => entityList.value.filter(e => e.status !== 'published' && e.readiness.ready).length)
-const notReadyCount = computed(() => entityList.value.filter(e => e.status !== 'published' && !e.readiness.ready).length)
+interface CheckResult { passed: boolean; entity_issues: any[]; relation_issues: any[]; summary: string }
+interface EntityItem { id: string; name: string; name_cn: string; tier: number }
 
-const previewEndpoints = computed(() => {
-  if (!selected.value) return []
-  const name = selected.value.name
-  const eps = []
-  if (publishConfig.capabilities.includes('query')) {
-    eps.push({ method: 'GET', path: `/ontology-api/objects/${name}` })
-    eps.push({ method: 'GET', path: `/ontology-api/objects/${name}/{id}` })
-  }
-  if (publishConfig.capabilities.includes('relations')) {
-    eps.push({ method: 'GET', path: `/ontology-api/objects/${name}/{id}/relations` })
-  }
-  if (publishConfig.capabilities.includes('write')) {
-    eps.push({ method: 'POST', path: `/ontology-api/objects/${name}` })
-  }
-  if (publishConfig.capabilities.includes('rules')) {
-    eps.push({ method: 'POST', path: `/ontology-api/objects/${name}/execute-rule` })
-  }
-  return eps
+const versions = ref<VersionSummary[]>([])
+const selectedVersionId = ref<string | null>(null)
+const detail = ref<VersionDetail | null>(null)
+const checkResult = ref<CheckResult | null>(null)
+const loading = ref(false)
+
+const showCreateDialog = ref(false)
+const showEntitySelector = ref(false)
+const showRejectDialog = ref(false)
+
+const newVersion = reactive({ name: '', description: '' })
+const rejectReason = ref('')
+const selectedEntityIds = ref<string[]>([])
+const allEntities = ref<EntityItem[]>([])
+
+const availableEntities = computed(() => {
+  if (!detail.value) return allEntities.value
+  const inVersion = new Set(detail.value.entities.map(e => e.source_entity_id))
+  return allEntities.value.filter(e => !inVersion.has(e.id))
 })
 
-function getStatusLabel(item: EntityStatus) {
-  if (item.status === 'published') return { key: 'published', text: '已发布' }
-  if (item.readiness.ready) return { key: 'ready', text: '就绪' }
-  return { key: 'notready', text: '未就绪' }
+onMounted(async () => {
+  await loadVersions()
+  await loadAllEntities()
+})
+
+async function loadVersions() {
+  versions.value = await get('/ontology-publish/versions')
 }
 
-function selectEntity(item: EntityStatus) {
-  selectedId.value = item.id
-  if (item.publish_config?.capabilities) {
-    publishConfig.capabilities = [...item.publish_config.capabilities]
-    publishConfig.access_level = item.publish_config.access_level || 'api_key'
-  } else {
-    publishConfig.capabilities = ['query', 'relations']
-    publishConfig.access_level = 'api_key'
-  }
+async function loadAllEntities() {
+  const list = await get('/entities')
+  allEntities.value = (list.items || list).map((e: any) => ({ id: e.id, name: e.name, name_cn: e.name_cn, tier: e.tier }))
 }
 
-async function loadStatus() {
+async function selectVersion(id: string) {
+  selectedVersionId.value = id
+  checkResult.value = null
+  detail.value = await get(`/ontology-publish/versions/${id}`)
+}
+
+async function createVersion() {
+  const v = await post('/ontology-publish/versions', { name: newVersion.name, description: newVersion.description || null })
+  showCreateDialog.value = false
+  newVersion.name = ''
+  newVersion.description = ''
+  await loadVersions()
+  await selectVersion(v.id)
+}
+
+async function deleteVersion() {
+  if (!detail.value) return
+  await del(`/ontology-publish/versions/${detail.value.id}`)
+  detail.value = null
+  selectedVersionId.value = null
+  await loadVersions()
+}
+
+async function addEntities() {
+  if (!detail.value) return
+  loading.value = true
+  await post(`/ontology-publish/versions/${detail.value.id}/entities`, { entity_ids: selectedEntityIds.value })
+  selectedEntityIds.value = []
+  showEntitySelector.value = false
+  await selectVersion(detail.value.id)
+  await loadVersions()
+  loading.value = false
+}
+
+async function removeEntity(entityId: string) {
+  if (!detail.value) return
+  await del(`/ontology-publish/versions/${detail.value.id}/entities/${entityId}`)
+  await selectVersion(detail.value.id)
+  await loadVersions()
+}
+
+async function runCheck() {
+  if (!detail.value) return
+  loading.value = true
+  checkResult.value = await get(`/ontology-publish/versions/${detail.value.id}/check`)
+  loading.value = false
+}
+
+async function submitForApproval() {
+  if (!detail.value) return
+  loading.value = true
   try {
-    const data = await get<EntityStatus[]>('/ontology-publish/status')
-    entityList.value = data
-  } catch { /* empty */ }
-}
-
-async function publish() {
-  if (!selected.value) return
-  publishing.value = true
-  try {
-    await post('/ontology-publish/publish', { entity_id: selected.value.id, config: publishConfig })
-    await loadStatus()
+    await post(`/ontology-publish/versions/${detail.value.id}/submit`)
+    await loadVersions()
+    await selectVersion(detail.value.id)
   } catch (e: any) {
-    alert(e?.response?.data?.detail || '发布失败')
-  } finally {
-    publishing.value = false
+    checkResult.value = { passed: false, entity_issues: [], relation_issues: [], summary: e?.response?.data?.detail || '提交失败' }
   }
+  loading.value = false
 }
 
-async function unpublish() {
-  if (!selected.value || !confirm('确定取消发布？取消后本体服务将无法访问该实体。')) return
-  try {
-    await post(`/ontology-publish/unpublish/${selected.value.id}`, {})
-    await loadStatus()
-  } catch { /* ignore */ }
+async function approveVersion() {
+  if (!detail.value) return
+  loading.value = true
+  await post(`/ontology-publish/versions/${detail.value.id}/approve`)
+  await loadVersions()
+  await selectVersion(detail.value.id)
+  loading.value = false
 }
 
-onMounted(loadStatus)
+async function rejectVersion() {
+  if (!detail.value) return
+  await post(`/ontology-publish/versions/${detail.value.id}/reject`, { reason: rejectReason.value })
+  rejectReason.value = ''
+  showRejectDialog.value = false
+  await loadVersions()
+  await selectVersion(detail.value.id)
+}
+
+async function rollbackVersion() {
+  if (!detail.value) return
+  loading.value = true
+  const v = await post(`/ontology-publish/versions/${detail.value.id}/rollback`)
+  await loadVersions()
+  await selectVersion(v.id)
+  loading.value = false
+}
+
+function formatStatus(status: string) {
+  const map: Record<string, string> = { draft: '草稿', pending_approval: '待审批', published: '已发布', rejected: '已驳回' }
+  return map[status] || status
+}
+
+function formatTime(iso: string) {
+  return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
 </script>
 
 <style scoped>
-.publish-page { display: flex; flex-direction: column; height: 100%; }
-.publish-page__header { padding: 20px 24px 12px; flex-shrink: 0; }
-.page-title { font-size: 18px; font-weight: 700; color: var(--neutral-900); margin: 0 0 4px; }
-.page-desc { font-size: 13px; color: var(--neutral-500); margin: 0; }
-.publish-page__body { display: flex; flex: 1; overflow: hidden; border-top: 1px solid var(--neutral-200); }
+.publish-page { padding: 24px; height: 100%; display: flex; flex-direction: column; }
+.publish-page__header { margin-bottom: 20px; }
+.page-title { font-size: 20px; font-weight: 700; color: var(--neutral-900); margin: 0; }
+.page-desc { font-size: 13px; color: var(--neutral-500); margin: 4px 0 0; }
+.publish-page__body { display: flex; gap: 20px; flex: 1; min-height: 0; }
 
-.publish-sidebar { width: 300px; flex-shrink: 0; border-right: 1px solid var(--neutral-200); display: flex; flex-direction: column; }
-.publish-sidebar__stats { display: flex; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--neutral-100); }
-.stat-item { font-size: 12px; color: var(--neutral-500); }
-.stat-item strong { color: var(--neutral-800); }
-.publish-sidebar__list { flex: 1; overflow-y: auto; padding: 8px; }
+.version-sidebar { width: 280px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
+.version-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.version-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; border: 1px solid var(--neutral-100); transition: all 0.15s; }
+.version-item:hover { background: var(--neutral-50); }
+.version-item--active { background: var(--semantic-50); border-color: var(--semantic-200); }
+.version-item__badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: var(--neutral-100); color: var(--neutral-600); }
+.version-item__badge--published { background: #dcfce7; color: #166534; }
+.version-item__badge--pending_approval { background: #fef3c7; color: #92400e; }
+.version-item__badge--rejected { background: #fee2e2; color: #991b1b; }
+.version-item__badge--draft { background: #e0e7ff; color: #3730a3; }
+.version-item__info { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.version-item__name { font-size: 13px; font-weight: 500; color: var(--neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.version-item__meta { font-size: 11px; color: var(--neutral-500); }
+.version-item__active { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; background: #dcfce7; color: #166534; }
+.version-empty { font-size: 13px; color: var(--neutral-400); text-align: center; padding: 20px; }
 
-.entity-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 6px; cursor: pointer; }
-.entity-row:hover { background: var(--neutral-50); }
-.entity-row--active { background: var(--semantic-50); }
-.entity-row__status { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.entity-row__status--published { background: #10b981; }
-.entity-row__status--active { background: #94a3b8; }
-.entity-row__info { flex: 1; min-width: 0; }
-.entity-row__name { font-size: 13px; font-weight: 600; color: var(--neutral-800); display: block; }
-.entity-row__en { font-size: 10px; color: var(--neutral-400); font-family: monospace; }
-.entity-row__badge { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 500; flex-shrink: 0; }
-.entity-row__badge--published { background: #d1fae5; color: #059669; }
-.entity-row__badge--ready { background: #dbeafe; color: #1d4ed8; }
-.entity-row__badge--notready { background: var(--neutral-100); color: var(--neutral-500); }
+.version-main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.version-empty-main { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--neutral-400); }
 
-.publish-main { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
-.publish-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--neutral-400); font-size: 13px; }
+.meta-card { background: var(--neutral-50); border-radius: 10px; padding: 16px; }
+.meta-card__header { display: flex; align-items: center; gap: 10px; }
+.meta-card__header h2 { font-size: 16px; font-weight: 600; margin: 0; color: var(--neutral-900); }
+.meta-card__desc { font-size: 13px; color: var(--neutral-600); margin: 8px 0 0; }
+.meta-card__timeline { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--neutral-500); }
+.meta-card__reject { margin-top: 8px; padding: 8px 10px; background: #fef2f2; border-radius: 6px; font-size: 12px; color: #dc2626; }
+.meta-card__rollback { margin-top: 6px; font-size: 11px; color: var(--neutral-500); font-style: italic; }
 
-.section-title { font-size: 14px; font-weight: 600; color: var(--neutral-800); margin: 0 0 10px; }
-.check-card, .config-card, .preview-card { background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: 10px; padding: 16px; }
+.status-tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.status-tag--draft { background: #e0e7ff; color: #3730a3; }
+.status-tag--pending_approval { background: #fef3c7; color: #92400e; }
+.status-tag--published { background: #dcfce7; color: #166534; }
+.status-tag--rejected { background: #fee2e2; color: #991b1b; }
 
-.check-items { display: flex; flex-direction: column; gap: 6px; }
-.check-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--neutral-700); }
-.check-item--pass .check-icon { color: #10b981; font-weight: 700; }
-.check-item--fail .check-icon { color: #ef4444; font-weight: 700; }
-.check-item--warn .check-icon { color: #f59e0b; font-weight: 700; }
-.check-issues { margin-top: 8px; padding: 8px 10px; background: #fef2f2; border-radius: 6px; }
-.check-issue { font-size: 12px; color: #dc2626; padding: 2px 0; }
+.entity-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 16px; }
+.entity-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.entity-card__header h3 { font-size: 14px; font-weight: 600; margin: 0; }
+.entity-table__row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--neutral-50); font-size: 13px; }
+.entity-table__row--header { font-size: 11px; font-weight: 600; color: var(--neutral-500); text-transform: uppercase; }
+.col-name { flex: 2; display: flex; flex-direction: column; gap: 1px; }
+.col-name small { font-size: 11px; color: var(--neutral-400); }
+.col-tier { width: 50px; text-align: center; }
+.col-attrs { width: 70px; text-align: center; }
+.col-status { width: 50px; text-align: center; }
+.col-action { width: 60px; text-align: center; }
+.check-pass { color: #16a34a; font-weight: 700; }
+.check-fail { color: #dc2626; font-weight: 700; }
+.entity-empty { font-size: 13px; color: var(--neutral-400); text-align: center; padding: 20px; }
 
-.capability-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.cap-item { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; padding: 4px 0; }
-.cap-item input { margin: 0; }
-.cap-item__label { font-weight: 500; color: var(--neutral-800); min-width: 70px; }
-.cap-item__desc { color: var(--neutral-500); font-size: 12px; }
-.config-row { display: flex; align-items: center; gap: 10px; }
-.config-label { font-size: 12px; font-weight: 600; color: var(--neutral-600); }
-.config-select { padding: 5px 10px; border: 1px solid var(--neutral-200); border-radius: 6px; font-size: 12px; }
+.check-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 16px; }
+.check-card h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
+.check-card__summary { font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 6px; }
+.check-card__summary--pass { background: #dcfce7; color: #166534; }
+.check-card__summary--fail { background: #fef2f2; color: #dc2626; }
+.check-card__issues { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+.issue-item { font-size: 12px; color: #dc2626; padding: 4px 8px; background: #fef2f2; border-radius: 4px; }
+.issue-item--rel { color: #92400e; background: #fef3c7; }
 
-.preview-endpoints { display: flex; flex-direction: column; gap: 4px; }
-.preview-ep { display: flex; align-items: center; gap: 8px; font-size: 12px; }
-.preview-ep__method { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: #dbeafe; color: #1d4ed8; }
-.preview-ep code { font-family: monospace; color: var(--neutral-700); font-size: 11px; }
+.action-bar { display: flex; gap: 10px; align-items: center; padding-top: 8px; }
 
-.publish-actions { display: flex; align-items: center; gap: 12px; padding-top: 8px; }
-.btn-primary { padding: 8px 20px; border-radius: 6px; border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-primary { padding: 8px 18px; border-radius: 6px; border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-primary:hover:not(:disabled) { background: var(--semantic-700); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-danger { padding: 8px 20px; border-radius: 6px; border: 1px solid #fca5a5; background: #fef2f2; color: #dc2626; font-size: 13px; font-weight: 500; cursor: pointer; }
-.btn-danger:hover { background: #fee2e2; }
-.publish-hint { font-size: 12px; color: var(--neutral-500); }
-.publish-hint--warn { color: #f59e0b; }
+.btn-secondary { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--neutral-200); background: #fff; color: var(--neutral-700); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-secondary:hover { background: var(--neutral-50); }
+.btn-danger { padding: 8px 18px; border-radius: 6px; border: none; background: #dc2626; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-danger:hover:not(:disabled) { background: #b91c1c; }
+.btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-danger-outline { padding: 8px 18px; border-radius: 6px; border: 1px solid #fca5a5; background: #fef2f2; color: #dc2626; font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-danger-outline:hover { background: #fee2e2; }
+.btn-sm { padding: 4px 12px; border-radius: 5px; border: 1px solid var(--neutral-200); background: #fff; font-size: 12px; cursor: pointer; }
+.btn-sm:hover { background: var(--neutral-50); }
+.btn-block { width: 100%; }
+.btn-link { background: none; border: none; font-size: 12px; cursor: pointer; color: var(--semantic-600); }
+.btn-link--danger { color: #dc2626; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 400px; max-height: 80vh; overflow-y: auto; }
+.modal-box--wide { width: 520px; }
+.modal-box h3 { font-size: 16px; font-weight: 600; margin: 0 0 16px; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.form-group { margin-bottom: 12px; }
+.form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--neutral-600); margin-bottom: 4px; }
+.form-group input, .form-group textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--neutral-200); border-radius: 6px; font-size: 13px; resize: vertical; }
+
+.selector-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.selector-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
+.selector-item:hover { background: var(--neutral-50); }
+.selector-item input { margin: 0; }
+.selector-item__name { font-weight: 500; }
+.selector-item__en { color: var(--neutral-400); font-size: 11px; }
+.selector-item__tier { margin-left: auto; font-size: 11px; color: var(--neutral-500); }
 </style>
