@@ -1,7 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
-const Placeholder = () => import('../views/common/PlaceholderPage.vue')
-
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -29,7 +27,6 @@ const router = createRouter({
     // 数据中心
     { path: '/datasource', name: 'datasource', component: () => import('../views/datasource/DataSourceView.vue'), meta: { title: '数据源' } },
     { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射' } },
-    { path: '/data/quality', name: 'data-quality', component: Placeholder, meta: { title: '数据质量' } },
     { path: '/data/resolution', name: 'data-resolution', component: () => import('../views/resolution/ResolutionView.vue'), meta: { title: '实体解析' } },
 
     // 逻辑中心
@@ -43,13 +40,6 @@ const router = createRouter({
     { path: '/service/agent', name: 'service-agent', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: 'Agent 交互' } },
     { path: '/service/agent/:id', name: 'service-agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
     { path: '/service/workflow', name: 'service-workflow', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '流程编排' } },
-
-    // 兼容旧路由
-    { path: '/agents', redirect: '/service/agent' },
-    { path: '/agents/:id', redirect: to => `/service/agent/${to.params.id}` },
-    { path: '/harness', redirect: '/service/workflow' },
-    { path: '/copilot', redirect: '/service/agent' },
-    { path: '/orchestration/models', redirect: '/settings/models' },
 
     // 业务场景
     { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景总览' } },
@@ -65,14 +55,11 @@ const router = createRouter({
     { path: '/ops/evals', name: 'ops-evals', component: () => import('../views/ops/AgentEvalsView.vue'), meta: { title: 'Agent 评测' } },
     { path: '/ops/traces', name: 'ops-traces', component: () => import('../views/ops/AgentTracesView.vue'), meta: { title: '运行追踪' } },
 
-
     // 系统设置
     { path: '/settings/models', name: 'settings-models', component: () => import('../views/models/ModelManageView.vue'), meta: { title: '模型管理' } },
-    { path: '/settings/tools', name: 'settings-tools', component: () => import('../views/settings/ToolManageView.vue'), meta: { title: '工具管理' } },
     { path: '/settings/monitor', name: 'settings-monitor', component: () => import('../views/settings/MonitorView.vue'), meta: { title: '运维监控' } },
     { path: '/settings/general', name: 'settings-general', component: () => import('../views/governance/GovernanceView.vue'), meta: { title: '系统配置' } },
     { path: '/governance/audit', name: 'gov-audit', component: () => import('../views/governance/AuditLogView.vue'), meta: { title: '权限审计' } },
-    { path: '/app/api', redirect: '/service/api' },
   ]
 })
 
