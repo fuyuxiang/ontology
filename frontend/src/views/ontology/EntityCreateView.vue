@@ -23,17 +23,37 @@
     <!-- ══ AI 智能创建 ══ -->
     <template v-if="mode === 'ai'">
 
+      <!-- AI 子模式切换 -->
+      <div class="ai-submode-tabs">
+        <button class="ai-submode-tab" :class="{ 'ai-submode-tab--active': aiSubMode === 'guided' }" @click="aiSubMode = 'guided'">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1a6 6 0 100 12A6 6 0 007 1zM7 4v3l2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          智能引导
+        </button>
+        <button class="ai-submode-tab" :class="{ 'ai-submode-tab--active': aiSubMode === 'quick' }" @click="aiSubMode = 'quick'">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M4 7h6M7 4v6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          快速提取
+        </button>
+      </div>
+
+      <!-- 智能引导模式 -->
+      <div v-if="aiSubMode === 'guided' && aiStep === 'input'" class="ai-guided-wrapper">
+        <AiGuidedBuilder @complete="handleGuidedComplete" />
+      </div>
+
+      <!-- 快速提取模式（原有逻辑） -->
+      <template v-if="aiSubMode === 'quick' && aiStep === 'input'">
+
       <!-- 步骤指示器 -->
       <div class="ai-steps">
-        <div class="ai-step" :class="{ 'ai-step--active': aiStep === 'input', 'ai-step--done': aiStep !== 'input' }">
+        <div class="ai-step ai-step--active">
           <span class="ai-step__num">1</span><span class="ai-step__label">输入描述</span>
         </div>
         <div class="ai-step__line"></div>
-        <div class="ai-step" :class="{ 'ai-step--active': aiStep === 'edit', 'ai-step--done': aiStep === 'confirm' }">
+        <div class="ai-step">
           <span class="ai-step__num">2</span><span class="ai-step__label">编辑确认</span>
         </div>
         <div class="ai-step__line"></div>
-        <div class="ai-step" :class="{ 'ai-step--active': aiStep === 'confirm' }">
+        <div class="ai-step">
           <span class="ai-step__num">3</span><span class="ai-step__label">提交创建</span>
         </div>
       </div>
@@ -86,6 +106,22 @@
               <span class="tpl-card__hint">点击填入</span>
             </div>
           </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- 步骤指示器（编辑/确认阶段，两种模式共享） -->
+      <div v-if="aiStep !== 'input' && aiResult" class="ai-steps">
+        <div class="ai-step ai-step--done">
+          <span class="ai-step__num">1</span><span class="ai-step__label">{{ aiSubMode === 'guided' ? '智能引导' : '输入描述' }}</span>
+        </div>
+        <div class="ai-step__line"></div>
+        <div class="ai-step" :class="{ 'ai-step--active': aiStep === 'edit', 'ai-step--done': aiStep === 'confirm' }">
+          <span class="ai-step__num">2</span><span class="ai-step__label">编辑确认</span>
+        </div>
+        <div class="ai-step__line"></div>
+        <div class="ai-step" :class="{ 'ai-step--active': aiStep === 'confirm' }">
+          <span class="ai-step__num">3</span><span class="ai-step__label">提交创建</span>
         </div>
       </div>
 
@@ -225,7 +261,7 @@
           </div>
 
           <div class="edit-actions">
-            <button class="btn-secondary" @click="aiStep = 'input'">← 重新提取</button>
+            <button class="btn-secondary" @click="aiStep = 'input'">← {{ aiSubMode === 'guided' ? '返回引导' : '重新提取' }}</button>
             <button class="btn-primary" @click="aiStep = 'confirm'" :disabled="aiResult.entities.filter(e=>e.selected).length === 0">下一步：确认提交 →</button>
           </div>
         </div>
@@ -414,6 +450,7 @@
 import { reactive, ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
+import AiGuidedBuilder from '../../components/ontology/AiGuidedBuilder.vue'
 import { entityApi } from '../../api/ontology'
 import { relationApi } from '../../api/relations'
 import { post } from '../../api/client'
@@ -431,6 +468,7 @@ const breadcrumbs = [
 ]
 
 const mode = ref<'ai' | 'manual' | 'import'>('ai')
+const aiSubMode = ref<'guided' | 'quick'>('guided')
 const attrTypes = ['string', 'number', 'boolean', 'date', 'ref', 'computed', 'enum', 'json']
 const relTypes = ['has', 'belongs_to', 'references', 'triggers', 'produces', 'consumes']
 const cardinalities = ['1:1', '1:N', 'N:1', 'N:N']
@@ -596,6 +634,18 @@ function addRelation() {
   aiResult.value?.relations.push({ from_entity: '', to_entity: '', name: '', rel_type: 'has', cardinality: '1:N' })
 }
 
+function handleGuidedComplete(result: { entities: any[]; relations: any[] }) {
+  result.entities.forEach((e: any) => {
+    e.selected = e.selected ?? true
+    e.attributes = e.attributes || []
+    e.datasource_id = ''
+    e.table_name = ''
+  })
+  aiResult.value = result as any
+  aiStep.value = 'edit'
+  selectedEntityIdx.value = 0
+}
+
 async function handleAiExtract() {
   aiExtracting.value = true
   try {
@@ -653,6 +703,13 @@ async function handleAiCreate() {
 .mode-tab { display: flex; align-items: center; gap: 6px; padding: 7px 16px; border-radius: var(--radius-md); border: none; background: transparent; font-size: var(--text-body-size); font-weight: 500; color: var(--neutral-600); cursor: pointer; transition: all var(--transition-fast); }
 .mode-tab:hover { color: var(--neutral-800); }
 .mode-tab--active { background: var(--neutral-0); color: var(--semantic-600); box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+
+/* AI 子模式切换 */
+.ai-submode-tabs { display: flex; gap: 4px; margin-bottom: 16px; }
+.ai-submode-tab { display: flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: var(--radius-md); border: 1px solid var(--neutral-200); background: transparent; font-size: 12px; font-weight: 500; color: var(--neutral-600); cursor: pointer; transition: all var(--transition-fast); }
+.ai-submode-tab:hover { border-color: var(--semantic-300); color: var(--semantic-600); }
+.ai-submode-tab--active { border-color: var(--semantic-500); background: var(--semantic-50); color: var(--semantic-700); }
+.ai-guided-wrapper { min-height: 560px; display: flex; flex-direction: column; }
 
 /* 步骤指示器 */
 .ai-steps { display: flex; align-items: center; margin-bottom: 24px; }
