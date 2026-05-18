@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 def get_llm_client(api_key: str | None = None, api_base: str | None = None) -> OpenAI:
     client_kwargs = {
         "api_key": api_key or settings.LLM_API_KEY,
-        "base_url": api_base or settings.LLM_API_BASE,
+        "base_url": api_base or settings.LLM_BASE_URL,
     }
     try:
         return OpenAI(**client_kwargs)

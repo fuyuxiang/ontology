@@ -269,7 +269,7 @@ def voice_audit_file(kb_id: str, fid: str, req: VoiceAuditReq, db: Session = Dep
 }}
 只返回JSON，不要其他内容。"""
 
-    client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_API_BASE)
+    client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_BASE_URL)
     try:
         resp = client.chat.completions.create(
             model=settings.LLM_MODEL,

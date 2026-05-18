@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     NEO4J_PASSWORD: str = "ontology123"
     SECRET_KEY: str = "change-me-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
-    LLM_API_BASE: str = "https://coding.dashscope.aliyuncs.com/v1"
+    LLM_BASE_URL: str = "https://coding.dashscope.aliyuncs.com/v1"
     LLM_API_KEY: str = ""
     LLM_MODEL: str = "qwen3.5-plus"
     HOST: str = "0.0.0.0"

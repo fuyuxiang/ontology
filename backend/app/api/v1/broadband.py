@@ -1332,7 +1332,7 @@ def voice_audit(churn_id: str, req: VoiceAuditReq):
     from openai import OpenAI
     from app.config import settings
 
-    client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_API_BASE)
+    client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_BASE_URL)
 
     results = []
     for call in req.calls:
