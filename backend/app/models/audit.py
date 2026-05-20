@@ -19,6 +19,8 @@ class AuditLog(Base):
     target_type: Mapped[str] = mapped_column(String(30), nullable=False)
     target_id: Mapped[str] = mapped_column(String(36), nullable=False)
     target_name: Mapped[str] = mapped_column(String(200), default="")
+    details: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(16), default="success")
     changes_json: Mapped[list | None] = mapped_column(JSON)
     snapshot_before: Mapped[dict | None] = mapped_column(JSON)
     snapshot_after: Mapped[dict | None] = mapped_column(JSON)

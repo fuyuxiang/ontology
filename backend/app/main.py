@@ -185,6 +185,15 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE agents ADD COLUMN edges_json JSON"))
             conn.commit()
 
+        # audit_log 表补充 details / status 列
+        if "audit_log" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("audit_log")}
+            if "details" not in cols:
+                conn.execute(text("ALTER TABLE audit_log ADD COLUMN details TEXT"))
+            if "status" not in cols:
+                conn.execute(text("ALTER TABLE audit_log ADD COLUMN status VARCHAR(16) DEFAULT 'success'"))
+            conn.commit()
+
     db = SessionLocal()
     try:
         seed_admin(db)

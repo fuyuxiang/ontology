@@ -1,87 +1,255 @@
 <div align="center">
 
-# 本体驱动智能策略平台
+# 元枢 Ontology · 企业级本体智能平台
 
-**Ontology-Driven Intelligent Strategy Platform**
+**Yuanshu Ontology — Enterprise Ontology Intelligence Platform**
 
-*将领域知识图谱与 AI 推理引擎深度融合的下一代运营决策系统*
+*以本体为锚 · 以语义为网 · 让数据可懂 · 让 AI 可信*
 
 [![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js)](https://vuejs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org/)
+[![OWL](https://img.shields.io/badge/W3C-OWL-005A9C)](https://www.w3.org/OWL/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
 ---
 
-## 目录
+## 概述
 
-- [项目概述](#项目概述)
-- [系统截图](#系统截图)
+**元枢 Ontology** 是一款面向企业数据治理与智能应用构建的本体智能平台。平台以"**语义层 · 动力层 · 动态层**"三层架构为核心，将分散在业务系统、数据库与流程中的对象、关系、规则、动作与智能体统一组织，形成可查询、可分析、可执行、可持续演进的企业语义网络，让数据从"看得见的表"进化为"用得起的知识"，驱动数据治理、规则推理与智能体应用一体协同。
+
+> 💡 适用场景：数据资产治理 · 业务对象建模 · 智能体应用构建 · 规则驱动分析 · 场景化运营 · 跨系统能力编排。
+
+<details>
+<summary><b>📖 目录</b></summary>
+
+- [核心理念](#核心理念)
+- [核心能力](#核心能力)
 - [系统架构](#系统架构)
-- [技术栈](#技术栈)
 - [功能模块](#功能模块)
-- [API 接口](#api-接口)
+  - [本体中心](#本体中心)
+  - [逻辑中心](#逻辑中心)
+  - [本体服务](#本体服务)
+  - [业务场景](#业务场景)
+  - [运营观测](#运营观测)
+  - [系统设置](#系统设置)
+- [AI Copilot](#ai-copilot)
+- [技术栈](#技术栈)
 - [快速开始](#快速开始)
 - [环境配置](#环境配置)
+- [API 文档](#api-文档)
+- [项目结构](#项目结构)
 - [二次开发](#二次开发)
+- [License](#license)
+
+</details>
 
 ---
 
-## 项目概述
+## 核心理念
 
-传统运营系统面临的核心痛点：业务规则散落在代码中、数据关系隐藏在表结构里、策略决策依赖人工经验。
+元枢的设计目标是让企业数据从静态表结构进入业务语义空间，使数据、规则、流程和 AI 应用能够围绕统一的业务对象协同工作。
 
-本平台通过 **本体建模** 将业务领域知识结构化为三层对象体系（核心层 → 领域层 → 场景层），结合知识图谱可视化、声明式规则引擎、多数据源集成和 AI Copilot 智能问答，实现从数据到洞察到行动的闭环。
+平台采用三层架构：
 
-### 核心能力
+```text
+┌──────────────────────────────────────────────┐
+│                动态层 Dynamic Layer           │
+│  场景运行 / Agent 编排 / 流程执行 / 反馈闭环     │
+├──────────────────────────────────────────────┤
+│                动力层 Power Layer             │
+│  规则 / 函数 / 动作 / 服务接口 / 工作流          │
+├──────────────────────────────────────────────┤
+│                语义层 Semantic Layer          │
+│  实体 / 属性 / 关系 / 映射 / 数据对象            │
+└──────────────────────────────────────────────┘
+```
 
-- **本体建模**：三层 Tier 架构（核心/领域/场景），支持实体、属性、关系、规则、动作全生命周期管理
-- **双层知识图谱**：本体层（实体关系网络）+ 数据层（真实数据节点）交织可视化，基于 vue-flow + D3-force 布局
-- **声明式规则引擎**：条件表达式 + 结构化条件双模式，支持真实数据源评估、置信度计算、风险等级判定
-- **AI 智能问答**：双模式 Copilot（普通对话 + Agent 工具调用），本体感知上下文注入，SSE 流式响应
-- **多数据源集成**：支持 MySQL / PostgreSQL / Oracle / SQL Server，自动发现表结构，从数据表一键生成本体实体
-- **智能编排**：可视化工作流画布，拖拽式节点编排，支持智能体创建与发布
-- **场景化分析**：内置携号转网预警、FTTR 续约策划、宽带退单稽核、政企根因分析四大电信运营场景
-- **审计追踪**：全操作审计日志，记录变更快照，支持回溯
+### 语义层
+
+语义层负责定义企业的核心业务对象及其关系。
+
+它将数据库表、字段、接口数据和业务概念映射为统一的对象模型，解决跨系统数据口径不一致、对象识别困难、字段含义不清晰等问题。
+
+主要能力包括：
+
+- 实体、属性、关系建模
+- 业务对象图谱
+- 数据源接入与字段映射
+- 实体解析与 ID 归一
+- 数据血缘与对象关系追踪
+
+### 动力层
+
+动力层负责描述对象之上的业务逻辑和执行能力。
+
+它将规则、函数、动作、API 和工作流组织为可复用的能力单元，使本体不只用于查询和展示，也可以驱动业务判断、流程执行和系统调用。
+
+主要能力包括：
+
+- 规则配置与评估
+- 函数计算与派生属性
+- 业务动作封装
+- API 服务发布
+- SDK 生成
+- 可视化流程编排
+
+### 动态层
+
+动态层负责面向具体场景的运行、编排和反馈。
+
+它将语义对象和业务能力提供给 Copilot、Agent、工作流和场景应用使用，支持基于上下文的分析、推理、执行和追踪。
+
+主要能力包括：
+
+- Copilot 对话
+- Agent 工具调用
+- 场景化业务应用
+- 工作流执行
+- 运行追踪
+- 评测与监控
 
 ---
 
-## 系统截图
+## 核心能力
 
-![系统总览](docs/images/screenshot-1.png)
-
-![本体图谱](docs/images/screenshot-2.png)
-
-![智能编排](docs/images/screenshot-3.png)
+| 🧱 建模与接入 | ⚙️ 逻辑与执行 | 🚀 服务与运营 |
+|---|---|---|
+| **本体建模** — 实体、属性、关系与对象图谱统一治理 | **规则动作** — 声明式规则、计算函数与可执行动作 | **服务输出** — API 服务、OSDK 生成、Agent 接口三种赋能形态 |
+| **数据接入** — 多源数据库连接、表发现与字段映射 | **流程编排** — 拖拽式可视化工作流，支持节点 / 连线 / 主题切换 | **场景应用** — 携号转网、FTTR、宽带退单、政企根因等行业样板 |
+| **实体解析** — 跨源对象识别、ID 归一与冲突仲裁 | **AI Copilot** — 对话模式 + Agent 模式，本体上下文感知 | **治理运维** — 版本发布、审批、回滚、审计、追踪与 Agent 评测 |
 
 ---
 
 ## 系统架构
 
+```text
+┌───────────────────────────────────────────────────────────────┐
+│                          Frontend                              │
+│   Vue 3 · TypeScript · Vite · Pinia · Ant Design Vue · VueFlow │
+│   本体建模 / 数据映射 / 流程编排 / 场景应用 / 运行观测            │
+└───────────────────────────┬───────────────────────────────────┘
+                            │ HTTP · SSE · JWT
+┌───────────────────────────┴───────────────────────────────────┐
+│                          Backend                               │
+│   FastAPI · SQLAlchemy · Pydantic · Uvicorn                    │
+│   ┌────────────┬─────────────┬─────────────┬───────────────┐  │
+│   │ Rule Engine│Agent Service│Workflow Svc │ OSDK Generator│  │
+│   └────────────┴─────────────┴─────────────┴───────────────┘  │
+│   对象管理 / 规则评估 / 动作执行 / Agent 调用 / 审计 / API 服务   │
+└───────┬─────────────────────────┬─────────────────────┬───────┘
+        │                         │                     │
+┌───────┴────────┐    ┌───────────┴────────────┐ ┌──────┴──────┐
+│  Metadata DB   │    │   External Data Sources│ │     LLM     │
+│ SQLite / MySQL │    │ MySQL · PostgreSQL ·   │ │ OpenAI-     │
+│ 模型 / 版本快照 │    │ Oracle · SQL Server    │ │ compatible  │
+└────────────────┘    └────────────────────────┘ └─────────────┘
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                      Frontend (Vue 3 + TypeScript)                   │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────┐ │
-│  │ 本体管理  │ │ 知识图谱  │ │ 业务规则  │ │ 智能编排  │ │ AI Copilot│ │
-│  │ Explorer │ │ vue-flow │ │  Logic   │ │ Harness  │ │  Agent    │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └─────┬─────┘ │
-│                    Pinia Store + Axios (JWT + SSE)                   │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │ HTTP / SSE
-┌──────────────────────────────┴──────────────────────────────────────┐
-│                      Backend (FastAPI + Uvicorn)                      │
-│  entities · relations · rules · copilot · datasources · agents       │
-│  dashboard · auth · audit                                            │
-│  CopilotService · AgentService · RuleEngine · FileImportService      │
-└──────────────────────────────┬──────────────────────────────────────┘
-                               │ SQLAlchemy ORM
-┌──────────────────────────────┴──────────────────────────────────────┐
-│                    MySQL（生产）/ SQLite（开发）                       │
-└─────────────────────────────────────────────────────────────────────┘
-```
+
+| 组件 | 职责 |
+|------|------|
+| **Frontend** | 本体建模、数据映射、流程编排、场景应用与运行观测等全部交互能力 |
+| **Backend** | 对象管理、规则评估、动作执行、Agent 调用、SDK 生成、权限审计与 API 服务 |
+| **Metadata Database** | 保存本体模型、映射关系、规则配置、版本快照与运行记录 |
+| **External Data Sources** | 通过连接器接入业务库，支撑数据发现、字段映射、查询预览与实体解析 |
+| **LLM** | 通过 OpenAI 兼容协议接入，驱动 Copilot、Agent 与智能建模能力 |
+
+---
+
+## 功能模块
+
+平台共六大功能域，与左侧导航一一对应。
+
+### 本体中心
+
+> 建设企业统一语义模型——从原始数据到可消费的知识对象。
+
+| 模块 | 路由 | 能力简述 |
+|------|------|----------|
+| 数据工坊 | `/datasource` | 数据接入 / 数据管道 / 水合演练 三 Tab 一站式 |
+| 本体建模 | `/browser` | 三层 Tier 实体 CRUD、属性、关系、AI 提取与批量导入 |
+| 本体工作室 | `/studio` | 卡片视图 + 三盒视图，呈现对象、实例规模与规则覆盖 |
+| 本体图谱 | `/browser/graph` | 双层交织画布：本体层 + 数据层，力导向布局与血缘 BFS |
+| 本体映射 | `/data/mapping` | 本体字段 ↔ 物理字段映射、覆盖率统计 |
+| 实体解析 | `/data/resolution` | ID 归一与冲突仲裁，支撑跨源同名实体识别 |
+| 本体发布 | `/ontology/publish` | 草稿 → 校验 → 审批 → 上线 / 回滚，全过程留痕 |
+
+### 逻辑中心
+
+> 让规则与函数成为本体的一部分——业务逻辑可被推理、被调用、被复用。
+
+| 模块 | 路由 | 能力简述 |
+|------|------|----------|
+| Actions 管理 | `/logic/actions` | 业务动作的参数 Schema、前置条件与手动触发 |
+| Functions 管理 | `/logic/functions` | 派生属性 / 计算函数定义，支持入参 Schema 与单元测试 |
+| Rules 管理 | `/logic/rules` | 声明式规则：条件表达式 + 结构化条件双模式 |
+
+### 本体服务
+
+> 把平台能力开放给外部系统与智能体——本体即接口，能力即服务。
+
+| 模块 | 路由 | 能力简述 |
+|------|------|----------|
+| API 服务 | `/service/api` | 基于本体自动生成对外 REST 接口 |
+| OSDK 生成 | `/service/osdk` | 一键产出 TypeScript / Python SDK |
+| Agent 交互 | `/service/agent` | 智能体卡片网格 + 详情画布，节点 / 边持久化 |
+| 流程编排 | `/service/workflow` | 拖拽式可视化工作流画布 |
+
+### 业务场景
+
+> 即开即用的行业样板，可作 Demo 亦可作底座。
+
+| 场景 | 路由 | 能力点 |
+|------|------|--------|
+| 携号转网预警 | `/scene/mnp` | 风险图谱 + 实体映射 + 流程编排时间线 |
+| FTTR 续约策划 | `/scene/fttr` | 续约策略与价值分析 |
+| 宽带退单稽核 | `/scene/broadband` | 列表 + 统计大屏 + 智能收件箱 + 详情四件套 |
+| 政企根因分析 | `/scene/enterprise` | 关联实体聚合的根因定位 |
+
+### 运营观测
+
+> 让 AI 可解释、可衡量、可追溯。
+
+| 模块 | 路由 | 能力简述 |
+|------|------|----------|
+| 本体试车场 | `/harness` | 本体能力沙箱，端到端验证规则、动作、Copilot 行为 |
+| Agent 评测 | `/ops/evals` | 评测套件 / 用例管理、批量执行与结果对比 |
+| 运行追踪 | `/ops/traces` | 全链路 Trace，下钻到工具调用与 Token 消耗 |
+
+### 系统设置
+
+> 治理与运维——让平台稳得住、管得清。
+
+| 模块 | 路由 | 能力简述 |
+|------|------|----------|
+| 模型管理 | `/settings/models` | LLM 模型注册、Endpoint / Key 配置 |
+| 权限审计 | `/governance/audit` | 全操作审计日志 + 变更快照 |
+| 运维监控 | `/settings/monitor` | 资源指标、服务状态、安全事件、系统信息 |
+| 系统配置 | `/settings/general` | 角色（admin / editor / viewer）与平台参数 |
+
+---
+
+## AI Copilot
+
+Copilot 是贯穿平台的智能助手能力。它可以读取本体上下文、数据源摘要、实体关系、规则配置与运行结果，辅助用户完成对象查询、规则分析、流程解释与场景决策。
+
+| 模式 | 适用场景 |
+|------|----------|
+| **对话模式** | 自然语言问答、对象解释、规则说明、数据口径查询、场景分析 |
+| **Agent 模式** | 工具调用与任务执行——Agent 自主完成数据查询、实体解析、规则评估、动作触发与流程编排 |
+
+### Agent 工具矩阵
+
+| 类别 | 工具 | 说明 |
+|------|------|------|
+| 🧩 **本体** | `describe_ontology_model` · `get_entity_detail` | 查询本体 Schema 与实体详情 |
+| 🗄️ **数据源** | `list_datasources` · `get_table_schema` · `query_datasource` | 数据源、表结构与只读 SQL 查询（自动 LIMIT，禁止 DML/DDL） |
+| 📊 **实例** | `query_entity_data` | 按实体查询关联数据源中的实例数据 |
+| 📐 **规则** | `get_business_rules` · `evaluate_rule` · `evaluate_all_rules` · `screen_users_by_rule` | 规则查询、单规则与全量评估、人群筛选 |
+| ⚡ **动作** | `execute_action` | 触发预定义业务动作 |
 
 ---
 
@@ -89,179 +257,16 @@
 
 | 层级 | 技术 | 说明 |
 |------|------|------|
-| 前端框架 | Vue 3.5 + TypeScript 6 | Composition API + `<script setup>` |
-| 构建工具 | Vite 8 | HMR 热更新，代理后端 API |
-| 状态管理 | Pinia 3 | 7 个 Store |
-| 图可视化 | vue-flow 1.48 + D3-force | 交互式画布 + 力导向布局 |
-| HTTP 客户端 | Axios 1.15 | JWT 拦截器 + SSE 流式解析 |
-| 后端框架 | FastAPI 0.115 + Uvicorn | ASGI 异步服务器 |
-| ORM | SQLAlchemy 2.0 | Mapped 声明式模型 |
-| 数据验证 | Pydantic 2.11 | 请求/响应 Schema |
-| 认证 | JWT (PyJWT) + Passlib (bcrypt) | Bearer Token |
-| 数据库 | MySQL（生产）/ SQLite（开发） | 通过 DATABASE_URL 切换 |
-| LLM | OpenAI 兼容接口 | 可替换任意 LLM |
-| 数据源驱动 | pymysql / psycopg2 / oracledb / pymssql | 多数据库连接 |
-
----
-
-## 功能模块
-
-### 1. 本体管理（`/browser`）
-
-三层 Tier 架构管理所有业务实体：
-
-| Tier | 定位 | 示例 |
-|------|------|------|
-| Tier 1 核心层 | 业务基础实体 | 客户、订单、产品 |
-| Tier 2 领域层 | 运营领域概念 | 营销活动、客户分群、策略 |
-| Tier 3 场景层 | 场景专属对象 | 携转预警、FTTR订阅、退单工单 |
-
-- 实体 CRUD：创建/编辑/删除，支持搜索过滤
-- 属性管理：类型支持 string / number / boolean / date / json / ref / computed
-- 关系管理：1:1 / 1:N / N:1 / N:N 基数，可视化血缘图谱（BFS 1-3 跳）
-- 规则 & 动作：查看关联规则，手动触发动作
-- 文件导入：支持 JSON / OWL / TTL 格式批量导入本体
-- AI 提取：上传文档自动提取实体结构
-
-### 2. 知识图谱（`/browser/graph`）
-
-基于 vue-flow + D3-force 的双层交织可视化画布：
-
-- **本体层**：实体节点（按 Tier 着色：T1 蓝 / T2 紫 / T3 绿）+ 贝塞尔关系边
-- **数据层**：每个实体对应的真实数据节点（表名、记录数、字段数），虚线边连接
-- 工具栏：数据层开关、布局方向切换、适应视口
-- 小地图：右下角缩略图，支持拖拽导航
-- 节点交互：拖拽、点击选中、hover 高亮、右侧详情面板
-
-### 3. 业务规则（`/browser/rules`）
-
-声明式规则引擎，将业务逻辑从代码中解耦：
-
-- 规则列表：按状态（active/inactive）、优先级（high/medium/low）、关键词筛选
-- 创建/编辑规则：条件表达式 + 结构化条件 JSON 双模式
-- 手动执行：触发规则，记录执行次数和最后触发时间
-- 规则评估：对指定用户 ID 评估，返回匹配明细、置信度（0-1）、风险等级
-
-### 4. 数据源管理（`/datasource`）
-
-外部数据库连接管理，支持 MySQL / PostgreSQL / Oracle / SQL Server：
-
-- 创建数据源：输入连接信息，自动发现所有表
-- 连接测试、表结构查看、数据预览（前 20 条）
-- 启用/禁用、刷新记录数
-- 从数据源一键生成本体实体（自动映射列类型）
-
-### 5. 智能编排（`/harness`、`/agents`）
-
-可视化工作流画布，拖拽式节点编排：
-
-- 工作流画布：节点拖拽、连线、删除，支持浅色/深色主题
-- 智能体管理：卡片网格展示，点击进入详情画布
-- 智能体详情：独立编排画布 + 设置面板，节点/边持久化到数据库
-- 模型管理：LLM 模型注册与配置（`/orchestration/models`）
-
-### 6. AI 智能问答（`/copilot`）
-
-集成 LLM 的本体感知对话助手：
-
-- **普通对话**：自动注入本体上下文（实体/关系/规则/数据源），SSE 流式输出
-- **Agent 模式**：LLM + 工具调用循环（最多 8 轮），工具包括：
-  - `describe_ontology_model`：查询本体结构
-  - `query_datasource`：安全执行只读 SQL（自动 LIMIT，禁止 DML/DDL）
-  - `query_entity_data`：按实体查询关联数据源
-  - `evaluate_rule` / `evaluate_all_rules`：规则评估
-  - `execute_action`：执行业务动作
-
-### 7. 场景分析（`/scene`）
-
-四大电信运营场景：
-
-| 场景 | 路由 | 说明 |
-|------|------|------|
-| 携号转网预警 | `/scene/mnp` | 风险图谱、实体映射、流程编排时间线 |
-| FTTR 续约策划 | `/scene/fttr` | 续约策略分析 |
-| 宽带退单稽核 | `/scene/broadband` | 退单列表、统计、智能收件箱、详情 |
-| 政企根因分析 | `/scene/enterprise` | 根因定位与分析 |
-
-### 8. 数据看板（`/dashboard`）
-
-- KPI 指标卡：实体总数、关系总数、规则总数、活跃规则数
-- Tier 分布统计、对象健康状态、近期操作活动
-
-### 9. 系统治理（`/governance`）
-
-- 审计日志：全操作记录，含变更快照
-- 权限管理：角色（admin / editor / viewer）
-- API 开放平台（`/app/api`）
-
----
-
-## API 接口
-
-### 实体 `/api/v1/entities`
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/` | 列表（支持 tier/status/search/namespace 过滤） |
-| POST | `/` | 创建实体 |
-| GET/PUT/DELETE | `/{id}` | 详情 / 更新 / 删除（级联删除属性/规则/动作） |
-| GET | `/graph` | 全量图谱（节点+边） |
-| GET | `/data-layer` | 数据层映射（实体→表→数据源） |
-| GET | `/{id}/lineage` | 血缘图谱（BFS，支持深度控制） |
-| POST | `/ai-extract` | AI 自动提取实体 |
-| POST | `/import-from-datasource` | 从数据源导入实体 |
-
-### 关系 `/api/v1/relations`
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET/POST | `/` | 列表 / 创建 |
-| DELETE | `/{id}` | 删除关系 |
-
-### 规则 `/api/v1/rules`
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET/POST | `/` | 列表 / 创建 |
-| PUT/DELETE | `/{id}` | 更新 / 删除 |
-| POST | `/{id}/execute` | 执行规则 |
-| POST | `/{id}/evaluate` | 评估规则（真实数据源） |
-
-### 数据源 `/api/v1/datasources`
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET/POST | `/` | 列表 / 创建（自动发现所有表） |
-| POST | `/test` | 测试连接 |
-| POST | `/fetch-tables` | 获取表列表 |
-| POST | `/{id}/toggle` | 启用/禁用 |
-| POST | `/{id}/refresh-tables` | 刷新记录数 |
-| GET | `/{id}/preview` | 数据预览 |
-| GET | `/{id}/tables/{table}/schema` | 表结构 |
-
-### AI 对话 `/api/v1/copilot`
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| POST | `/chat` | 普通对话（SSE 流式） |
-| POST | `/agent-chat` | Agent 工具调用（SSE 流式） |
-
-### 智能体 `/api/v1/agents`
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET/POST | `/` | 列表 / 创建 |
-| GET/PUT/DELETE | `/{id}` | 详情 / 更新 / 删除 |
-| POST | `/{id}/run` | 执行工作流（SSE 流式） |
-
-### 其他
-
-| 路径 | 说明 |
-|------|------|
-| POST `/api/v1/auth/login` | 用户登录，返回 JWT |
-| GET `/api/v1/auth/me` | 当前用户信息 |
-| GET `/api/v1/dashboard/stats` | 全局统计 |
-| GET `/api/health` | 健康检查 |
+| 🎨 **前端框架** | Vue 3 + TypeScript | Composition API + `<script setup>` |
+| 🛠️ **构建 / 状态** | Vite + Pinia | HMR 热更新 · 多 Store 状态管理 |
+| 🧱 **UI / 可视化** | Ant Design Vue + Vue Flow | 企业级控件 · 双层力导向画布 |
+| 🌐 **HTTP / 流** | Axios | JWT 自动注入 · SSE 流式解析 |
+| 🚀 **后端框架** | FastAPI + Uvicorn | ASGI · 异步 IO · OpenAPI 自动文档 |
+| 🗃️ **ORM / 校验** | SQLAlchemy 2.0 + Pydantic 2 | Mapped 声明式模型 · 类型安全 Schema |
+| 🔐 **认证** | PyJWT + Passlib (bcrypt) | Bearer Token · 角色权限 |
+| 💾 **元数据库** | SQLite / MySQL | 通过 `DATABASE_URL` 一键切换 |
+| 🔌 **外部数据源** | MySQL · PostgreSQL · Oracle · SQL Server | pymysql / psycopg2 / oracledb / pymssql |
+| 🤖 **LLM** | OpenAI 兼容协议 | 任意厂商，支持工具调用、SSE 流式与执行链路追踪 |
 
 ---
 
@@ -271,24 +276,40 @@
 
 - Python 3.11+
 - Node.js 18+
-- pnpm / npm
+- pnpm 9+ 或 npm 10+
+- 可选：MySQL 8
 
-### 后端启动
+### 启动后端
 
 ```bash
 cd backend
-
-pip install fastapi uvicorn sqlalchemy pydantic-settings passlib[bcrypt] pyjwt openai pymysql psycopg2-binary
-
-# 可选
-pip install rdflib oracledb pymssql
-
+pip install -r requirements.txt
 uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
 ```
 
-启动后自动完成：建表、数据库迁移、创建默认管理员（admin / admin123）
+安装核心依赖：
 
-### 前端启动
+```bash
+pip install fastapi uvicorn sqlalchemy pydantic-settings \
+            passlib[bcrypt] pyjwt openai \
+            pymysql psycopg2-binary
+```
+
+可选数据源依赖：
+
+```bash
+pip install rdflib oracledb pymssql
+```
+
+后端启动后，接口文档地址为：
+
+```text
+http://localhost:8001/docs
+```
+
+> 💡 启动时自动完成建表 · 数据库迁移 · 创建默认管理员 `admin / admin123`，开箱即用。
+
+### 启动前端
 
 ```bash
 cd frontend
@@ -296,68 +317,141 @@ pnpm install
 pnpm dev
 ```
 
-访问 `http://localhost:5173`，后端代理到 `http://localhost:8001`。
+前端访问地址：
 
-### 一键启动（Windows）
+```text
+http://localhost:5173
+```
 
-```bat
+开发环境下，前端请求会代理到后端服务：
+
+```text
+http://localhost:8001
+```
+
+### 一键脚本
+
+Windows：
+
+```bash
 start.bat
+stop.bat
+ctl.bat
+```
+
+macOS / Linux：
+
+```bash
+./start.sh
+./stop.sh
+./restart.sh
 ```
 
 ---
 
 ## 环境配置
 
-`backend/.env`：
+后端配置文件位于：
+
+```text
+backend/.env
+```
+
+示例配置：
 
 ```env
-DATABASE_URL=mysql+pymysql://user:pass@host:port/ontology_platform?charset=utf8mb4
+# 元数据库
+DATABASE_URL=sqlite:///./ontology.db
+
+# MySQL 示例
+# DATABASE_URL=mysql+pymysql://user:password@host:3306/ontology_platform?charset=utf8mb4
+
+# LLM
 LLM_API_BASE=https://your-llm-api.com/v1
 LLM_API_KEY=your-api-key
 LLM_MODEL=your-model-name
-SECRET_KEY=your-secret-key
+
+# 安全配置
+SECRET_KEY=replace-with-strong-random-string
 ```
 
-切换数据库只需修改 `DATABASE_URL`，支持 SQLite / MySQL / PostgreSQL。
+生产环境建议：
+
+> ⚠️ **生产部署清单**
+> - 使用 **MySQL** 作为元数据库（避免 SQLite 并发瓶颈）
+> - 使用强随机值配置 `SECRET_KEY`，建议通过 `openssl rand -hex 32` 生成
+> - 通过密钥管理服务（KMS / Vault）管理数据库密码与模型服务 Key
+> - **务必修改默认管理员账号和密码**（`admin / admin123`）
+> - 开启审计、访问日志与基于角色的访问控制
+
+---
+
+## API 文档
+
+后端启动后访问 Swagger UI：
+
+```text
+http://localhost:8001/docs
+```
+
+所有业务接口默认挂载在：
+
+```text
+/api/v1
+```
+
+> 💡 平台后端共注册 28 个路由域，覆盖本体、数据、规则、动作、Agent、Copilot、版本发布、运维监控等全部能力。详细接口以 Swagger UI 和后端路由定义为准。
+
+---
+
+## 项目结构
+
+```text
+.
+├── backend
+│   ├── app
+│   │   ├── api
+│   │   ├── models
+│   │   ├── services
+│   │   ├── schemas
+│   │   └── main.py
+│   └── .env
+│
+├── frontend
+│   ├── src
+│   │   ├── views
+│   │   ├── components
+│   │   ├── router
+│   │   ├── stores
+│   │   └── main.ts
+│   └── package.json
+│
+├── docs
+└── README.md
+```
 
 ---
 
 ## 二次开发
 
-### 新增 API 路由
+常见扩展方向包括：
 
-1. 在 `backend/app/api/v1/` 下创建路由文件
-2. 在 `backend/app/main.py` 中注册：`app.include_router(router, prefix="/api/v1")`
+- 新增业务实体和关系
+- 新增数据源连接器
+- 新增规则类型
+- 新增业务动作
+- 新增 Agent 工具
+- 新增行业场景页面
+- 新增外部系统 API 集成
 
-### 新增数据模型
+建议将详细开发说明维护在：
 
-1. 在 `backend/app/models/` 下定义 SQLAlchemy 模型
-2. 在 `backend/app/models/__init__.py` 中导出
-3. 启动时自动建表；如需迁移已有表，在 `main.py` 的 `lifespan()` 中添加 ALTER TABLE
-
-### 新增前端页面
-
-1. 在 `frontend/src/views/` 下创建 Vue 组件
-2. 在 `frontend/src/router/index.ts` 中添加路由
-3. 在 `frontend/src/components/common/AppSidebar.vue` 中添加导航项
-
-### 新增 Agent 工具
-
-1. 在 `backend/app/services/agent_tools.py` 的 `AGENT_TOOL_SPECS` 中添加工具定义
-2. 在 `backend/app/services/agent_service.py` 的 `_execute_tool()` 中添加执行逻辑
-
-### 替换 LLM
-
-修改 `.env` 即可切换到任意 OpenAI 兼容接口：
-
-```env
-LLM_API_BASE=https://your-llm-api.com/v1
-LLM_API_KEY=your-api-key
-LLM_MODEL=your-model-name
+```text
+docs/development.md
 ```
 
 ---
 
 ## License
 
-MIT
+MIT © 元枢 Ontology

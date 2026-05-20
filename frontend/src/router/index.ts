@@ -21,12 +21,14 @@ const router = createRouter({
     },
     { path: '/browser/graph', name: 'browser-graph', component: () => import('../views/dataflow/DataflowView.vue'), meta: { title: '本体图谱' } },
     { path: '/studio', name: 'studio', component: () => import('../views/studio/OntologyStudio.vue'), meta: { title: '本体工作室' } },
+    { path: '/builder', name: 'ontology-builder', component: () => import('../views/builder/OntologyBuilderView.vue'), meta: { title: '本体构建器' } },
     { path: '/ontology/publish', name: 'ontology-publish', component: () => import('../views/ontology/OntologyPublishView.vue'), meta: { title: '本体发布' } },
     { path: '/ontology/create', name: 'ontology-create', component: () => import('../views/ontology/EntityCreateView.vue'), meta: { title: '新建本体对象' } },
     { path: '/ontology/:id', name: 'ontology-detail', component: () => import('../views/detail/EntityDetail.vue'), meta: { title: '实体详情' } },
 
     // 数据中心
-    { path: '/datasource', name: 'datasource', component: () => import('../views/datasource/DataSourceView.vue'), meta: { title: '数据源' } },
+    { path: '/datasource', name: 'datasource', component: () => import('../views/datasource/DataWorkshopView.vue'), meta: { title: '数据工坊' } },
+    { path: '/data/workshop', name: 'data-workshop', component: () => import('../views/datasource/DataWorkshopView.vue'), meta: { title: '数据工坊' } },
     { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射' } },
     { path: '/data/resolution', name: 'data-resolution', component: () => import('../views/resolution/ResolutionView.vue'), meta: { title: '实体解析' } },
 
@@ -41,6 +43,10 @@ const router = createRouter({
     { path: '/service/agent', name: 'service-agent', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: 'Agent 交互' } },
     { path: '/service/agent/:id', name: 'service-agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
     { path: '/service/workflow', name: 'service-workflow', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '流程编排' } },
+    { path: '/harness', name: 'ontology-harness', component: () => import('../views/harness/OntologyHarnessView.vue'), meta: { title: '本体试车场' } },
+
+    // AIP 场景平台
+    { path: '/aip', name: 'aip-platform', component: () => import('../views/aip/AipPlatformView.vue'), meta: { title: 'AIP 场景平台' } },
 
     // 业务场景
     { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景总览' } },
