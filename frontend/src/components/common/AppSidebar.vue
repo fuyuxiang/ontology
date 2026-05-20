@@ -105,7 +105,8 @@ const navGroups = [
     { path: '/dashboard', label: '平台总览', icon: ico.dashboard, exact: true },
   ]},
   { label: '本体中心', items: [
-    { path: '/datasource', label: '数据接入', icon: ico.datasource },
+    { path: '/datasource', label: '数据工坊', icon: ico.datasource },
+    { path: '/builder', label: '本体构建器', icon: ico.tool },
     { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },
     { path: '/studio', label: '本体工作室', icon: ico.graph },
     { path: '/browser/graph', label: '本体图谱', icon: ico.graph },
@@ -124,6 +125,7 @@ const navGroups = [
     { path: '/service/workflow', label: '流程编排', icon: ico.workflow },
   ]},
   { label: '业务场景', items: [
+    { path: '/aip', label: 'AIP 场景平台', icon: ico.workflow },
     { path: '/scene', label: '场景总览', icon: ico.scene, exact: true, children: [
       { path: '/scene/fttr', label: 'FTTR续约' },
       { path: '/scene/broadband', label: '宽带退单' },
@@ -132,6 +134,7 @@ const navGroups = [
     ]},
   ]},
   { label: '运营观测', items: [
+    { path: '/harness', label: '本体试车场', icon: ico.sandbox },
     { path: '/ops/evals', label: 'Agent 评测', icon: ico.evals },
     { path: '/ops/traces', label: '运行追踪', icon: ico.tracking },
   ]},
