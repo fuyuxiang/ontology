@@ -76,8 +76,29 @@
           :hydration="aboxHydrationMap"
           @select="selectObject"
         />
+        <StudioBusinessView
+          v-else-if="activeView === 'business'"
+          :objects="tbox.objectTypes"
+          :relations="tbox.linkTypes"
+          :selected="selectedObject"
+          @select="selectObject"
+        />
+        <StudioTwinView
+          v-else-if="activeView === 'twin'"
+          :objects="tbox.objectTypes"
+          :relations="tbox.linkTypes"
+          :selected="selectedObject"
+          @select="selectObject"
+        />
+        <StudioSemanticView
+          v-else-if="activeView === 'flow'"
+          :objects="tbox.objectTypes"
+          :relations="tbox.linkTypes"
+          :selected="selectedObject"
+          @select="selectObject"
+        />
         <div v-else class="studio__placeholder">
-          <p>{{ viewOptions.find(v => v.value === activeView)?.label }} — 视图开发中</p>
+          <p>未知视图</p>
         </div>
       </div>
 
@@ -124,6 +145,9 @@ import { ref, computed, onMounted } from 'vue'
 import { studioApi, type StudioTBox, type StudioABox, type StudioRBox, type StudioStats, type StudioObjectType, type StudioHydration } from '../../api/studio'
 import StudioCardView from './StudioCardView.vue'
 import StudioThreeBox from './StudioThreeBox.vue'
+import StudioBusinessView from './StudioBusinessView.vue'
+import StudioTwinView from './StudioTwinView.vue'
+import StudioSemanticView from './StudioSemanticView.vue'
 
 const tbox = ref<StudioTBox | null>(null)
 const abox = ref<StudioABox | null>(null)
