@@ -215,6 +215,8 @@ def get_capability(db: Session = Depends(get_db)) -> dict[str, Any]:
     action_list = []
     for a in actions:
         ent = entity_map.get(a.entity_id)
+        meta = a.action_meta_json or {}
+        desc = (meta.get("description") if isinstance(meta, dict) else None) or ""
         action_list.append({
             "apiName": f"{ent.name}.{a.name}" if ent else a.name,
             "shortApiName": a.name,
@@ -223,11 +225,12 @@ def get_capability(db: Session = Depends(get_db)) -> dict[str, Any]:
             "scenarioCode": _scenario_of(ent) if ent else "core",
             "kind": "ACTION",
             "returnType": "void",
-            "inputProperties": [],
-            "outputProperties": [],
+            "inputProperties": [p.get("name") for p in (a.parameters_json or []) if isinstance(p, dict)],
+            "outputProperties": [e.get("property") for e in (a.effects_json or []) if isinstance(e, dict)],
             "writesState": True,
             "implRef": f"action_executor::{a.name}",
-            "description": a.description or "",
+            "description": desc,
+            "actionType": a.type,
         })
 
     function_list = []
