@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, or_
 from pydantic import BaseModel
 from datetime import datetime
 
@@ -22,6 +22,8 @@ class AuditLogItem(BaseModel):
     target_type: str
     target_id: str
     target_name: str
+    details: str | None = None
+    status: str = "success"
     changes_json: list | None
 
     model_config = {"from_attributes": True}
@@ -41,6 +43,7 @@ def list_audit_logs(
     action: str | None = Query(None),
     target_type: str | None = Query(None),
     user_name: str | None = Query(None),
+    keyword: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     q = db.query(AuditLog)
@@ -50,8 +53,23 @@ def list_audit_logs(
         q = q.filter(AuditLog.target_type == target_type)
     if user_name:
         q = q.filter(AuditLog.user_name.ilike(f"%{user_name}%"))
+    if keyword:
+        like = f"%{keyword}%"
+        q = q.filter(or_(
+            AuditLog.target_name.ilike(like),
+            AuditLog.target_id.ilike(like),
+            AuditLog.details.ilike(like),
+            AuditLog.user_name.ilike(like),
+        ))
 
     total = q.count()
     items = q.order_by(desc(AuditLog.timestamp)).offset((page - 1) * page_size).limit(page_size).all()
 
     return AuditLogPage(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.get("/audit-logs/actions", response_model=list[str])
+def list_audit_actions(db: Session = Depends(get_db)):
+    """返回当前所有出现过的操作类型，用于前端筛选下拉。"""
+    rows = db.query(AuditLog.action).distinct().all()
+    return sorted({r[0] for r in rows if r[0]})
