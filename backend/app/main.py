@@ -118,6 +118,7 @@ from app.api.v1.evals import router as evals_router
 from app.api.v1.actions import router as actions_router
 from app.api.v1.functions import router as functions_router
 from app.api.v1.monitor import router as monitor_router
+from app.api.v1.studio import router as studio_router
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +264,7 @@ app.include_router(evals_router, prefix="/api/v1")
 app.include_router(actions_router, prefix="/api/v1")
 app.include_router(functions_router, prefix="/api/v1")
 app.include_router(monitor_router, prefix="/api/v1")
+app.include_router(studio_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

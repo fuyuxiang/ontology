@@ -107,6 +107,7 @@ const navGroups = [
   { label: '本体中心', items: [
     { path: '/datasource', label: '数据接入', icon: ico.datasource },
     { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },
+    { path: '/studio', label: '本体工作室', icon: ico.graph },
     { path: '/browser/graph', label: '本体图谱', icon: ico.graph },
     { path: '/data/mapping', label: '本体映射', icon: ico.mapping },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
