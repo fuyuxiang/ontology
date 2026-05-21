@@ -35,6 +35,10 @@ def get_tbox(db: Session = Depends(get_db)) -> dict[str, Any]:
 
     entity_map = {e.id: e for e in entities}
 
+    # 数据源索引：按主表名查 record_count
+    from app.models.datasource import DataSource
+    ds_by_table = {ds.table_name: ds for ds in db.query(DataSource).all() if ds.table_name}
+
     object_types = []
     for e in entities:
         properties = []
@@ -54,6 +58,14 @@ def get_tbox(db: Session = Depends(get_db)) -> dict[str, Any]:
                 "dataStatus": a.data_status,
             })
 
+        # 实例数：从主映射表的 datasource.record_count 推算
+        primary_tables = [a.source_table for a in e.attributes if a.source_table]
+        abox_scale = 0
+        if primary_tables:
+            ds = ds_by_table.get(primary_tables[0])
+            if ds:
+                abox_scale = ds.record_count or 0
+
         object_types.append({
             "apiName": e.name,
             "displayName": e.name_cn,
@@ -64,7 +76,7 @@ def get_tbox(db: Session = Depends(get_db)) -> dict[str, Any]:
             "status": e.status,
             "visibility": "PROMINENT",
             "iriPattern": f"ontology:{e.name}/{{id}}",
-            "aboxScale": 0,  # 由 abox 接口计算
+            "aboxScale": abox_scale,
             "dataSource": _data_source_of(e),
             "description": e.description or "",
             "remarks": [],
@@ -115,38 +127,79 @@ def get_tbox(db: Session = Depends(get_db)) -> dict[str, Any]:
 
 @router.get("/abox")
 def get_abox(db: Session = Depends(get_db)) -> dict[str, Any]:
-    """A-box 断言层：实例数据 + 水合状态。
-
-    当前我们尚无真实实例表，输出实例 = 0 但保留对象/关系列表，
-    给前端"未水合"状态使用。后续接入 poc-service-api 的真实数据。
-    """
+    """A-box 断言层：基于属性映射推算实例数 + 字段覆盖率"""
     entities = db.query(OntologyEntity).all()
+
+    # 一次性加载所有 datasource，按 table_name 建索引
+    from app.models.datasource import DataSource
+    datasources = db.query(DataSource).all()
+    ds_by_table: dict[str, DataSource] = {}
+    for ds in datasources:
+        if ds.table_name:
+            ds_by_table[ds.table_name] = ds
+
+    hydration = []
+    individuals_total = 0
+    by_object: dict[str, int] = {}
+    for e in entities:
+        # 同一对象的属性可能映射到多个表，取第一张表的 record_count 当实例数
+        mapped_attrs = [a for a in e.attributes if a.source_field]
+        populated_attrs = [a for a in mapped_attrs if a.data_status == "已确认"]
+        primary_table: str | None = None
+        instance_count = 0
+        backing_source = ""
+        if mapped_attrs:
+            tables = [a.source_table for a in mapped_attrs if a.source_table]
+            if tables:
+                primary_table = tables[0]
+                ds = ds_by_table.get(primary_table)
+                if ds:
+                    instance_count = ds.record_count or 0
+                    backing_source = ds.name
+                else:
+                    backing_source = primary_table
+
+        # 水合等级
+        total = len(e.attributes)
+        if not mapped_attrs:
+            level = "none"
+        elif primary_table and instance_count > 0 and len(populated_attrs) == total:
+            level = "full"
+        elif primary_table and instance_count > 0:
+            level = "partial"
+        else:
+            level = "mapping"
+
+        coverage = len(mapped_attrs) / total if total > 0 else 0
+        hydration.append({
+            "objectTypeApiName": e.name,
+            "level": level,
+            "instanceCount": instance_count,
+            "propertyCompleteness": {
+                "total": total,
+                "mapped": len(mapped_attrs),
+                "populated": len(populated_attrs),
+                "coverage": round(coverage, 4),
+            },
+            "backingSource": backing_source,
+            "primaryTable": primary_table,
+        })
+        individuals_total += instance_count
+        by_object[e.name] = instance_count
+
     return {
         "kind": "abox",
         "version": _SCHEMA_VERSION,
         "generatedAt": _now_iso(),
-        "source": "live (placeholder, awaiting POC integration)",
+        "source": "datasources.record_count via attribute.source_table",
         "meta": {
-            "individualCount": 0,
+            "individualCount": individuals_total,
             "linkCount": 0,
             "scenarios": _all_scenarios(entities),
+            "byObjectType": by_object,
         },
         "individuals": [],
-        "hydration": [
-            {
-                "objectTypeApiName": e.name,
-                "level": "none",
-                "instanceCount": 0,
-                "propertyCompleteness": {
-                    "total": len(e.attributes),
-                    "mapped": sum(1 for a in e.attributes if a.source_field),
-                    "populated": 0,
-                    "coverage": 0.0,
-                },
-                "backingSource": _data_source_of(e),
-            }
-            for e in entities
-        ],
+        "hydration": hydration,
     }
 
 
@@ -280,6 +333,9 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
     actions = db.query(EntityAction).all()
     functions = db.query(OntologyFunction).all()
 
+    from app.models.datasource import DataSource
+    ds_by_table = {ds.table_name: ds for ds in db.query(DataSource).all() if ds.table_name}
+
     prop_count = sum(len(e.attributes) for e in entities)
 
     tier_breakdown = {f"Tier{t}": [e.name for e in entities if e.tier == t] for t in (1, 2, 3)}
@@ -293,6 +349,22 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
         meta = r.rule_meta_json or {}
         family = (meta.get("category") if isinstance(meta, dict) else None) or "INFERENCE"
         rule_family[family] = rule_family.get(family, 0) + 1
+
+    # ABox 真实数据
+    abox_total = 0
+    abox_by_object: dict[str, int] = {}
+    abox_by_scenario: dict[str, int] = {}
+    for e in entities:
+        primary_tables = [a.source_table for a in e.attributes if a.source_table]
+        count = 0
+        if primary_tables:
+            ds = ds_by_table.get(primary_tables[0])
+            if ds:
+                count = ds.record_count or 0
+        abox_total += count
+        abox_by_object[e.name] = count
+        sc = _scenario_of(e)
+        abox_by_scenario[sc] = abox_by_scenario.get(sc, 0) + count
 
     return {
         "generatedAt": _now_iso(),
@@ -319,10 +391,10 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
             "scenarioBreakdown": scenario_breakdown,
         },
         "abox": {
-            "individualCount": 0,
+            "individualCount": abox_total,
             "linkCount": 0,
-            "byObjectType": {},
-            "byScenario": {},
+            "byObjectType": abox_by_object,
+            "byScenario": abox_by_scenario,
             "bySourceRef": {},
         },
         "validation": {
@@ -330,6 +402,37 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
             "failed": 0,
             "checks": [],
         },
+    }
+
+
+# ─── 数据刷新：手动触发所有 datasource 实例计数 ──────────────────────
+
+@router.post("/refresh-counts")
+def refresh_counts(db: Session = Depends(get_db)) -> dict[str, Any]:
+    """触发所有启用的数据源重新统计 record_count，刷新 A-Box 实例数"""
+    from app.models.datasource import DataSource
+    from app.api.v1.datasources import _count_records
+
+    sources = db.query(DataSource).filter(DataSource.enabled == True).all()  # noqa: E712
+    results = []
+    success = 0
+    for ds in sources:
+        if not ds.table_name:
+            results.append({"id": ds.id, "name": ds.name, "status": "skip", "message": "未关联数据表"})
+            continue
+        count, err = _count_records(ds)
+        if err:
+            results.append({"id": ds.id, "name": ds.name, "status": "error", "message": err})
+            continue
+        ds.record_count = count
+        success += 1
+        results.append({"id": ds.id, "name": ds.name, "status": "ok", "count": count})
+    db.commit()
+    return {
+        "refreshedAt": _now_iso(),
+        "total": len(sources),
+        "success": success,
+        "results": results,
     }
 
 
