@@ -46,6 +46,7 @@
         <div class="studio__header-info">
           <strong>{{ tbox?.meta.objectTypeCount ?? 0 }} 个对象类型 · {{ tbox?.meta.linkTypeCount ?? 0 }} 条关系</strong>
           <span class="studio__owl-tag">W3C OWL</span>
+          <span v-if="stats" class="studio__abox-tag">{{ formatNumber(stats.abox.individualCount) }} 个实例</span>
         </div>
         <div class="studio__view-switcher">
           <button
@@ -58,6 +59,10 @@
             {{ v.label }}
           </button>
         </div>
+        <button class="studio__refresh-btn" @click="refreshCounts" :disabled="refreshing" :title="lastRefreshAt ? '上次刷新: ' + lastRefreshAt : '刷新数据源实例数'">
+          <span v-if="refreshing">⟳ 刷新中</span>
+          <span v-else>⟳ 刷新数据</span>
+        </button>
       </header>
 
       <div class="studio__body" v-if="!loading && tbox">
@@ -191,18 +196,40 @@ function formatNumber(n: number) {
   return n.toLocaleString('en-US')
 }
 
+const refreshing = ref(false)
+const lastRefreshAt = ref<string | null>(null)
+
+async function refreshCounts() {
+  refreshing.value = true
+  try {
+    const result = await studioApi.refreshCounts()
+    lastRefreshAt.value = new Date().toLocaleTimeString('zh-CN')
+    // 重新拉取所有数据
+    await reload()
+    console.log('刷新完成:', result)
+  } catch (e) {
+    console.error('刷新失败', e)
+  } finally {
+    refreshing.value = false
+  }
+}
+
+async function reload() {
+  const [t, a, r, s] = await Promise.all([
+    studioApi.tbox(),
+    studioApi.abox(),
+    studioApi.rbox(),
+    studioApi.stats(),
+  ])
+  tbox.value = t
+  abox.value = a
+  rbox.value = r
+  stats.value = s
+}
+
 onMounted(async () => {
   try {
-    const [t, a, r, s] = await Promise.all([
-      studioApi.tbox(),
-      studioApi.abox(),
-      studioApi.rbox(),
-      studioApi.stats(),
-    ])
-    tbox.value = t
-    abox.value = a
-    rbox.value = r
-    stats.value = s
+    await reload()
   } finally {
     loading.value = false
   }
@@ -343,6 +370,34 @@ onMounted(async () => {
   font-size: 11px;
   border-radius: 4px;
   font-weight: 500;
+}
+.studio__abox-tag {
+  background: #ecfdf5;
+  color: #047857;
+  padding: 2px 8px;
+  font-size: 11px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+.studio__refresh-btn {
+  margin-left: 12px;
+  padding: 5px 12px;
+  font-size: 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 5px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.studio__refresh-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+.studio__refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 .studio__view-switcher {
   display: inline-flex;
