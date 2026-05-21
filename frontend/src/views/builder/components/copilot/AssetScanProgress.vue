@@ -1,76 +1,85 @@
 <template>
   <div class="scan-process">
-    <div class="scan-process__title">🔎 资产扫描中...</div>
-    <div class="scan-process__list">
+    <div class="scan-process-title">
+      <span style="color:#6366f1">🔎</span>
+      <span>AI 资产扫描引擎</span>
+    </div>
+    <div class="scan-steps">
       <div
         v-for="(s, idx) in SCAN_STEPS"
         :key="s.key"
-        class="scan-step"
-        :class="{
-          'scan-step--active': idx === activeStep,
-          'scan-step--done': idx < activeStep,
-        }"
+        :class="['scan-step', stepStatus(idx)]"
       >
-        <div class="scan-step__dot">
-          <svg v-if="idx < activeStep" width="10" height="10" viewBox="0 0 10 10">
-            <path d="M2 5l2 2 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-          </svg>
+        <div class="scan-step-indicator">
+          <span v-if="stepStatus(idx) === 'done'" style="color:#10b981;font-size:16px">✓</span>
+          <span v-else-if="stepStatus(idx) === 'running'" style="color:#6366f1;font-size:14px">⟳</span>
+          <span v-else class="scan-step-num">{{ idx + 1 }}</span>
+          <div v-if="idx < SCAN_STEPS.length - 1" :class="['scan-step-line', { done: stepStatus(idx) === 'done' }]"></div>
         </div>
-        <div class="scan-step__main">
-          <div class="scan-step__label">{{ s.label }}</div>
-          <div class="scan-step__desc">{{ s.description }}</div>
+        <div class="scan-step-body">
+          <div class="scan-step-label">
+            <span class="scan-step-icon">{{ stepIcon(idx) }}</span>
+            {{ s.label }}
+          </div>
+          <div v-if="stepStatus(idx) === 'running'" class="scan-step-desc">{{ s.description }}</div>
+          <div v-else-if="stepStatus(idx) === 'done'" class="scan-step-result">{{ stepResult(idx) }}</div>
         </div>
       </div>
+    </div>
+
+    <div v-if="showRadar" class="radar-container">
+      <div class="radar-ring radar-ring-1"></div>
+      <div class="radar-ring radar-ring-2"></div>
+      <div class="radar-ring radar-ring-3"></div>
+      <div class="radar-sweep"></div>
+      <div class="radar-center">
+        <span style="font-size:20px;color:#6366f1">📡</span>
+      </div>
+      <div class="radar-label">
+        扫描数据中台资产中... <span class="radar-count">{{ radarCount.toLocaleString() }}</span> 条
+      </div>
+      <div class="radar-dot" style="top:20%;left:65%;animation-delay:0s"></div>
+      <div class="radar-dot" style="top:40%;left:25%;animation-delay:0.5s"></div>
+      <div class="radar-dot" style="top:60%;left:70%;animation-delay:1s"></div>
+      <div class="radar-dot" style="top:30%;left:45%;animation-delay:1.5s"></div>
+      <div class="radar-dot" style="top:55%;left:40%;animation-delay:0.8s"></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { SCAN_STEPS } from '../../../../data/builderPresets'
-defineProps<{ activeStep: number }>()
-</script>
 
-<style scoped>
-.scan-process {
-  background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(99, 102, 241, 0.05));
-  border: 1px solid rgba(99, 102, 241, 0.2);
-  border-radius: 12px;
-  padding: 14px;
+const props = defineProps<{ activeStep: number; keywords?: string[] }>()
+
+function stepStatus(i: number): 'done' | 'running' | 'pending' {
+  if (i < props.activeStep) return 'done'
+  if (i === props.activeStep) return 'running'
+  return 'pending'
 }
-.scan-process__title {
-  font-size: 13px; font-weight: 600; color: #1e293b;
-  margin-bottom: 10px;
+
+const ICONS = ['🎯', '🛡️', '🧠', '📡', '📚', '✨']
+function stepIcon(i: number) { return ICONS[i] || '•' }
+
+function stepResult(i: number) {
+  const kw = (props.keywords || []).join('、') || '场景识别 · 资产匹配'
+  switch (i) {
+    case 0: return `识别关键词：${kw}`
+    case 1: return '检测通过，无敏感内容'
+    case 2: return '语义抽取主体、属性、关系候选'
+    case 3: return '匹配到结构化资产候选'
+    case 4: return '匹配到非结构化文档候选'
+    case 5: return '组装资产清单完成'
+    default: return ''
+  }
 }
-.scan-process__list { display: grid; gap: 8px; }
-.scan-step {
-  display: flex; gap: 10px; align-items: flex-start;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #fff;
-  border: 1px solid #e2e8f0;
-  transition: all 200ms ease;
-}
-.scan-step--active {
-  border-color: #6366f1;
-  background: rgba(99, 102, 241, 0.04);
-  box-shadow: 0 4px 12px -4px rgba(99, 102, 241, 0.2);
-}
-.scan-step--done { border-color: #10b981; background: rgba(16, 185, 129, 0.04); }
-.scan-step__dot {
-  width: 18px; height: 18px; border-radius: 50%;
-  background: #f1f5f9; color: #fff;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; margin-top: 1px;
-}
-.scan-step--active .scan-step__dot {
-  background: #6366f1;
-  animation: scanPulse 1.5s ease-in-out infinite;
-}
-.scan-step--done .scan-step__dot { background: #10b981; }
-@keyframes scanPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
-  50% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
-}
-.scan-step__label { font-size: 12px; font-weight: 600; color: #1e293b; line-height: 1.5; }
-.scan-step__desc { font-size: 11px; color: #94a3b8; line-height: 1.5; }
-</style>
+
+const showRadar = computed(() => stepStatus(3) === 'running' || stepStatus(4) === 'running')
+const radarCount = ref(0)
+let timer: number | null = null
+onMounted(() => {
+  timer = window.setInterval(() => { radarCount.value += Math.floor(Math.random() * 137) + 23 }, 220)
+})
+onBeforeUnmount(() => { if (timer) window.clearInterval(timer) })
+</script>
