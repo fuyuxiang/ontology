@@ -49,25 +49,86 @@
     <!-- 属性表格 -->
     <div class="detail__content">
       <template v-if="activeTab === '属性'">
-        <table class="data-table">
+        <div class="attr-toolbar">
+          <div class="attr-toolbar__info">
+            <span class="attr-toolbar__count">{{ attrs.length }} 个属性</span>
+            <span class="attr-toolbar__sep">·</span>
+            <span class="attr-toolbar__count">已映射 {{ mappedCount }}/{{ attrs.length }}</span>
+          </div>
+          <div class="attr-toolbar__actions">
+            <template v-if="!editingMappings">
+              <button class="btn-secondary" @click="startEditMappings">编辑映射</button>
+            </template>
+            <template v-else>
+              <button class="btn-secondary" @click="cancelEditMappings">取消</button>
+              <button class="btn-primary" @click="saveMappings" :disabled="saving">
+                {{ saving ? '保存中...' : '保存映射' }}
+              </button>
+            </template>
+          </div>
+        </div>
+        <table class="data-table data-table--mapping">
           <thead>
             <tr>
               <th>属性名称</th>
               <th>类型</th>
-              <th>描述</th>
               <th>必填</th>
-              <th>示例值</th>
+              <th>源表</th>
+              <th>源字段</th>
+              <th>状态</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="attr in attrs" :key="attr.name">
-              <td><code class="text-code">{{ attr.name }}</code></td>
+            <tr v-for="attr in attrs" :key="attr.id">
+              <td>
+                <code class="text-code">{{ attr.name }}</code>
+                <div v-if="attr.desc" class="attr-desc">{{ attr.desc }}</div>
+              </td>
               <td><span class="type-tag">{{ attr.type }}</span></td>
-              <td class="text-body">{{ attr.desc }}</td>
               <td>
                 <span class="status-dot" :class="attr.required ? 'status-dot--success' : 'status-dot--muted'"></span>
               </td>
-              <td class="text-caption" style="font-family: var(--font-mono);">{{ attr.example }}</td>
+              <td>
+                <select
+                  v-if="editingMappings"
+                  :value="mappingDraft[attr.id]?.source_table || ''"
+                  @change="onTableChange(attr.id, ($event.target as HTMLSelectElement).value)"
+                  class="mapping-input"
+                >
+                  <option value="">-- 未选择 --</option>
+                  <optgroup v-for="ds in datasources" :key="ds.id" :label="ds.name">
+                    <option v-for="t in ds.tables || []" :key="`${ds.id}-${t}`" :value="t">{{ t }}</option>
+                  </optgroup>
+                </select>
+                <code v-else-if="attr.source_table" class="text-code">{{ attr.source_table }}</code>
+                <span v-else class="text-muted">—</span>
+              </td>
+              <td>
+                <input
+                  v-if="editingMappings"
+                  type="text"
+                  :value="mappingDraft[attr.id]?.source_field || ''"
+                  @input="mappingDraft[attr.id].source_field = ($event.target as HTMLInputElement).value"
+                  class="mapping-input"
+                  placeholder="字段名"
+                />
+                <code v-else-if="attr.source_field" class="text-code">{{ attr.source_field }}</code>
+                <span v-else class="text-muted">—</span>
+              </td>
+              <td>
+                <select
+                  v-if="editingMappings"
+                  :value="mappingDraft[attr.id]?.data_status || '未确认来源'"
+                  @change="mappingDraft[attr.id].data_status = ($event.target as HTMLSelectElement).value"
+                  class="mapping-input"
+                >
+                  <option value="未确认来源">未确认来源</option>
+                  <option value="已确认">已确认</option>
+                  <option value="待校验">待校验</option>
+                  <option value="未映射">未映射</option>
+                </select>
+                <span v-else class="status-tag" :class="`status-tag--${mappingTone(attr.data_status)}`">{{ attr.data_status || '未确认来源' }}</span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -300,6 +361,7 @@ import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
 import MetricCard from '../../components/common/MetricCard.vue'
 import EntityLineageGraph from '../../components/canvas/EntityLineageGraph.vue'
 import { useOntologyStore } from '../../store/ontology'
+import { entityApi } from '../../api/ontology'
 import { resolutionApi } from '../../api/resolution'
 import { get } from '../../api/client'
 import type { SourceDataPreview, SourceField } from '../../api/resolution'
@@ -356,9 +418,86 @@ const metrics = computed(() => [
 
 const attrs = computed(() =>
   detail.value?.attributes.map(a => ({
-    name: a.name, type: a.type, desc: a.description, required: a.required, example: a.example || '',
+    id: a.id,
+    name: a.name,
+    type: a.type,
+    desc: a.description,
+    required: a.required,
+    example: a.example || '',
+    source_table: a.source_table || '',
+    source_field: a.source_field || '',
+    data_status: a.data_status || '未确认来源',
   })) ?? []
 )
+
+const mappedCount = computed(() => attrs.value.filter(a => a.source_field && a.source_table).length)
+
+// 字段映射编辑态
+interface MappingDraft { source_table: string; source_field: string; data_status: string }
+const editingMappings = ref(false)
+const saving = ref(false)
+const mappingDraft = ref<Record<string, MappingDraft>>({})
+const datasources = ref<{ id: string; name: string; tables?: string[] }[]>([])
+
+function startEditMappings() {
+  mappingDraft.value = {}
+  for (const a of attrs.value) {
+    mappingDraft.value[a.id] = {
+      source_table: a.source_table,
+      source_field: a.source_field,
+      data_status: a.data_status,
+    }
+  }
+  editingMappings.value = true
+  loadDatasources()
+}
+
+function cancelEditMappings() {
+  editingMappings.value = false
+  mappingDraft.value = {}
+}
+
+function onTableChange(attrId: string, value: string) {
+  if (!mappingDraft.value[attrId]) {
+    mappingDraft.value[attrId] = { source_table: '', source_field: '', data_status: '未确认来源' }
+  }
+  mappingDraft.value[attrId].source_table = value
+}
+
+async function saveMappings() {
+  if (!detail.value) return
+  saving.value = true
+  try {
+    const items = Object.entries(mappingDraft.value).map(([attribute_id, m]) => ({
+      attribute_id,
+      source_table: m.source_table || null,
+      source_field: m.source_field || null,
+      data_status: m.data_status,
+    }))
+    await entityApi.updateAttributeMappings(detail.value.id, items)
+    await store.fetchEntity(entityId.value)
+    editingMappings.value = false
+  } catch (e) {
+    console.error('保存映射失败', e)
+  } finally {
+    saving.value = false
+  }
+}
+
+async function loadDatasources() {
+  try {
+    datasources.value = await get<{ id: string; name: string; tables?: string[] }[]>('/datasources')
+  } catch (e) {
+    console.error('加载数据源失败', e)
+  }
+}
+
+function mappingTone(status: string | undefined): string {
+  if (!status || status === '未确认来源') return 'muted'
+  if (status === '已确认') return 'success'
+  if (status === '待校验') return 'warning'
+  return 'danger'
+}
 
 const relations = computed(() =>
   detail.value?.relations.map(r => ({
@@ -685,6 +824,66 @@ watch(activeTab, (tab) => {
 .instance-col-head { display: flex; flex-direction: column; gap: 2px; }
 .instance-col-field { font-family: var(--font-mono); font-size: var(--text-caption-size); color: var(--neutral-700); }
 .instance-col-attr { font-size: 10px; color: var(--semantic-500); font-weight: 500; }
+
+/* 字段映射 */
+.attr-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+}
+.attr-toolbar__info { font-size: 12px; color: #475569; display: flex; align-items: center; gap: 8px; }
+.attr-toolbar__count { font-weight: 500; }
+.attr-toolbar__sep { color: #cbd5e1; }
+.attr-toolbar__actions { display: flex; gap: 8px; }
+.btn-primary, .btn-secondary {
+  padding: 5px 14px;
+  font-size: 12px;
+  border: 1px solid;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+}
+.btn-primary { background: #4f6ef7; color: #fff; border-color: #4f6ef7; }
+.btn-primary:hover:not(:disabled) { background: #3a5be0; }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+.btn-secondary { background: #fff; color: #475569; border-color: #cbd5e1; }
+.btn-secondary:hover { background: #f1f5f9; }
+
+.data-table--mapping td { vertical-align: middle; }
+.attr-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-top: 2px;
+  line-height: 1.4;
+}
+.mapping-input {
+  width: 100%;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  outline: none;
+  background: #fff;
+  font-family: monospace;
+}
+.mapping-input:focus { border-color: #4f6ef7; }
+.text-muted { color: #cbd5e1; font-size: 12px; }
+.status-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+  border: 1px solid transparent;
+}
+.status-tag--success { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
+.status-tag--warning { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+.status-tag--muted { background: #f1f5f9; color: #64748b; border-color: #e2e8f0; }
+.status-tag--danger { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
 .instance-cell { font-size: var(--text-caption-size); font-family: var(--font-mono); color: var(--neutral-700); }
 
 .instance-pagination {

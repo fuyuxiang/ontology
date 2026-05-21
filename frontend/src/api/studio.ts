@@ -1,4 +1,4 @@
-import { get } from './client'
+import { get, post } from './client'
 
 export interface StudioProperty {
   apiName: string
@@ -147,4 +147,5 @@ export const studioApi = {
   rbox: () => get<StudioRBox>('/studio/rbox'),
   capability: () => get<unknown>('/studio/capability'),
   stats: () => get<StudioStats>('/studio/stats'),
+  refreshCounts: () => post<{ refreshedAt: string; total: number; success: number; results: unknown[] }>('/studio/refresh-counts', {}),
 }
