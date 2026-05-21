@@ -1,21 +1,21 @@
 <template>
-  <div class="step2">
+  <div class="step2-root">
     <header class="step2-topbar">
-      <button class="ob-back-btn" @click="$emit('prev')">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M9 11L5 7l4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        返回
-      </button>
-      <div class="step2-topbar__title">本体走测 · 专家审批</div>
-      <div class="step2-topbar__progress">
-        <span>已通过 {{ approvedCount }} / {{ classes.length }}</span>
-        <div class="step2-progress-bar">
-          <div class="step2-progress-fill" :style="{ width: progressPct + '%' }"></div>
+      <button class="step2-back-btn" @click="$emit('prev')">← 返回</button>
+      <div class="step2-topbar-title">本体走测 · 专家审批</div>
+      <div class="step2-topbar-progress">
+        <span class="step2-progress-label">已通过 {{ approvedCount }} / {{ classes.length }}</span>
+        <div class="step2-progress-track">
+          <div class="step2-progress-bar" :style="{ width: progressPct + '%' }"></div>
         </div>
+        <span class="step2-progress-pct">{{ Math.round(progressPct) }}%</span>
       </div>
-      <button class="step2-btn step2-btn--ghost" @click="approveAll">✅ 一键全部通过</button>
-      <button class="step2-btn step2-btn--primary" :disabled="approvedCount < classes.length" @click="finishReview">完成走测</button>
+      <button class="step2-approve-all-btn" @click="approveAll">✅ 一键全部通过</button>
+      <button
+        :class="['step2-complete-btn', { active: approvedCount === classes.length && classes.length > 0 }]"
+        :disabled="approvedCount < classes.length"
+        @click="finishReview"
+      >完成走测</button>
     </header>
 
     <div v-if="!hasPermission" class="step2-no-perm">
@@ -24,44 +24,39 @@
     </div>
 
     <div class="step2-body">
-      <!-- 左侧：本体清单 -->
+      <!-- 左侧：本体清单（沿用 step2-story-* 的视觉） -->
       <aside class="step2-left">
-        <div class="step2-section-title">本体对象 · {{ classes.length }}</div>
-        <div class="step2-class-list">
+        <div class="step2-left-header">本体对象 · {{ classes.length }}</div>
+        <div class="step2-story-list">
           <div
             v-for="c in classes"
             :key="c.id"
-            class="step2-class-row"
-            :class="{
-              'step2-class-row--active': selectedId === c.id,
-              'step2-class-row--approved': c.approved,
-            }"
+            :class="['step2-story-item', { active: selectedId === c.id }]"
             @click="selectedId = c.id"
           >
-            <div class="step2-class-row__icon" :class="`step2-class-row__icon--t${c.tier}`">{{ c.icon }}</div>
-            <div class="step2-class-row__main">
-              <div class="step2-class-row__name">{{ c.displayName }}</div>
-              <div class="step2-class-row__en">{{ c.name }} · T{{ c.tier }}</div>
+            <div class="step2-story-icon" :style="{ background: tierBg(c.tier), color: tierColor(c.tier) }">{{ c.icon }}</div>
+            <div class="step2-story-meta">
+              <div class="step2-story-name">{{ c.displayName }}</div>
+              <div class="step2-story-output">{{ c.name }} · T{{ c.tier }} · {{ c.properties.length }} 属性</div>
             </div>
-            <span v-if="c.approved" class="step2-check-icon">✓</span>
+            <span :class="['step2-status-tag', c.approved ? 'approved' : 'pending']">{{ c.approved ? '已通过' : '待确认' }}</span>
           </div>
         </div>
       </aside>
 
       <!-- 中央：网络视图 -->
       <main class="step2-mid">
-        <div class="step2-mid__head">
-          <div class="step2-mid__title">本体视图区</div>
-          <div class="step2-mid__hint">点击本体在右侧编辑；新增关系时依次点击起点和终点</div>
+        <div class="step2-layer-header">
+          <div class="step2-layer-title">
+            本体视图区
+            <span class="step2-layer-title-sub">点击本体在右侧编辑；新增关系时依次点击起点和终点</span>
+          </div>
           <button
-            class="step2-relation-toggle"
-            :class="{ active: relationMode.active }"
+            :class="['step2-edit-toggle', { active: relationMode.active }]"
             @click="toggleRelationMode"
-          >
-            {{ relationMode.active ? '退出连线' : '+ 新增关系' }}
-          </button>
+          >{{ relationMode.active ? '退出连线' : '+ 新增关系' }}</button>
         </div>
-        <div class="step2-mid__canvas">
+        <div class="step2-layers-scroll" style="padding:0">
           <SemanticCanvas
             :objects="classes"
             :relations="relations"
@@ -77,100 +72,81 @@
       <aside class="step2-right">
         <!-- 本体编辑卡 -->
         <div v-if="selected" class="step2-editor-card">
-          <div class="step2-editor-card__head">
-            <div class="step2-editor-card__title">本体编辑</div>
-            <span class="step2-status-badge" :class="{ approved: selected.approved }">
-              {{ selected.approved ? '已通过' : '待确认' }}
-            </span>
+          <div class="step2-editor-head">
+            <span>📝 本体编辑</span>
+            <span :class="['step2-status-tag', selected.approved ? 'approved' : 'pending']">{{ selected.approved ? '已通过' : '待确认' }}</span>
           </div>
-          <div class="step2-form">
-            <div class="step2-form__row">
-              <label>本体名称</label>
-              <a-input v-model:value="selected.displayName" size="middle" @change="syncStore" />
-            </div>
-            <div class="step2-form__row">
-              <label>英文名 (API)</label>
-              <a-input v-model:value="selected.name" size="middle" @change="syncStore" />
-            </div>
-            <div class="step2-form__row">
-              <label>层级</label>
-              <a-select v-model:value="selected.tier" :options="tierOptions" @change="syncStore" />
-            </div>
-            <div class="step2-form__meta">
-              <span>关系：{{ relationCountFor(selected.id) }} 条</span>
-              <span>属性：{{ selected.properties.length }} 个</span>
-            </div>
+          <label class="step2-editor-label">本体名称</label>
+          <a-input v-model:value="selected.displayName" size="small" @change="syncStore" />
+          <label class="step2-editor-label">英文名 (API)</label>
+          <a-input v-model:value="selected.name" size="small" @change="syncStore" />
+          <label class="step2-editor-label">层级</label>
+          <a-select v-model:value="selected.tier" size="small" :options="tierOptions" @change="syncStore" />
+          <div class="step2-editor-meta">
+            <span>关系：{{ relationCountFor(selected.id) }} 条</span>
+            <span>属性：{{ selected.properties.length }} 个</span>
           </div>
 
-          <div class="step2-prop-title">属性表</div>
-          <div class="step2-prop-list">
+          <div class="step2-editor-section-head">
+            <span>属性 ({{ selected.properties.length }})</span>
+            <button @click="addProp">+ 增加属性</button>
+          </div>
+          <div class="step2-editor-props">
             <div v-for="p in selected.properties" :key="p.id" class="step2-editor-prop">
               <a-input v-model:value="p.name" size="small" placeholder="属性名" @change="syncStore" />
               <a-select v-model:value="p.type" size="small" :options="typeOptions" @change="syncStore" />
-              <button class="step2-icon-btn step2-icon-btn--danger" @click="removeProp(p.id)">×</button>
+              <button class="step2-editor-del" title="删除属性" @click="removeProp(p.id)">×</button>
             </div>
-            <button class="step2-add-prop" @click="addProp">+ 增加属性</button>
+            <div v-if="!selected.properties.length" class="step2-editor-empty" style="color:#94a3b8;font-size:12px;text-align:center;padding:8px">暂无属性，可点击"增加属性"补充</div>
           </div>
 
           <button
             class="step2-editor-approve"
             :disabled="selected.approved"
             @click="approveSelected"
-          >
-            {{ selected.approved ? '✓ 已通过' : '确认通过' }}
-          </button>
+          >{{ selected.approved ? '✓ 已通过' : '确认通过' }}</button>
         </div>
 
         <!-- 关系新增卡 -->
         <div class="step2-editor-card step2-relation-card">
-          <div class="step2-editor-card__head">
-            <div class="step2-editor-card__title">关系新增</div>
-            <span class="step2-status-badge" :class="{ active: relationMode.active }">
-              {{ relationMode.active ? '连线中' : '待启动' }}
-            </span>
+          <div class="step2-editor-head">
+            <span>🔗 关系新增</span>
+            <span :class="['step2-status-tag', relationMode.active ? 'approved' : 'pending']">{{ relationMode.active ? '连线中' : '待启动' }}</span>
           </div>
-          <div class="step2-form">
-            <div class="step2-form__row">
-              <label>起点本体</label>
-              <a-select
-                v-model:value="relationMode.from"
-                placeholder="选择起点"
-                size="middle"
-                :options="classOptions"
-              />
-            </div>
-            <div class="step2-form__row">
-              <label>终点本体</label>
-              <a-select
-                v-model:value="relationMode.to"
-                placeholder="选择终点"
-                size="middle"
-                :options="classOptions"
-              />
-            </div>
-            <div class="step2-form__row">
-              <label>关系名称</label>
-              <a-input v-model:value="relationMode.label" placeholder="例如：持有合约" size="middle" />
-            </div>
-            <div class="step2-form__row">
-              <label>基数</label>
-              <a-select v-model:value="relationMode.cardinality" size="middle" :options="cardOptions" />
-            </div>
+          <div class="step2-relation-form">
+            <label class="step2-editor-label">起点本体</label>
+            <a-select
+              v-model:value="relationMode.from"
+              placeholder="选择起点"
+              size="small"
+              :options="classOptions"
+            />
+            <label class="step2-editor-label">终点本体</label>
+            <a-select
+              v-model:value="relationMode.to"
+              placeholder="选择终点"
+              size="small"
+              :options="classOptions"
+            />
+            <label class="step2-editor-label">关系名称</label>
+            <a-input v-model:value="relationMode.label" placeholder="例如：持有合约" size="small" />
+            <label class="step2-editor-label">基数</label>
+            <a-select v-model:value="relationMode.cardinality" size="small" :options="cardOptions" />
+            <button
+              class="step2-relation-save"
+              :disabled="!canSaveRelation"
+              @click="saveRelation"
+            >保存关系</button>
           </div>
-          <button
-            class="step2-editor-approve"
-            :disabled="!canSaveRelation"
-            @click="saveRelation"
-          >保存关系</button>
 
-          <div v-if="relations.length" class="step2-relations-list">
-            <div class="step2-prop-title">已有关系</div>
-            <div v-for="r in relations" :key="r.id" class="step2-relation-row">
-              <span class="step2-relation-from">{{ classNameOf(r.source) }}</span>
-              <span class="step2-relation-arrow">→</span>
-              <span class="step2-relation-to">{{ classNameOf(r.target) }}</span>
-              <span class="step2-relation-label">{{ r.displayName }}</span>
-              <button class="step2-icon-btn step2-icon-btn--danger" @click="removeRelation(r.id)">×</button>
+          <div v-if="relations.length" style="margin-top:12px">
+            <div class="step2-editor-label">已有关系</div>
+            <div v-for="r in relations" :key="r.id" style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid #f1f5f9">
+              <span style="color:#475569">{{ classNameOf(r.source) }}</span>
+              <span style="color:#94a3b8">→</span>
+              <span style="color:#475569">{{ classNameOf(r.target) }}</span>
+              <span style="color:#6366f1;background:#eef2ff;padding:1px 6px;border-radius:4px;font-family:monospace">{{ r.displayName }}</span>
+              <button class="step2-editor-del" style="margin-left:auto" @click="removeRelation(r.id)">×</button>
             </div>
           </div>
         </div>
@@ -241,6 +217,12 @@ function classNameOf(id: string) {
 }
 function relationCountFor(id: string) {
   return relations.value.filter(r => r.source === id || r.target === id).length
+}
+function tierBg(t: 1 | 2 | 3) {
+  return t === 1 ? 'rgba(46,91,255,0.12)' : t === 2 ? 'rgba(0,199,177,0.12)' : 'rgba(255,107,53,0.12)'
+}
+function tierColor(t: 1 | 2 | 3) {
+  return t === 1 ? '#2E5BFF' : t === 2 ? '#00C7B1' : '#FF6B35'
 }
 
 function syncStore() {

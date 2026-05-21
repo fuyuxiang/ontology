@@ -2,204 +2,312 @@
   <div class="ln-tab">
     <div class="ln-header">
       <div>
-        <div class="ln-title">数据血缘追踪</div>
-        <div class="ln-subtitle">按行对齐数据源 → ETL → 本体 → 应用；点击本体节点查看字段级血缘</div>
-      </div>
-      <a-input v-model:value="search" placeholder="搜索节点..." allow-clear style="width: 240px" />
-    </div>
-
-    <div class="ln-canvas">
-      <!-- 列：数据源 -->
-      <div class="ln-col">
-        <div class="ln-col__title">数据源</div>
-        <div v-for="n in filteredCol('source')" :key="n.id" class="ln-node ln-node--source" @click="select(n)" :class="{ 'ln-node--active': selected?.id === n.id }">
-          <div class="ln-node__icon">🗄️</div>
-          <div class="ln-node__body">
-            <div class="ln-node__name">{{ n.name }}</div>
-            <div class="ln-node__sub">{{ n.sub }}</div>
-          </div>
+        <div class="ln-title">
+          <span class="ln-title__dot"></span>
+          数据血缘追踪
         </div>
-      </div>
-      <div class="ln-col-arrow">→</div>
-
-      <!-- 列：ETL -->
-      <div class="ln-col">
-        <div class="ln-col__title">ETL 加工</div>
-        <div v-for="n in filteredCol('etl')" :key="n.id" class="ln-node ln-node--etl" @click="select(n)" :class="{ 'ln-node--active': selected?.id === n.id }">
-          <div class="ln-node__icon">⚙️</div>
-          <div class="ln-node__body">
-            <div class="ln-node__name">{{ n.name }}</div>
-            <div class="ln-node__sub">{{ n.sub }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="ln-col-arrow">→</div>
-
-      <!-- 列：本体 -->
-      <div class="ln-col">
-        <div class="ln-col__title">本体对象</div>
-        <div v-for="n in filteredCol('ontology')" :key="n.id" class="ln-node ln-node--ontology" @click="select(n)" :class="{ 'ln-node--active': selected?.id === n.id }">
-          <div class="ln-node__icon">⚛️</div>
-          <div class="ln-node__body">
-            <div class="ln-node__name">{{ n.name }}</div>
-            <div class="ln-node__sub">{{ n.sub }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="ln-col-arrow">→</div>
-
-      <!-- 列：应用 -->
-      <div class="ln-col">
-        <div class="ln-col__title">应用消费</div>
-        <div v-for="n in filteredCol('app')" :key="n.id" class="ln-node ln-node--app" @click="select(n)" :class="{ 'ln-node--active': selected?.id === n.id }">
-          <div class="ln-node__icon">📊</div>
-          <div class="ln-node__body">
-            <div class="ln-node__name">{{ n.name }}</div>
-            <div class="ln-node__sub">{{ n.sub }}</div>
-          </div>
-        </div>
+        <div class="ln-subtitle">按行对齐 数据源 → ETL → 本体 → 应用；点击本体节点查看字段级血缘</div>
       </div>
     </div>
 
-    <!-- 字段级血缘 -->
-    <div v-if="selected" class="ln-detail">
-      <div class="ln-detail__title">
-        <span>{{ selected.name }}</span>
-        <a-button size="small" @click="selected = null">关闭</a-button>
+    <div class="ln-canvas-wrapper">
+      <VueFlow
+        v-model:nodes="flowNodes"
+        v-model:edges="flowEdges"
+        :node-types="nodeTypes"
+        :default-edge-options="defaultEdgeOptions"
+        :fit-view-on-init="true"
+        :fit-view-options="{ padding: 0.08 }"
+        :nodes-draggable="true"
+        :nodes-connectable="false"
+        :pan-on-drag="false"
+        :zoom-on-double-click="false"
+        :pro-options="{ hideAttribution: true }"
+        @node-click="onNodeClick"
+      >
+        <Background variant="dots" :gap="20" :size="1" pattern-color="#e5e7eb" />
+        <Controls position="bottom-left" :show-interactive="false" />
+      </VueFlow>
+
+      <div v-if="loading" class="ln-loading">
+        <div class="ln-loading__spinner"></div>
+        <span>加载血缘数据...</span>
       </div>
-      <div class="ln-detail__sub">字段级血缘 / 字段映射</div>
-      <table class="ln-detail__table">
-        <thead>
-          <tr><th>字段</th><th>类型</th><th>映射来源</th><th>转换</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="(f, i) in (selected.fields || [])" :key="i">
-            <td><strong>{{ f.field }}</strong></td>
-            <td>{{ f.type }}</td>
-            <td><span class="ln-mono">{{ f.from }}</span></td>
-            <td>{{ f.transform || '直接映射' }}</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
+
+    <a-drawer
+      v-model:open="detailOpen"
+      :title="detailTitle"
+      width="640"
+      placement="right"
+      :body-style="{ paddingBottom: '24px' }"
+    >
+      <div v-if="detailLoading" class="ln-drawer__loading">
+        <a-spin />
+      </div>
+      <div v-else-if="detailData">
+        <div v-if="detailData.groups.length === 0" class="ln-drawer__empty">
+          暂无字段级血缘记录
+        </div>
+        <div v-for="(group, gi) in detailData.groups" :key="gi" class="ln-detail__group">
+          <div class="ln-detail__src">
+            <span class="ln-detail__src-tag">来源</span>
+            <span class="ln-detail__src-text">{{ group.source }}</span>
+          </div>
+          <table class="ln-detail__table">
+            <thead>
+              <tr>
+                <th>源字段</th>
+                <th>本体属性（中文名）</th>
+                <th>API 名称</th>
+                <th>类型</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(f, fi) in group.fields" :key="fi">
+                <td><span class="ln-mono">{{ f.from }}</span></td>
+                <td>{{ f.to }}</td>
+                <td><span class="ln-mono">{{ f.apiName }}</span></td>
+                <td>
+                  <span class="ln-tag" :class="`ln-tag--${f.type.toLowerCase()}`">{{ f.type }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </a-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, markRaw } from 'vue'
+import { VueFlow, MarkerType } from '@vue-flow/core'
+import { Background } from '@vue-flow/background'
+import { Controls } from '@vue-flow/controls'
+import type { Node, Edge } from '@vue-flow/core'
+import { message } from 'ant-design-vue'
 
-interface Field { field: string; type: string; from: string; transform?: string }
-interface LineageNode {
-  id: string
-  type: 'source' | 'etl' | 'ontology' | 'app'
-  name: string
-  sub: string
-  fields?: Field[]
+import LineageLayerNode from '../../../components/lineage/LineageLayerNode.vue'
+import LineageSourceNode from '../../../components/lineage/LineageSourceNode.vue'
+import LineageETLNode from '../../../components/lineage/LineageETLNode.vue'
+import LineageOntologyNode from '../../../components/lineage/LineageOntologyNode.vue'
+import LineageAppNode from '../../../components/lineage/LineageAppNode.vue'
+
+import { lineageApi, type LineageRow, type LineageCrossEdge, type FieldLineageResponse } from '../../../api/lineage'
+
+const nodeTypes = {
+  lineageLayer: markRaw(LineageLayerNode),
+  lineageSource: markRaw(LineageSourceNode),
+  lineageETL: markRaw(LineageETLNode),
+  lineageOntology: markRaw(LineageOntologyNode),
+  lineageApp: markRaw(LineageAppNode),
 }
 
-const search = ref('')
-const selected = ref<LineageNode | null>(null)
-
-const nodes: LineageNode[] = [
-  { id: 's1', type: 'source', name: 'CBSS用户信息主表', sub: 'dwa_v_d_cus_cb_user_info' },
-  { id: 's2', type: 'source', name: 'CBSS活动合约系统', sub: 'dwa_v_d_cus_cb_act_info' },
-  { id: 's3', type: 'source', name: '客服工单系统', sub: 'dwd_d_evt_kf_order_main' },
-  { id: 's4', type: 'source', name: '出账系统', sub: 'dwa_v_m_cus_cb_sing_charge' },
-
-  { id: 'e1', type: 'etl', name: '客户主数据加工', sub: 'pl-customer-001' },
-  { id: 'e2', type: 'etl', name: '合约清洗加工', sub: 'pl-contract-001' },
-  { id: 'e3', type: 'etl', name: '工单去重映射', sub: 'pl-workorder-001' },
-  { id: 'e4', type: 'etl', name: '出账聚合', sub: 'pl-charge-agg' },
-
-  {
-    id: 'o1', type: 'ontology', name: 'Customer 客户', sub: '17 字段 · 40,929 实例',
-    fields: [
-      { field: 'user_id', type: 'STRING', from: 'cb_user_info.user_id', transform: '直接映射' },
-      { field: 'name', type: 'STRING', from: 'cb_user_info.name', transform: '脱敏（保留首字 + ***）' },
-      { field: 'innet_months', type: 'INT', from: 'cb_user_info.in_net_date', transform: 'datediff(now, in_net_date)/30' },
-      { field: 'segment', type: 'ENUM', from: '规则引擎 BR-SEG-001', transform: 'TYPE_1 / TYPE_5 推导' },
-      { field: 'churn_risk', type: 'FLOAT', from: 'tag_churn_risk', transform: '模型推理打分' },
-    ],
-  },
-  {
-    id: 'o2', type: 'ontology', name: 'Contract 合约', sub: '12 字段 · 40,929 实例',
-    fields: [
-      { field: 'contract_id', type: 'STRING', from: 'cb_act_info.act_id', transform: '直接映射' },
-      { field: 'product_id', type: 'STRING', from: 'cb_act_info.prod_id' },
-      { field: 'remaining_months', type: 'INT', from: 'cb_act_info.end_date', transform: 'datediff(end_date, now)/30' },
-      { field: 'is_expiring_soon', type: 'BOOL', from: 'remaining_months', transform: 'remaining_months <= 3' },
-    ],
-  },
-  { id: 'o3', type: 'ontology', name: 'WorkOrder 工单', sub: '8 字段 · 82,757 实例' },
-  { id: 'o4', type: 'ontology', name: 'Order 订单', sub: '6 字段 · 651 实例' },
-
-  { id: 'a1', type: 'app', name: 'AIP场景平台', sub: 'FTTR续约场景' },
-  { id: 'a2', type: 'app', name: 'AI助手', sub: '本体查询' },
-  { id: 'a3', type: 'app', name: 'Agent Harness', sub: 'A/B 测试' },
-  { id: 'a4', type: 'app', name: 'OSDK 服务', sub: '业务系统消费' },
-]
-
-function filteredCol(t: LineageNode['type']) {
-  const kw = search.value.trim().toLowerCase()
-  return nodes.filter((n) => n.type === t && (!kw || n.name.toLowerCase().includes(kw) || n.sub.toLowerCase().includes(kw)))
+const defaultEdgeOptions = {
+  type: 'default',
+  markerEnd: MarkerType.ArrowClosed,
 }
 
-function select(n: LineageNode) { selected.value = n }
+// X 坐标参考原版 bn / Sn / xn
+const COL_X = { source: 0, etl: 290, ontology: 580, app: 870 }
+const ROW_GAP = 52
+const HEADER_Y = -62
+
+const flowNodes = ref<Node[]>([])
+const flowEdges = ref<Edge[]>([])
+const loading = ref(false)
+
+const rowsCache = ref<LineageRow[]>([])
+
+const detailOpen = ref(false)
+const detailLoading = ref(false)
+const detailData = ref<FieldLineageResponse | null>(null)
+const detailTitle = computed(() =>
+  detailData.value
+    ? `${detailData.value.ontologyLabel} (${detailData.value.objectName}) — 字段级血缘`
+    : '字段级血缘',
+)
+
+onMounted(loadGraph)
+
+async function loadGraph() {
+  loading.value = true
+  try {
+    const data = await lineageApi.workshop()
+    rowsCache.value = data.rows
+    buildGraph(data.rows, data.crossEdges)
+  } catch (e: unknown) {
+    message.error(`加载血缘数据失败：${getErrorMessage(e)}`)
+  } finally {
+    loading.value = false
+  }
+}
+
+function buildGraph(rows: LineageRow[], crossEdges: LineageCrossEdge[]) {
+  const headerNodes: Node[] = [
+    { id: 'lh-source', type: 'lineageLayer', position: { x: COL_X.source + 19, y: HEADER_Y },
+      data: { label: '数据源层', tone: 'source' }, draggable: false, selectable: false },
+    { id: 'lh-etl', type: 'lineageLayer', position: { x: COL_X.etl + 7, y: HEADER_Y },
+      data: { label: 'ETL层', tone: 'etl' }, draggable: false, selectable: false },
+    { id: 'lh-ontology', type: 'lineageLayer', position: { x: COL_X.ontology + 1, y: HEADER_Y },
+      data: { label: '本体层', tone: 'ontology' }, draggable: false, selectable: false },
+    { id: 'lh-app', type: 'lineageLayer', position: { x: COL_X.app, y: HEADER_Y },
+      data: { label: '应用层', tone: 'app' }, draggable: false, selectable: false },
+  ]
+
+  const rowNodes: Node[] = rows.flatMap((r, i) => {
+    const y = i * ROW_GAP
+    return [
+      { id: `ls-${r.key}`, type: 'lineageSource', position: { x: COL_X.source, y },
+        data: { label: r.source } },
+      { id: `le-${r.key}`, type: 'lineageETL', position: { x: COL_X.etl, y: y + 2 },
+        data: { label: r.etl } },
+      { id: r.ontologyId, type: 'lineageOntology', position: { x: COL_X.ontology, y: y - 4 },
+        data: { label: r.ontologyLabel, objectName: r.objectName, tier: r.tier } },
+      { id: `la-${r.key}`, type: 'lineageApp', position: { x: COL_X.app, y: y + 2 },
+        data: { label: r.app } },
+    ]
+  })
+
+  const linkEdges: Edge[] = rows.flatMap((r) => [
+    { id: `l-${r.key}-source-etl`, source: `ls-${r.key}`, target: `le-${r.key}`,
+      style: { stroke: '#94a3b8' } },
+    { id: `l-${r.key}-etl-ontology`, source: `le-${r.key}`, target: r.ontologyId,
+      style: { stroke: '#8B5CF6' } },
+    { id: `l-${r.key}-ontology-app`, source: r.ontologyId, target: `la-${r.key}`,
+      style: { stroke: '#f59e0b' } },
+  ])
+
+  const ontologyEdges: Edge[] = crossEdges.map((e) => ({
+    id: e.id,
+    source: e.source,
+    target: e.target,
+    style: { stroke: '#8B5CF6', strokeDasharray: '5 3' },
+  }))
+
+  flowNodes.value = [...headerNodes, ...rowNodes]
+  flowEdges.value = [...linkEdges, ...ontologyEdges]
+}
+
+async function onNodeClick(event: { node: Node }) {
+  const node = event.node
+  if (node.type !== 'lineageOntology') return
+
+  detailOpen.value = true
+  detailLoading.value = true
+  detailData.value = null
+  try {
+    detailData.value = await lineageApi.objectFields(node.id)
+  } catch (e: unknown) {
+    message.error(`加载字段级血缘失败：${getErrorMessage(e)}`)
+    detailOpen.value = false
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error) {
+    return (error as { message: string }).message
+  }
+  return String(error)
+}
 </script>
 
 <style scoped>
 .ln-tab { display: flex; flex-direction: column; gap: 16px; }
 .ln-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
-.ln-title { font-size: 14px; font-weight: 600; color: var(--neutral-900); }
-.ln-subtitle { font-size: 12px; color: var(--neutral-500); margin-top: 2px; }
 
-.ln-canvas {
-  display: flex; align-items: stretch; gap: 0;
-  background: #fff; border: 1px solid var(--neutral-200); border-radius: 12px;
-  padding: 24px; min-height: 480px; overflow-x: auto;
+.ln-title {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 600; color: var(--neutral-900);
 }
-.ln-col { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 10px; }
-.ln-col__title {
-  font-size: 12px; font-weight: 600; color: var(--neutral-600);
-  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;
-  padding-bottom: 8px; border-bottom: 1px solid var(--neutral-100);
+.ln-title__dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #8B5CF6;
 }
-.ln-col-arrow {
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; color: var(--neutral-300); padding: 0 8px;
+.ln-subtitle {
+  font-size: 12px; color: var(--neutral-500); margin-top: 2px;
 }
 
-.ln-node {
+.ln-canvas-wrapper {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--neutral-200);
+  border-radius: 12px;
+  height: 650px;
+  overflow: hidden;
+}
+
+.ln-loading {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; background: rgba(255,255,255,0.85);
+  color: var(--neutral-500); font-size: 12px;
+}
+.ln-loading__spinner {
+  width: 22px; height: 22px;
+  border: 2.5px solid var(--neutral-100);
+  border-top-color: #8B5CF6;
+  border-radius: 50%;
+  animation: ln-spin 0.7s linear infinite;
+}
+@keyframes ln-spin { to { transform: rotate(360deg); } }
+
+.ln-drawer__loading { display: flex; justify-content: center; padding: 40px; }
+.ln-drawer__empty { padding: 24px; text-align: center; color: var(--neutral-500); font-size: 13px; }
+
+.ln-detail__group { margin-bottom: 20px; }
+.ln-detail__group:last-child { margin-bottom: 0; }
+
+.ln-detail__src {
   display: flex; align-items: center; gap: 8px;
-  background: #fff; border: 1px solid var(--neutral-200); border-radius: 8px;
-  padding: 10px 12px; cursor: pointer; transition: all var(--transition-fast);
+  margin-bottom: 8px;
+  font-size: 12px;
 }
-.ln-node:hover { box-shadow: var(--shadow-sm); }
-.ln-node--active { border-color: var(--semantic-500); box-shadow: 0 0 0 2px rgba(76, 110, 245, 0.18); }
-.ln-node__icon { font-size: 18px; flex-shrink: 0; }
-.ln-node__body { flex: 1; min-width: 0; }
-.ln-node__name { font-size: 12px; font-weight: 600; color: var(--neutral-900); }
-.ln-node__sub { font-size: 11px; color: var(--neutral-500); margin-top: 2px; word-break: break-all; }
-
-.ln-node--source { border-left: 3px solid #3b82f6; }
-.ln-node--etl { border-left: 3px solid #f59e0b; }
-.ln-node--ontology { border-left: 3px solid #7c3aed; }
-.ln-node--app { border-left: 3px solid #10b981; }
-
-.ln-detail { background: #fff; border: 1px solid var(--neutral-200); border-radius: 12px; padding: 18px 20px; }
-.ln-detail__title {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 14px; font-weight: 600; color: var(--neutral-900); margin-bottom: 4px;
+.ln-detail__src-tag {
+  font-size: 11px; font-weight: 600;
+  color: #5b21b6; background: #EDE9FE;
+  padding: 2px 8px; border-radius: 4px;
+  flex-shrink: 0;
 }
-.ln-detail__sub { font-size: 12px; color: var(--neutral-500); margin-bottom: 12px; }
+.ln-detail__src-text { color: var(--neutral-700); word-break: break-all; }
+
 .ln-detail__table { width: 100%; border-collapse: collapse; }
 .ln-detail__table thead th {
   background: var(--neutral-50); padding: 8px 12px; text-align: left;
-  font-size: 11px; color: var(--neutral-600); border-bottom: 1px solid var(--neutral-200);
+  font-size: 11px; font-weight: 600; color: var(--neutral-600);
+  border-bottom: 1px solid var(--neutral-200);
 }
 .ln-detail__table tbody td {
   padding: 8px 12px; font-size: 12px; color: var(--neutral-700);
   border-bottom: 1px solid var(--neutral-100);
 }
-.ln-mono { font-family: var(--font-mono); font-size: 11px; }
+.ln-mono { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--neutral-800); }
+
+.ln-tag {
+  display: inline-block; padding: 1px 8px;
+  font-size: 10px; font-weight: 600; border-radius: 4px;
+  background: var(--neutral-100); color: var(--neutral-600);
+}
+.ln-tag--string { background: #DBEAFE; color: #1d4ed8; }
+.ln-tag--int, .ln-tag--decimal, .ln-tag--integer { background: #FEF3C7; color: #92400e; }
+.ln-tag--fk { background: #EDE9FE; color: #5b21b6; }
+.ln-tag--enum { background: #FFE4E6; color: #be123c; }
+.ln-tag--timestamp, .ln-tag--date, .ln-tag--datetime { background: #ECFEFF; color: #0e7490; }
+.ln-tag--json, .ln-tag--text { background: #F3F4F6; color: #374151; }
+.ln-tag--boolean { background: #DCFCE7; color: #166534; }
+
+:deep(.vue-flow__edge-path) { stroke-width: 1.5; }
+:deep(.vue-flow__controls) {
+  background: #fff; border: 1px solid var(--neutral-200);
+  border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+:deep(.vue-flow__controls-button) {
+  background: #fff; border-color: var(--neutral-200); color: var(--neutral-500);
+}
+:deep(.vue-flow__controls-button:hover) {
+  background: var(--neutral-50); color: var(--neutral-700);
+}
+:deep(.vue-flow__handle) { transition: opacity 0.15s; }
 </style>

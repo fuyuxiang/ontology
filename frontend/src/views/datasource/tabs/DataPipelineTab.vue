@@ -170,40 +170,9 @@
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import * as dsApi from '../../../api/datasource'
+import * as plApi from '../../../api/pipelines'
+import type { Pipeline, PipelineRun, PipelineSummary } from '../../../api/pipelines'
 import type { DataSource } from '../../../types/datasource'
-
-interface PipelineRun {
-  id: string
-  pipeline_id: string
-  status: 'running' | 'success' | 'error' | 'stopped' | 'pending' | 'idle'
-  step_index: number
-  step_label: string
-  records: number
-  duration_ms: number
-  progress: number
-  started_at: string
-}
-
-interface Pipeline {
-  id: string
-  name: string
-  description: string
-  source: string
-  target: string
-  datasource_id: string | null
-  steps: string[]
-  tags: string[]
-  schedule: string
-  step_duration_ms: number
-  status: 'idle' | 'running' | 'success' | 'error' | 'stopped'
-  last_run_at?: string
-  last_records?: number
-  last_objects?: number
-  last_duration_ms?: number
-  recent_runs?: PipelineRun[]
-}
-
-const STORAGE_KEY = 'dataworkshop.pipelines.v1'
 
 const STATUS_LABEL: Record<string, string> = {
   idle: '空闲', running: '运行中', stopped: '已停止', error: '错误', success: '成功', pending: '排队中',
@@ -214,6 +183,9 @@ const STATUS_COLOR: Record<string, string> = {
 }
 
 const pipelines = ref<Pipeline[]>([])
+const summary = ref<PipelineSummary>({
+  total: 0, running: 0, success: 0, stopped: 0, error: 0, idle: 0, total_records_last_run: 0,
+})
 const activeRuns = reactive<Record<string, PipelineRun>>({})
 const datasources = ref<DataSource[]>([])
 const keyword = ref('')
@@ -240,29 +212,7 @@ const statusOptions = [
   { value: 'error', label: '错误' },
 ]
 
-const summary = computed(() => {
-  const s = { total: pipelines.value.length, running: 0, success: 0, stopped: 0, error: 0, idle: 0, total_records_last_run: 0 }
-  pipelines.value.forEach((p) => {
-    const st = activeRuns[p.id]?.status || p.status
-    if (st === 'running') s.running++
-    else if (st === 'success') s.success++
-    else if (st === 'stopped') s.stopped++
-    else if (st === 'error') s.error++
-    else s.idle++
-    if (p.last_records) s.total_records_last_run += p.last_records
-  })
-  return s
-})
-
-const filtered = computed(() => {
-  const kw = keyword.value.toLowerCase().trim()
-  return pipelines.value.filter((p) => {
-    const st = activeRuns[p.id]?.status || p.status
-    if (statusFilter.value && st !== statusFilter.value) return false
-    if (!kw) return true
-    return [p.name, p.description, p.source, p.target].some((s) => (s || '').toLowerCase().includes(kw))
-  })
-})
+const filtered = computed(() => pipelines.value)
 
 const dsOptions = computed(() =>
   datasources.value.map((d) => ({
@@ -318,62 +268,29 @@ function dsName(id?: string | null) {
   return d?.name || id
 }
 
-function loadPersisted(): Pipeline[] {
+async function refreshList() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch (e) { /* ignore */ }
-  return seedPipelines()
-}
-function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(pipelines.value))
-}
-
-function seedPipelines(): Pipeline[] {
-  const now = new Date()
-  const t = (h: number) => new Date(now.getTime() - h * 3600_000).toISOString()
-  return [
-    {
-      id: 'pl-customer-001', name: '客户主数据接入', description: '从 B 域数仓抽取客户主数据，落入 Customer 本体对象',
-      source: 'B域数仓 · DWA_V_D_CUS_CB_USER_INFO', target: 'Customer 对象',
-      datasource_id: null, steps: ['抽取', '清洗', '主键解析', '本体映射'], tags: ['核心', '日更'],
-      schedule: '0 2 * * *', step_duration_ms: 1500, status: 'success',
-      last_run_at: t(2), last_records: 40929, last_objects: 40929, last_duration_ms: 6800,
-      recent_runs: [
-        { id: 'run-' + Date.now() + '-1', pipeline_id: 'pl-customer-001', status: 'success', step_index: 3, step_label: '本体映射', records: 40929, duration_ms: 6800, progress: 100, started_at: t(2) },
-        { id: 'run-' + Date.now() + '-2', pipeline_id: 'pl-customer-001', status: 'success', step_index: 3, step_label: '本体映射', records: 38741, duration_ms: 7200, progress: 100, started_at: t(26) },
-      ],
-    },
-    {
-      id: 'pl-contract-001', name: '合约数据接入', description: '同步合约表，构建 Contract 实例',
-      source: 'CBSS · DWA_V_D_CUS_CB_ACT_INFO', target: 'Contract 对象',
-      datasource_id: null, steps: ['抽取', '过期标记', '本体映射'], tags: ['日更'],
-      schedule: '0 3 * * *', step_duration_ms: 1500, status: 'success',
-      last_run_at: t(3), last_records: 40929, last_objects: 40929, last_duration_ms: 4900, recent_runs: [],
-    },
-    {
-      id: 'pl-workorder-001', name: '工单数据接入', description: '客服工单全量接入',
-      source: '客服工单系统 · DWD_D_EVT_KF_ORDER_MAIN', target: 'WorkOrder 对象',
-      datasource_id: null, steps: ['抽取', '工单去重', '本体映射'], tags: [],
-      schedule: '*/30 * * * *', step_duration_ms: 1500, status: 'idle',
-      last_run_at: t(8), last_records: 82757, last_objects: 82757, last_duration_ms: 12300, recent_runs: [],
-    },
-    {
-      id: 'pl-mnp-warning', name: '携转预警结果回写', description: '将携转风险评分写入 t_mnp_risk_warning',
-      source: '风险评分模型', target: 't_mnp_risk_warning',
-      datasource_id: null, steps: ['模型推理', '阈值过滤', '结果落库'], tags: ['MNP'],
-      schedule: '', step_duration_ms: 1500, status: 'idle',
-      last_run_at: t(36), last_records: 1284, last_objects: 1284, last_duration_ms: 5400, recent_runs: [],
-    },
-  ]
+    const params: { keyword?: string; status?: string } = {}
+    if (keyword.value) params.keyword = keyword.value
+    if (statusFilter.value) params.status = statusFilter.value
+    const res = await plApi.listPipelines(params)
+    pipelines.value = res.items || []
+    summary.value = res.summary
+    const runs = await plApi.listActiveRuns()
+    Object.keys(activeRuns).forEach((k) => delete activeRuns[k])
+    ;(runs.items || []).forEach((r) => { activeRuns[r.pipeline_id] = r })
+  } catch (e: any) {
+    message.error('加载管线失败: ' + (e?.message || e))
+  }
 }
 
 let pollTimer: number | null = null
 function startPolling() {
   if (pollTimer) return
-  const tick = () => {
-    advanceRuns()
-    pollTimer = window.setTimeout(tick, 800)
+  const tick = async () => {
+    await refreshList()
+    const delay = Object.keys(activeRuns).length > 0 ? 800 : 1500
+    pollTimer = window.setTimeout(tick, delay)
   }
   tick()
 }
@@ -381,54 +298,12 @@ function stopPolling() {
   if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
 }
 
-function advanceRuns() {
-  const ids = Object.keys(activeRuns)
-  let changed = false
-  for (const id of ids) {
-    const run = activeRuns[id]
-    const p = pipelines.value.find((x) => x.id === id)
-    if (!p) { delete activeRuns[id]; continue }
-    const stepCount = p.steps.length
-    const stepDur = p.step_duration_ms || 1500
-    const totalDur = stepCount * stepDur
-    const elapsed = Date.now() - new Date(run.started_at).getTime()
-    const progress = Math.min(100, Math.round((elapsed / totalDur) * 100))
-    const stepIdx = Math.min(stepCount - 1, Math.floor(elapsed / stepDur))
-    run.progress = progress
-    run.step_index = stepIdx
-    run.step_label = p.steps[stepIdx]
-    if (elapsed >= totalDur) {
-      const records = mockRecords(p)
-      const finalRun: PipelineRun = {
-        ...run, status: 'success', step_index: stepCount - 1, step_label: p.steps[stepCount - 1],
-        records, duration_ms: totalDur, progress: 100,
-      }
-      p.status = 'success'
-      p.last_run_at = new Date().toISOString()
-      p.last_records = records
-      p.last_objects = records
-      p.last_duration_ms = totalDur
-      p.recent_runs = [finalRun, ...(p.recent_runs || [])].slice(0, 10)
-      delete activeRuns[id]
-      changed = true
-    }
-  }
-  if (changed) persist()
-}
-
-function mockRecords(p: Pipeline) {
-  if (p.datasource_id) {
-    const ds = datasources.value.find((d) => d.id === p.datasource_id)
-    if (ds && ds.record_count != null) return ds.record_count
-  }
-  if (p.last_records) {
-    const jitter = Math.floor((Math.random() - 0.5) * Math.max(100, p.last_records * 0.05))
-    return Math.max(0, p.last_records + jitter)
-  }
-  return 1000 + Math.floor(Math.random() * 100000)
-}
-
-function refreshList() { pipelines.value = loadPersisted() }
+let searchDebounce: number | null = null
+watch(keyword, () => {
+  if (searchDebounce) clearTimeout(searchDebounce)
+  searchDebounce = window.setTimeout(refreshList, 250)
+})
+watch(statusFilter, refreshList)
 
 function openCreate() {
   editing.value = null
@@ -451,74 +326,74 @@ function openEdit(p: Pipeline) {
   showEditor.value = true
 }
 
-function openDetail(p: Pipeline) {
-  detail.value = p
-  showDetail.value = true
+async function openDetail(p: Pipeline) {
+  try {
+    const full = await plApi.getPipeline(p.id)
+    detail.value = full
+    showDetail.value = true
+  } catch (e: any) {
+    message.error('加载失败: ' + (e?.message || e))
+  }
 }
 
-function handleSave() {
+async function handleSave() {
   if (!form.name.trim()) { message.warning('请输入管线名称'); return }
   const steps = form.stepsText.split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
   if (steps.length === 0) { message.warning('至少需要一个步骤'); return }
   const dur = Number(form.step_duration_ms)
   if (!Number.isFinite(dur) || dur < 100 || dur > 60000) { message.warning('单步耗时范围 100~60000'); return }
   const tags = form.tags.split(',').map((s) => s.trim()).filter(Boolean)
-  if (editing.value) {
-    const idx = pipelines.value.findIndex((x) => x.id === editing.value!.id)
-    if (idx >= 0) {
-      const p = pipelines.value[idx]
-      pipelines.value[idx] = {
-        ...p, name: form.name.trim(), description: form.description, source: form.source,
-        target: form.target, datasource_id: form.datasource_id || null, steps, tags,
-        schedule: form.schedule, step_duration_ms: dur,
-      }
+  const payload: plApi.PipelinePayload = {
+    name: form.name.trim(), description: form.description, source: form.source,
+    target: form.target, datasource_id: form.datasource_id || null, steps, tags,
+    schedule: form.schedule, step_duration_ms: dur,
+  }
+  try {
+    if (editing.value) {
+      await plApi.updatePipeline(editing.value.id, payload)
+      message.success('管线已更新')
+    } else {
+      await plApi.createPipeline(payload)
+      message.success('管线已创建')
     }
-    message.success('管线已更新')
-  } else {
-    const id = 'pl-' + Math.random().toString(36).slice(2, 10)
-    pipelines.value.unshift({
-      id, name: form.name.trim(), description: form.description, source: form.source,
-      target: form.target, datasource_id: form.datasource_id || null, steps, tags,
-      schedule: form.schedule, step_duration_ms: dur, status: 'idle', recent_runs: [],
-    })
-    message.success('管线已创建')
+    showEditor.value = false
+    await refreshList()
+  } catch (e: any) {
+    message.error('保存失败: ' + (e?.response?.data?.detail || e?.message || e))
   }
-  persist()
-  showEditor.value = false
 }
 
-function runPipeline(p: Pipeline) {
-  if (activeRuns[p.id]) return
-  const run: PipelineRun = {
-    id: 'run-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
-    pipeline_id: p.id, status: 'running', step_index: 0,
-    step_label: p.steps[0] || '步骤 1', records: 0, duration_ms: 0, progress: 0,
-    started_at: new Date().toISOString(),
+async function runPipeline(p: Pipeline) {
+  try {
+    await plApi.runPipeline(p.id)
+    message.success('管线已开始执行')
+    await refreshList()
+  } catch (e: any) {
+    message.error('启动失败: ' + (e?.response?.data?.detail || e?.message || e))
   }
-  activeRuns[p.id] = run
-  p.status = 'running'
-  message.success('管线已开始执行')
-  persist()
 }
 
-function stopPipeline(p: Pipeline) {
-  delete activeRuns[p.id]
-  p.status = 'stopped'
-  message.success('已停止')
-  persist()
+async function stopPipeline(p: Pipeline) {
+  try {
+    await plApi.stopPipeline(p.id)
+    message.success('已停止')
+    await refreshList()
+  } catch (e: any) {
+    message.error('停止失败: ' + (e?.response?.data?.detail || e?.message || e))
+  }
 }
 
-function deletePipeline(p: Pipeline) {
-  pipelines.value = pipelines.value.filter((x) => x.id !== p.id)
-  delete activeRuns[p.id]
-  message.success('管线已删除')
-  persist()
+async function deletePipeline(p: Pipeline) {
+  try {
+    await plApi.deletePipeline(p.id)
+    message.success('管线已删除')
+    await refreshList()
+  } catch (e: any) {
+    message.error('删除失败: ' + (e?.response?.data?.detail || e?.message || e))
+  }
 }
-
-watch(pipelines, persist, { deep: true })
 
 onMounted(async () => {
-  pipelines.value = loadPersisted()
   try {
     const r = await dsApi.listDataSources()
     datasources.value = Array.isArray(r) ? r : ((r as any).items || [])

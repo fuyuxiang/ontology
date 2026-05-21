@@ -1,5 +1,5 @@
 <template>
-  <div class="step3">
+  <div class="step3-root">
     <header class="step3-topbar">
       <button class="ob-back-btn" @click="$emit('prev')">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

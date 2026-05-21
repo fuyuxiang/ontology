@@ -119,6 +119,8 @@ from app.api.v1.actions import router as actions_router
 from app.api.v1.functions import router as functions_router
 from app.api.v1.monitor import router as monitor_router
 from app.api.v1.studio import router as studio_router
+from app.api.v1.pipelines import router as pipelines_router, start_worker as start_pipeline_worker
+from app.api.v1.lineage import router as lineage_router
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +231,8 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(asyncio.to_thread(_preheat_sync))
 
+    start_pipeline_worker()
+
     yield
 
 
@@ -274,6 +278,8 @@ app.include_router(actions_router, prefix="/api/v1")
 app.include_router(functions_router, prefix="/api/v1")
 app.include_router(monitor_router, prefix="/api/v1")
 app.include_router(studio_router, prefix="/api/v1")
+app.include_router(pipelines_router, prefix="/api/v1")
+app.include_router(lineage_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

@@ -76,8 +76,12 @@
     <div class="aip-body" v-if="store.viewMode === 'workflow'">
       <SceneSidebar @open-import="showImport = true" />
 
-      <div class="aip-canvas-wrap">
-        <button class="aip-canvas-add" @click="addNodeFromToolbox" title="添加节点">+</button>
+      <div class="aip-canvas-wrap" ref="canvasWrapEl">
+        <button class="aip-canvas-add" :class="{ active: showAddNode }" @click="showAddNode = !showAddNode" title="添加节点">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
 
         <div v-if="!store.dataLoaded" class="aip-canvas-loading">正在加载场景数据...</div>
         <VueFlow v-else
@@ -91,11 +95,15 @@
           :default-viewport="{ x: 100, y: 100, zoom: 0.55 }"
           @node-click="onNodeClick"
           @pane-click="onPaneClick"
+          @dragover="onCanvasDragOver"
+          @drop="onCanvasDrop"
           class="aip-flow">
           <Background variant="dots" pattern-color="#cbd5e1" :gap="16" :size="1" />
           <Controls />
           <MiniMap :node-color="miniMapColor" mask-color="rgba(15,23,42,0.5)" />
         </VueFlow>
+
+        <AddNodeDrawer :open="showAddNode" @close="showAddNode = false" @pick="onAddNodePick" />
       </div>
 
       <transition name="aip-drawer">
@@ -171,23 +179,6 @@
         <textarea class="aip-input aip-input--ta" v-model="importText" rows="12" placeholder="粘贴场景 JSON..."></textarea>
       </div>
     </a-modal>
-
-    <!-- 添加节点对话框 -->
-    <a-modal v-model:open="showAddNode" title="添加节点" @ok="confirmAddNode">
-      <div class="aip-add-node">
-        <div v-for="g in NODE_GROUPS" :key="g" class="aip-add-node__group">
-          <div class="aip-add-node__group-label">{{ g }}</div>
-          <div class="aip-add-node__items">
-            <button v-for="t in NODE_TYPES.filter(t => t.group === g)" :key="t.type"
-              class="aip-add-node__item" :class="{ active: addType === t.type }"
-              :style="{ borderColor: addType === t.type ? t.color : '#e2e8f0', color: addType === t.type ? t.color : '#475569' }"
-              @click="addType = t.type">
-              {{ t.label }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </a-modal>
   </div>
 </template>
 
@@ -202,18 +193,19 @@ import '@vue-flow/controls/dist/style.css'
 import '@vue-flow/minimap/dist/style.css'
 
 import { useAipStore } from '../../store/aip'
-import { NODE_TYPES, NODE_GROUPS, SCENE_LIST, type SceneMeta } from './aipData'
+import { NODE_TYPES, SCENE_LIST, type SceneMeta } from './aipData'
 import AipNode from './nodes/AipNode.vue'
 import SceneSidebar from './panels/SceneSidebar.vue'
 import PropertyPanel from './panels/PropertyPanel.vue'
 import BottomDrawer from './panels/BottomDrawer.vue'
 import SceneConfigDrawer from './panels/SceneConfigDrawer.vue'
+import AddNodeDrawer from './panels/AddNodeDrawer.vue'
 
 const store = useAipStore()
 const showImport = ref(false)
 const importText = ref('')
 const showAddNode = ref(false)
-const addType = ref<string>('ontologyQuery')
+const canvasWrapEl = ref<HTMLElement | null>(null)
 
 const nodeTypes = NODE_TYPES.reduce((acc, t) => { acc[t.type] = markRaw(AipNode); return acc }, {} as Record<string, any>)
 
@@ -272,17 +264,29 @@ function miniMapColor(node: any) {
   return NODE_TYPES.find(t => t.type === node.type)?.color || '#94a3b8'
 }
 
-function addNodeFromToolbox() {
-  showAddNode.value = true
+function onAddNodePick(_n: any) {
+  // store 已在 drawer 内 push 节点；这里同步到 VueFlow
+  syncFromStore()
 }
-function confirmAddNode() {
-  const meta = NODE_TYPES.find(t => t.type === addType.value)
-  if (!meta) return
-  const id = `${addType.value}_${Date.now()}`
+function onCanvasDragOver(e: DragEvent) {
+  e.preventDefault()
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+}
+function onCanvasDrop(e: DragEvent) {
+  e.preventDefault()
+  const type = e.dataTransfer?.getData('application/aip-node')
+  const label = e.dataTransfer?.getData('application/aip-label')
+  if (!type) return
+  const meta = NODE_TYPES.find(t => t.type === type)
+  const wrap = canvasWrapEl.value
+  if (!wrap) return
+  const rect = wrap.getBoundingClientRect()
+  const position = { x: e.clientX - rect.left - 100, y: e.clientY - rect.top - 30 }
+  const id = `${type}_${Date.now()}`
   store.addNode({
-    id, type: addType.value,
-    position: { x: 100 + Math.random() * 400, y: 100 + Math.random() * 200 },
-    data: { label: meta.label },
+    id, type,
+    position,
+    data: { label: label || meta?.label || type, status: 'idle' },
   })
   showAddNode.value = false
   syncFromStore()
@@ -455,13 +459,16 @@ const AGENTS = [
   background: radial-gradient(rgba(59,108,255,.04) 0%, rgba(59,108,255,.02) 30%, #f5f7fb 70% 100%);
 }
 .aip-canvas-add {
-  position: absolute; top: 16px; right: 16px; z-index: 5;
-  width: 36px; height: 36px; border-radius: 50%;
+  position: absolute; top: 12px; right: 12px; z-index: 10;
+  width: 40px; height: 40px; border-radius: 50%;
   border: none; background: #2E5BFF; color: #fff;
-  font-size: 20px; line-height: 1; cursor: pointer;
-  box-shadow: 0 2px 8px rgba(46,91,255,.3);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 12px rgba(46,91,255,.35);
+  transition: transform .15s, background .15s;
 }
-.aip-canvas-add:hover { background: #1d4ed8; transform: scale(1.05); }
+.aip-canvas-add:hover { background: #1d4ed8; transform: scale(1.06); }
+.aip-canvas-add.active { background: #1d4ed8; transform: rotate(45deg); }
 .aip-flow { width: 100%; height: 100%; }
 .aip-canvas-loading { padding: 80px; text-align: center; color: #94a3b8; font-size: 13px; }
 
@@ -527,14 +534,4 @@ const AGENTS = [
 .aip-import__hint { font-size: 12px; color: #64748b; margin-bottom: 10px; }
 .aip-input { width: 100%; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px; outline: none; }
 .aip-input--ta { resize: vertical; font-family: ui-monospace, monospace; }
-
-.aip-add-node { display: flex; flex-direction: column; gap: 12px; }
-.aip-add-node__group-label { font-size: 11px; color: #94a3b8; font-weight: 600; margin-bottom: 6px; letter-spacing: 0.4px; }
-.aip-add-node__items { display: flex; flex-wrap: wrap; gap: 6px; }
-.aip-add-node__item {
-  padding: 6px 12px; background: #fff; border: 1.5px solid #e2e8f0;
-  border-radius: 4px; font-size: 12px; color: #475569; cursor: pointer;
-}
-.aip-add-node__item:hover { border-color: #2E5BFF; color: #2E5BFF; }
-.aip-add-node__item.active { background: rgba(46,91,255,.05); }
 </style>

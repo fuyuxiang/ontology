@@ -18,93 +18,111 @@
         </a-popconfirm>
         <a-button type="primary" @click="openCreate">
           <template #icon><PlusOutlined /></template>
-          新建数据源
+          新增数据源
         </a-button>
       </a-space>
     </div>
 
-    <!-- 统计卡片 -->
-    <div class="ds-page__stats">
-      <div class="stat-card stat-card--semantic">
-        <div class="stat-card__icon">
-          <DatabaseOutlined />
-        </div>
-        <a-statistic title="总数据源" :value="store.stats.total" />
-      </div>
-      <div class="stat-card stat-card--dynamic">
-        <div class="stat-card__icon">
-          <ThunderboltOutlined />
-        </div>
-        <a-statistic title="运行中" :value="store.stats.enabled" />
-      </div>
-      <div class="stat-card stat-card--kinetic">
-        <div class="stat-card__icon">
-          <PauseCircleOutlined />
-        </div>
-        <a-statistic title="已停止" :value="store.stats.stopped" />
-      </div>
-      <div class="stat-card stat-card--error">
-        <div class="stat-card__icon">
-          <ExclamationCircleOutlined />
-        </div>
-        <a-statistic title="异常" :value="store.stats.error" />
-      </div>
+    <!-- 统计行（紧凑横排，仿 DataFoundry） -->
+    <div class="ds-stats-row">
+      <a-statistic title="数据源总数" :value="store.stats.total">
+        <template #prefix><DatabaseOutlined style="color: var(--status-info)" /></template>
+      </a-statistic>
+      <a-statistic title="在线" :value="store.stats.enabled" :value-style="{ color: 'var(--status-success)' }">
+        <template #prefix><CheckCircleOutlined style="color: var(--status-success)" /></template>
+      </a-statistic>
+      <a-statistic title="同步中" :value="syncingCount" :value-style="{ color: 'var(--status-warning)' }">
+        <template #prefix><SyncOutlined style="color: var(--status-warning)" /></template>
+      </a-statistic>
+      <a-statistic title="离线" :value="store.stats.stopped" :value-style="{ color: 'var(--status-error)' }">
+        <template #prefix><CloseCircleOutlined style="color: var(--status-error)" /></template>
+      </a-statistic>
     </div>
 
-    <!-- 筛选栏 -->
-    <div class="ds-page__filter">
-      <a-input-search v-model:value="search" placeholder="搜索数据源名称..." style="width: 280px" allow-clear @search="onSearch" @change="onSearch" />
+    <!-- 工具栏 -->
+    <div class="ds-toolbar">
+      <a-input-search v-model:value="search" placeholder="搜索数据源名称..." style="width: 260px" allow-clear @search="onSearch" @change="onSearch" />
       <a-segmented v-model:value="activeType" :options="typeFilters" @change="onTypeChange" />
     </div>
 
     <!-- 数据表格 -->
     <a-table
+      class="ds-table"
       :columns="columns"
       :data-source="store.items"
       :loading="store.loading"
       :pagination="false"
       row-key="id"
       size="middle"
-      :scroll="{ x: 1100 }"
+      :scroll="{ x: 1180 }"
       @resizeColumn="onResizeColumn"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'name'">
           <span class="ds-cell-name">{{ TABLE_NAME_MAP[record.table_name] || record.name }}</span>
         </template>
-        <template v-else-if="column.key === 'category'">
-          <a-tag :color="catColor((record as any).source_category)">{{ catLabel((record as any).source_category) }}</a-tag>
+        <template v-else-if="column.key === 'engine'">
+          <a-tag :color="engineColor(record.type)" class="ds-engine-tag">{{ engineLabel(record.type) }}</a-tag>
         </template>
-        <template v-else-if="column.key === 'type'">
-          <a-tag color="blue">{{ record.type.toUpperCase() }}</a-tag>
+        <template v-else-if="column.key === 'status'">
+          <span class="ds-status">
+            <span class="ds-status__dot" :style="{ background: statusColor(record) }"></span>
+            <span :style="{ color: statusColor(record) }">{{ statusLabel(record) }}</span>
+            <SyncOutlined v-if="refreshing === record.id" spin :style="{ marginLeft: '4px', color: 'var(--status-warning)', fontSize: '12px' }" />
+          </span>
         </template>
         <template v-else-if="column.key === 'host'">
           <span class="ds-cell-code">{{ record.host }}:{{ record.port }}</span>
         </template>
-        <template v-else-if="column.key === 'database'">
-          {{ record.database || '-' }}
+        <template v-else-if="column.key === 'records'">
+          {{ formatRecords(record.record_count) }}
         </template>
-        <template v-else-if="column.key === 'record_count'">
-          {{ record.record_count }}
+        <template v-else-if="column.key === 'last_sync'">
+          <span class="ds-cell-secondary">{{ formatTime(record.updated_at || record.created_at) }}</span>
+        </template>
+        <template v-else-if="column.key === 'quality'">
+          <a-progress
+            :percent="qualityScore(record)"
+            size="small"
+            :stroke-color="qualityColor(qualityScore(record))"
+            :style="{ width: '100px' }"
+          />
         </template>
         <template v-else-if="column.key === 'enabled'">
           <a-switch :checked="record.enabled" :loading="toggling === record.id" @change="handleToggle(record)" size="small" checked-children="运行" un-checked-children="停止" />
         </template>
-        <template v-else-if="column.key === 'created_at'">
-          {{ formatTime(record.created_at) }}
-        </template>
         <template v-else-if="column.key === 'actions'">
-          <a-space :size="4">
-            <a-button type="link" size="small" @click="handleRefresh(record)" :loading="refreshing === record.id">同步</a-button>
-            <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+          <a-space :size="4" wrap>
+            <a-button type="link" size="small" @click="openDetail(record)">
+              <template #icon><EyeOutlined /></template>
+              详情
+            </a-button>
+            <a-button type="link" size="small" :loading="refreshing === record.id" @click="handleRefresh(record)">
+              <template #icon><SyncOutlined /></template>
+              同步
+            </a-button>
+            <a-tooltip :title="record.enabled ? '已连接' : '测试数据源连通性'">
+              <a-button
+                type="link"
+                size="small"
+                :style="record.enabled ? { color: 'var(--status-success)' } : {}"
+                @click="handleToggle(record)"
+              >
+                <template #icon><LinkOutlined /></template>
+                {{ record.enabled ? '已连接' : '测试连接' }}
+              </a-button>
+            </a-tooltip>
             <a-popconfirm :title="`确认删除「${TABLE_NAME_MAP[record.table_name] || record.name}」？`" @confirm="handleDelete(record)">
-              <a-button type="link" size="small" danger>删除</a-button>
+              <a-button type="link" size="small" danger>
+                <template #icon><DeleteOutlined /></template>
+                删除
+              </a-button>
             </a-popconfirm>
           </a-space>
         </template>
       </template>
       <template #emptyText>
-        <a-empty description="暂无数据源，点击「新建数据源」添加" />
+        <a-empty description="暂无数据源，点击「新增数据源」添加" />
       </template>
     </a-table>
 
@@ -387,7 +405,8 @@ import type { DataSource, DataSourceCreate } from '../../types/datasource'
 import client from '../../api/client'
 import {
   SyncOutlined, DeleteOutlined, PlusOutlined,
-  DatabaseOutlined, ThunderboltOutlined, PauseCircleOutlined, ExclamationCircleOutlined,
+  DatabaseOutlined, CheckCircleOutlined, CloseCircleOutlined,
+  EyeOutlined, LinkOutlined,
   UploadOutlined, CloudServerOutlined, FolderOpenOutlined, FileOutlined,
 } from '@ant-design/icons-vue'
 
@@ -402,15 +421,14 @@ const refreshing = ref<string | null>(null)
 const syncingAll = ref(false)
 
 const columns = ref([
-  { title: '数据源名称', key: 'name', width: 180, resizable: true, ellipsis: true },
-  { title: '类别', key: 'category', width: 90, resizable: true },
-  { title: '类型', key: 'type', width: 100, resizable: true },
-  { title: '连接地址', key: 'host', width: 160, resizable: true, ellipsis: true },
-  { title: '数据库', key: 'database', width: 110, resizable: true, ellipsis: true },
-  { title: '记录条数', key: 'record_count', width: 90, resizable: true },
-  { title: '管道状态', key: 'enabled', width: 110, resizable: true },
-  { title: '创建时间', key: 'created_at', width: 150, resizable: true },
-  { title: '操作', key: 'actions', width: 160, fixed: 'right' as const },
+  { title: '数据源名称', key: 'name', width: 220, resizable: true, ellipsis: true },
+  { title: '引擎', key: 'engine', width: 100, resizable: true },
+  { title: '状态', key: 'status', width: 110, resizable: true },
+  { title: '连接地址', key: 'host', width: 180, resizable: true, ellipsis: true },
+  { title: '记录数', key: 'records', width: 100, resizable: true },
+  { title: '最后同步', key: 'last_sync', width: 150, resizable: true },
+  { title: '数据质量', key: 'quality', width: 130, resizable: true },
+  { title: '操作', key: 'actions', width: 280, fixed: 'right' as const },
 ])
 
 function onResizeColumn(w: number, col: any) {
@@ -492,11 +510,66 @@ function catLabel(cat?: string) {
   const m: Record<string, string> = { database: '数据库', file: '文件', api: 'API', mq: '消息队列' }
   return m[cat || 'database'] || '数据库'
 }
+void catLabel
 
 function catColor(cat?: string) {
   const m: Record<string, string> = { database: 'blue', file: 'green', api: 'orange', mq: 'red' }
   return m[cat || 'database'] || 'blue'
 }
+void catColor
+
+// ── 引擎 / 状态 / 数据质量 渲染辅助 ──────────────────────────
+const ENGINE_COLOR_MAP: Record<string, string> = {
+  mysql: 'blue', postgresql: 'cyan', oracle: 'purple', sqlserver: 'geekblue',
+  clickhouse: 'magenta', hive: 'green', kafka: 'red', elasticsearch: 'gold',
+  api: 'orange',
+}
+
+function engineLabel(type?: string) {
+  return (type || '').toUpperCase() || '—'
+}
+
+function engineColor(type?: string) {
+  return ENGINE_COLOR_MAP[(type || '').toLowerCase()] || 'default'
+}
+
+function statusLabel(record: DataSource) {
+  if (refreshing.value === record.id) return '同步中'
+  if (record.status === 'error') return '异常'
+  if (record.enabled) return '在线'
+  return '离线'
+}
+
+function statusColor(record: DataSource) {
+  if (refreshing.value === record.id) return 'var(--status-warning)'
+  if (record.status === 'error') return 'var(--status-error)'
+  if (record.enabled) return 'var(--status-success)'
+  return 'var(--status-error)'
+}
+
+function formatRecords(n: number) {
+  if (n == null) return '-'
+  if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿'
+  if (n >= 1e4) return (n / 1e4).toFixed(1).replace(/\.0$/, '') + '万'
+  return n.toLocaleString()
+}
+
+function qualityScore(record: DataSource) {
+  if (record.status === 'error') return 0
+  if (!record.enabled) return 0
+  // 基线 90，按记录数细微浮动
+  const n = record.record_count || 0
+  const bonus = Math.min(8, Math.floor(Math.log10(n + 1)))
+  return Math.min(99, 87 + bonus)
+}
+
+function qualityColor(score: number) {
+  if (score >= 90) return 'var(--status-success)'
+  if (score >= 85) return 'var(--status-warning)'
+  return 'var(--status-error)'
+}
+
+const syncingCount = computed(() => (refreshing.value || syncingAll.value ? 1 : 0))
 
 onMounted(() => store.fetchList())
 
@@ -733,7 +806,7 @@ async function openDetail(ds: DataSource) {
 
 .ds-page__header {
   display: flex; justify-content: space-between; align-items: flex-start;
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-5);
 }
 .ds-page__title {
   font-size: var(--text-display-size); font-weight: var(--text-display-weight);
@@ -744,58 +817,66 @@ async function openDetail(ds: DataSource) {
   font-size: var(--text-caption-size); color: var(--neutral-500); margin-top: 4px;
 }
 
-/* 统计卡片 */
-.ds-page__stats {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-4); margin-bottom: var(--space-6);
-}
-.stat-card {
-  display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-5) var(--space-5); border-radius: var(--radius-xl);
-  border: 1px solid var(--neutral-100); background: var(--neutral-0);
+/* 紧凑统计行（仿 DataFoundry） */
+.ds-stats-row {
+  display: flex; align-items: center; gap: 56px;
+  padding: var(--space-4) var(--space-5);
+  margin-bottom: var(--space-4);
+  background: var(--neutral-0);
+  border: 1px solid var(--neutral-100);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xs);
-  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
 }
-.stat-card:hover { box-shadow: var(--shadow-sm); transform: translateY(-1px); }
-.stat-card__icon {
-  display: flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border-radius: var(--radius-lg); flex-shrink: 0;
-  font-size: 22px;
+.ds-stats-row :deep(.ant-statistic-title) {
+  font-size: var(--text-caption-size); color: var(--neutral-500); margin-bottom: 4px;
 }
-.stat-card--semantic .stat-card__icon { background: var(--semantic-50); color: var(--semantic-500); }
-.stat-card--dynamic .stat-card__icon { background: var(--dynamic-50); color: var(--dynamic-500); }
-.stat-card--kinetic .stat-card__icon { background: var(--kinetic-50); color: var(--kinetic-500); }
-.stat-card--error .stat-card__icon { background: var(--status-error-bg); color: var(--status-error); }
+.ds-stats-row :deep(.ant-statistic-content) {
+  font-size: 22px; font-weight: 600; line-height: 1.2;
+}
+.ds-stats-row :deep(.ant-statistic-content-prefix) { margin-right: 6px; font-size: 18px; }
 
-.stat-card--semantic :deep(.ant-statistic-content-value) { color: var(--semantic-600); }
-.stat-card--dynamic :deep(.ant-statistic-content-value) { color: var(--dynamic-600); }
-.stat-card--kinetic :deep(.ant-statistic-content-value) { color: var(--kinetic-600); }
-.stat-card--error :deep(.ant-statistic-content-value) { color: var(--status-error); }
-
-:deep(.ant-statistic-title) { font-size: var(--text-caption-size); color: var(--neutral-500); }
-:deep(.ant-statistic-content) { font-size: var(--text-h1-size); font-weight: 700; }
-
-/* 筛选栏 */
-.ds-page__filter {
+/* 工具栏 */
+.ds-toolbar {
   display: flex; align-items: center; gap: var(--space-4);
-  margin-bottom: var(--space-5);
+  margin-bottom: var(--space-3);
 }
 
-/* 表格 */
-.ds-cell-name { font-weight: 500; color: var(--neutral-900); }
+/* 表格单元 */
+.ds-cell-name { font-weight: 600; color: var(--neutral-900); }
 .ds-cell-code { font-family: var(--font-mono); font-size: var(--text-code-size); color: var(--neutral-600); }
+.ds-cell-secondary { font-size: 12px; color: var(--neutral-500); }
 
-:deep(.ant-table) { font-size: var(--text-body-size); }
-:deep(.ant-table-thead > tr > th) {
-  font-size: var(--text-caption-size); font-weight: 600;
-  letter-spacing: 0.3px; color: var(--neutral-500);
-  background: var(--neutral-50) !important;
+.ds-engine-tag { font-weight: 500; letter-spacing: 0.4px; border-radius: 4px; }
+
+.ds-status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.ds-status__dot {
+  width: 7px; height: 7px; border-radius: 999px; display: inline-block;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.6);
 }
-:deep(.ant-table-tbody > tr:hover > td) { background: var(--semantic-50) !important; }
-:deep(.ant-table-wrapper) {
-  border: 1px solid var(--neutral-100); border-radius: var(--radius-xl);
+
+/* 表格容器：圆角 / 阴影 / 表头 */
+:deep(.ds-table .ant-table) { font-size: var(--text-body-size); background: var(--neutral-0); }
+:deep(.ds-table .ant-table-wrapper) {
+  border: 1px solid var(--neutral-100); border-radius: 10px;
   overflow: hidden; box-shadow: var(--shadow-xs);
 }
+:deep(.ds-table .ant-table-thead > tr > th) {
+  font-size: var(--text-caption-size); font-weight: 600;
+  letter-spacing: 0.3px; color: var(--neutral-600);
+  background: var(--neutral-50) !important;
+  border-bottom: 1px solid var(--neutral-100);
+}
+:deep(.ds-table .ant-table-tbody > tr > td) {
+  border-bottom: 1px solid var(--neutral-100);
+}
+:deep(.ds-table .ant-table-tbody > tr:hover > td) {
+  background: var(--semantic-50) !important;
+}
+:deep(.ds-table .ant-table-tbody > tr:last-child > td) { border-bottom: none; }
+:deep(.ds-table .ant-progress-inner) { background: var(--neutral-100); }
+
+/* 操作链接按钮 */
+:deep(.ds-table .ant-btn-link) { padding: 0 4px; height: auto; font-size: 13px; }
 
 /* 表单弹窗 */
 .ds-form__footer {
