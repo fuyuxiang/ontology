@@ -1,13 +1,13 @@
 <template>
-  <!-- 空状态欢迎页（自带 .ob-root.ob-empty-root） -->
+  <!-- 空状态欢迎页 -->
   <EmptyWelcome
     v-if="!sessions.length && !activeSession"
-    @open-new="openNewModal('ai')"
-    @open-upload="openNewModal('upload')"
+    @open-method="openNewModal"
   >
     <template #modal>
       <NewOntologyModal
         v-if="newModalOpen"
+        :open="newModalOpen"
         :default-method="defaultMethod"
         @update:open="newModalOpen = $event"
         @submit="onCreateSession"
@@ -15,7 +15,7 @@
     </template>
   </EmptyWelcome>
 
-  <!-- 最近构建表（自带 .ob-root） -->
+  <!-- 最近构建表 -->
   <RecentBuildTable
     v-else-if="!activeSession"
     :sessions="sessions"
@@ -27,6 +27,7 @@
     <template #modal>
       <NewOntologyModal
         v-if="newModalOpen"
+        :open="newModalOpen"
         :default-method="defaultMethod"
         @update:open="newModalOpen = $event"
         @submit="onCreateSession"
@@ -44,8 +45,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, ref, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useBuilderStore } from '../../store/builder'
 import type { BuildMethod, BuilderSession } from '../../types/builder'
@@ -56,6 +57,7 @@ import NewOntologyModal from './components/NewOntologyModal.vue'
 import BuilderShell from './components/BuilderShell.vue'
 
 const router = useRouter()
+const route = useRoute()
 const store = useBuilderStore()
 const { sessions, activeSession } = storeToRefs(store)
 
@@ -69,8 +71,6 @@ function openNewModal(method?: BuildMethod) {
 
 function onCreateSession(payload: {
   ontologyName: string
-  scenarioId: string
-  scenarioName: string
   buildMethod: BuildMethod
 }) {
   store.createSession(payload)
@@ -93,4 +93,30 @@ function exitToList() {
 function gotoStudio() {
   router.push('/studio')
 }
+
+// /logic/* 回流：?session_id=&attach_to=&new_id=&kind=rule|action|function
+function captureBuilderReturn() {
+  const q = route.query
+  const sid = (q.session_id || '') as string
+  const attachTo = (q.attach_to || '') as string
+  const newId = (q.new_id || '') as string
+  const kind = (q.kind || '') as 'rule' | 'action' | 'function' | ''
+  if (!sid || !attachTo || !newId || !kind) return
+  store.setActiveSession(sid)
+  const session = store.activeSession
+  if (!session) return
+  const objects = session.ontologyObjects.map(o => {
+    if (o.id !== attachTo) return o
+    if (kind === 'rule')      return { ...o, rules: [...new Set([...o.rules, newId])] }
+    if (kind === 'action')    return { ...o, actions: [...new Set([...o.actions, newId])] }
+    if (kind === 'function')  return { ...o, derivedProperties: [...new Set([...o.derivedProperties, newId])] }
+    return o
+  })
+  store.patchActive({ ontologyObjects: objects })
+  // 清掉 query
+  router.replace({ path: route.path })
+}
+
+onMounted(captureBuilderReturn)
+watch(() => route.fullPath, captureBuilderReturn)
 </script>

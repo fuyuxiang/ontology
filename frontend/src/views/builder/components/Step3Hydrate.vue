@@ -14,12 +14,12 @@
     <!-- 演练成功大屏 -->
     <div v-if="success" class="step3-success">
       <div class="step3-success__hero">🎉</div>
-      <div class="step3-success__title">{{ session.buildMethod === 'upload' ? '导入成功' : '发布成功' }}</div>
+      <div class="step3-success__title">{{ session.buildMethod === 'import' ? '导入成功' : '发布成功' }}</div>
       <div class="step3-success__sub">{{ session.ontologyName }} 已发布至本体工作室</div>
 
       <div class="step3-success__stats">
         <div class="step3-success-stat">
-          <div class="num">{{ session.ontologyClasses.length }}</div>
+          <div class="num">{{ session.ontologyObjects.length }}</div>
           <div class="label">本体</div>
         </div>
         <div class="step3-success-stat">
@@ -27,7 +27,7 @@
           <div class="label">关系</div>
         </div>
         <div class="step3-success-stat">
-          <div class="num">{{ session.ontologyClasses.length }}</div>
+          <div class="num">{{ session.ontologyObjects.length }}</div>
           <div class="label">走测节点</div>
         </div>
         <div class="step3-success-stat">
@@ -178,9 +178,9 @@
           <a-descriptions size="small" :column="1" bordered>
             <a-descriptions-item label="版本号">{{ versionLabel }}</a-descriptions-item>
             <a-descriptions-item label="冻结时间">{{ frozenAt }}</a-descriptions-item>
-            <a-descriptions-item label="对象总数">{{ session.ontologyClasses.length }}</a-descriptions-item>
+            <a-descriptions-item label="对象总数">{{ session.ontologyObjects.length }}</a-descriptions-item>
             <a-descriptions-item label="关系总数">{{ session.ontologyRelations.length }}</a-descriptions-item>
-            <a-descriptions-item label="构建路径">{{ session.buildMethod === 'ai' ? '路径A 场景对话驱动' : '路径B 已有本体导入' }}</a-descriptions-item>
+            <a-descriptions-item label="构建路径">{{ buildPathLabel }}</a-descriptions-item>
             <a-descriptions-item label="水合状态">{{ drillStatus ? '已演练' : '未演练' }}</a-descriptions-item>
           </a-descriptions>
         </div>
@@ -231,12 +231,12 @@
     <!-- 发布弹窗 -->
     <a-modal v-model:open="publishModalOpen" :footer="null" :width="560" class="step3-publish-modal">
       <div class="step3-modal-content">
-        <div class="step3-modal-title">确认发布 · {{ versionLabel }} {{ session.scenarioName }}</div>
+        <div class="step3-modal-title">确认发布 · {{ versionLabel }} {{ session.ontologyName }}</div>
         <div class="step3-modal-text">
-          首次发布：{{ versionLabel }} {{ session.scenarioName }}，包含
-          <strong>{{ session.ontologyClasses.length }}</strong> 个本体、
+          首次发布：{{ versionLabel }} {{ session.ontologyName }}，包含
+          <strong>{{ session.ontologyObjects.length }}</strong> 个对象、
           <strong>{{ session.ontologyRelations.length }}</strong> 条关系，
-          <strong>{{ session.ontologyClasses.length }}</strong> 个走测节点全部通过
+          <strong>{{ session.ontologyObjects.length }}</strong> 个走测节点全部通过
         </div>
         <div class="step3-modal-stats">
           <div><span>归因准确率：</span><strong>{{ baselines[0]?.value || '94.6%' }}</strong></div>
@@ -292,12 +292,19 @@ let countdownTimer: number | null = null
 let drillTimer: number | null = null
 
 const versionLabel = computed(() => props.session.publishedVersion || 'v0.1')
+const buildPathLabel = computed(() => {
+  const m = props.session.buildMethod
+  if (m === 'chat')    return '对话生成'
+  if (m === 'import')  return '文件导入'
+  if (m === 'extract') return '文档抽取'
+  return '手工建模'
+})
 const frozenAt = computed(() => {
   const d = new Date(props.session.publishedAt || new Date().toISOString())
   return d.toLocaleString('zh-CN')
 })
 
-const baselines = computed(() => MONITORING_BASELINES[props.session.scenarioId] || MONITORING_BASELINES['refund-root-cause'])
+const baselines = computed(() => MONITORING_BASELINES[props.session.scenarioId || ''] || MONITORING_BASELINES['refund-root-cause'])
 const relationAccuracy = computed(() => drillStatus.value === 'pass' ? '98.2' : drillStatus.value === 'warn' ? '92.4' : '0')
 
 const consumerColumns = [
@@ -332,8 +339,8 @@ const rollbackRules = computed(() => {
 
 const gates = computed<PublishGate[]>(() => {
   const list: PublishGate[] = JSON.parse(JSON.stringify(DEFAULT_PUBLISH_GATES))
-  const classCount = props.session.ontologyClasses.length
-  const approvedCount = props.session.ontologyClasses.filter(c => c.approved).length
+  const classCount = props.session.ontologyObjects.length
+  const approvedCount = props.session.ontologyObjects.filter(c => c.approved).length
   list[0] = { ...list[0], desc: `本体 ${classCount} 个`, pass: classCount > 0 }
   list[1] = { ...list[1], desc: `通过节点 ${approvedCount} / ${classCount}`, pass: classCount > 0 && approvedCount === classCount }
   list[2] = { ...list[2], desc: `实体 ${drillResult.value?.entityCount?.toLocaleString() || 0} · 关系 ${drillResult.value?.relationCount?.toLocaleString() || 0}`, pass: !!drillResult.value && drillStatus.value !== 'error' }
@@ -390,7 +397,7 @@ async function startDrill() {
 
   // 阶段 2：实例化
   pushLog('RUN', `字段映射检查：${totalCols}/${totalCols} 字段全部命中`)
-  for (const c of props.session.ontologyClasses.slice(0, 4)) {
+  for (const c of props.session.ontologyObjects.slice(0, 4)) {
     await sleep(280)
     pushLog('OK', `创建 ${c.displayName} 实例 × ${Math.round(totalRows / 4).toLocaleString()}...`)
   }
@@ -403,7 +410,7 @@ async function startDrill() {
   drillProgress.value = 0.75
 
   // 阶段 4：策略输出
-  for (const c of props.session.ontologyClasses.slice(0, 2)) {
+  for (const c of props.session.ontologyObjects.slice(0, 2)) {
     await sleep(260)
     pushLog('RUN', `执行规则：${c.name}_validation（结构验证）...`)
     await sleep(220)

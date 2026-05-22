@@ -4,12 +4,12 @@ import type {
   BuilderSession,
   BuildMethod,
   SessionStatus,
-  OntologyClassDraft,
+  OntologyObjectDraft,
   OntologyRelationDraft,
   UploadRecord,
+  OntologyHints,
 } from '../types/builder'
 import {
-  SCENARIO_PRESETS,
   SCENARIO_CLASS_PRESETS,
   SCENARIO_RELATION_PRESETS,
   DEMO_UPLOAD_RECORDS,
@@ -23,10 +23,50 @@ function uid(prefix = 'id') {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+function emptyHints(): OntologyHints {
+  return { suggested_rules: [], suggested_actions: [] }
+}
+
+function migrateSession(s: any): BuilderSession {
+  // 旧 storage 用 ontologyClasses + 'ai'/'upload'，做就地迁移以避免崩溃
+  const buildMethod: BuildMethod = (() => {
+    const m = s.buildMethod
+    if (m === 'ai') return 'chat'
+    if (m === 'upload') return 'import'
+    if (m === 'manual' || m === 'import' || m === 'extract' || m === 'chat') return m
+    return 'manual'
+  })()
+  const objects: OntologyObjectDraft[] = (s.ontologyObjects || s.ontologyClasses || []).map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    displayName: c.displayName,
+    tier: c.tier,
+    namespace: c.namespace,
+    description: c.description || '',
+    primaryKey: c.primaryKey || 'id',
+    icon: c.icon || '🔷',
+    instanceCount: c.instanceCount || 0,
+    properties: c.properties || [],
+    derivedProperties: c.derivedProperties || [],
+    rules: c.rules || [],
+    actions: c.actions || [],
+    approved: c.approved ?? false,
+  }))
+  return {
+    ...s,
+    buildMethod,
+    ontologyObjects: objects,
+    ontologyRelations: s.ontologyRelations || [],
+    hints: s.hints || emptyHints(),
+  } as BuilderSession
+}
+
 function loadSessions(): BuilderSession[] {
   try {
     const raw = localStorage.getItem(SESSIONS_KEY)
-    return raw ? JSON.parse(raw) : []
+    if (!raw) return []
+    const arr = JSON.parse(raw)
+    return Array.isArray(arr) ? arr.map(migrateSession) : []
   } catch { return [] }
 }
 
@@ -42,11 +82,11 @@ function persist<T>(key: string, val: T) {
   try { localStorage.setItem(key, JSON.stringify(val)) } catch { /* noop */ }
 }
 
-export function buildPresetClasses(scenarioId: string): OntologyClassDraft[] {
+export function buildPresetClasses(scenarioId: string): OntologyObjectDraft[] {
   const presets = SCENARIO_CLASS_PRESETS[scenarioId] || []
   return presets.map((p, i) => ({
-    id: uid('cls'),
-    name: p.name || `Class${i + 1}`,
+    id: uid('obj'),
+    name: p.name || `Object${i + 1}`,
     displayName: p.displayName || p.name || `对象${i + 1}`,
     tier: (p.tier ?? 1) as 1 | 2 | 3,
     description: p.description || '',
@@ -58,15 +98,16 @@ export function buildPresetClasses(scenarioId: string): OntologyClassDraft[] {
       { id: uid('prop'), name: 'name', displayName: '名称', type: 'string', required: true },
       { id: uid('prop'), name: 'updated_at', displayName: '更新时间', type: 'date', required: false },
     ],
+    derivedProperties: [],
     rules: [],
     actions: [],
     approved: false,
   }))
 }
 
-export function buildPresetRelations(scenarioId: string, classes: OntologyClassDraft[]): OntologyRelationDraft[] {
+export function buildPresetRelations(scenarioId: string, objects: OntologyObjectDraft[]): OntologyRelationDraft[] {
   const rels = SCENARIO_RELATION_PRESETS[scenarioId] || []
-  const findId = (name: string) => classes.find(c => c.name === name)?.id || ''
+  const findId = (name: string) => objects.find(o => o.name === name)?.id || ''
   return rels.map((r, i) => ({
     id: uid('rel'),
     name: r.name,
@@ -103,26 +144,24 @@ export const useBuilderStore = defineStore('builder', () => {
 
   function createSession(payload: {
     ontologyName: string
-    scenarioId: string
-    scenarioName?: string
     buildMethod: BuildMethod
     createdBy?: string
+    scenarioId?: string
+    scenarioName?: string
   }): BuilderSession {
-    const scenario = SCENARIO_PRESETS.find(s => s.id === payload.scenarioId)
-    const classes = buildPresetClasses(payload.scenarioId)
-    const relations = buildPresetRelations(payload.scenarioId, classes)
     const session: BuilderSession = {
       sessionId: uid('sess'),
       ontologyName: payload.ontologyName,
       scenarioId: payload.scenarioId,
-      scenarioName: payload.scenarioName || scenario?.title || payload.scenarioId,
+      scenarioName: payload.scenarioName,
       buildMethod: payload.buildMethod,
       status: 'drafting',
       createdBy: payload.createdBy || (localStorage.getItem('username') || '当前用户'),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      ontologyClasses: payload.buildMethod === 'ai' ? [] : classes,
-      ontologyRelations: payload.buildMethod === 'ai' ? [] : relations,
+      ontologyObjects: [],
+      ontologyRelations: [],
+      hints: emptyHints(),
       selectedAssetIds: [],
       selectedSampleSourceIds: [],
       approvedScenarios: [],
@@ -169,24 +208,24 @@ export const useBuilderStore = defineStore('builder', () => {
     if (activeSessionId.value) updateSession(activeSessionId.value, { status })
   }
 
-  // 类与关系操作
-  function addClass(cls: OntologyClassDraft) {
+  // 对象 / 关系操作
+  function addObject(obj: OntologyObjectDraft) {
     if (!activeSession.value) return
-    const list = [...activeSession.value.ontologyClasses, cls]
-    patchActive({ ontologyClasses: list })
+    const list = [...activeSession.value.ontologyObjects, obj]
+    patchActive({ ontologyObjects: list })
   }
-  function updateClass(id: string, patch: Partial<OntologyClassDraft>) {
+  function updateObject(id: string, patch: Partial<OntologyObjectDraft>) {
     if (!activeSession.value) return
-    const list = activeSession.value.ontologyClasses.map(c =>
+    const list = activeSession.value.ontologyObjects.map(c =>
       c.id === id ? { ...c, ...patch } : c,
     )
-    patchActive({ ontologyClasses: list })
+    patchActive({ ontologyObjects: list })
   }
-  function deleteClass(id: string) {
+  function deleteObject(id: string) {
     if (!activeSession.value) return
-    const list = activeSession.value.ontologyClasses.filter(c => c.id !== id)
+    const list = activeSession.value.ontologyObjects.filter(c => c.id !== id)
     const rels = activeSession.value.ontologyRelations.filter(r => r.source !== id && r.target !== id)
-    patchActive({ ontologyClasses: list, ontologyRelations: rels })
+    patchActive({ ontologyObjects: list, ontologyRelations: rels })
   }
   function addRelation(rel: OntologyRelationDraft) {
     if (!activeSession.value) return
@@ -199,14 +238,14 @@ export const useBuilderStore = defineStore('builder', () => {
     patchActive({ ontologyRelations: list })
   }
 
-  function approveClass(id: string) {
+  function approveObject(id: string) {
     if (!activeSession.value) return
-    updateClass(id, { approved: true })
+    updateObject(id, { approved: true })
   }
-  function approveAllClasses() {
+  function approveAllObjects() {
     if (!activeSession.value) return
-    const list = activeSession.value.ontologyClasses.map(c => ({ ...c, approved: true }))
-    patchActive({ ontologyClasses: list })
+    const list = activeSession.value.ontologyObjects.map(c => ({ ...c, approved: true }))
+    patchActive({ ontologyObjects: list })
   }
 
   // ── 上传记录 ──
@@ -233,9 +272,9 @@ export const useBuilderStore = defineStore('builder', () => {
     sessions, activeSessionId, uploads,
     activeSession, reviewableSessions,
     createSession, updateSession, deleteSession, setActiveSession, setStatus,
-    addClass, updateClass, deleteClass,
+    addObject, updateObject, deleteObject,
     addRelation, deleteRelation,
-    approveClass, approveAllClasses,
+    approveObject, approveAllObjects,
     addUploadRecord, updateUploadRecord, deleteUploadRecord,
     patchActive,
   }

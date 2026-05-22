@@ -1,5 +1,6 @@
 <template>
   <div class="logic-page">
+    <BuilderReturnBanner kind-label="动作" />
     <div class="logic-page__header">
       <div>
         <h1 class="text-display">Actions 管理</h1>
@@ -103,9 +104,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { actionApi, type ActionItem } from '../../api/actions'
 import { get } from '../../api/client'
 import ModalDialog from '../../components/common/ModalDialog.vue'
+import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
+
+const route = useRoute()
+const router = useRouter()
 
 const actions = ref<ActionItem[]>([])
 const entities = ref<any[]>([])
@@ -153,10 +159,18 @@ async function fetchEntities() {
 }
 
 async function handleCreate() {
-  await actionApi.create(form.value)
+  const created = await actionApi.create(form.value)
   showAdd.value = false
   form.value = { name: '', entity_id: '', type: 'manual' }
   await fetchActions()
+  // 从 builder 来：跳回去并自动挂载
+  if (route.query.from === 'builder') {
+    const sid = route.query.session_id as string
+    const oid = route.query.object_id as string
+    if (sid && oid && (created as any)?.id) {
+      router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: (created as any).id, kind: 'action' } })
+    }
+  }
 }
 
 async function handleExecute(action: ActionItem) {
@@ -170,7 +184,17 @@ async function handleDelete(action: ActionItem) {
   await fetchActions()
 }
 
-onMounted(() => { fetchActions(); fetchEntities() })
+onMounted(() => {
+  fetchActions(); fetchEntities()
+  if (route.query.from === 'builder') {
+    form.value = {
+      name: (route.query.prefill_name || '') as string,
+      entity_id: (route.query.object_id || '') as string,
+      type: 'manual',
+    }
+    showAdd.value = true
+  }
+})
 </script>
 
 <style scoped>
