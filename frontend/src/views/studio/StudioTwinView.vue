@@ -117,7 +117,9 @@
       <div class="twin-card">
         <header class="twin-card__head">
           <span class="twin-card__title">实时事件流</span>
-          <span class="twin-card__tag">EVENT BUS · LIVE</span>
+          <span class="twin-card__tag" :style="{ color: useRealEvents ? '#10b981' : '#94a3b8' }">
+            {{ useRealEvents ? 'EVENT BUS · LIVE' : 'EVENT BUS · DEMO' }}
+          </span>
         </header>
         <div class="twin-card__events">
           <div
@@ -224,6 +226,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import type { StudioObjectType, StudioLinkType } from '../../api/studio'
+import { studioApi } from '../../api/studio'
 
 const props = defineProps<{
   objects: StudioObjectType[]
@@ -353,14 +356,33 @@ const eventBank = [
 
 interface EventItem { id: string; ts: string; type: string; icon: string; desc: string }
 const events = ref<EventItem[]>([])
+const useRealEvents = ref(false)  // 后端有数据时切换到实时模式
 
-function genEvent(): EventItem {
+function genMockEvent(): EventItem {
   const sample = eventBank[Math.floor(Math.random() * eventBank.length)]
   return { id: `${Date.now()}-${Math.random()}`, ts: nowTime(), ...sample }
 }
 function nowTime(): string {
   const d = new Date()
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+function formatTs(iso: string): string {
+  if (!iso) return nowTime()
+  const d = new Date(iso)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
+}
+async function fetchRealEvents() {
+  try {
+    const res = await studioApi.events(30)
+    if (res.events && res.events.length > 0) {
+      useRealEvents.value = true
+      events.value = res.events.map(e => ({ ...e, ts: formatTs(e.ts) }))
+      return true
+    }
+  } catch (e) {
+    console.warn('events api failed, falling back to mock', e)
+  }
+  return false
 }
 function eventColor(type: string): string {
   return ({ state_change: '#5E6AD2', touchpoint: '#06B6D4', order: '#10B981', skill: '#A78BFA', rule: '#F59E0B', alert: '#EF4444', ml: '#EC4899', segment: '#3B82F6' } as Record<string, string>)[type] || '#94a3b8'
@@ -406,14 +428,23 @@ function alertIcon(tone: string): string {
 let eventTimer: number | undefined
 let heartbeatTimer: number | undefined
 
-onMounted(() => {
-  // 初始化 18 条事件
-  events.value = Array.from({ length: 18 }, () => genEvent())
+onMounted(async () => {
+  // 优先尝试拉真实事件；后端没数据时回落到 mock
+  const hasReal = await fetchRealEvents()
+  if (!hasReal) {
+    events.value = Array.from({ length: 18 }, () => genMockEvent())
+  }
 
-  eventTimer = window.setInterval(() => {
-    events.value = [genEvent(), ...events.value].slice(0, 30)
+  eventTimer = window.setInterval(async () => {
+    if (useRealEvents.value) {
+      // 真实模式：每 5s 重新拉
+      await fetchRealEvents()
+    } else {
+      // mock 模式：1.5s 添加一条
+      events.value = [genMockEvent(), ...events.value].slice(0, 30)
+    }
     aboxLive.value += Math.floor(Math.random() * 3)
-  }, 1500)
+  }, useRealEvents.value ? 5000 : 1500)
 
   heartbeatTimer = window.setInterval(() => {
     decisionPerMin.value = Math.max(60, Math.min(220, decisionPerMin.value + Math.floor((Math.random() - 0.45) * 24)))
