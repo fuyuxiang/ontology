@@ -9,9 +9,10 @@
       </button>
       <div class="ob-shell-title">
         <span class="name">{{ session.ontologyName }}</span>
-        <span class="meta">{{ session.scenarioName }} · {{ session.buildMethod === 'ai' ? 'AI 构建' : '导入构建' }}</span>
+        <span class="meta">{{ methodLabel }}<template v-if="session.scenarioName"> · {{ session.scenarioName }}</template></span>
       </div>
       <div class="ob-shell-actions">
+        <button class="ob-shell-doc-btn" @click="openDocs" title="业务文档库">📚 文档库</button>
         <span class="ob-shell-version">{{ versionLabel }}</span>
       </div>
     </header>
@@ -34,13 +35,9 @@
     </div>
 
     <div class="ob-shell-body">
-      <Step1Build
-        v-if="currentStep === 1 && session.buildMethod === 'ai'"
-        :session="session"
-        @next="goNext"
-      />
-      <Step1Import
-        v-else-if="currentStep === 1 && session.buildMethod === 'upload'"
+      <component
+        v-if="currentStep === 1"
+        :is="stepOneCmp"
         :session="session"
         @next="goNext"
       />
@@ -62,9 +59,11 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import type { BuilderSession } from '../../../types/builder'
-import Step1Build from './Step1Build.vue'
+import type { BuilderSession, BuildMethod } from '../../../types/builder'
+import Step1Manual from './Step1Manual.vue'
 import Step1Import from './Step1Import.vue'
+import Step1Extract from './Step1Extract.vue'
+import Step1Build from './Step1Build.vue'
 import Step2Review from './Step2Review.vue'
 import Step3Hydrate from './Step3Hydrate.vue'
 
@@ -76,18 +75,47 @@ defineEmits<{
 
 const currentStep = ref(1)
 
-const aiSteps = [
-  { key: 'build', label: '本体构建', sub: '场景驱动 · 资产助手' },
-  { key: 'review', label: '专家走测审批', sub: '逐节点通过 / 驳回 / 修正' },
-  { key: 'hydrate', label: '水合演练 · 发布', sub: '数据接入 · 端到端验证' },
-]
-const importSteps = [
-  { key: 'import', label: '本体导入', sub: '选择本体文件' },
-  { key: 'review', label: '导入审核', sub: '逐节点通过 / 驳回 / 修正' },
-  { key: 'hydrate', label: '水合演练 · 发布', sub: '版本确认 · 工作室可见' },
-]
+function openDocs() { window.open('/logic/documents', '_blank') }
 
-const stepsForMethod = computed(() => props.session.buildMethod === 'ai' ? aiSteps : importSteps)
+const stepOneCmp = computed(() => ({
+  manual:  Step1Manual,
+  import:  Step1Import,
+  extract: Step1Extract,
+  chat:    Step1Build,
+}[props.session.buildMethod] || Step1Manual))
+
+const METHOD_LABEL: Record<BuildMethod, string> = {
+  manual: '手工建模',
+  import: '文件导入',
+  extract: '文档抽取',
+  chat: '对话生成',
+}
+const methodLabel = computed(() => METHOD_LABEL[props.session.buildMethod] || '手工建模')
+
+const STEP_DEFS: Record<BuildMethod, { key: string; label: string; sub: string }[]> = {
+  manual: [
+    { key: 'build', label: '手工建模', sub: '逐项录入对象、属性、关系' },
+    { key: 'review', label: '专家走测审批', sub: '逐对象通过 / 修正 / 挂载' },
+    { key: 'hydrate', label: '水合演练 · 发布', sub: '数据接入 · 端到端验证' },
+  ],
+  import: [
+    { key: 'import', label: '文件导入', sub: 'OWL / RDF / JSON 标准本体' },
+    { key: 'review', label: '导入审核', sub: '逐对象通过 / 修正 / 挂载' },
+    { key: 'hydrate', label: '水合演练 · 发布', sub: '版本确认 · 工作室可见' },
+  ],
+  extract: [
+    { key: 'extract', label: '文档抽取', sub: '业务文档 LLM 流式抽取' },
+    { key: 'review', label: '专家走测审批', sub: '建议挂载 · 通过' },
+    { key: 'hydrate', label: '水合演练 · 发布', sub: '数据接入 · 端到端验证' },
+  ],
+  chat: [
+    { key: 'chat', label: '对话生成', sub: '场景驱动 · 资产联动' },
+    { key: 'review', label: '专家走测审批', sub: '建议挂载 · 通过' },
+    { key: 'hydrate', label: '水合演练 · 发布', sub: '数据接入 · 端到端验证' },
+  ],
+}
+
+const stepsForMethod = computed(() => STEP_DEFS[props.session.buildMethod] || STEP_DEFS.manual)
 
 const versionLabel = computed(() => {
   if (props.session.publishedVersion) return `已发布 · ${props.session.publishedVersion}`
@@ -132,7 +160,13 @@ function goPrev() { currentStep.value = Math.max(1, currentStep.value - 1) }
 }
 .ob-shell-title .name { font-size: 15px; font-weight: 600; color: #0f172a; }
 .ob-shell-title .meta { font-size: 12px; color: #94a3b8; }
-.ob-shell-actions { margin-left: auto; }
+.ob-shell-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.ob-shell-doc-btn {
+  padding: 4px 12px; border-radius: 6px;
+  background: #fff; border: 1px solid #e2e8f0;
+  font-size: 12px; color: #475569; cursor: pointer;
+}
+.ob-shell-doc-btn:hover { border-color: #4f46e5; color: #4f46e5; }
 .ob-shell-version {
   display: inline-block; padding: 4px 10px; border-radius: 6px;
   background: rgba(79, 70, 229, 0.08); color: #4f46e5;

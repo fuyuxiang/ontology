@@ -95,10 +95,10 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { OntologyClassDraft, OntologyRelationDraft, Step1Phase } from '../../../../types/builder'
+import type { OntologyObjectDraft, OntologyRelationDraft, Step1Phase } from '../../../../types/builder'
 
 const props = defineProps<{
-  objects: OntologyClassDraft[]
+  objects: OntologyObjectDraft[]
   relations: OntologyRelationDraft[]
   phase: Step1Phase
   graphPhaseLabel?: string
@@ -164,7 +164,7 @@ const renderedNodes = computed<RNode[]>(() => {
   const t3 = props.objects.filter(o => o.tier === 3)
   const out: RNode[] = []
   const colSpacing = 200
-  const place = (objs: OntologyClassDraft[], y: number, tier: 1 | 2 | 3, maxPerRow = 6) => {
+  const place = (objs: OntologyObjectDraft[], y: number, tier: 1 | 2 | 3, maxPerRow = 6) => {
     const rows = Math.max(1, Math.ceil(objs.length / maxPerRow))
     objs.forEach((o, i) => {
       const row = Math.floor(i / maxPerRow)

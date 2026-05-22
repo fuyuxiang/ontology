@@ -271,6 +271,32 @@ class AgentService:
                         "rule_count": len(result.get("rules", [])),
                     }
 
+            elif tool_name == "list_business_datasources":
+                if isinstance(result, dict):
+                    return {
+                        "type": "asset_picker",
+                        "kind": "datasource",
+                        "display_card": result.get("display_card"),
+                    }
+
+            elif tool_name == "list_business_documents":
+                if isinstance(result, dict):
+                    return {
+                        "type": "asset_picker",
+                        "kind": "document",
+                        "display_card": result.get("display_card"),
+                    }
+
+            elif tool_name == "analyze_assets_for_ontology":
+                if isinstance(result, dict) and not result.get("error"):
+                    return {
+                        "type": "ontology_draft",
+                        "entities": result.get("entities", []),
+                        "relations": result.get("relations", []),
+                        "suggested_rules": result.get("suggested_rules", []),
+                        "suggested_actions": result.get("suggested_actions", []),
+                    }
+
         except Exception:
             pass
         return None

@@ -1,5 +1,6 @@
 <template>
   <div class="logic-page">
+    <BuilderReturnBanner kind-label="函数" />
     <div class="logic-page__header">
       <div>
         <h1 class="text-display">Functions 管理</h1>
@@ -124,9 +125,14 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { functionApi, type FunctionItem } from '../../api/functions'
 import { get } from '../../api/client'
 import ModalDialog from '../../components/common/ModalDialog.vue'
+import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
+
+const route = useRoute()
+const router = useRouter()
 
 const functions = ref<FunctionItem[]>([])
 const entities = ref<any[]>([])
@@ -174,10 +180,17 @@ async function fetchEntities() {
 }
 
 async function handleCreate() {
-  await functionApi.create(form.value as any)
+  const created = await functionApi.create(form.value as any)
   showAdd.value = false
   form.value = { name: '', description: '', entity_id: '', return_type: 'string', logic_type: 'expression', logic_body: '', is_derived_property: false }
   await fetchFunctions()
+  if (route.query.from === 'builder') {
+    const sid = route.query.session_id as string
+    const oid = route.query.object_id as string
+    if (sid && oid && (created as any)?.id) {
+      router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: (created as any).id, kind: 'function' } })
+    }
+  }
 }
 
 async function handleTest(fn: FunctionItem) {
@@ -192,7 +205,19 @@ async function handleDelete(fn: FunctionItem) {
   await fetchFunctions()
 }
 
-onMounted(() => { fetchFunctions(); fetchEntities() })
+onMounted(() => {
+  fetchFunctions(); fetchEntities()
+  if (route.query.from === 'builder') {
+    form.value = {
+      name: (route.query.prefill_name || '') as string,
+      description: (route.query.prefill_desc || '') as string,
+      entity_id: (route.query.object_id || '') as string,
+      return_type: 'string', logic_type: 'expression', logic_body: '',
+      is_derived_property: true,
+    }
+    showAdd.value = true
+  }
+})
 </script>
 
 <style scoped>

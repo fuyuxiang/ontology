@@ -4,7 +4,7 @@
       <button class="step2-back-btn" @click="$emit('prev')">← 返回</button>
       <div class="step2-topbar-title">本体走测 · 专家审批</div>
       <div class="step2-topbar-progress">
-        <span class="step2-progress-label">已通过 {{ approvedCount }} / {{ classes.length }}</span>
+        <span class="step2-progress-label">已通过 {{ approvedCount }} / {{ objects.length }}</span>
         <div class="step2-progress-track">
           <div class="step2-progress-bar" :style="{ width: progressPct + '%' }"></div>
         </div>
@@ -12,29 +12,61 @@
       </div>
       <button class="step2-approve-all-btn" @click="approveAll">✅ 一键全部通过</button>
       <button
-        :class="['step2-complete-btn', { active: approvedCount === classes.length && classes.length > 0 }]"
-        :disabled="approvedCount < classes.length"
+        :class="['step2-complete-btn', { active: approvedCount === objects.length && objects.length > 0 }]"
+        :disabled="approvedCount < objects.length"
         @click="finishReview"
       >完成走测</button>
     </header>
 
-    <div v-if="!hasPermission" class="step2-no-perm">
-      <span>当前角色（场景策划）无审批权限，请联系分析师或管理员</span>
-      <button class="step2-no-perm__btn" @click="hasPermission = true">以管理员身份继续</button>
+    <!-- 顶部 LLM 建议区 -->
+    <div v-if="hasHints" class="step2-hints">
+      <div class="step2-hints-head">💡 LLM 建议（来自文档抽取/对话生成）</div>
+      <div class="step2-hints-body">
+        <div v-for="r in hints.suggested_rules" :key="r.id" class="step2-hint-card step2-hint-card--rule">
+          <div class="step2-hint-head">
+            <span class="step2-hint-tag step2-hint-tag--rule">规则建议</span>
+            <strong>{{ r.name }}</strong>
+            <span v-if="r.targetObjectId" class="step2-hint-target">建议挂到：{{ objectName(r.targetObjectId) }}</span>
+          </div>
+          <div class="step2-hint-desc">{{ r.description }}</div>
+          <div v-if="r.conditionHint || r.actionHint" class="step2-hint-meta">
+            <span v-if="r.conditionHint">条件提示：{{ r.conditionHint }}</span>
+            <span v-if="r.actionHint">动作提示：{{ r.actionHint }}</span>
+          </div>
+          <div class="step2-hint-actions">
+            <button class="btn-mini" @click="createFromHint(r, 'rule')">＋ 创建到 /logic/rules</button>
+            <button class="btn-mini" @click="attachExisting(r, 'rule')">挂到已有规则</button>
+            <button class="btn-mini btn-ghost" @click="ignoreHint(r.id, 'rule')">忽略</button>
+          </div>
+        </div>
+        <div v-for="a in hints.suggested_actions" :key="a.id" class="step2-hint-card step2-hint-card--action">
+          <div class="step2-hint-head">
+            <span class="step2-hint-tag step2-hint-tag--action">动作建议</span>
+            <strong>{{ a.name }}</strong>
+            <span v-if="a.targetObjectId" class="step2-hint-target">建议挂到：{{ objectName(a.targetObjectId) }}</span>
+          </div>
+          <div class="step2-hint-desc">{{ a.description }}</div>
+          <div class="step2-hint-actions">
+            <button class="btn-mini" @click="createFromHint(a, 'action')">＋ 创建到 /logic/actions</button>
+            <button class="btn-mini" @click="attachExisting(a, 'action')">挂到已有动作</button>
+            <button class="btn-mini btn-ghost" @click="ignoreHint(a.id, 'action')">忽略</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="step2-body">
-      <!-- 左侧：本体清单（沿用 step2-story-* 的视觉） -->
+      <!-- 左：对象列表 -->
       <aside class="step2-left">
-        <div class="step2-left-header">本体对象 · {{ classes.length }}</div>
+        <div class="step2-left-header">本体对象 · {{ objects.length }}</div>
         <div class="step2-story-list">
           <div
-            v-for="c in classes"
+            v-for="c in objects"
             :key="c.id"
             :class="['step2-story-item', { active: selectedId === c.id }]"
             @click="selectedId = c.id"
           >
-            <div class="step2-story-icon" :style="{ background: tierBg(c.tier), color: tierColor(c.tier) }">{{ c.icon }}</div>
+            <div class="step2-story-icon" :style="{ background: tierBg(c.tier), color: tierColor(c.tier) }">{{ c.icon || '🔷' }}</div>
             <div class="step2-story-meta">
               <div class="step2-story-name">{{ c.displayName }}</div>
               <div class="step2-story-output">{{ c.name }} · T{{ c.tier }} · {{ c.properties.length }} 属性</div>
@@ -44,39 +76,32 @@
         </div>
       </aside>
 
-      <!-- 中央：网络视图 -->
+      <!-- 中：图谱 -->
       <main class="step2-mid">
         <div class="step2-layer-header">
           <div class="step2-layer-title">
             本体视图区
-            <span class="step2-layer-title-sub">点击本体在右侧编辑；新增关系时依次点击起点和终点</span>
+            <span class="step2-layer-title-sub">点击对象在右侧编辑、挂载规则/动作/派生属性</span>
           </div>
-          <button
-            :class="['step2-edit-toggle', { active: relationMode.active }]"
-            @click="toggleRelationMode"
-          >{{ relationMode.active ? '退出连线' : '+ 新增关系' }}</button>
         </div>
         <div class="step2-layers-scroll" style="padding:0">
           <SemanticCanvas
-            :objects="classes"
+            :objects="objects"
             :relations="relations"
             :phase="'graph_done'"
             :editable="false"
-            @add="onAddClass"
-            @delete="onDeleteClass"
           />
         </div>
       </main>
 
-      <!-- 右侧：编辑器 -->
+      <!-- 右：编辑器 -->
       <aside class="step2-right">
-        <!-- 本体编辑卡 -->
         <div v-if="selected" class="step2-editor-card">
           <div class="step2-editor-head">
-            <span>📝 本体编辑</span>
+            <span>📝 对象编辑</span>
             <span :class="['step2-status-tag', selected.approved ? 'approved' : 'pending']">{{ selected.approved ? '已通过' : '待确认' }}</span>
           </div>
-          <label class="step2-editor-label">本体名称</label>
+          <label class="step2-editor-label">对象名称（中文）</label>
           <a-input v-model:value="selected.displayName" size="small" @change="syncStore" />
           <label class="step2-editor-label">英文名 (API)</label>
           <a-input v-model:value="selected.name" size="small" @change="syncStore" />
@@ -97,60 +122,77 @@
               <a-select v-model:value="p.type" size="small" :options="typeOptions" @change="syncStore" />
               <button class="step2-editor-del" title="删除属性" @click="removeProp(p.id)">×</button>
             </div>
-            <div v-if="!selected.properties.length" class="step2-editor-empty" style="color:#94a3b8;font-size:12px;text-align:center;padding:8px">暂无属性，可点击"增加属性"补充</div>
           </div>
+
+          <div class="step2-editor-section-head">
+            <span>派生属性（Function）</span>
+            <a class="step2-editor-link" :href="addFnHref" target="_blank">＋ 新建 ↗</a>
+          </div>
+          <ResourcePickerMulti type="function" v-model="selected.derivedProperties" @update:modelValue="syncStore" />
+
+          <div class="step2-editor-section-head">
+            <span>规则</span>
+            <a class="step2-editor-link" :href="addRuleHref" target="_blank">＋ 新建 ↗</a>
+          </div>
+          <ResourcePickerMulti type="rule" v-model="selected.rules" @update:modelValue="syncStore" />
+
+          <div class="step2-editor-section-head">
+            <span>动作</span>
+            <a class="step2-editor-link" :href="addActionHref" target="_blank">＋ 新建 ↗</a>
+          </div>
+          <ResourcePickerMulti type="action" v-model="selected.actions" @update:modelValue="syncStore" />
 
           <button
             class="step2-editor-approve"
-            :disabled="selected.approved"
+            :disabled="!canApprove(selected)"
             @click="approveSelected"
           >{{ selected.approved ? '✓ 已通过' : '确认通过' }}</button>
+          <div v-if="!canApprove(selected)" class="step2-approve-hint">
+            通过条件：至少 1 个必填属性作为主键候选
+          </div>
         </div>
 
-        <!-- 关系新增卡 -->
         <div class="step2-editor-card step2-relation-card">
           <div class="step2-editor-head">
-            <span>🔗 关系新增</span>
-            <span :class="['step2-status-tag', relationMode.active ? 'approved' : 'pending']">{{ relationMode.active ? '连线中' : '待启动' }}</span>
+            <span>🔗 关系</span>
           </div>
-          <div class="step2-relation-form">
-            <label class="step2-editor-label">起点本体</label>
-            <a-select
-              v-model:value="relationMode.from"
-              placeholder="选择起点"
-              size="small"
-              :options="classOptions"
-            />
-            <label class="step2-editor-label">终点本体</label>
-            <a-select
-              v-model:value="relationMode.to"
-              placeholder="选择终点"
-              size="small"
-              :options="classOptions"
-            />
-            <label class="step2-editor-label">关系名称</label>
-            <a-input v-model:value="relationMode.label" placeholder="例如：持有合约" size="small" />
-            <label class="step2-editor-label">基数</label>
-            <a-select v-model:value="relationMode.cardinality" size="small" :options="cardOptions" />
-            <button
-              class="step2-relation-save"
-              :disabled="!canSaveRelation"
-              @click="saveRelation"
-            >保存关系</button>
+          <div v-for="r in relations" :key="r.id" class="step2-rel-row">
+            <span>{{ objectName(r.source) }}</span>
+            <span class="step2-rel-arrow">→</span>
+            <span>{{ objectName(r.target) }}</span>
+            <span class="step2-rel-label">{{ r.displayName }}</span>
+            <button class="step2-editor-del" @click="removeRelation(r.id)">×</button>
           </div>
+          <div v-if="!relations.length" class="step2-rel-empty">尚无关系</div>
+        </div>
 
-          <div v-if="relations.length" style="margin-top:12px">
-            <div class="step2-editor-label">已有关系</div>
-            <div v-for="r in relations" :key="r.id" style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;border-bottom:1px solid #f1f5f9">
-              <span style="color:#475569">{{ classNameOf(r.source) }}</span>
-              <span style="color:#94a3b8">→</span>
-              <span style="color:#475569">{{ classNameOf(r.target) }}</span>
-              <span style="color:#6366f1;background:#eef2ff;padding:1px 6px;border-radius:4px;font-family:monospace">{{ r.displayName }}</span>
-              <button class="step2-editor-del" style="margin-left:auto" @click="removeRelation(r.id)">×</button>
-            </div>
-          </div>
+        <div v-if="hints.suggested_rules.length || hints.suggested_actions.length" class="step2-attach-tip">
+          顶部还有 {{ hints.suggested_rules.length + hints.suggested_actions.length }} 条 LLM 建议待处理
         </div>
       </aside>
+    </div>
+
+    <!-- 挂载已有规则/动作的弹窗 -->
+    <div v-if="attachModal.open" class="step2-modal-mask" @click.self="attachModal.open = false">
+      <div class="step2-modal">
+        <div class="step2-modal-head">挂载到 {{ attachModal.kind === 'rule' ? '已有规则' : '已有动作' }}</div>
+        <div class="step2-modal-body">
+          <div class="step2-form-row">
+            <label>挂到对象</label>
+            <select v-model="attachModal.objectId">
+              <option v-for="o in objects" :key="o.id" :value="o.id">{{ o.displayName }}（{{ o.name }}）</option>
+            </select>
+          </div>
+          <div class="step2-form-row">
+            <label>{{ attachModal.kind === 'rule' ? '规则' : '动作' }}</label>
+            <ResourcePickerMulti :type="attachModal.kind" v-model="attachModal.picked" />
+          </div>
+        </div>
+        <div class="step2-modal-actions">
+          <button class="btn-mini btn-ghost" @click="attachModal.open = false">取消</button>
+          <button class="btn-mini" :disabled="!attachModal.picked.length || !attachModal.objectId" @click="confirmAttach">确认挂载</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -158,29 +200,28 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRouter } from 'vue-router'
 import { useBuilderStore } from '../../../store/builder'
-import type { BuilderSession } from '../../../types/builder'
+import type {
+  BuilderSession,
+  OntologyHints,
+  SuggestedRule,
+  SuggestedAction,
+} from '../../../types/builder'
 import SemanticCanvas from './graph/SemanticCanvas.vue'
+import ResourcePickerMulti from './manual/ResourcePickerMulti.vue'
 
 const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void }>()
 const store = useBuilderStore()
+const router = useRouter()
 
-const hasPermission = ref(true)
-const selectedId = ref<string | null>(props.session.ontologyClasses[0]?.id || null)
-const classes = ref([...props.session.ontologyClasses])
+const selectedId = ref<string | null>(props.session.ontologyObjects[0]?.id || null)
+const objects = ref([...props.session.ontologyObjects])
 const relations = ref([...props.session.ontologyRelations])
-
-const relationMode = reactive<{
-  active: boolean
-  from?: string
-  to?: string
-  label: string
-  cardinality: '1:1' | '1:N' | 'N:N'
-}>({
-  active: false,
-  label: '',
-  cardinality: '1:N',
+const hints = ref<OntologyHints>({
+  suggested_rules: [...(props.session.hints?.suggested_rules || [])],
+  suggested_actions: [...(props.session.hints?.suggested_actions || [])],
 })
 
 const tierOptions = [
@@ -195,63 +236,47 @@ const typeOptions = [
   { label: '布尔', value: 'boolean' },
   { label: '枚举', value: 'enum' },
 ]
-const cardOptions = [
-  { label: '1:1', value: '1:1' },
-  { label: '1:N', value: '1:N' },
-  { label: 'N:N', value: 'N:N' },
-]
 
-const selected = computed(() => classes.value.find(c => c.id === selectedId.value))
-const approvedCount = computed(() => classes.value.filter(c => c.approved).length)
-const progressPct = computed(() => classes.value.length ? (approvedCount.value / classes.value.length) * 100 : 0)
-const classOptions = computed(() => classes.value.map(c => ({
-  label: `${c.displayName}（${c.name}）`,
-  value: c.id,
-})))
-const canSaveRelation = computed(() =>
-  relationMode.from && relationMode.to && relationMode.label.trim() && relationMode.from !== relationMode.to,
-)
+const selected = computed(() => objects.value.find(c => c.id === selectedId.value))
+const approvedCount = computed(() => objects.value.filter(c => c.approved).length)
+const progressPct = computed(() => objects.value.length ? (approvedCount.value / objects.value.length) * 100 : 0)
+const hasHints = computed(() => hints.value.suggested_rules.length || hints.value.suggested_actions.length)
 
-function classNameOf(id: string) {
-  return classes.value.find(c => c.id === id)?.displayName || id
-}
-function relationCountFor(id: string) {
-  return relations.value.filter(r => r.source === id || r.target === id).length
-}
-function tierBg(t: 1 | 2 | 3) {
-  return t === 1 ? 'rgba(46,91,255,0.12)' : t === 2 ? 'rgba(0,199,177,0.12)' : 'rgba(255,107,53,0.12)'
-}
-function tierColor(t: 1 | 2 | 3) {
-  return t === 1 ? '#2E5BFF' : t === 2 ? '#00C7B1' : '#FF6B35'
-}
+const addRuleHref   = computed(() => `/logic/rules?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=rule`)
+const addActionHref = computed(() => `/logic/actions?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=action`)
+const addFnHref     = computed(() => `/logic/functions?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=function`)
+
+function objectName(id: string) { return objects.value.find(o => o.id === id)?.displayName || id }
+function relationCountFor(id: string) { return relations.value.filter(r => r.source === id || r.target === id).length }
+function tierBg(t: 1 | 2 | 3) { return t === 1 ? 'rgba(46,91,255,0.12)' : t === 2 ? 'rgba(0,199,177,0.12)' : 'rgba(255,107,53,0.12)' }
+function tierColor(t: 1 | 2 | 3) { return t === 1 ? '#2E5BFF' : t === 2 ? '#00C7B1' : '#FF6B35' }
 
 function syncStore() {
   store.patchActive({
-    ontologyClasses: [...classes.value],
+    ontologyObjects: [...objects.value],
     ontologyRelations: [...relations.value],
+    hints: { ...hints.value },
   })
 }
 
-function toggleRelationMode() {
-  relationMode.active = !relationMode.active
-  if (!relationMode.active) {
-    relationMode.from = undefined
-    relationMode.to = undefined
-    relationMode.label = ''
-  }
+function canApprove(o: typeof objects.value[0]) {
+  return o.properties.some(p => p.required)
 }
 
 function approveSelected() {
   if (!selected.value) return
+  if (!canApprove(selected.value)) { message.warning('至少 1 个必填属性'); return }
   selected.value.approved = true
   syncStore()
-  // 自动跳到下一个未通过对象
-  const next = classes.value.find(c => !c.approved)
+  const next = objects.value.find(c => !c.approved)
   if (next) selectedId.value = next.id
 }
 
 function approveAll() {
-  classes.value = classes.value.map(c => ({ ...c, approved: true }))
+  for (const o of objects.value) {
+    if (!canApprove(o)) { message.warning(`对象 ${o.displayName} 缺少必填属性，无法通过`); return }
+  }
+  objects.value = objects.value.map(c => ({ ...c, approved: true }))
   syncStore()
   message.success('已一键通过全部对象')
 }
@@ -272,67 +297,70 @@ function removeProp(id: string) {
   selected.value.properties = selected.value.properties.filter(p => p.id !== id)
   syncStore()
 }
-
-function onAddClass() {
-  const cls = {
-    id: 'cls-' + Date.now().toString(36),
-    name: 'NewClass' + (classes.value.length + 1),
-    displayName: '新对象',
-    tier: 2 as const,
-    description: '',
-    primaryKey: 'id',
-    icon: '🆕',
-    instanceCount: 0,
-    properties: [{ id: 'p-' + Date.now(), name: 'id', displayName: '主键', type: 'string', required: true }],
-    rules: [],
-    actions: [],
-    approved: false,
-  }
-  classes.value.push(cls)
-  syncStore()
-}
-function onDeleteClass(id: string) {
-  classes.value = classes.value.filter(c => c.id !== id)
-  relations.value = relations.value.filter(r => r.source !== id && r.target !== id)
-  if (selectedId.value === id) selectedId.value = classes.value[0]?.id || null
-  syncStore()
-}
-
-function saveRelation() {
-  if (!canSaveRelation.value) return
-  relations.value.push({
-    id: 'rel-' + Date.now().toString(36),
-    name: relationMode.label.trim().replace(/\s+/g, '_'),
-    displayName: relationMode.label.trim(),
-    source: relationMode.from!,
-    target: relationMode.to!,
-    cardinality: relationMode.cardinality,
-    description: relationMode.label.trim(),
-    relationType: 'ObjectProperty',
-    semanticType: 'association',
-  })
-  relationMode.from = undefined
-  relationMode.to = undefined
-  relationMode.label = ''
-  relationMode.active = false
-  syncStore()
-  message.success('已保存关系')
-}
 function removeRelation(id: string) {
   relations.value = relations.value.filter(r => r.id !== id)
   syncStore()
 }
 
+// ── LLM 建议卡片三种处理 ──
+function ignoreHint(id: string, kind: 'rule' | 'action') {
+  if (kind === 'rule') hints.value.suggested_rules = hints.value.suggested_rules.filter(r => r.id !== id)
+  else hints.value.suggested_actions = hints.value.suggested_actions.filter(a => a.id !== id)
+  syncStore()
+}
+function createFromHint(h: SuggestedRule | SuggestedAction, kind: 'rule' | 'action') {
+  // 把建议字段塞进 query，跳到 logic 页预填表单
+  const objectId = h.targetObjectId || selected.value?.id || objects.value[0]?.id || ''
+  const path = kind === 'rule' ? '/logic/rules' : '/logic/actions'
+  router.push({
+    path,
+    query: {
+      from: 'builder',
+      session_id: props.session.sessionId,
+      object_id: objectId,
+      kind,
+      prefill_name: h.name,
+      prefill_desc: h.description,
+      prefill_condition: (h as SuggestedRule).conditionHint || '',
+      prefill_action: (h as SuggestedRule).actionHint || (h as SuggestedAction).effectHint || '',
+    },
+  })
+  // 同时把这条 hint 移除（避免重复创建）
+  ignoreHint(h.id, kind)
+}
+
+const attachModal = reactive<{ open: boolean; kind: 'rule' | 'action'; objectId: string; picked: string[]; hintId: string }>({
+  open: false, kind: 'rule', objectId: '', picked: [], hintId: '',
+})
+function attachExisting(h: SuggestedRule | SuggestedAction, kind: 'rule' | 'action') {
+  attachModal.open = true
+  attachModal.kind = kind
+  attachModal.objectId = h.targetObjectId || selected.value?.id || objects.value[0]?.id || ''
+  attachModal.picked = []
+  attachModal.hintId = h.id
+}
+function confirmAttach() {
+  const obj = objects.value.find(o => o.id === attachModal.objectId)
+  if (!obj) return
+  if (attachModal.kind === 'rule') obj.rules = [...new Set([...obj.rules, ...attachModal.picked])]
+  else obj.actions = [...new Set([...obj.actions, ...attachModal.picked])]
+  ignoreHint(attachModal.hintId, attachModal.kind)
+  attachModal.open = false
+  syncStore()
+  message.success('已挂载')
+}
+
 function finishReview() {
-  if (approvedCount.value < classes.value.length) {
+  if (approvedCount.value < objects.value.length) {
     message.warning('请将所有对象审批通过后再完成走测')
     return
   }
   store.patchActive({
-    ontologyClasses: classes.value,
+    ontologyObjects: objects.value,
     ontologyRelations: relations.value,
+    hints: { ...hints.value },
     status: 'pending_hydration',
-    approvedScenarios: classes.value.map(c => c.id),
+    approvedScenarios: objects.value.map(c => c.id),
     reviewLog: [
       {
         storyId: 'review-all',
@@ -349,226 +377,76 @@ function finishReview() {
 }
 
 watch(() => props.session.sessionId, () => {
-  classes.value = [...props.session.ontologyClasses]
+  objects.value = [...props.session.ontologyObjects]
   relations.value = [...props.session.ontologyRelations]
-  selectedId.value = classes.value[0]?.id || null
+  hints.value = {
+    suggested_rules: [...(props.session.hints?.suggested_rules || [])],
+    suggested_actions: [...(props.session.hints?.suggested_actions || [])],
+  }
+  selectedId.value = objects.value[0]?.id || null
 })
+
+// 父级 OntologyBuilderView 已通过 query 自动挂载新建 ID，这里同步本地 state
+watch(() => props.session.ontologyObjects, (v) => {
+  objects.value = [...v]
+}, { deep: true })
 </script>
 
 <style scoped>
-.step2 {
-  display: flex; flex-direction: column;
-  height: calc(100vh - 64px - 56px - 76px);
-  background: #f1f5f9;
-}
-
-.step2-topbar {
-  display: flex; align-items: center; gap: 16px;
-  padding: 12px 20px;
-  background: #fff;
-  border-bottom: 1px solid #e2e8f0;
-}
-.step2-topbar__title { font-size: 14px; font-weight: 600; color: #0f172a; }
-.step2-topbar__progress {
-  display: flex; align-items: center; gap: 10px; flex: 1;
-  font-size: 12px; color: #64748b;
-}
-.step2-progress-bar {
-  flex: 1; max-width: 280px;
-  height: 6px; border-radius: 999px;
-  background: #f1f5f9;
-  overflow: hidden;
-}
-.step2-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #4f46e5, #06b6d4);
-  border-radius: 999px;
-  transition: width 200ms ease;
-}
-.step2-btn {
-  padding: 6px 14px; border-radius: 8px;
-  border: 1px solid transparent; cursor: pointer;
-  font-size: 12px; font-weight: 600;
-  transition: all 150ms ease;
-}
-.step2-btn--ghost { background: #fff; color: #475569; border-color: #e2e8f0; }
-.step2-btn--ghost:hover { border-color: #4f46e5; color: #4f46e5; }
-.step2-btn--primary {
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: #fff;
-}
-.step2-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.ob-back-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: transparent; border: 0; padding: 4px 10px;
-  border-radius: 6px; color: #475569; font-size: 12px; cursor: pointer;
-}
-.ob-back-btn:hover { background: #f1f5f9; color: #0f172a; }
-
-.step2-no-perm {
-  margin: 12px 16px;
-  padding: 10px 16px;
-  border-radius: 10px;
-  background: rgba(245, 158, 11, 0.1);
-  color: #b45309;
-  display: flex; gap: 12px; align-items: center;
-  font-size: 12px;
-}
-.step2-no-perm__btn {
-  margin-left: auto;
-  padding: 4px 12px; border-radius: 6px;
-  background: #fff; border: 1px solid #fbbf24;
-  color: #b45309; font-size: 11px; cursor: pointer;
-}
-
-.step2-body {
-  display: grid;
-  grid-template-columns: 280px 1fr 360px;
-  gap: 12px;
-  padding: 12px 16px;
-  flex: 1;
-  overflow: hidden;
-}
-
-.step2-left, .step2-right {
-  background: #fff;
+.step2-hints {
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  background: rgba(245,158,11,0.06);
+  border: 1px solid #fde68a;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  overflow-y: auto;
 }
-.step2-mid {
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  display: flex; flex-direction: column;
-  overflow: hidden;
+.step2-hints-head { font-size: 12px; font-weight: 600; color: #b45309; margin-bottom: 8px; }
+.step2-hints-body { display: flex; flex-direction: column; gap: 8px; }
+.step2-hint-card {
+  padding: 10px 12px; background: #fff; border-radius: 8px;
+  border-left: 3px solid #f59e0b;
 }
-.step2-mid__head {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f1f5f9;
-  display: flex; align-items: center; gap: 12px;
+.step2-hint-card--action { border-left-color: #6366f1; }
+.step2-hint-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.step2-hint-tag { font-size: 10px; padding: 1px 8px; border-radius: 999px; font-weight: 600; }
+.step2-hint-tag--rule { background: rgba(245,158,11,0.12); color: #b45309; }
+.step2-hint-tag--action { background: rgba(99,102,241,0.12); color: #4f46e5; }
+.step2-hint-target { font-size: 10px; color: #94a3b8; margin-left: auto; }
+.step2-hint-desc { font-size: 12px; color: #475569; margin-bottom: 4px; }
+.step2-hint-meta { font-size: 10px; color: #94a3b8; display: flex; gap: 12px; margin-bottom: 6px; }
+.step2-hint-actions { display: flex; gap: 6px; }
+.btn-mini {
+  padding: 3px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;
+  background: #4f46e5; color: #fff; border: 1px solid #4f46e5;
 }
-.step2-mid__title { font-size: 13px; font-weight: 600; color: #0f172a; }
-.step2-mid__hint { font-size: 11px; color: #94a3b8; flex: 1; }
-.step2-relation-toggle {
-  padding: 5px 12px; border-radius: 6px;
-  border: 1px solid #cbd5e1; background: #fff;
-  font-size: 12px; color: #475569; cursor: pointer;
-}
-.step2-relation-toggle.active {
-  background: rgba(79, 70, 229, 0.08); color: #4f46e5; border-color: #4f46e5;
-}
-.step2-mid__canvas { flex: 1; overflow: hidden; }
+.btn-mini:hover { background: #4338ca; }
+.btn-mini:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-mini.btn-ghost { background: #fff; color: #475569; border-color: #e2e8f0; }
+.btn-mini.btn-ghost:hover { color: #4f46e5; border-color: #4f46e5; }
 
-.step2-section-title {
-  font-size: 11px; font-weight: 600; color: #94a3b8;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  padding: 14px 16px 8px;
-}
-.step2-class-list { padding: 0 12px 12px; }
-.step2-class-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 4px;
-  transition: background 150ms ease;
-}
-.step2-class-row:hover { background: #f8fafc; }
-.step2-class-row--active { background: rgba(79, 70, 229, 0.06); }
-.step2-class-row--approved { opacity: 0.85; }
-.step2-class-row__icon {
-  width: 28px; height: 28px; border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  color: #fff; font-size: 12px; flex-shrink: 0;
-}
-.step2-class-row__icon--t1 { background: linear-gradient(135deg, #4c6ef5, #364fc7); }
-.step2-class-row__icon--t2 { background: linear-gradient(135deg, #7950f2, #5f3dc4); }
-.step2-class-row__icon--t3 { background: linear-gradient(135deg, #20c997, #087f5b); }
-.step2-class-row__main { flex: 1; min-width: 0; line-height: 1.3; }
-.step2-class-row__name { font-size: 12px; font-weight: 600; color: #0f172a; }
-.step2-class-row__en { font-size: 10px; color: #94a3b8; }
-.step2-check-icon { color: #10b981; font-weight: 700; }
+.step2-editor-link { font-size: 11px; color: #4f46e5; text-decoration: none; }
+.step2-editor-link:hover { text-decoration: underline; }
+.step2-approve-hint { font-size: 11px; color: #b45309; text-align: center; margin-top: 6px; }
+.step2-attach-tip { padding: 8px 12px; font-size: 11px; color: #b45309; background: rgba(245,158,11,0.08); border-radius: 8px; margin: 12px; }
 
-.step2-editor-card {
-  margin: 14px;
-  padding: 14px;
-  background: #fff;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
+.step2-rel-row {
+  display: grid; grid-template-columns: 1fr 14px 1fr 1.4fr 24px; gap: 6px;
+  align-items: center; padding: 6px 0; font-size: 11px;
+  border-bottom: 1px dashed #e2e8f0;
 }
-.step2-editor-card__head {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px;
-}
-.step2-editor-card__title { font-size: 13px; font-weight: 600; color: #0f172a; }
-.step2-status-badge {
-  padding: 2px 8px; border-radius: 999px;
-  font-size: 10px; font-weight: 500;
-  background: rgba(245, 158, 11, 0.12); color: #b45309;
-}
-.step2-status-badge.approved { background: rgba(16, 185, 129, 0.12); color: #059669; }
-.step2-status-badge.active { background: rgba(79, 70, 229, 0.12); color: #4f46e5; }
+.step2-rel-row:last-child { border-bottom: 0; }
+.step2-rel-arrow { color: #94a3b8; text-align: center; }
+.step2-rel-label { color: #4f46e5; font-family: monospace; }
+.step2-rel-empty { font-size: 11px; color: #94a3b8; text-align: center; padding: 12px 0; }
 
-.step2-form { display: grid; gap: 10px; margin-bottom: 12px; }
-.step2-form__row { display: grid; gap: 4px; }
-.step2-form__row label { font-size: 11px; color: #94a3b8; font-weight: 500; }
-.step2-form__meta {
-  font-size: 11px; color: #64748b;
-  display: flex; gap: 12px;
-  padding-top: 4px; border-top: 1px dashed #e2e8f0;
+.step2-modal-mask {
+  position: fixed; inset: 0; background: rgba(15,23,42,0.5);
+  display: flex; align-items: center; justify-content: center; z-index: 1000;
 }
-
-.step2-prop-title {
-  font-size: 11px; font-weight: 600; color: #94a3b8;
-  text-transform: uppercase; letter-spacing: 0.5px;
-  margin-top: 12px; margin-bottom: 8px;
-}
-.step2-prop-list { display: grid; gap: 6px; }
-.step2-editor-prop {
-  display: grid; grid-template-columns: 1fr 90px 28px; gap: 6px;
-  align-items: center;
-}
-.step2-icon-btn {
-  width: 28px; height: 28px; border-radius: 6px;
-  border: 0; cursor: pointer; font-size: 14px; line-height: 1;
-}
-.step2-icon-btn--danger { background: #fee2e2; color: #ef4444; }
-.step2-icon-btn--danger:hover { background: #fecaca; }
-.step2-add-prop {
-  padding: 6px; border-radius: 6px;
-  border: 1px dashed #cbd5e1; background: transparent;
-  color: #64748b; font-size: 12px; cursor: pointer;
-}
-.step2-add-prop:hover { border-color: #4f46e5; color: #4f46e5; }
-
-.step2-editor-approve {
-  margin-top: 14px;
-  width: 100%;
-  padding: 8px;
-  border-radius: 8px; border: 0;
-  background: linear-gradient(135deg, #4f46e5, #7c3aed);
-  color: #fff; font-size: 13px; font-weight: 600;
-  cursor: pointer;
-}
-.step2-editor-approve:disabled { opacity: 0.5; cursor: not-allowed; }
-.step2-editor-approve:hover:not(:disabled) { box-shadow: 0 6px 14px -4px rgba(79, 70, 229, 0.4); }
-
-.step2-relations-list { margin-top: 12px; }
-.step2-relation-row {
-  display: grid; grid-template-columns: auto 12px auto 1fr 24px;
-  gap: 6px; align-items: center;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: #f8fafc;
-  margin-bottom: 4px;
-  font-size: 11px;
-}
-.step2-relation-from, .step2-relation-to { color: #1e293b; font-weight: 500; }
-.step2-relation-arrow { color: #94a3b8; }
-.step2-relation-label { color: #4f46e5; font-weight: 500; }
-.step2-relation-row .step2-icon-btn {
-  width: 22px; height: 22px; padding: 0;
-  font-size: 13px;
-}
+.step2-modal { background: #fff; border-radius: 12px; padding: 16px 20px; width: 460px; max-width: 90vw; }
+.step2-modal-head { font-size: 14px; font-weight: 600; color: #0f172a; margin-bottom: 12px; }
+.step2-form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+.step2-form-row label { font-size: 11px; color: #64748b; }
+.step2-form-row select { padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
+.step2-modal-actions { display: flex; gap: 6px; justify-content: flex-end; }
 </style>

@@ -2,8 +2,8 @@
   <div class="step1-import">
     <div class="step1-import__inner">
       <div class="step1-import__header">
-        <div class="step1-import__title">本体导入</div>
-        <div class="step1-import__sub">上传 OWL / JSON 本体文件，系统会解析对象、属性与关系，进入导入审核流程</div>
+        <div class="step1-import__title">文件导入</div>
+        <div class="step1-import__sub">导入 OWL / RDF / JSON 标准本体文件，系统会解析对象、属性与关系，进入审核流程</div>
       </div>
 
       <div
@@ -28,7 +28,7 @@
         <div class="import-summary__grid">
           <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.classCount }}</div>
-            <div class="card-label">对象类型</div>
+            <div class="card-label">对象</div>
           </div>
           <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.relationCount }}</div>
@@ -72,7 +72,7 @@
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore, buildPresetClasses, buildPresetRelations } from '../../../store/builder'
-import type { BuilderSession, OntologyClassDraft } from '../../../types/builder'
+import type { BuilderSession, OntologyObjectDraft } from '../../../types/builder'
 
 const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'next'): void }>()
@@ -85,7 +85,7 @@ const parsedSummary = ref<{
   relationCount: number
   propertyCount: number
   fileSize: string
-  preview: OntologyClassDraft[]
+  preview: OntologyObjectDraft[]
 } | null>(null)
 
 function onDrop(e: DragEvent) {
@@ -101,8 +101,8 @@ function onFileChange(e: Event) {
 async function parseFile(file: File) {
   message.loading({ content: '正在解析本体文件...', key: 'parse', duration: 0 })
   await new Promise(r => setTimeout(r, 1200))
-  const classes = buildPresetClasses(props.session.scenarioId)
-  const relations = buildPresetRelations(props.session.scenarioId, classes)
+  const classes = buildPresetClasses(props.session.scenarioId || 'refund-root-cause')
+  const relations = buildPresetRelations(props.session.scenarioId || 'refund-root-cause', classes)
   const propertyCount = classes.reduce((sum, c) => sum + c.properties.length, 0)
   parsedSummary.value = {
     classCount: classes.length,
@@ -112,7 +112,7 @@ async function parseFile(file: File) {
     preview: classes.slice(0, 10),
   }
   store.patchActive({
-    ontologyClasses: classes,
+    ontologyObjects: classes,
     ontologyRelations: relations,
   })
   store.addUploadRecord({
@@ -120,7 +120,7 @@ async function parseFile(file: File) {
     fileType: (file.name.split('.').pop() || 'OWL').toUpperCase(),
     fileSize: (file.size / 1024).toFixed(0) + ' KB',
     sourceOntology: props.session.ontologyName,
-    scenarioName: props.session.scenarioName,
+    scenarioName: props.session.scenarioName || props.session.ontologyName,
     status: 'completed',
     statusText: `已提取 ${classes.length} 对象、${relations.length} 关系`,
     extractedSummary: '本体定义已解析',

@@ -50,14 +50,20 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, watch } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { ruleApi } from '../../api/rules'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
 
-defineProps<{ visible: boolean }>()
-const emit = defineEmits<{ close: []; created: [] }>()
+const props = defineProps<{
+  visible: boolean
+  prefillName?: string
+  prefillCondition?: string
+  prefillAction?: string
+  prefillEntityId?: string
+}>()
+const emit = defineEmits<{ close: []; created: [rule: { id: string; name: string }] }>()
 const toast = useToast()
 
 const submitting = ref(false)
@@ -72,7 +78,15 @@ const form = reactive({
   status: 'active',
 })
 
+function applyPrefill() {
+  if (props.prefillName) form.name = props.prefillName
+  if (props.prefillCondition) form.condition_expr = props.prefillCondition
+  if (props.prefillAction) form.action_desc = props.prefillAction
+  if (props.prefillEntityId) form.entity_id = props.prefillEntityId
+}
+
 onMounted(async () => {
+  applyPrefill()
   try {
     const list = await entityApi.list()
     entities.value = list.map(e => ({
@@ -81,11 +95,13 @@ onMounted(async () => {
   } catch { /* ignore */ }
 })
 
+watch(() => props.visible, (v) => { if (v) applyPrefill() })
+
 async function handleSubmit() {
   if (!form.name || !form.entity_id || !form.condition_expr || !form.action_desc) return
   submitting.value = true
   try {
-    await ruleApi.create(form as never)
+    const rule = await ruleApi.create(form as never)
     toast.success('规则创建成功')
     form.name = ''
     form.entity_id = ''
@@ -93,7 +109,7 @@ async function handleSubmit() {
     form.action_desc = ''
     form.priority = 'medium'
     form.status = 'active'
-    emit('created')
+    emit('created', { id: (rule as any).id, name: (rule as any).name })
     emit('close')
   } catch (e) {
     toast.error(`创建失败: ${(e as Error).message}`)

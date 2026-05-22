@@ -130,6 +130,35 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
         required=("action_name",),
         sensitive=True,
     ),
+    # ── 本体构建器（对话生成模式）专用工具 ──
+    AgentToolSpec(
+        name="list_business_datasources",
+        description="列出当前可用的业务数据源（数据资产），按业务领域和关键字筛选；返回 display_card=asset_picker，前端会渲染为多选卡片让用户勾选。仅在用户描述完业务后、确认资产前调用。",
+        parameters={
+            "domain": {"type": "string", "description": "业务领域，如政企、宽带、退单。可为空字符串"},
+            "keywords": {"type": "array", "items": {"type": "string"}, "description": "关键词列表（可选）"},
+        },
+        required=("domain",),
+    ),
+    AgentToolSpec(
+        name="list_business_documents",
+        description="列出业务文档库里的候选文档（Word/Excel/PDF），可按 domain 或已选 datasource_ids 关联过滤；返回 display_card=asset_picker。仅在用户已经选完数据源后、开始抽取前调用。",
+        parameters={
+            "domain": {"type": "string", "description": "业务领域，可为空"},
+            "datasource_ids": {"type": "array", "items": {"type": "string"}, "description": "已选中的数据源 id 数组（可选）"},
+        },
+        required=("domain",),
+    ),
+    AgentToolSpec(
+        name="analyze_assets_for_ontology",
+        description="基于选中的数据源（表结构）+ 业务文档（解析文本）+ 业务上下文，让 LLM 抽取本体对象/属性/关系，并产出规则/动作建议。返回 entities[]/relations[]/suggested_rules[]/suggested_actions[]。仅在用户选完资产和文档后调用。",
+        parameters={
+            "datasource_ids": {"type": "array", "items": {"type": "string"}, "description": "选中的数据源 id 数组"},
+            "document_ids": {"type": "array", "items": {"type": "string"}, "description": "选中的业务文档 id 数组"},
+            "business_context": {"type": "string", "description": "用户描述的业务场景（前几轮对话总结）"},
+        },
+        required=("datasource_ids", "document_ids", "business_context"),
+    ),
 )
 
 

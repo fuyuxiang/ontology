@@ -1,5 +1,6 @@
 <template>
   <div class="logic-page">
+    <BuilderReturnBanner kind-label="规则" />
     <div class="logic-page__header">
       <div>
         <h1 class="text-display">业务逻辑</h1>
@@ -103,7 +104,15 @@
       </div>
     </div>
 
-    <RuleCreateForm :visible="showAdd" @close="showAdd = false" @created="store.fetchRules()" />
+    <RuleCreateForm
+      :visible="showAdd"
+      :prefill-name="prefill.name"
+      :prefill-condition="prefill.condition"
+      :prefill-action="prefill.action"
+      :prefill-entity-id="prefill.entityId"
+      @close="onCreateClose"
+      @created="onCreated"
+    />
 
     <!-- 编辑规则弹窗 -->
     <ModalDialog :visible="showEdit" title="编辑规则" width="560px" @close="showEdit = false">
@@ -130,18 +139,44 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useRulesStore } from '../../store/rules'
 import RuleCreateForm from '../../components/common/RuleCreateForm.vue'
 import ModalDialog from '../../components/common/ModalDialog.vue'
+import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 import { ruleApi } from '../../api/rules'
 import { useToast } from '../../composables/useToast'
 
 const store = useRulesStore()
 const toast = useToast()
+const route = useRoute()
+const router = useRouter()
 const expandedId = ref<string | null>(null)
 const showAdd = ref(false)
 const showEdit = ref(false)
 const editForm = reactive({ id: '', name: '', condition_expr: '', action_desc: '', priority: 'medium', status: 'active' })
+
+const prefill = reactive({ name: '', condition: '', action: '', entityId: '' })
+
+function onCreateClose() {
+  showAdd.value = false
+  // 取消时如果是从 builder 来的，跳回构建器
+  if (route.query.from === 'builder') {
+    const sid = (route.query.session_id || '') as string
+    if (sid) router.push({ path: '/builder' })
+  }
+}
+
+function onCreated(rule: { id: string; name: string }) {
+  store.fetchRules()
+  if (route.query.from === 'builder') {
+    const sid = route.query.session_id as string
+    const oid = route.query.object_id as string
+    if (sid && oid) {
+      router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: rule.id, kind: 'rule' } })
+    }
+  }
+}
 
 function openEdit(rule: { id: string; name: string; condition: string; action: string; priority: string; status: string }) {
   editForm.id = rule.id
@@ -183,7 +218,17 @@ async function handleExecute(id: string) {
   }
 }
 
-onMounted(() => { store.fetchRules() })
+onMounted(() => {
+  store.fetchRules()
+  // 处理 ?from=builder：自动打开新建表单 + 预填
+  if (route.query.from === 'builder') {
+    prefill.name = (route.query.prefill_name || '') as string
+    prefill.condition = (route.query.prefill_condition || '') as string
+    prefill.action = (route.query.prefill_action || '') as string
+    prefill.entityId = (route.query.object_id || '') as string
+    showAdd.value = true
+  }
+})
 
 const search = computed({
   get: () => store.filter.search,
