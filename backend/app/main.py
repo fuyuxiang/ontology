@@ -206,6 +206,8 @@ from app.api.v1.resolution import router as resolution_router
 from app.api.v1.governance import router as governance_router
 from app.api.v1.prompt_templates import router as prompt_templates_router
 from app.api.v1.ai_ontology import router as ai_ontology_router
+from app.api.v1.builder import router as builder_router
+from app.api.v1.business_documents import router as business_documents_router
 from app.api.v1.ontology_api import router as ontology_api_router
 from app.api.v1.osdk import router as osdk_router
 from app.api.v1.ontology_publish import router as ontology_publish_router
@@ -390,6 +392,8 @@ app.include_router(lineage_router, prefix="/api/v1")
 app.include_router(aip_scenes_router, prefix="/api/v1")
 app.include_router(aip_executions_router, prefix="/api/v1")
 app.include_router(aip_webhooks_router, prefix="/api/v1")
+app.include_router(builder_router, prefix="/api/v1")
+app.include_router(business_documents_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

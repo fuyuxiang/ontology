@@ -6,7 +6,7 @@ import type {
   MonitoringBaseline,
   UploadRecord,
   DataAsset,
-  OntologyClassDraft,
+  OntologyObjectDraft,
 } from '../types/builder'
 
 // ── 三大预置场景 ──
@@ -44,14 +44,14 @@ export const SCENARIO_PLACEHOLDERS: Record<string, string> = {
   'fttr-renewal': '描述你的业务场景，例如：提取FTTR合约近1个月内到期用户，按ARPU值分档...',
 }
 
-// ── Copilot 欢迎语 ──
+// ── 欢迎语 ──
 export const SCENARIO_WELCOME: Record<string, string> = {
   'refund-root-cause':
-    '你好！我是场景 Copilot，请描述你的业务场景需求，我来帮你拆解用户故事、匹配数据资产并构建本体。\n\n例如：「围绕宽带装机退单构建根因分析本体，结合流程图、业务文档、规则表和外呼数据识别退单原因」',
+    '你好！我是本体构建助手，请描述你的业务场景需求，我来帮你拆解用户故事、匹配数据资产并构建本体。\n\n例如：「围绕宽带装机退单构建根因分析本体，结合流程图、业务文档、规则表和外呼数据识别退单原因」',
   'enterprise-qa':
-    '你好！我是场景 Copilot，请描述你的业务场景需求，我来帮你拆解用户故事、匹配数据资产并构建本体。\n\n例如：「围绕政企 KPI 智能问数及根因分析构建本体，结合要客明细、指标血缘、预算毛利和应收数据定位收入波动原因」',
+    '你好！我是本体构建助手，请描述你的业务场景需求，我来帮你拆解用户故事、匹配数据资产并构建本体。\n\n例如：「围绕政企 KPI 智能问数及根因分析构建本体，结合要客明细、指标血缘、预算毛利和应收数据定位收入波动原因」',
   'fttr-renewal':
-    '你好！我是场景 Copilot，请描述你的业务场景需求，我来帮你拆解用户故事、匹配数据资产并构建本体。\n\n例如：「提取FTTR合约近1个月内到期用户，按ARPU值分档，匹配产品进行营销触达」',
+    '你好！我是本体构建助手，请描述你的业务场景需求，我来帮你拆解用户故事、匹配数据资产并构建本体。\n\n例如：「提取FTTR合约近1个月内到期用户，按ARPU值分档，匹配产品进行营销触达」',
 }
 
 // ── 资产扫描 6 步 ──
@@ -311,7 +311,7 @@ export const SCENARIO_ASSETS: Record<string, DataAsset[]> = {
 }
 
 // ── 默认对象类型预设（按场景） ──
-export const SCENARIO_CLASS_PRESETS: Record<string, Array<Partial<OntologyClassDraft>>> = {
+export const SCENARIO_CLASS_PRESETS: Record<string, Array<Partial<OntologyObjectDraft>>> = {
   'refund-root-cause': [
     { name: 'Customer', displayName: '客户', tier: 1, primaryKey: 'customer_id', icon: '👤', description: '客户主信息，含星级、ARPU、归属地', instanceCount: 12500 },
     { name: 'Product', displayName: '产品', tier: 1, primaryKey: 'product_id', icon: '📦', description: '宽带 / FTTR / 融合产品族', instanceCount: 320 },

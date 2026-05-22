@@ -33,6 +33,10 @@ class ToolRouter:
             "evaluate_all_rules": self._tool_evaluate_all_rules,
             "screen_users_by_rule": self._tool_screen_users_by_rule,
             "execute_action": self._tool_execute_action,
+            # 本体构建器（chat 模式）三件套
+            "list_business_datasources": self._tool_list_business_datasources,
+            "list_business_documents": self._tool_list_business_documents,
+            "analyze_assets_for_ontology": self._tool_analyze_assets_for_ontology,
         }
         handler = handlers.get(tool_name)
         if not handler:
@@ -280,3 +284,205 @@ class ToolRouter:
         mode = "模拟执行" if dry_run else "执行"
         summary = f"{mode} '{action_name}' {'成功' if result.success else '失败'}"
         return result_dict, summary, 1
+
+    # ── 本体构建器（chat 模式）三件套 ────────────────────────────
+
+    def _tool_list_business_datasources(self, args: dict) -> tuple[Any, str, int]:
+        """列出业务数据源（带前 3 张表名），返回 display_card=asset_picker。"""
+        from app.services.datasource_utils import get_table_schema as _get_schema  # noqa: F401
+
+        domain = str(args.get("domain", "")).strip()
+        keywords = args.get("keywords") or []
+        if not isinstance(keywords, list):
+            keywords = []
+
+        q = self.db.query(DataSource).filter(DataSource.enabled == True)  # noqa: E712
+        rows = q.all()
+
+        def matches(ds: DataSource) -> bool:
+            blob = " ".join(filter(None, [
+                ds.name or "", ds.description or "", ds.table_name or "", ds.database or "",
+            ])).lower()
+            if domain and domain.lower() not in blob:
+                return False
+            if keywords:
+                return any(str(k).lower() in blob for k in keywords)
+            return True
+
+        items = []
+        for ds in rows:
+            if not matches(ds):
+                continue
+            tables = []
+            try:
+                # tables_json 可能是 list[str] 或 list[dict]
+                t = getattr(ds, "tables_json", None) or []
+                for x in t[:3]:
+                    if isinstance(x, dict):
+                        tables.append(x.get("table_name") or x.get("name") or "")
+                    else:
+                        tables.append(str(x))
+            except Exception:
+                pass
+            if not tables and ds.table_name:
+                tables = [ds.table_name]
+            items.append({
+                "id": ds.id, "name": ds.name, "description": ds.description or "",
+                "table_count": len(tables) or (1 if ds.table_name else 0),
+                "domain_tags": [],
+                "sample_tables": [t for t in tables if t][:3],
+            })
+
+        result = {
+            "items": items,
+            "display_card": {
+                "type": "asset_picker",
+                "kind": "datasource",
+                "title": f"为「{domain or '该业务'}」匹配到 {len(items)} 个数据源",
+                "items": items,
+            },
+        }
+        return result, f"匹配 {len(items)} 个数据源", len(items)
+
+    def _tool_list_business_documents(self, args: dict) -> tuple[Any, str, int]:
+        """列出业务文档库候选文档，返回 display_card=asset_picker。"""
+        from app.models import BusinessDocument
+
+        domain = str(args.get("domain", "")).strip()
+        ds_ids = args.get("datasource_ids") or []
+        rows = self.db.query(BusinessDocument).all()
+
+        def matches(d: BusinessDocument) -> bool:
+            if not domain:
+                return True
+            tags = " ".join(d.domain_tags or [])
+            blob = f"{d.name or ''} {tags} {d.summary or ''}".lower()
+            return domain.lower() in blob
+
+        items = []
+        for d in rows:
+            if not matches(d):
+                continue
+            items.append({
+                "id": d.id, "name": d.name, "file_type": d.file_type or "",
+                "size_bytes": d.size_bytes or 0,
+                "domain_tags": list(d.domain_tags or []),
+                "summary": d.summary or "",
+            })
+
+        result = {
+            "items": items,
+            "linked_datasource_ids": list(ds_ids) if isinstance(ds_ids, list) else [],
+            "display_card": {
+                "type": "asset_picker",
+                "kind": "document",
+                "title": f"为「{domain or '该业务'}」匹配到 {len(items)} 份业务文档",
+                "items": items,
+            },
+        }
+        return result, f"匹配 {len(items)} 份文档", len(items)
+
+    def _tool_analyze_assets_for_ontology(self, args: dict) -> tuple[Any, str, int]:
+        """根据已选数据源 + 文档 + 上下文，让 LLM 抽取本体草稿（含规则/动作建议）。"""
+        from app.services.datasource_utils import get_table_schema
+        from app.models import BusinessDocument
+        from app.config import settings as _settings
+        from app.services.copilot import get_llm_client
+        import json as _json
+        import re as _re
+
+        ds_ids = args.get("datasource_ids") or []
+        doc_ids = args.get("document_ids") or []
+        ctx = str(args.get("business_context") or "").strip()
+
+        # 1. 拼数据源 schema
+        ds_blocks: list[str] = []
+        for did in ds_ids:
+            ds = self.db.get(DataSource, did)
+            if not ds:
+                continue
+            tables = []
+            try:
+                tables = list(getattr(ds, "tables_json", None) or [])
+            except Exception:
+                tables = []
+            if not tables and ds.table_name:
+                tables = [{"table_name": ds.table_name}]
+            for t in tables[:5]:
+                tname = t["table_name"] if isinstance(t, dict) else str(t)
+                try:
+                    cols = get_table_schema(ds, tname) or []
+                except Exception:
+                    cols = []
+                col_lines = "\n".join(
+                    f"  - {c.get('name')} ({c.get('type','?')}){' PK' if c.get('is_pk') else ''}: {c.get('comment') or ''}"
+                    for c in cols[:30]
+                )
+                ds_blocks.append(f"### 数据源 {ds.name} · 表 {tname}\n{col_lines}")
+
+        # 2. 拼文档正文
+        doc_blocks: list[str] = []
+        for did in doc_ids:
+            d = self.db.get(BusinessDocument, did)
+            if not d:
+                continue
+            doc_blocks.append(f"### 文档 {d.name}\n{(d.parsed_text or '')[:6000]}")
+
+        prompt = """你是本体建模专家，要从用户提供的数据源 schema + 业务文档中抽取本体草稿。
+术语规范：对象（Object）/ 属性（Property）/ 关系（Relation）/ 规则（Rule）/ 动作（Action）。
+
+严格返回 JSON：
+{
+  "entities": [{"name":"PascalCase","display_name":"中文","tier":1|2|3,"description":"...","primary_key":"id","icon":"emoji","properties":[{"name":"snake_case","display_name":"中文","type":"string|number|date|boolean|enum","required":true|false,"description":"..."}]}],
+  "relations": [{"name":"snake_case","display_name":"中文","from_entity":"对象英文名","to_entity":"对象英文名","cardinality":"1:1|1:N|N:N","description":"..."}],
+  "suggested_rules": [{"name":"中文","description":"...","condition_hint":"...","action_hint":"...","target_entity":"对象英文名"}],
+  "suggested_actions": [{"name":"中文","description":"...","trigger_hint":"...","effect_hint":"...","target_entity":"对象英文名"}]
+}
+不要输出其他文字。
+"""
+        user_content = (
+            f"## 业务上下文\n{ctx or '（无）'}\n\n"
+            f"## 数据源 Schema\n" + ("\n\n".join(ds_blocks) or "（无）") + "\n\n"
+            f"## 业务文档\n" + ("\n\n".join(doc_blocks) or "（无）")
+        )[:18000]
+
+        client = get_llm_client()
+        try:
+            resp = client.chat.completions.create(
+                model=_settings.LLM_MODEL,
+                messages=[
+                    {"role": "system", "content": prompt},
+                    {"role": "user", "content": user_content},
+                ],
+                temperature=0,
+                max_tokens=6000,
+                timeout=120,
+            )
+        except Exception as e:
+            return {"error": f"LLM 调用失败: {e}"}, f"LLM 调用失败", 0
+
+        text = (resp.choices[0].message.content or "").strip()
+        if text.startswith("```"):
+            text = _re.sub(r"^```\w*\n", "", text)
+            text = _re.sub(r"\n```\s*$", "", text)
+        try:
+            data = _json.loads(text)
+        except _json.JSONDecodeError:
+            start = text.find("{")
+            end = text.rfind("}")
+            if start < 0 or end < 0:
+                return {"error": "LLM 返回不是合法 JSON"}, "解析失败", 0
+            data = _json.loads(text[start: end + 1])
+
+        ents = data.get("entities", []) or []
+        rels = data.get("relations", []) or []
+        s_rules = data.get("suggested_rules", []) or []
+        s_actions = data.get("suggested_actions", []) or []
+        result = {
+            "entities": ents,
+            "relations": rels,
+            "suggested_rules": s_rules,
+            "suggested_actions": s_actions,
+        }
+        summary = f"产出 {len(ents)} 对象 / {len(rels)} 关系 / {len(s_rules)} 规则建议 / {len(s_actions)} 动作建议"
+        return result, summary, len(ents)
