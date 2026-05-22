@@ -43,7 +43,7 @@ export interface DataAsset {
   linkUrl?: string
 }
 
-// ── 本体类与属性 ──
+// ── 对象、属性、关系（全平台统一术语） ──
 export interface OntologyProperty {
   id: string
   name: string
@@ -53,7 +53,7 @@ export interface OntologyProperty {
   description?: string
 }
 
-export interface OntologyClassDraft {
+export interface OntologyObjectDraft {
   id: string
   name: string
   displayName: string
@@ -64,9 +64,36 @@ export interface OntologyClassDraft {
   icon: string
   instanceCount: number
   properties: OntologyProperty[]
-  rules: string[]
-  actions: string[]
+  derivedProperties: string[]   // Function ID 数组（派生属性）
+  rules: string[]               // BusinessRule ID 数组
+  actions: string[]             // EntityAction ID 数组
   approved?: boolean
+}
+
+// ── LLM 抽取/对话生成产生的"规则/动作建议"（只放 hints，不直接落库） ──
+export interface SuggestedRule {
+  id: string
+  name: string
+  description: string
+  conditionHint?: string
+  actionHint?: string
+  targetObjectId?: string  // 建议挂到哪个对象（按 id）
+  source?: string          // 来自哪个文档/消息
+}
+
+export interface SuggestedAction {
+  id: string
+  name: string
+  description: string
+  triggerHint?: string
+  effectHint?: string
+  targetObjectId?: string
+  source?: string
+}
+
+export interface OntologyHints {
+  suggested_rules: SuggestedRule[]
+  suggested_actions: SuggestedAction[]
 }
 
 // ── 关系 ──
@@ -83,7 +110,7 @@ export interface OntologyRelationDraft {
 }
 
 // ── 会话 ──
-export type BuildMethod = 'ai' | 'upload'
+export type BuildMethod = 'manual' | 'import' | 'extract' | 'chat'
 export type SessionStatus =
   | 'drafting'
   | 'pending_review'
@@ -140,15 +167,16 @@ export interface DrillResult {
 export interface BuilderSession {
   sessionId: string
   ontologyName: string
-  scenarioId: string
-  scenarioName: string
+  scenarioId?: string
+  scenarioName?: string
   buildMethod: BuildMethod
   status: SessionStatus
   createdBy: string
   createdAt: string
   updatedAt: string
-  ontologyClasses: OntologyClassDraft[]
+  ontologyObjects: OntologyObjectDraft[]
   ontologyRelations: OntologyRelationDraft[]
+  hints: OntologyHints
   selectedAssetIds: string[]
   selectedSampleSourceIds: string[]
   approvedScenarios: string[]

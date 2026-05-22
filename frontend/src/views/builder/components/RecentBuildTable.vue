@@ -9,8 +9,7 @@
       <div class="ob-recent-table-wrap">
         <div class="ob-recent-table">
           <div class="ob-recent-row ob-recent-head">
-            <div>任务名称</div>
-            <div>所属场景</div>
+            <div>本体名称</div>
             <div>构建方式</div>
             <div>当前阶段</div>
             <div>审核状态</div>
@@ -27,9 +26,6 @@
             <div class="ob-recent-name-cell">
               <span class="ob-recent-icon" aria-hidden="true">📋</span>
               <span class="ob-recent-name" :title="s.ontologyName">{{ s.ontologyName }}</span>
-            </div>
-            <div>
-              <span class="ob-recent-chip ob-recent-chip-blue">{{ s.scenarioName }}</span>
             </div>
             <div>
               <span :class="['ob-recent-chip', `ob-recent-chip-${methodInfo(s).tone}`]">{{ methodInfo(s).label }}</span>
@@ -100,10 +96,12 @@ function reviewInfo(status: SessionStatus) {
   return { label: '已审核', tone: 'green' }
 }
 
-function methodInfo(s: BuilderSession): { label: string; tone: 'green' | 'purple' | 'slate' } {
+function methodInfo(s: BuilderSession): { label: string; tone: 'green' | 'purple' | 'slate' | 'orange' | 'blue' } {
   const m: BuildMethod = s.buildMethod
-  if (m === 'upload') return { label: '文件上传', tone: 'green' }
-  return { label: 'AI 构建', tone: 'purple' }
+  if (m === 'import')  return { label: '文件导入', tone: 'green' }
+  if (m === 'extract') return { label: '文档抽取', tone: 'orange' }
+  if (m === 'chat')    return { label: '对话生成', tone: 'purple' }
+  return { label: '手工建模', tone: 'blue' }
 }
 
 function formatTime(iso: string) {
