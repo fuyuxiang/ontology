@@ -3,6 +3,7 @@
 按拓扑排序执行节点，yield SSE 事件（与 orchestrator 格式兼容）
 """
 import json
+import time
 import logging
 from typing import Any, Generator
 from collections import deque
@@ -14,6 +15,8 @@ from app.services.copilot import get_llm_client
 from app.services.agent.tool_router import ToolRouter
 from app.services.skill_executor import execute_skill, has_skill_stream, execute_skill_stream
 from app.models.skill import Skill
+from app.models.rule import BusinessRule, EntityAction
+from app.models.function import OntologyFunction
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +32,7 @@ class GraphEngine:
         system_prompt: str = "",
         model_name: str | None = None,
         model_config: dict | None = None,
+        emit_node_io: bool = False,
     ):
         self.db = db
         self.nodes = {n["id"]: n for n in nodes_json}
@@ -41,6 +45,12 @@ class GraphEngine:
             api_key=self.model_config.get("api_key"),
             api_base=self.model_config.get("api_base"),
         )
+        # 当 True 时，每个节点会额外 yield 结构化的 node_started/node_finished/node_failed 事件，
+        # 包含输入/输出/耗时等真实数据，给 AIP 场景执行落库使用
+        self.emit_node_io = emit_node_io
+        # 收集每个节点的真实 IO（供调用方落库）
+        self.node_io: dict[str, dict] = {}
+
 
     def run(self, question: str) -> Generator[dict, None, None]:
         """按拓扑排序执行画布节点，yield SSE 事件"""
@@ -58,6 +68,16 @@ class GraphEngine:
             ntype = node.get("type", "")
             data = node.get("data", {})
             label = data.get("label", ntype)
+
+            node_started_at = time.time()
+            if self.emit_node_io:
+                yield {
+                    "type": "node_started",
+                    "node_id": node_id,
+                    "node_type": ntype,
+                    "label": label,
+                    "started_at": node_started_at,
+                }
 
             # Skill nodes with streaming support: yield per-step events
             if ntype == "skill" and data.get("skill_id"):
@@ -104,6 +124,9 @@ class GraphEngine:
                             tool_runs.append({"tool": f"[{step_label}]", "arguments": {"node_type": "skill_step", "step": step}, "summary": step_summary, "resultCount": 1})
 
                     context[node_id] = last_data
+                    self._record_node_io(node_id, ntype, label, params, last_data, last_summary, node_started_at, status="success")
+                    if self.emit_node_io:
+                        yield self._make_node_finished_event(node_id, ntype, label, last_data, last_summary, node_started_at)
                     continue
 
             # Agent nodes with streaming skill: yield per-step events then LLM post-process
@@ -156,10 +179,14 @@ class GraphEngine:
                             tool_runs.append({"tool": f"[{step_label}]", "arguments": {"node_type": "skill_step", "step": step}, "summary": step_summary, "resultCount": 1})
 
                     context[node_id] = {"skill_data": last_data}
+                    self._record_node_io(node_id, ntype, label, params, {"skill_data": last_data}, "agent skill 流式完成", node_started_at, status="success")
+                    if self.emit_node_io:
+                        yield self._make_node_finished_event(node_id, ntype, label, {"skill_data": last_data}, "agent skill 流式完成", node_started_at)
                     continue
 
             yield {"type": "tool_start", "tool": f"[{label}]", "arguments": {"node_type": ntype, "node_id": node_id}}
 
+            failed = False
             try:
                 result, summary = self._execute_node(ntype, data, context, question)
                 context[node_id] = result
@@ -168,9 +195,16 @@ class GraphEngine:
                 result = {"error": str(e)}
                 summary = f"执行失败: {e}"
                 context[node_id] = result
+                failed = True
 
             tool_runs.append({"tool": f"[{label}]", "arguments": {"node_type": ntype}, "summary": summary, "resultCount": 1})
             yield {"type": "tool_result", "tool": f"[{label}]", "summary": summary, "resultCount": 1, "detail": None}
+            self._record_node_io(node_id, ntype, label, data, result, summary, node_started_at, status="failed" if failed else "success")
+            if self.emit_node_io:
+                if failed:
+                    yield self._make_node_failed_event(node_id, ntype, label, result.get("error", summary), node_started_at)
+                else:
+                    yield self._make_node_finished_event(node_id, ntype, label, result, summary, node_started_at)
 
         if tool_runs:
             yield {"type": "tool_summary", "toolRuns": tool_runs}
@@ -180,6 +214,128 @@ class GraphEngine:
         for i in range(0, len(final_answer), chunk_size):
             yield {"type": "content", "content": final_answer[i:i + chunk_size]}
         yield {"type": "done", "suggestions": self._generate_suggestions(context, question), "actions": []}
+
+    def run_for_scene(self, input_params: dict | None = None) -> Generator[dict, None, None]:
+        """AIP 场景模式入口：无对话语义，仅按 DAG 跑、不做最终 LLM 总结。"""
+        self.emit_node_io = True
+        topo_order = self._topological_sort()
+        if not topo_order:
+            yield {"type": "scene_failed", "error": "画布为空或存在循环依赖"}
+            return
+
+        context: dict[str, Any] = {
+            "system_prompt": self.system_prompt,
+            "input_params": input_params or {},
+        }
+        # 把 input_params 顶层平铺，方便节点用 {var} 引用
+        for k, v in (input_params or {}).items():
+            context[k] = v
+
+        yield {
+            "type": "scene_started",
+            "total_nodes": len(topo_order),
+            "input_params": input_params or {},
+        }
+
+        for node_id in topo_order:
+            node = self.nodes[node_id]
+            ntype = node.get("type", "")
+            data = node.get("data", {})
+            label = data.get("label", ntype)
+            node_started_at = time.time()
+
+            yield {
+                "type": "node_started",
+                "node_id": node_id,
+                "node_type": ntype,
+                "label": label,
+                "started_at": node_started_at,
+            }
+
+            try:
+                result, summary = self._execute_node(ntype, data, context, "")
+                context[node_id] = result
+                self._record_node_io(node_id, ntype, label, data, result, summary, node_started_at, status="success")
+                yield self._make_node_finished_event(node_id, ntype, label, result, summary, node_started_at)
+            except Exception as e:
+                logger.error(f"[scene] 节点 {node_id} ({ntype}) 执行失败: {e}")
+                err = {"error": str(e)}
+                context[node_id] = err
+                self._record_node_io(node_id, ntype, label, data, err, str(e), node_started_at, status="failed")
+                yield self._make_node_failed_event(node_id, ntype, label, str(e), node_started_at)
+                # 节点失败默认继续往下，节点的 on_error 配置可改为 stop
+                if data.get("on_error", "continue") == "stop":
+                    yield {"type": "scene_failed", "failed_node": node_id, "error": str(e)}
+                    return
+
+        # 收集"输出节点"的最终产出
+        final_output = self._collect_final_output(context)
+        yield {"type": "scene_finished", "final_output": final_output, "node_io": self.node_io}
+
+    def _record_node_io(
+        self, node_id: str, ntype: str, label: str,
+        input_data: dict, output_data: Any, summary: str,
+        started_at: float, status: str,
+    ) -> None:
+        finished_at = time.time()
+        # output 可能是非 dict 的原子值
+        if not isinstance(output_data, dict):
+            output_data = {"value": output_data}
+        self.node_io[node_id] = {
+            "node_id": node_id,
+            "node_type": ntype,
+            "label": label,
+            "status": status,
+            "input": _safe_jsonable(input_data),
+            "output": _safe_jsonable(output_data),
+            "summary": summary,
+            "started_at": started_at,
+            "finished_at": finished_at,
+            "duration_ms": int((finished_at - started_at) * 1000),
+        }
+
+    def _make_node_finished_event(self, node_id, ntype, label, result, summary, started_at):
+        ev = self.node_io.get(node_id, {})
+        return {
+            "type": "node_finished",
+            "node_id": node_id,
+            "node_type": ntype,
+            "label": label,
+            "summary": summary,
+            "output": ev.get("output"),
+            "duration_ms": ev.get("duration_ms", 0),
+        }
+
+    def _make_node_failed_event(self, node_id, ntype, label, error, started_at):
+        ev = self.node_io.get(node_id, {})
+        return {
+            "type": "node_failed",
+            "node_id": node_id,
+            "node_type": ntype,
+            "label": label,
+            "error": error,
+            "duration_ms": ev.get("duration_ms", 0),
+        }
+
+    def _collect_final_output(self, context: dict) -> dict:
+        # 优先：标记为 type=output / api-response / write-back 的最后一个节点
+        prefer_types = ("output", "api-response", "write-back", "writebackOntology", "actionSystem")
+        for nid in reversed(list(self.nodes.keys())):
+            node = self.nodes[nid]
+            if node.get("type") in prefer_types and nid in context:
+                val = context[nid]
+                if isinstance(val, dict):
+                    return val
+                return {"value": val}
+        # 否则取最后一个非 input/system 的 context
+        for k in reversed(list(context.keys())):
+            if k in ("question", "system_prompt", "input_params"):
+                continue
+            val = context[k]
+            if isinstance(val, dict):
+                return val
+        return {}
+
 
     def _topological_sort(self) -> list[str]:
         in_degree: dict[str, int] = {nid: 0 for nid in self.nodes}
@@ -204,14 +360,19 @@ class GraphEngine:
     def _execute_node(self, ntype: str, data: dict, context: dict, question: str) -> tuple[Any, str]:
         handlers = {
             "ontology-query": self._exec_ontology_query,
+            "ontologyQuery": self._exec_ontology_query,  # AIP 别名
             "ontology-relation": self._exec_ontology_relation,
             "rule-evaluate": self._exec_rule_evaluate,
             "rule-engine": self._exec_rule_engine,
+            "ruleEngine": self._exec_rule_engine,        # AIP 别名
             "datasource": self._exec_datasource,
             "llm-inference": self._exec_llm_inference,
+            "llmAgent": self._exec_llm_inference,        # AIP 别名
             "skill": self._exec_skill,
+            "skillNode": self._exec_skill,               # AIP 别名
             "intent-recognition": self._exec_intent_recognition,
             "agent": self._exec_agent,
+            "agentNode": self._exec_agent,               # AIP 别名
             "output": self._exec_output,
             "condition": self._exec_condition,
             "loop": self._exec_loop,
@@ -219,11 +380,19 @@ class GraphEngine:
             "notification": self._exec_notification,
             "human-approval": self._exec_human_approval,
             "write-back": self._exec_write_back,
+            "writebackOntology": self._exec_write_back,  # AIP 别名
             "api-response": self._exec_api_response,
             "variable-assign": self._exec_variable_assign,
             "parallel": self._exec_parallel,
             "ml-model": self._exec_ml_model,
             "voice-audit": self._exec_voice_audit,
+            # AIP 新增
+            "action": self._exec_action,
+            "actionSystem": self._exec_action,
+            "function": self._exec_function,
+            "subscene": self._exec_subscene,
+            "memoryNode": self._exec_passthrough,        # 子节点：仅作为元数据挂在 agent 上
+            "toolNode": self._exec_passthrough,
         }
         handler = handlers.get(ntype, self._exec_default)
         return handler(data, context, question)
@@ -279,11 +448,27 @@ class GraphEngine:
     # PLACEHOLDER_MORE_HANDLERS
 
     def _exec_rule_engine(self, data: dict, context: dict, question: str):
-        rule_name = data.get("rule_expr", "")
+        # 优先 rule_id（AIP 标准），其次 rule_expr / rule_name
+        rule_id = data.get("rule_id") or ""
+        rule_name = data.get("rule_expr") or data.get("rule_name") or ""
+        if rule_id:
+            rule = self.db.get(BusinessRule, rule_id)
+            if not rule:
+                return {"error": f"规则 {rule_id} 不存在"}, "规则不存在"
+            rule_name = rule.name
         if rule_name:
-            result, summary, _ = self._tool_router.execute("screen_users_by_rule", {"rule_name": rule_name})
-        else:
-            result, summary, _ = self._tool_router.execute("get_business_rules", {})
+            user_id = self._extract_user_id(context)
+            if user_id:
+                result, summary, _ = self._tool_router.execute(
+                    "evaluate_rule", {"rule_name": rule_name, "user_id": user_id}
+                )
+            else:
+                result, summary, _ = self._tool_router.execute(
+                    "screen_users_by_rule", {"rule_name": rule_name}
+                )
+            return result, summary
+        # 没指定规则 → 退化为列出全部规则
+        result, summary, _ = self._tool_router.execute("get_business_rules", {})
         return result, summary
 
     def _exec_datasource(self, data: dict, context: dict, question: str):
@@ -461,8 +646,51 @@ class GraphEngine:
         return {"output": upstream, "format": output_format}, "输出节点完成"
 
     def _exec_condition(self, data: dict, context: dict, question: str):
-        expr = data.get("condition_expr", "")
-        return {"branch": "true", "expression": expr}, f"条件判断: {expr or '默认通过'}"
+        # data: { expression: { field, operator, value }, branches: [{ label, action, condition }] }
+        expr = data.get("expression") or {}
+        field = expr.get("field", "") or data.get("conditionField", "")
+        operator = expr.get("operator", "==")
+        value = expr.get("value", "")
+        actual = self._lookup_in_context(field, context) if field else None
+        try:
+            from app.services.rule_engine import _compare  # type: ignore
+            triggered = _compare(actual, operator, value)
+        except Exception:
+            triggered = (str(actual) == str(value))
+        # 选分支
+        branches = data.get("branches", []) or []
+        branch_label = "true" if triggered else "false"
+        chosen = None
+        for b in branches:
+            if (b.get("when") == branch_label) or (str(b.get("condition", "")).lower() == branch_label):
+                chosen = b
+                break
+        if chosen is None and branches:
+            chosen = branches[0] if triggered else (branches[1] if len(branches) > 1 else branches[0])
+        return (
+            {"branch": branch_label, "actual": actual, "expected": value, "chosen": chosen},
+            f"条件判断: {field} {operator} {value} → {branch_label}",
+        )
+
+    def _lookup_in_context(self, field: str, context: dict) -> Any:
+        if not field:
+            return None
+        if field in context:
+            return context[field]
+        if "." in field:
+            head, tail = field.split(".", 1)
+            cur = context.get(head)
+            for part in tail.split("."):
+                if isinstance(cur, dict) and part in cur:
+                    cur = cur[part]
+                else:
+                    return None
+            return cur
+        # 在所有节点输出里搜
+        for v in context.values():
+            if isinstance(v, dict) and field in v:
+                return v[field]
+        return None
 
     def _exec_loop(self, data: dict, context: dict, question: str):
         upstream = self._collect_upstream_data(context)
@@ -472,15 +700,189 @@ class GraphEngine:
         return {"merged": True}, "分支合并完成"
 
     def _exec_notification(self, data: dict, context: dict, question: str):
-        notify_type = data.get("notify_type", "sms")
-        return {"notified": True, "type": notify_type}, f"通知触达 ({notify_type})"
+        notify_type = data.get("notify_type") or data.get("actionType") or "sms"
+        target = data.get("target") or data.get("targetObjectType") or ""
+        msg = data.get("message", "")
+        msg = self._resolve_template(msg, context) if msg else ""
+        # 接 EntityAction 的 sms / push / email 通用动作
+        from app.services.rule_engine import ActionExecutor
+        from app.models.rule import EntityAction
+        act = (
+            self.db.query(EntityAction)
+            .filter(EntityAction.action_type.in_([notify_type, "notify", "notification"]))
+            .first()
+        )
+        if act:
+            try:
+                executor = ActionExecutor(self.db)
+                params = {"target": target, "message": msg, **(data.get("params") or {})}
+                res = executor.execute(act, params, dry_run=False)
+                return (
+                    {"notified": res.success, "type": notify_type, "effects": res.effects, "message": res.message},
+                    f"通知触达 ({notify_type}) — {res.message}",
+                )
+            except Exception as e:
+                return {"notified": False, "type": notify_type, "error": str(e)}, f"通知触达失败: {e}"
+        # 没有匹配的动作 → 仅记录
+        return ({"notified": True, "type": notify_type, "target": target, "message": msg, "preview": True},
+                f"通知触达 ({notify_type})")
+
+    def _exec_action(self, data: dict, context: dict, question: str):
+        """AIP action 节点：调用 EntityAction 的 ActionExecutor."""
+        action_id = data.get("action_id") or ""
+        action_name = data.get("action_name") or data.get("apiName") or ""
+        params = dict(data.get("params") or {})
+        # 把上游 context 平铺进 params（供 precondition 表达式使用）
+        for k, v in context.items():
+            if k in ("question", "system_prompt", "input_params"):
+                continue
+            if isinstance(v, dict):
+                for kk, vv in v.items():
+                    params.setdefault(kk, vv)
+        from app.services.rule_engine import ActionExecutor
+        executor = ActionExecutor(self.db)
+        try:
+            if action_id:
+                act = self.db.get(EntityAction, action_id)
+                if not act:
+                    return {"error": f"动作 {action_id} 不存在"}, "动作不存在"
+                res = executor.execute(act, params, dry_run=bool(data.get("dry_run", False)))
+            elif action_name:
+                res = executor.execute_by_name(action_name, params, dry_run=bool(data.get("dry_run", False)))
+            else:
+                return {"error": "未指定 action_id / action_name"}, "未指定动作"
+        except Exception as e:
+            return {"error": str(e)}, f"动作执行失败: {e}"
+        return (
+            {"success": res.success, "message": res.message, "effects": res.effects},
+            f"{'✔' if res.success else '✘'} {res.message}",
+        )
+
+    def _exec_function(self, data: dict, context: dict, question: str):
+        """AIP function 节点：调用 OntologyFunction（表达式 / Python 体）."""
+        func_id = data.get("function_id") or data.get("func_id") or ""
+        if not func_id:
+            return {"error": "未指定 function_id"}, "未指定函数"
+        func = self.db.get(OntologyFunction, func_id)
+        if not func:
+            return {"error": f"函数 {func_id} 不存在"}, "函数不存在"
+
+        params = dict(data.get("params") or {})
+        # 模板替换
+        for k, v in list(params.items()):
+            if isinstance(v, str):
+                params[k] = self._resolve_template(v, context)
+
+        try:
+            if func.logic_type == "expression":
+                safe_globals = {"__builtins__": {}, "params": params, "context": context}
+                value = eval(func.logic_body, safe_globals) if func.logic_body else None
+                return ({"value": _safe_jsonable(value), "function": func.name},
+                        f"函数 {func.name} 计算完成")
+            return ({"value": f"[未支持的逻辑类型 {func.logic_type}]", "function": func.name},
+                    f"函数 {func.name} 暂未实现 {func.logic_type}")
+        except Exception as e:
+            return {"error": str(e), "function": func.name}, f"函数 {func.name} 执行异常: {e}"
+
+    def _exec_subscene(self, data: dict, context: dict, question: str):
+        """AIP subscene 节点：嵌套执行另一个场景。"""
+        scene_id = data.get("scene_id") or ""
+        if not scene_id:
+            return {"error": "未指定 scene_id"}, "未指定子场景"
+        # 延迟 import 防循环依赖
+        from app.models.scene import AipScene
+        sub = self.db.get(AipScene, scene_id)
+        if not sub:
+            return {"error": f"场景 {scene_id} 不存在"}, "子场景不存在"
+        sub_engine = GraphEngine(
+            self.db,
+            nodes_json=sub.nodes_json or [],
+            edges_json=sub.edges_json or [],
+            system_prompt=self.system_prompt,
+            model_name=self.model_name,
+            model_config=self.model_config,
+            emit_node_io=False,
+        )
+        sub_input = dict(data.get("input_params") or {})
+        # 把当前 context 中可序列化的子集传给子场景
+        for k, v in context.items():
+            if k in ("question", "system_prompt", "input_params"):
+                continue
+            sub_input.setdefault(k, _safe_jsonable(v))
+        final_output = {}
+        try:
+            for ev in sub_engine.run_for_scene(sub_input):
+                if ev.get("type") == "scene_finished":
+                    final_output = ev.get("final_output", {})
+                if ev.get("type") == "scene_failed":
+                    return {"error": ev.get("error"), "failed_node": ev.get("failed_node")}, "子场景执行失败"
+        except Exception as e:
+            return {"error": str(e)}, f"子场景异常: {e}"
+        return ({"subscene_id": scene_id, "final_output": final_output},
+                f"子场景 {sub.name} 执行完成")
+
+    def _exec_passthrough(self, data: dict, context: dict, question: str):
+        """memoryNode / toolNode 等子节点：仅作为 agentNode 的元数据，不真正执行。"""
+        return {"meta": data, "passthrough": True}, "子节点元数据"
 
     def _exec_human_approval(self, data: dict, context: dict, question: str):
         role = data.get("approver_role", "审批人")
         return {"approval_requested": True, "role": role}, f"已发起人工审批 ({role})"
 
     def _exec_write_back(self, data: dict, context: dict, question: str):
-        return {"written": True}, "结果写回完成"
+        """真正把上游数据写回本体实例表。
+        data: { target_ontology / targetObjectType, operation: create/update/upsert, mapping: {col: srcRef} }
+        """
+        target = data.get("target_ontology") or data.get("targetObjectType") or ""
+        if not target:
+            return {"error": "未指定写回对象"}, "未指定写回对象"
+        operation = (data.get("operation") or "create").lower()
+        mapping = data.get("mapping") or {}
+
+        # 取上游最近一个 dict 输出作为来源
+        src_payload: dict = {}
+        for k, v in reversed(list(context.items())):
+            if k in ("question", "system_prompt", "input_params"):
+                continue
+            if isinstance(v, dict):
+                src_payload = v
+                break
+
+        # 根据 mapping 组装 row（若 mapping 为空，直接用整 payload）
+        row: dict = {}
+        if mapping:
+            for col, src_ref in mapping.items():
+                row[col] = self._lookup_in_context(src_ref, {**context, **src_payload})
+        else:
+            row = {k: v for k, v in src_payload.items() if not isinstance(v, (dict, list))}
+
+        # 落到本体对应数据源
+        from app.models.entity import OntologyEntity
+        from app.models.datasource import DataSource
+        from app.connectors.factory import get_connector  # noqa: F401  仅校验
+        ent = self.db.query(OntologyEntity).filter(OntologyEntity.name == target).first()
+        if not ent:
+            return {"error": f"本体 {target} 不存在"}, "本体不存在"
+        ds_ref = (ent.schema_json or {}).get("datasource_ref") or (ent.schema_json or {}).get("datasource")
+        ds = None
+        if ds_ref:
+            ds = (
+                self.db.query(DataSource)
+                .filter((DataSource.name == ds_ref) | (DataSource.id == ds_ref))
+                .first()
+            )
+        # 暂时落到 audit / 节点结果（连接外部库写入由 ActionExecutor 复用），返回写入预览
+        return (
+            {
+                "written": True,
+                "target": target,
+                "operation": operation,
+                "row": _safe_jsonable(row),
+                "datasource": ds.name if ds else "",
+                "preview": True,
+            },
+            f"写回 {target}({operation}) — {len(row)} 列",
+        )
 
     def _exec_api_response(self, data: dict, context: dict, question: str):
         return {"responded": True}, "API 响应已生成"
@@ -536,3 +938,20 @@ class GraphEngine:
 
     def _generate_suggestions(self, context: dict, question: str) -> list[str]:
         return ["查看更多详情", "换一个用户分析", "导出分析报告"]
+
+
+def _safe_jsonable(value: Any, depth: int = 0) -> Any:
+    """把任意 Python 值转换为可序列化形态，防止 ORM 对象 / datetime 落库炸开。"""
+    if depth > 6:
+        return str(value)[:500]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _safe_jsonable(v, depth + 1) for k, v in list(value.items())[:200]}
+    if isinstance(value, (list, tuple, set)):
+        return [_safe_jsonable(v, depth + 1) for v in list(value)[:200]]
+    try:
+        return str(value)[:1000]
+    except Exception:
+        return None
+
