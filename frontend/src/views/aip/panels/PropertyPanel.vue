@@ -20,12 +20,17 @@
         <label>节点名称</label>
         <input v-model="node.data.label" class="aip-input" @input="touch" />
       </div>
+      <div class="aip-field">
+        <label>节点类型</label>
+        <input :value="node.type" class="aip-input" disabled />
+      </div>
 
       <!-- ontologyQuery -->
       <template v-if="node.type === 'ontologyQuery'">
         <div class="aip-field">
           <label>主对象类型</label>
-          <input v-model="node.data.objectType" class="aip-input" placeholder="如 Customer / InstallOrder" @input="touch" />
+          <ResourcePicker type="entity" :model-value="node.data.objectType || ''"
+            @update:model-value="(v: string) => onPick('objectType', v)" placeholder="选择本体对象" />
         </div>
         <div class="aip-field">
           <label>关联本体（多选，逗号分隔）</label>
@@ -45,11 +50,9 @@
       <!-- llmAgent -->
       <template v-else-if="node.type === 'llmAgent'">
         <div class="aip-field">
-          <label>LLM 模型</label>
-          <select class="aip-input" v-model="node.data.model" @change="touch">
-            <option value="">请选择</option>
-            <option v-for="m in LLM_MODELS" :key="m.value" :value="m.label">{{ m.label }}</option>
-          </select>
+          <label>LLM 模型（模型注册中心）</label>
+          <ResourcePicker type="model" :model-value="node.data.model_id || ''"
+            @update:model-value="(v: string) => onPick('model_id', v)" placeholder="选择已注册模型" />
         </div>
         <div class="aip-field">
           <label>ML 模型</label>
@@ -68,21 +71,28 @@
           <input type="number" class="aip-input" v-model.number="node.data.maxTokens" @input="touch" placeholder="2048" />
         </div>
         <div class="aip-field">
-          <label>System Prompt</label>
-          <textarea class="aip-input aip-input--ta" rows="6" v-model="node.data.systemPrompt" @input="touch"></textarea>
+          <label>Prompt 模板（支持 {question} {upstream} {nodeId.field}）</label>
+          <textarea class="aip-input aip-input--ta" rows="6" v-model="node.data.prompt" @input="touch"></textarea>
         </div>
       </template>
 
       <!-- agentNode -->
       <template v-else-if="node.type === 'agentNode'">
-        <div class="aip-field"><label>Agent 类型</label><input class="aip-input" v-model="node.data.agentType" @input="touch" /></div>
-        <div class="aip-field"><label>主 Skill ID</label><input class="aip-input" v-model="node.data.primarySkillId" @input="touch" /></div>
+        <div class="aip-field">
+          <label>关联 Agent</label>
+          <ResourcePicker type="agent" :model-value="node.data.agent_id || ''"
+            @update:model-value="(v: string) => onPick('agent_id', v)" placeholder="选择已发布 Agent" />
+        </div>
+        <div class="aip-field">
+          <label>主 Skill</label>
+          <ResourcePicker type="skill" :model-value="node.data.skill_id || ''"
+            @update:model-value="(v: string) => onPick('skill_id', v)" placeholder="选择 Skill（可选）" />
+        </div>
         <div class="aip-field"><label>角色</label>
           <select class="aip-input" v-model="node.data.agentRole" @change="touch">
             <option>reasoning</option><option>generation</option><option>orchestration</option>
           </select>
         </div>
-        <div class="aip-field"><label>关联 LLM 节点</label><input class="aip-input" v-model="node.data.llmNodeId" @input="touch" /></div>
         <div class="aip-field">
           <label>关联本体（逗号分隔）</label>
           <textarea class="aip-input aip-input--ta" rows="2" :value="(node.data.objectTypes || []).join(',')"
@@ -92,6 +102,11 @@
 
       <!-- skillNode -->
       <template v-else-if="node.type === 'skillNode'">
+        <div class="aip-field">
+          <label>绑定 Skill</label>
+          <ResourcePicker type="skill" :model-value="node.data.skill_id || ''"
+            @update:model-value="(v: string) => onPick('skill_id', v)" placeholder="选择 Skill" />
+        </div>
         <div class="aip-field">
           <label>已绑定 Skill ({{ (node.data.skills || []).length }})</label>
           <div v-for="(s, i) in (node.data.skills || [])" :key="i" class="aip-list-item">
@@ -130,9 +145,10 @@
 
       <!-- ruleEngine -->
       <template v-else-if="node.type === 'ruleEngine'">
-        <div class="aip-field"><label>规则引用 (逗号分隔)</label>
-          <textarea class="aip-input aip-input--ta" rows="2" :value="(node.data.ruleRefs || []).join(',')"
-            @input="(e: any) => updateArr('ruleRefs', e.target.value)"></textarea>
+        <div class="aip-field">
+          <label>关联规则</label>
+          <ResourcePicker type="rule" :model-value="node.data.rule_id || ''"
+            @update:model-value="(v: string) => onPick('rule_id', v)" placeholder="选择规则" />
         </div>
         <div class="aip-field"><label>表达式字段</label><input class="aip-input" v-model="node.data.expressionField" @input="touch" /></div>
         <div class="aip-field"><label>操作符</label>
@@ -145,25 +161,62 @@
 
       <!-- writebackOntology -->
       <template v-else-if="node.type === 'writebackOntology'">
-        <div class="aip-field"><label>写回本体对象</label><input class="aip-input" v-model="node.data.targetObjectType" @input="touch" /></div>
+        <div class="aip-field">
+          <label>写回本体对象</label>
+          <ResourcePicker type="entity" :model-value="node.data.target_ontology || node.data.targetObjectType || ''"
+            @update:model-value="(v: string) => onPick('target_ontology', v)" placeholder="选择写回的本体" />
+        </div>
         <div class="aip-field"><label>操作</label>
           <select class="aip-input" v-model="node.data.operation" @change="touch">
             <option value="create">create</option><option value="update">update</option><option value="upsert">upsert</option>
           </select>
         </div>
-        <div class="aip-field"><label>关联模型</label><input class="aip-input" v-model="node.data.modelRef" @input="touch" /></div>
-        <div class="aip-field"><label>Webhook</label><input class="aip-input" v-model="node.data.webhook" @input="touch" /></div>
+        <div class="aip-field"><label>字段映射（JSON: 列 → 来源引用）</label>
+          <textarea class="aip-input aip-input--ta" rows="4" :value="JSON.stringify(node.data.mapping || {}, null, 2)"
+            @input="(e: any) => onJsonChange('mapping', e.target.value)"></textarea>
+        </div>
       </template>
 
-      <!-- actionSystem -->
-      <template v-else-if="node.type === 'actionSystem'">
-        <div class="aip-field"><label>动作类型</label>
-          <select class="aip-input" v-model="node.data.actionType" @change="touch">
-            <option v-for="a in ACTION_TYPES" :key="a.value" :value="a.value">{{ a.label }}</option>
-          </select>
+      <!-- actionSystem (即 action 节点) -->
+      <template v-else-if="node.type === 'actionSystem' || node.type === 'action'">
+        <div class="aip-field">
+          <label>关联动作</label>
+          <ResourcePicker type="action" :model-value="node.data.action_id || ''"
+            @update:model-value="(v: string) => onPick('action_id', v)" placeholder="选择动作" />
         </div>
-        <div class="aip-field"><label>目标对象</label><input class="aip-input" v-model="node.data.targetObjectType" @input="touch" /></div>
-        <div class="aip-field"><label>API 名称</label><input class="aip-input" v-model="node.data.apiName" @input="touch" /></div>
+        <div class="aip-field"><label>参数（JSON）</label>
+          <textarea class="aip-input aip-input--ta" rows="4" :value="JSON.stringify(node.data.params || {}, null, 2)"
+            @input="(e: any) => onJsonChange('params', e.target.value)"></textarea>
+        </div>
+        <div class="aip-field aip-field--row">
+          <input type="checkbox" :checked="!!node.data.dry_run" @change="(e: any) => { node.data.dry_run = e.target.checked; touch() }" />
+          <span>Dry-run 模式（仅校验，不真正执行）</span>
+        </div>
+      </template>
+
+      <!-- function -->
+      <template v-else-if="node.type === 'function'">
+        <div class="aip-field">
+          <label>关联函数</label>
+          <ResourcePicker type="function" :model-value="node.data.function_id || ''"
+            @update:model-value="(v: string) => onPick('function_id', v)" placeholder="选择函数" />
+        </div>
+        <div class="aip-field"><label>参数（JSON，支持 {nodeId.field} 模板）</label>
+          <textarea class="aip-input aip-input--ta" rows="4" :value="JSON.stringify(node.data.params || {}, null, 2)"
+            @input="(e: any) => onJsonChange('params', e.target.value)"></textarea>
+        </div>
+      </template>
+
+      <!-- subscene -->
+      <template v-else-if="node.type === 'subscene'">
+        <div class="aip-field">
+          <label>子场景</label>
+          <input class="aip-input" v-model="node.data.scene_id" @input="touch" placeholder="子场景 ID" />
+        </div>
+        <div class="aip-field"><label>子场景入参（JSON）</label>
+          <textarea class="aip-input aip-input--ta" rows="4" :value="JSON.stringify(node.data.input_params || {}, null, 2)"
+            @input="(e: any) => onJsonChange('input_params', e.target.value)"></textarea>
+        </div>
       </template>
 
       <!-- condition -->
@@ -174,6 +227,7 @@
             <option v-for="op in OPERATORS" :key="op">{{ op }}</option>
           </select>
         </div>
+        <div class="aip-field"><label>比较值</label><input class="aip-input" :value="node.data.expression?.value || ''" @input="setExpr('value', $event)" /></div>
         <div class="aip-field">
           <label>分支 ({{ (node.data.branches || []).length }})</label>
           <div v-for="(b, i) in (node.data.branches || [])" :key="i" class="aip-branch">
@@ -200,12 +254,27 @@
 import { computed } from 'vue'
 import { useAipStore } from '../../../store/aip'
 import { LLM_MODELS, ML_MODELS, OPERATORS, ACTION_TYPES, MEMORY_LAYERS, NODE_TYPES } from '../aipData'
+import ResourcePicker from '../../../components/aip/ResourcePicker.vue'
 
 const store = useAipStore()
 const node = computed(() => store.selectedNode)
 const meta = computed(() => node.value && NODE_TYPES.find(t => t.type === node.value!.type))
 
-function touch() { store.isDirty = true }
+function touch() { store.markDirty() }
+function onPick(field: string, value: string) {
+  if (!node.value) return
+  store.updateNodeData(node.value.id, { [field]: value })
+}
+function onJsonChange(field: string, raw: string) {
+  if (!node.value) return
+  try {
+    const parsed = raw.trim() ? JSON.parse(raw) : {}
+    store.updateNodeData(node.value.id, { [field]: parsed })
+  } catch {
+    // 暂存原文，等用户改成合法 JSON 再写回
+    node.value.data[field + '__raw'] = raw
+  }
+}
 function updateArr(field: string, value: string) {
   if (!node.value) return
   node.value.data[field] = value.split(',').map(s => s.trim()).filter(Boolean)

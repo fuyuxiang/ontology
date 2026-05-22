@@ -10,6 +10,12 @@ from app.repositories.workflow_repo import (
     WorkflowRepository,
     WorkflowExecutionRepository,
 )
+from app.repositories.scene_repo import (
+    AipSceneRepository,
+    AipSceneVersionRepository,
+    AipSceneExecutionRepository,
+    AipSceneTriggerRepository,
+)
 
 __all__ = [
     "BaseRepository",
@@ -22,4 +28,8 @@ __all__ = [
     "DashboardRepository",
     "WorkflowRepository",
     "WorkflowExecutionRepository",
+    "AipSceneRepository",
+    "AipSceneVersionRepository",
+    "AipSceneExecutionRepository",
+    "AipSceneTriggerRepository",
 ]

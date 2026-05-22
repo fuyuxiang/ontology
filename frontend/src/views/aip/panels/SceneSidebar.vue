@@ -63,7 +63,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue'
 import { useAipStore } from '../../../store/aip'
-import { SCENE_GROUPS, type SceneMeta } from '../aipData'
+import type { AipSceneBrief } from '../../../api/aip'
 
 const store = useAipStore()
 const emit = defineEmits<{ (e: 'open-import'): void }>()
@@ -75,28 +75,33 @@ function toggle(label: string) {
   expanded[label] = expanded[label] === false ? true : false
 }
 
-const groups = computed(() => SCENE_GROUPS.map(g => ({
-  label: g.label,
-  scenes: store.scenes
-    .filter(s => s.group === g.label)
-    .filter(s => !keyword.value || s.name.includes(keyword.value) || s.id.includes(keyword.value)),
-})))
+const groups = computed(() => {
+  const groupMap: Record<string, AipSceneBrief[]> = {}
+  for (const s of store.scenes) {
+    if (keyword.value && !(s.name.includes(keyword.value) || s.id.includes(keyword.value))) continue
+    const g = s.group_name || '自定义'
+    if (!groupMap[g]) groupMap[g] = []
+    groupMap[g].push(s)
+  }
+  return Object.entries(groupMap).map(([label, scenes]) => ({ label, scenes }))
+})
 
-function triggerText(s: SceneMeta) {
-  const t = s.triggerConfig
+function triggerText(s: AipSceneBrief) {
+  const t: any = s.trigger_config || {}
   if (!t.enabled) return '触发已暂停'
-  if (t.type === 'schedule' && t.schedule) return `定时 · ${pad(t.schedule.hour)}:${pad(t.schedule.minute)}`
+  if (t.type === 'schedule' && t.schedule) return `定时 · ${pad(t.schedule.hour || 0)}:${pad(t.schedule.minute || 0)}`
   if (t.type === 'event') return '事件触发'
   if (t.type === 'webhook') return 'Webhook'
   if (t.type === 'manual') return '手动触发'
   return '未配置触发'
 }
-function triggerLevel(s: SceneMeta) {
-  if (!s.triggerConfig.enabled) return 'paused'
-  return s.triggerConfig.type
+function triggerLevel(s: AipSceneBrief) {
+  const t: any = s.trigger_config || {}
+  if (!t.enabled) return 'paused'
+  return t.type || 'manual'
 }
-function triggerIcon(s: SceneMeta) {
-  const t = s.triggerConfig
+function triggerIcon(s: AipSceneBrief) {
+  const t: any = s.trigger_config || {}
   if (!t.enabled) return '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="4" y="3" width="3" height="10" fill="currentColor"/><rect x="9" y="3" width="3" height="10" fill="currentColor"/></svg>'
   if (t.type === 'schedule') return '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 4v4l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
   if (t.type === 'event') return '<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1l2 5h5l-4 3 2 6-5-3.5-5 3.5 2-6L1 6h5l2-5z" stroke="currentColor" stroke-width="1.3"/></svg>'
@@ -110,15 +115,7 @@ function openTrigger() {
   store.sceneDrawerTab = 'trigger'
 }
 
-function onDelete() {
-  if (!store.currentScene) return
-  if (!confirm(`确定删除场景「${store.currentScene.name}」？`)) return
-  const id = store.currentSceneId
-  const idx = store.scenes.findIndex(s => s.id === id)
-  if (idx !== -1) store.scenes.splice(idx, 1)
-  delete store.sceneData[id]
-  if (store.scenes.length) store.switchScene(store.scenes[0].id)
-}
+function onDelete() { store.deleteCurrentScene() }
 </script>
 
 <style scoped>
