@@ -9,6 +9,9 @@
         <button class="aip-bd__tab" :class="{ active: store.bottomTab === 'reasoning' }" @click="store.bottomTab = 'reasoning'">
           OAG 推理追溯 <span v-if="store.reasoning.length" class="aip-bd__count">{{ store.reasoning.length }}</span>
         </button>
+        <button class="aip-bd__tab" :class="{ active: store.bottomTab === 'history' }" @click="onSwitchHistory">
+          执行历史 <span v-if="store.executions.length" class="aip-bd__count">{{ store.executions.length }}</span>
+        </button>
       </div>
       <div class="aip-bd__actions">
         <button class="aip-bd__btn-ghost" @click="store.clearLogs()">清空</button>
@@ -17,7 +20,7 @@
     </div>
 
     <div class="aip-bd__body">
-      <!-- 左：日志 / 推理 -->
+      <!-- 左：日志 / 推理 / 历史 -->
       <div class="aip-bd__left">
         <div v-if="store.bottomTab === 'logs'">
           <div v-if="!store.logs.length" class="aip-bd__empty">点击「▶ 执行」按钮开始执行场景</div>
@@ -29,12 +32,13 @@
           </div>
         </div>
 
-        <div v-else class="aip-bd__reasoning">
+        <div v-else-if="store.bottomTab === 'reasoning'" class="aip-bd__reasoning">
           <div v-if="!store.reasoning.length" class="aip-bd__empty">执行场景后将显示 OAG 推理路径</div>
           <div v-for="(r, idx) in store.reasoning" :key="r.nodeId" class="aip-bd__reason-card" :style="{ marginLeft: (idx % 2 === 0 ? 0 : 40) + 'px' }">
             <div class="aip-bd__reason-head">
               <span class="aip-bd__reason-step">{{ idx + 1 }}</span>
               <span class="aip-bd__reason-name">{{ r.nodeName }}</span>
+              <span class="aip-bd__reason-status" :class="`aip-bd__reason-status--${r.status}`">{{ r.status === 'success' ? '✓' : '✘' }} {{ r.durationMs }}ms</span>
             </div>
             <div class="aip-bd__reason-body">
               <div v-if="r.consumed.length" class="aip-bd__reason-row">
@@ -55,6 +59,17 @@
               </div>
               <div class="aip-bd__reason-output">{{ r.output }}</div>
             </div>
+          </div>
+        </div>
+
+        <div v-else class="aip-bd__history">
+          <div v-if="!store.executions.length" class="aip-bd__empty">暂无执行记录</div>
+          <div v-for="e in store.executions" :key="e.id" class="aip-bd__history-row" @click="store.viewExecution(e.id)">
+            <span class="aip-bd__history-status" :class="`aip-bd__history-status--${e.status}`">{{ statusLabel(e.status) }}</span>
+            <span class="aip-bd__history-time">{{ e.started_at }}</span>
+            <span class="aip-bd__history-trigger">{{ e.triggered_by }}</span>
+            <span class="aip-bd__history-duration">{{ e.duration_ms || 0 }}ms · {{ e.node_count }} 节点</span>
+            <button class="aip-bd__btn-ghost" @click.stop="onReplay(e.id)">重放</button>
           </div>
         </div>
       </div>
@@ -106,20 +121,38 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from 'vue'
 import { useAipStore } from '../../../store/aip'
+import { replayExecution } from '../../../api/aip'
 
 const store = useAipStore()
 
 const payload = computed(() => {
   if (!store.selectedNode) return {}
   if (store.ioTab === 'input') return { id: store.selectedNode.id, type: store.selectedNode.type, data: store.selectedNode.data }
-  const r = store.reasoning.find(x => x.nodeId === store.selectedNode!.id)
-  return r ? { ...r } : { id: store.selectedNode.id, status: store.statusOf(store.selectedNode.id), message: '尚未执行' }
+  // 优先取真实 reasoning 中的输出
+  const r = store.reasoning.find((x: any) => x.nodeId === store.selectedNode!.id)
+  if (r) return { ...r, raw: r.raw }
+  return { id: store.selectedNode.id, status: store.statusOf(store.selectedNode.id), message: '尚未执行' }
 })
 const entries = computed(() => Object.entries(payload.value || {}))
 
 function shorten(v: any) {
   const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
   return s.length > 60 ? s.slice(0, 60) + '…' : s
+}
+
+function statusLabel(s: string) {
+  return s === 'success' ? '成功' : s === 'failed' ? '失败' : s === 'running' ? '运行中' : s
+}
+
+async function onSwitchHistory() {
+  store.bottomTab = 'history'
+  await store.loadHistory()
+}
+
+async function onReplay(eid: string) {
+  await replayExecution(eid)
+  store.pushLog('info', `已发起重放: ${eid}`)
+  setTimeout(() => store.loadHistory(), 1500)
 }
 
 let dragStart = 0
@@ -235,4 +268,24 @@ onBeforeUnmount(() => { document.removeEventListener('mousemove', onMove); docum
 .aip-bd__pre { background: #0f172a; color: #d1d5db; padding: 12px; border-radius: 6px; font-size: 11px; line-height: 1.5; overflow: auto; max-height: 100%; }
 .aip-bd__schema { display: flex; flex-direction: column; gap: 4px; }
 .aip-bd__schema-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: #f8fafc; border-radius: 4px; font-size: 11px; }
+
+.aip-bd__history { display: flex; flex-direction: column; gap: 4px; }
+.aip-bd__history-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px;
+  font-size: 12px; cursor: pointer;
+}
+.aip-bd__history-row:hover { background: #f8fafc; border-color: #2E5BFF; }
+.aip-bd__history-status { font-size: 10px; padding: 1px 8px; border-radius: 999px; }
+.aip-bd__history-status--success { background: #ecfdf5; color: #059669; }
+.aip-bd__history-status--failed  { background: #fef2f2; color: #dc2626; }
+.aip-bd__history-status--running { background: #eff6ff; color: #2563eb; }
+.aip-bd__history-status--cancelled { background: #f1f5f9; color: #64748b; }
+.aip-bd__history-time { font-family: ui-monospace, monospace; color: #1e293b; }
+.aip-bd__history-trigger { color: #64748b; font-size: 11px; }
+.aip-bd__history-duration { color: #94a3b8; font-size: 11px; flex: 1; }
+
+.aip-bd__reason-status { margin-left: auto; font-size: 10px; padding: 1px 8px; border-radius: 999px; }
+.aip-bd__reason-status--success { background: #ecfdf5; color: #059669; }
+.aip-bd__reason-status--failed { background: #fef2f2; color: #dc2626; }
 </style>

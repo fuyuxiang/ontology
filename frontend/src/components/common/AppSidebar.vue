@@ -117,6 +117,7 @@ const navGroups = [
     { path: '/logic/actions', label: 'Actions 管理', icon: ico.workflow },
     { path: '/logic/functions', label: 'Functions 管理', icon: ico.sdk },
     { path: '/logic/rules', label: 'Rules 管理', icon: ico.rules },
+    { path: '/logic/skills', label: 'Skills 管理', icon: ico.tool },
   ]},
   { label: '本体服务', items: [
     { path: '/service/api', label: 'API 服务', icon: ico.api },

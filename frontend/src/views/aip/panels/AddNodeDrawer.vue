@@ -107,15 +107,19 @@ const RAW_GROUPS: Array<{ label: string; color: string; nodes: NodeItem[] }> = [
     { type: 'toolNode', label: 'Action 节点', icon: 'tool', description: 'OntologyEngine / MLModel / LLM / KnowledgeGrowth 等 Tool' },
   ] },
   { label: 'Function 节点', color: '#0EA5E9', nodes: [
+    { type: 'function', label: '函数计算', icon: 'tool', description: '调用 OntologyFunction（表达式计算 / 派生属性）' },
     { type: 'ruleEngine', label: 'Function (规则版)', icon: 'filter', description: 'Stateless 纯规则节点（如 ③ 触点选择）' },
     { type: 'writebackOntology', label: 'Function (写回)', icon: 'save', description: 'Stateless 写回节点（如 ⑤ 结果输出）' },
   ] },
   { label: '动作节点', color: '#059669', nodes: [
-    { type: 'writebackOntology', label: '写回本体', icon: 'save', description: '写回本体对象' },
-    { type: 'actionSystem', label: '动作执行', icon: 'send', description: '执行系统动作' },
+    { type: 'writebackOntology', label: '写回本体', icon: 'save', description: '写回本体对象（按字段映射）' },
+    { type: 'actionSystem', label: '动作执行', icon: 'send', description: '调用 EntityAction（短信 / 推送 / 工单 / API）' },
+  ] },
+  { label: '编排节点', color: '#7C3AED', nodes: [
+    { type: 'subscene', label: '子场景调用', icon: 'robot', description: '嵌套执行另一个 AIP 场景' },
   ] },
   { label: '控制节点', color: '#64748B', nodes: [
-    { type: 'condition', label: '条件分支', icon: 'branch', description: '条件判断分流' },
+    { type: 'condition', label: '条件分支', icon: 'branch', description: '条件判断分流（==/!=/IN/BETWEEN）' },
   ] },
 ]
 

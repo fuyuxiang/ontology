@@ -36,6 +36,7 @@ const router = createRouter({
     { path: '/logic/actions', name: 'logic-actions', component: () => import('../views/logic/ActionsView.vue'), meta: { title: 'Actions 管理' } },
     { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/FunctionsView.vue'), meta: { title: 'Functions 管理' } },
     { path: '/logic/rules', name: 'logic-rules', component: () => import('../views/logic/LogicView.vue'), meta: { title: 'Rules 管理' } },
+    { path: '/logic/skills', name: 'logic-skills', component: () => import('../views/logic/SkillsView.vue'), meta: { title: 'Skills 管理' } },
 
     // 本体服务
     { path: '/service/api', name: 'service-api', component: () => import('../views/service/ApiServiceView.vue'), meta: { title: 'API 服务' } },

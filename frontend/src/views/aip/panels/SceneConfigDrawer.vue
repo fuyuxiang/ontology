@@ -26,23 +26,24 @@
         <!-- 基本信息 -->
         <div v-if="store.sceneDrawerTab === 'basic'">
           <div class="aip-field"><label>场景 ID</label><input class="aip-input" :value="scene.id" disabled /></div>
-          <div class="aip-field"><label>场景名称</label><input class="aip-input" v-model="scene.name" /></div>
-          <div class="aip-field"><label>所属分组</label><input class="aip-input" v-model="scene.group" /></div>
+          <div class="aip-field"><label>场景名称</label><input class="aip-input" v-model="scene.name" @input="store.markDirty()" /></div>
+          <div class="aip-field"><label>所属分组</label><input class="aip-input" v-model="scene.group_name" @input="store.markDirty()" /></div>
           <div class="aip-field"><label>状态</label>
             <div class="aip-status-row">
               <span class="aip-status-pill" :class="`aip-status-pill--${scene.status}`">{{ scene.status === 'published' ? '已发布' : '草稿' }}</span>
+              <span class="aip-status-pill aip-status-pill--draft" v-if="scene.version">v{{ scene.version }}</span>
             </div>
           </div>
-          <div class="aip-field"><label>描述</label><textarea class="aip-input aip-input--ta" rows="6" v-model="scene.description"></textarea></div>
+          <div class="aip-field"><label>描述</label><textarea class="aip-input aip-input--ta" rows="6" v-model="scene.description" @input="store.markDirty()"></textarea></div>
           <div class="aip-field">
-            <label>关联本体（{{ scene.ontologyBindings.length }}）</label>
+            <label>关联本体（{{ (scene.ontology_bindings || []).length }}）</label>
             <div class="aip-tag-row">
-              <span v-for="o in scene.ontologyBindings" :key="o" class="aip-tag aip-tag--blue">{{ o }}</span>
+              <span v-for="o in (scene.ontology_bindings || [])" :key="o" class="aip-tag aip-tag--blue">{{ o }}</span>
             </div>
           </div>
           <div class="aip-field"><label>统计数据</label>
             <div class="aip-stats">
-              <div v-for="(v, k) in scene.stats" :key="k" class="aip-stat">
+              <div v-for="(v, k) in (scene.stats || {})" :key="k" class="aip-stat">
                 <div class="aip-stat__val">{{ v }}</div>
                 <div class="aip-stat__label">{{ k }}</div>
               </div>
@@ -50,11 +51,11 @@
           </div>
           <div class="aip-field aip-field--row">
             <span class="aip-field__inline-label">创建时间</span>
-            <span>{{ scene.createdAt }}</span>
+            <span>{{ scene.created_at }}</span>
           </div>
           <div class="aip-field aip-field--row">
             <span class="aip-field__inline-label">更新时间</span>
-            <span>{{ scene.updatedAt }}</span>
+            <span>{{ scene.updated_at }}</span>
           </div>
         </div>
 
@@ -64,8 +65,8 @@
             <label>触发类型</label>
             <div class="aip-trigger-types">
               <button v-for="t in TRIGGERS" :key="t.value"
-                class="aip-trigger-card" :class="{ active: scene.triggerConfig.type === t.value }"
-                @click="setTriggerType(t.value)">
+                class="aip-trigger-card" :class="{ active: triggerForm.type === t.value }"
+                @click="triggerForm.type = t.value as any">
                 <span class="aip-trigger-card__icon" v-html="t.icon"></span>
                 <span class="aip-trigger-card__label">{{ t.label }}</span>
                 <span class="aip-trigger-card__desc">{{ t.desc }}</span>
@@ -75,31 +76,31 @@
           <div class="aip-field">
             <label>启用状态</label>
             <label class="aip-switch">
-              <input type="checkbox" v-model="scene.triggerConfig.enabled" />
-              <span>{{ scene.triggerConfig.enabled ? '已启用' : '已暂停' }}</span>
+              <input type="checkbox" v-model="triggerForm.enabled" />
+              <span>{{ triggerForm.enabled ? '已启用' : '已暂停' }}</span>
             </label>
           </div>
 
-          <template v-if="scene.triggerConfig.type === 'schedule' && scene.triggerConfig.schedule">
+          <template v-if="triggerForm.type === 'schedule'">
             <div class="aip-field">
               <label>频率</label>
-              <select class="aip-input" v-model="scene.triggerConfig.schedule.frequency">
+              <select class="aip-input" v-model="triggerForm.frequency" @change="updateCron">
                 <option value="daily">每天</option>
-                <option value="weekly">每周</option>
-                <option value="monthly">每月</option>
+                <option value="weekly">每周一</option>
+                <option value="monthly">每月 1 号</option>
                 <option value="custom">自定义 Cron</option>
               </select>
             </div>
-            <div class="aip-field aip-field--row" v-if="scene.triggerConfig.schedule.frequency !== 'custom'">
+            <div class="aip-field aip-field--row" v-if="triggerForm.frequency !== 'custom'">
               <span class="aip-field__inline-label">执行时间</span>
-              <input type="number" class="aip-input aip-input--xs" min="0" max="23" v-model.number="scene.triggerConfig.schedule.hour" />
+              <input type="number" class="aip-input aip-input--xs" min="0" max="23" v-model.number="triggerForm.hour" @input="updateCron" />
               <span>:</span>
-              <input type="number" class="aip-input aip-input--xs" min="0" max="59" v-model.number="scene.triggerConfig.schedule.minute" />
-              <span class="aip-field__hint">{{ scene.triggerConfig.schedule.timezone }}</span>
+              <input type="number" class="aip-input aip-input--xs" min="0" max="59" v-model.number="triggerForm.minute" @input="updateCron" />
+              <span class="aip-field__hint">{{ triggerForm.timezone }}</span>
             </div>
-            <div class="aip-field" v-else>
-              <label>Cron 表达式</label>
-              <input class="aip-input" v-model="scene.triggerConfig.schedule.cron" placeholder="0 0 8 * * ?" />
+            <div class="aip-field">
+              <label>Cron 表达式（5 字段，UTC/{{ triggerForm.timezone }}）</label>
+              <input class="aip-input" v-model="triggerForm.cron_expr" placeholder="0 8 * * *" />
             </div>
 
             <div class="aip-cron-preset">
@@ -108,14 +109,16 @@
             </div>
           </template>
 
-          <template v-else-if="scene.triggerConfig.type === 'event'">
+          <template v-else-if="triggerForm.type === 'event'">
             <div class="aip-field"><label>监听本体</label>
-              <select class="aip-input" v-model="(scene.triggerConfig.event ||= { objectType: '', trigger: 'created' }).objectType">
-                <option v-for="o in scene.ontologyBindings" :key="o" :value="o">{{ o }}</option>
+              <select class="aip-input" v-model="triggerForm.event_entity">
+                <option value="">不限</option>
+                <option v-for="o in (scene.ontology_bindings || [])" :key="o" :value="o">{{ o }}</option>
               </select>
             </div>
             <div class="aip-field"><label>事件类型</label>
-              <select class="aip-input" v-model="(scene.triggerConfig.event ||= { objectType: '', trigger: 'created' }).trigger">
+              <select class="aip-input" v-model="triggerForm.event_action">
+                <option value="">所有</option>
                 <option value="created">created</option>
                 <option value="updated">updated</option>
                 <option value="deleted">deleted</option>
@@ -123,12 +126,16 @@
             </div>
           </template>
 
-          <template v-else-if="scene.triggerConfig.type === 'webhook'">
+          <template v-else-if="triggerForm.type === 'webhook'">
             <div class="aip-field"><label>Webhook URL</label>
-              <input class="aip-input" :value="`https://aip.example.com/api/webhooks/${scene.id}`" disabled />
+              <input class="aip-input" :value="webhookUrl" disabled />
             </div>
             <div class="aip-field"><label>Secret</label>
-              <input class="aip-input" v-model="(scene.triggerConfig.webhook ||= { url: '', secret: '' }).secret" placeholder="HMAC SHA256 密钥" />
+              <input class="aip-input" v-model="triggerForm.webhook_secret" placeholder="可选 — 用于 HMAC SHA256 签名校验" />
+            </div>
+            <div class="aip-field__hint">
+              触发方式：POST {{ webhookUrl }}<br />
+              Header: <code>X-AIP-Signature: sha256=&lt;hex&gt;</code>（若配置了 secret）
             </div>
           </template>
 
@@ -137,6 +144,12 @@
               <div class="aip-field__hint">手动触发：仅可通过页面顶部的「▶ 执行」按钮启动</div>
             </div>
           </template>
+
+          <div class="aip-field aip-field--row" style="margin-top: 12px;">
+            <button class="aip-btn aip-btn--primary" @click="onSaveTrigger">保存触发器</button>
+            <button class="aip-btn aip-btn--ghost" @click="onTestFire" :disabled="!triggerForm.enabled">立即测试触发</button>
+            <span class="aip-field__hint" v-if="lastFiredAt">上次触发: {{ lastFiredAt }} · 累计 {{ fireCount }} 次</span>
+          </div>
         </div>
 
         <!-- 执行历史 -->
@@ -145,15 +158,15 @@
           <div v-for="h in history" :key="h.id" class="aip-history">
             <div class="aip-history__row">
               <span class="aip-history__status" :class="`aip-history__status--${h.status}`">
-                {{ h.status === 'success' ? '成功' : h.status === 'error' ? '失败' : '运行中' }}
+                {{ h.status === 'success' ? '成功' : h.status === 'failed' ? '失败' : '运行中' }}
               </span>
-              <span class="aip-history__time">{{ h.startedAt }}</span>
-              <span class="aip-history__trigger">{{ h.trigger === 'schedule' ? '定时' : h.trigger === 'manual' ? '手动' : h.trigger }}</span>
+              <span class="aip-history__time">{{ h.started_at }}</span>
+              <span class="aip-history__trigger">{{ h.triggered_by }}</span>
             </div>
             <div class="aip-history__meta">
-              <span>{{ h.durationSec }}s</span>
+              <span>{{ h.duration_ms || 0 }}ms</span>
               <span>·</span>
-              <span>{{ h.nodes }} 个节点</span>
+              <span>{{ h.node_count }} 个节点</span>
             </div>
           </div>
         </div>
@@ -163,12 +176,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useAipStore } from '../../../store/aip'
 
 const store = useAipStore()
 const scene = computed(() => store.currentScene)
-const history = computed(() => store.currentHistory)
+const history = computed(() => store.executions)
 
 const TRIGGERS = [
   { value: 'schedule', label: '定时触发', desc: 'Cron / 每日 / 每周 / 每月', icon: '<svg width="20" height="20" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 4v4l3 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' },
@@ -181,25 +194,102 @@ const CRON_PRESETS = [
   { label: '每天 08:00', frequency: 'daily' as const, hour: 8, minute: 0 },
   { label: '每天 09:00', frequency: 'daily' as const, hour: 9, minute: 0 },
   { label: '每周一 09:00', frequency: 'weekly' as const, hour: 9, minute: 0 },
-  { label: '每月 1 号', frequency: 'monthly' as const, hour: 9, minute: 0 },
-  { label: '每小时', frequency: 'custom' as const, hour: 0, minute: 0, cron: '0 0 * * * ?' },
+  { label: '每月 1 号 09:00', frequency: 'monthly' as const, hour: 9, minute: 0 },
+  { label: '每小时整点', frequency: 'custom' as const, hour: 0, minute: 0, cron: '0 * * * *' },
 ]
 
-function setTriggerType(t: any) {
-  if (!scene.value) return
-  scene.value.triggerConfig.type = t
-  if (t === 'schedule' && !scene.value.triggerConfig.schedule) {
-    scene.value.triggerConfig.schedule = { frequency: 'daily', hour: 9, minute: 0, timezone: 'Asia/Shanghai' }
-  }
-  store.isDirty = true
+interface TriggerForm {
+  type: 'schedule' | 'event' | 'webhook' | 'manual'
+  enabled: boolean
+  frequency: 'daily' | 'weekly' | 'monthly' | 'custom'
+  hour: number
+  minute: number
+  cron_expr: string
+  timezone: string
+  event_entity: string
+  event_action: string
+  webhook_secret: string
+  webhook_path: string
 }
-function applyPreset(p: any) {
-  if (!scene.value) return
-  scene.value.triggerConfig.schedule = {
-    frequency: p.frequency, hour: p.hour, minute: p.minute, timezone: 'Asia/Shanghai',
-    ...(p.cron ? { cron: p.cron } : {}),
+
+const triggerForm = ref<TriggerForm>({
+  type: 'manual',
+  enabled: false,
+  frequency: 'daily',
+  hour: 9, minute: 0,
+  cron_expr: '',
+  timezone: 'Asia/Shanghai',
+  event_entity: '',
+  event_action: '',
+  webhook_secret: '',
+  webhook_path: '',
+})
+
+const lastFiredAt = computed(() => store.trigger?.last_fired_at || '')
+const fireCount = computed(() => store.trigger?.fire_count || 0)
+const webhookUrl = computed(() => {
+  const path = triggerForm.value.webhook_path || store.trigger?.webhook_path || '<待保存后生成>'
+  return `${window.location.origin}/api/v1/aip/webhooks/${path}`
+})
+
+function syncFormFromStore() {
+  const t = store.trigger
+  if (!t) return
+  triggerForm.value = {
+    type: (t.type as any) || 'manual',
+    enabled: !!t.enabled,
+    frequency: ((t.schedule_payload || {}).frequency as any) || 'daily',
+    hour: ((t.schedule_payload || {}).hour as any) ?? 9,
+    minute: ((t.schedule_payload || {}).minute as any) ?? 0,
+    cron_expr: t.cron_expr || '',
+    timezone: t.timezone || 'Asia/Shanghai',
+    event_entity: t.event_entity || '',
+    event_action: t.event_action || '',
+    webhook_secret: t.webhook_secret || '',
+    webhook_path: t.webhook_path || '',
   }
-  store.isDirty = true
+}
+
+watch(() => store.currentSceneId, () => syncFormFromStore())
+watch(() => store.trigger, () => syncFormFromStore(), { deep: true })
+onMounted(syncFormFromStore)
+
+function updateCron() {
+  const f = triggerForm.value
+  const h = Math.max(0, Math.min(23, Number(f.hour) || 0))
+  const m = Math.max(0, Math.min(59, Number(f.minute) || 0))
+  if (f.frequency === 'daily') f.cron_expr = `${m} ${h} * * *`
+  else if (f.frequency === 'weekly') f.cron_expr = `${m} ${h} * * 1`
+  else if (f.frequency === 'monthly') f.cron_expr = `${m} ${h} 1 * *`
+}
+
+function applyPreset(p: any) {
+  triggerForm.value.frequency = p.frequency
+  triggerForm.value.hour = p.hour
+  triggerForm.value.minute = p.minute
+  if (p.cron) triggerForm.value.cron_expr = p.cron
+  else updateCron()
+}
+
+async function onSaveTrigger() {
+  const f = triggerForm.value
+  await store.saveTrigger({
+    type: f.type,
+    enabled: f.enabled,
+    cron_expr: f.cron_expr,
+    timezone: f.timezone,
+    schedule_payload: {
+      frequency: f.frequency, hour: f.hour, minute: f.minute, timezone: f.timezone,
+    },
+    event_entity: f.event_entity || undefined,
+    event_action: f.event_action || undefined,
+    webhook_secret: f.webhook_secret || undefined,
+  })
+  store.pushLog('success', '触发器已保存')
+}
+
+async function onTestFire() {
+  await store.fireTriggerOnce()
 }
 </script>
 

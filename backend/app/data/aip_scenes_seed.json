@@ -1,0 +1,1467 @@
+{
+  "fttr_renewal": {
+    "nodes": [
+      {
+        "id": "query_target_customers",
+        "type": "ontologyQuery",
+        "position": {
+          "x": -460,
+          "y": 80
+        },
+        "data": {
+          "label": "⓪ 本体查询 · 目标客户",
+          "objectType": "Customer",
+          "objectTypes": [
+            "Customer",
+            "Contract",
+            "Segment",
+            "Strategy",
+            "TouchEvent",
+            "Order"
+          ],
+          "filters": [
+            "{\"property\":\"subscription_status\",\"operator\":\"!=\",\"value\":\"renewed\"}",
+            "{\"property\":\"account_period_type\",\"operator\":\"IN\",\"value\":\"expired_unrenewed,expiring_t4plus,early_unsubscribe_unrenewed,other\"}",
+            "{\"property\":\"is_blacklist\",\"operator\":\"==\",\"value\":\"false\"}",
+            "{\"property\":\"arrears_status\",\"operator\":\"==\",\"value\":\"normal\"}",
+            "{\"property\":\"BR-MOMENT-001 合约临期\",\"operator\":\"<=\",\"value\":\"contract_end_date - today ≤ 90d\"}",
+            "{\"property\":\"BR-MOMENT-002 用量下降\",\"operator\":\"<\",\"value\":\"bandwidth_utilization < 0.3 持续 30d\"}",
+            "{\"property\":\"BR-MOMENT-003 竞品威胁\",\"operator\":\"==\",\"value\":\"TouchEvent.objection_type='competitive_comparison' AND NOT resolved\"}",
+            "{\"property\":\"BR-MOMENT-004 重试资格\",\"operator\":\">=\",\"value\":\"last_touch ≥ 30d 前 AND prev_result=FAILED\"}"
+          ]
+        }
+      },
+      {
+        "id": "agent_demand_insight",
+        "type": "agentNode",
+        "position": {
+          "x": 80,
+          "y": 80
+        },
+        "data": {
+          "label": "① 客群洞察 Agent",
+          "objectTypes": [
+            "Customer",
+            "Segment",
+            "TagDefinition"
+          ],
+          "agentType": "demand_insight",
+          "primarySkillId": "FTTRRenewalPlanningSkill",
+          "llmNodeId": "a1_llm"
+        }
+      },
+      {
+        "id": "agent_product_recommend",
+        "type": "agentNode",
+        "position": {
+          "x": 560,
+          "y": 80
+        },
+        "data": {
+          "label": "② 产品推荐 Agent",
+          "objectTypes": [
+            "Product",
+            "ProductFamily",
+            "Strategy"
+          ],
+          "agentType": "product_recommend",
+          "primarySkillId": "FTTRRenewalPlanningSkill",
+          "llmNodeId": "a2_llm"
+        }
+      },
+      {
+        "id": "func_channel_alloc",
+        "type": "ruleEngine",
+        "position": {
+          "x": 1040,
+          "y": 80
+        },
+        "data": {
+          "label": "③ 触点选择 Function",
+          "objectTypes": [
+            "Customer",
+            "Channel",
+            "WorkOrder"
+          ]
+        }
+      },
+      {
+        "id": "agent_script",
+        "type": "agentNode",
+        "position": {
+          "x": 1500,
+          "y": 80
+        },
+        "data": {
+          "label": "④ 话术 Agent",
+          "objectTypes": [
+            "Script",
+            "Objection",
+            "TouchEvent",
+            "ProductFamily"
+          ],
+          "agentType": "script_gen",
+          "primarySkillId": "EightSegmentScriptSkill",
+          "llmNodeId": "a4_llm"
+        }
+      },
+      {
+        "id": "func_retro_report",
+        "type": "writebackOntology",
+        "position": {
+          "x": 1980,
+          "y": 80
+        },
+        "data": {
+          "label": "⑤ 续约策略执行包 Function",
+          "objectTypes": [
+            "WorkOrder",
+            "Customer",
+            "Product",
+            "Script",
+            "Strategy",
+            "RenewalStrategyPackage"
+          ],
+          "agentType": "renewal_package",
+          "targetObjectType": "RenewalStrategyPackage",
+          "operation": "create"
+        }
+      },
+      {
+        "id": "a1_skills",
+        "type": "skillNode",
+        "position": {
+          "x": -100,
+          "y": 370
+        },
+        "data": {
+          "label": "技能子节点",
+          "skills": [
+            {
+              "name": "FTTR 续约策划技能"
+            },
+            {
+              "name": "V5 排序技能"
+            }
+          ]
+        }
+      },
+      {
+        "id": "a1_memory",
+        "type": "memoryNode",
+        "position": {
+          "x": 130,
+          "y": 370
+        },
+        "data": {
+          "label": "记忆子节点",
+          "memories": []
+        }
+      },
+      {
+        "id": "a1_tools",
+        "type": "toolNode",
+        "position": {
+          "x": 360,
+          "y": 370
+        },
+        "data": {
+          "label": "工具子节点",
+          "tools": [
+            {
+              "name": "本体引擎工具"
+            },
+            {
+              "name": "机器学习模型工具"
+            },
+            {
+              "name": "元景大模型工具"
+            },
+            {
+              "name": "知识增长工具"
+            }
+          ]
+        }
+      },
+      {
+        "id": "a2_skills",
+        "type": "skillNode",
+        "position": {
+          "x": 450,
+          "y": 370
+        },
+        "data": {
+          "label": "技能子节点",
+          "skills": [
+            {
+              "name": "FTTR 续约策划技能"
+            },
+            {
+              "name": "V5 排序技能（产品 ML 主）"
+            }
+          ]
+        }
+      },
+      {
+        "id": "a2_memory",
+        "type": "memoryNode",
+        "position": {
+          "x": 680,
+          "y": 370
+        },
+        "data": {
+          "label": "记忆子节点",
+          "memories": []
+        }
+      },
+      {
+        "id": "a2_tools",
+        "type": "toolNode",
+        "position": {
+          "x": 910,
+          "y": 370
+        },
+        "data": {
+          "label": "工具子节点",
+          "tools": [
+            {
+              "name": "本体引擎工具"
+            },
+            {
+              "name": "机器学习模型工具"
+            },
+            {
+              "name": "元景大模型工具"
+            },
+            {
+              "name": "知识增长工具"
+            }
+          ]
+        }
+      },
+      {
+        "id": "a4_skills",
+        "type": "skillNode",
+        "position": {
+          "x": 1360,
+          "y": 370
+        },
+        "data": {
+          "label": "技能子节点",
+          "skills": [
+            {
+              "name": "八段式话术生成技能"
+            },
+            {
+              "name": "异议匹配技能"
+            },
+            {
+              "name": "FTTR 续约策划技能（共享）"
+            }
+          ]
+        }
+      },
+      {
+        "id": "a4_memory",
+        "type": "memoryNode",
+        "position": {
+          "x": 1590,
+          "y": 370
+        },
+        "data": {
+          "label": "记忆子节点",
+          "memories": []
+        }
+      },
+      {
+        "id": "a4_tools",
+        "type": "toolNode",
+        "position": {
+          "x": 1820,
+          "y": 370
+        },
+        "data": {
+          "label": "工具子节点",
+          "tools": [
+            {
+              "name": "本体引擎工具"
+            },
+            {
+              "name": "元景大模型工具"
+            },
+            {
+              "name": "知识增长工具"
+            }
+          ]
+        }
+      },
+      {
+        "id": "a1_llm",
+        "type": "llmAgent",
+        "position": {
+          "x": 360,
+          "y": 600
+        },
+        "data": {
+          "label": "模型节点",
+          "model": "元景大模型DeepSeek-V3-0324",
+          "mlModelRef": "churn_predictor_v2",
+          "temperature": 0.3
+        }
+      },
+      {
+        "id": "a2_llm",
+        "type": "llmAgent",
+        "position": {
+          "x": 910,
+          "y": 600
+        },
+        "data": {
+          "label": "模型节点",
+          "model": "元景大模型DeepSeek-V3-0324",
+          "mlModelRef": "product_affinity_v1",
+          "temperature": 0.3
+        }
+      },
+      {
+        "id": "a4_llm",
+        "type": "llmAgent",
+        "position": {
+          "x": 1820,
+          "y": 600
+        },
+        "data": {
+          "label": "模型节点",
+          "model": "元景大模型DeepSeek-V3-0324",
+          "mlModelRef": "churn_predictor_v2",
+          "temperature": 0.5
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "e0",
+        "source": "query_target_customers",
+        "target": "agent_demand_insight",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "e1",
+        "source": "agent_demand_insight",
+        "target": "agent_product_recommend",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "e2",
+        "source": "agent_product_recommend",
+        "target": "func_channel_alloc",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "e3",
+        "source": "func_channel_alloc",
+        "target": "agent_script",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "e4",
+        "source": "agent_script",
+        "target": "func_retro_report",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "es1_s",
+        "source": "agent_demand_insight",
+        "target": "a1_skills",
+        "sourceHandle": "sub-skill",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#10b981",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es1_m",
+        "source": "agent_demand_insight",
+        "target": "a1_memory",
+        "sourceHandle": "sub-memory",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#7c3aed",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es1_t",
+        "source": "agent_demand_insight",
+        "target": "a1_tools",
+        "sourceHandle": "sub-tool",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#0ea5e9",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es2_s",
+        "source": "agent_product_recommend",
+        "target": "a2_skills",
+        "sourceHandle": "sub-skill",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#10b981",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es2_m",
+        "source": "agent_product_recommend",
+        "target": "a2_memory",
+        "sourceHandle": "sub-memory",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#7c3aed",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es2_t",
+        "source": "agent_product_recommend",
+        "target": "a2_tools",
+        "sourceHandle": "sub-tool",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#0ea5e9",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es4_s",
+        "source": "agent_script",
+        "target": "a4_skills",
+        "sourceHandle": "sub-skill",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#10b981",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es4_m",
+        "source": "agent_script",
+        "target": "a4_memory",
+        "sourceHandle": "sub-memory",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#7c3aed",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es4_t",
+        "source": "agent_script",
+        "target": "a4_tools",
+        "sourceHandle": "sub-tool",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#0ea5e9",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es1_l",
+        "source": "agent_demand_insight",
+        "target": "a1_llm",
+        "sourceHandle": "sub-llm",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#f59e0b",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es2_l",
+        "source": "agent_product_recommend",
+        "target": "a2_llm",
+        "sourceHandle": "sub-llm",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#f59e0b",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "es4_l",
+        "source": "agent_script",
+        "target": "a4_llm",
+        "sourceHandle": "sub-llm",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#f59e0b",
+          "strokeDasharray": "4 2"
+        }
+      }
+    ]
+  },
+  "ge_insight_qa": {
+    "nodes": [
+      {
+        "id": "ge_ontology_context_builder",
+        "type": "ontologyQuery",
+        "position": {
+          "x": -180,
+          "y": 200
+        },
+        "data": {
+          "label": "本体语义理解与上下文组装",
+          "objectType": "KPIIndicatorDef",
+          "objectTypes": [
+            "KPIIndicatorDef",
+            "GeCustomerSegment",
+            "GeProject",
+            "GeOpportunity",
+            "Contract",
+            "GeProductService",
+            "GeAccountManager",
+            "GeBusinessEvent",
+            "GeRegionOrg"
+          ],
+          "apiName": "gov_enterprise_ontology_context_builder",
+          "nodeKind": "LLM + 规则编排（非 Agent）",
+          "inputDescription": "用户自然语言问句",
+          "outputDescription": "本体上下文：本体实例集合 + 业务规则集合"
+        }
+      },
+      {
+        "id": "ge_data_analysis_agent",
+        "type": "agentNode",
+        "position": {
+          "x": 440,
+          "y": 200
+        },
+        "data": {
+          "label": "政企数据分析 Agent",
+          "objectTypes": [
+            "KPIIndicatorDef",
+            "GeCustomerSegment",
+            "GeRegionOrg",
+            "GeBusinessEvent",
+            "GeProductService"
+          ],
+          "primarySkillId": "skill_nl2sql_kpi_query",
+          "llmNodeId": "ge_a1_llm",
+          "model": "qwen2.5 / DeepSeek-V3",
+          "apiName": "gov_enterprise_data_analysis_agent",
+          "inputDescription": "本体上下文（来自节点 1）",
+          "outputDescription": "分析结果：异动清单 + 趋势分析 + 多维归因摘要"
+        }
+      },
+      {
+        "id": "ge_root_cause_reasoner_agent",
+        "type": "agentNode",
+        "position": {
+          "x": 840,
+          "y": 200
+        },
+        "data": {
+          "label": "政企归因推理 Agent",
+          "objectTypes": [
+            "KPIIndicatorDef",
+            "GeCustomerSegment",
+            "GeRegionOrg",
+            "Contract",
+            "GeAccountManager"
+          ],
+          "primarySkillId": "skill_cross_dim_attribution",
+          "llmNodeId": "ge_a2_llm",
+          "model": "qwen2.5 / DeepSeek-V3",
+          "apiName": "gov_enterprise_root_cause_reasoner",
+          "inputDescription": "分析结果 + 多维归因摘要（来自节点 2）",
+          "outputDescription": "推理结果：主根因标签 / 根因维度 / 根因置信度 / 业务信号 / 贡献因子 / 证据链摘要 / 推理路径快照 / 路由决策"
+        }
+      },
+      {
+        "id": "ge_business_rule_branch",
+        "type": "condition",
+        "position": {
+          "x": 1240,
+          "y": 200
+        },
+        "data": {
+          "label": "业务规则路由分支",
+          "expression": {
+            "field": "业务信号",
+            "operator": "switch",
+            "value": "大规模异常|要客流失|逾期应收|多维异常|正常"
+          },
+          "branches": [
+            {
+              "label": "大规模异常",
+              "condition": "业务信号 = 大规模异常",
+              "action": "数据稽核工单"
+            },
+            {
+              "label": "要客流失",
+              "condition": "业务信号 = 要客流失",
+              "action": "澄清定责工单"
+            },
+            {
+              "label": "逾期应收",
+              "condition": "业务信号 = 逾期应收",
+              "action": "催缴升级工单"
+            },
+            {
+              "label": "多维异常",
+              "condition": "业务信号 = 多维异常",
+              "action": "综合研判"
+            },
+            {
+              "label": "正常",
+              "condition": "业务信号 = 正常",
+              "action": "归档分析结论"
+            }
+          ],
+          "apiName": "gov_enterprise_business_rule_routing"
+        }
+      },
+      {
+        "id": "ge_action_data_audit",
+        "type": "actionSystem",
+        "position": {
+          "x": 1680,
+          "y": -80
+        },
+        "data": {
+          "label": "动作 · 数据稽核工单",
+          "targetObjectType": "KPIIndicatorDef",
+          "apiName": "CreateDataAuditTask",
+          "writebackTarget": "指标体系 · 稽核状态"
+        }
+      },
+      {
+        "id": "ge_action_clarify_accountability",
+        "type": "actionSystem",
+        "position": {
+          "x": 1680,
+          "y": 100
+        },
+        "data": {
+          "label": "动作 · 澄清定责工单",
+          "targetObjectType": "GeAccountManager",
+          "apiName": "CreateClarifyAccountabilityTask",
+          "writebackTarget": "政企客户经理 · 任务清单"
+        }
+      },
+      {
+        "id": "ge_action_collection_escalation",
+        "type": "actionSystem",
+        "position": {
+          "x": 1680,
+          "y": 280
+        },
+        "data": {
+          "label": "动作 · 催缴升级工单",
+          "targetObjectType": "Contract",
+          "apiName": "TriggerCollectionEscalation",
+          "writebackTarget": "政企合同 · 催缴状态"
+        }
+      },
+      {
+        "id": "ge_action_comprehensive_review",
+        "type": "actionSystem",
+        "position": {
+          "x": 1680,
+          "y": 460
+        },
+        "data": {
+          "label": "动作 · 综合研判",
+          "targetObjectType": "KPIIndicatorDef",
+          "apiName": "TriggerComprehensiveReview",
+          "writebackTarget": "指标体系 · 研判状态"
+        }
+      },
+      {
+        "id": "ge_action_archive_analysis",
+        "type": "actionSystem",
+        "position": {
+          "x": 1680,
+          "y": 640
+        },
+        "data": {
+          "label": "动作 · 归档分析结论",
+          "targetObjectType": "KPIIndicatorDef",
+          "apiName": "ArchiveAnalysisResult",
+          "writebackTarget": "指标体系 · 分析记录"
+        }
+      },
+      {
+        "id": "ge_a1_skills",
+        "type": "skillNode",
+        "position": {
+          "x": 160,
+          "y": 640
+        },
+        "data": {
+          "label": "技能子节点",
+          "skills": [
+            {
+              "name": "语义化指标查询"
+            },
+            {
+              "name": "指标异动检测"
+            },
+            {
+              "name": "多维归因融合"
+            }
+          ]
+        }
+      },
+      {
+        "id": "ge_a1_memory",
+        "type": "memoryNode",
+        "position": {
+          "x": 440,
+          "y": 640
+        },
+        "data": {
+          "label": "记忆子节点",
+          "memories": []
+        }
+      },
+      {
+        "id": "ge_a1_tools",
+        "type": "toolNode",
+        "position": {
+          "x": 720,
+          "y": 640
+        },
+        "data": {
+          "label": "工具子节点",
+          "tools": [
+            {
+              "name": "本体引擎工具"
+            },
+            {
+              "name": "指标数据源"
+            },
+            {
+              "name": "异动规则库"
+            }
+          ]
+        }
+      },
+      {
+        "id": "ge_a1_llm",
+        "type": "llmAgent",
+        "position": {
+          "x": 1000,
+          "y": 640
+        },
+        "data": {
+          "label": "模型节点",
+          "model": "元景大模型Qwen2.5-72B",
+          "mlModelRef": "kpi_anomaly_detector_v1",
+          "temperature": 0.2
+        }
+      },
+      {
+        "id": "ge_a2_skills",
+        "type": "skillNode",
+        "position": {
+          "x": 1280,
+          "y": 640
+        },
+        "data": {
+          "label": "技能子节点",
+          "skills": [
+            {
+              "name": "交叉归因分析"
+            },
+            {
+              "name": "根因置信度评估"
+            }
+          ]
+        }
+      },
+      {
+        "id": "ge_a2_memory",
+        "type": "memoryNode",
+        "position": {
+          "x": 1280,
+          "y": 870
+        },
+        "data": {
+          "label": "记忆子节点",
+          "memories": []
+        }
+      },
+      {
+        "id": "ge_a2_tools",
+        "type": "toolNode",
+        "position": {
+          "x": 1560,
+          "y": 870
+        },
+        "data": {
+          "label": "工具子节点",
+          "tools": [
+            {
+              "name": "本体引擎工具"
+            },
+            {
+              "name": "知识增长工具"
+            }
+          ]
+        }
+      },
+      {
+        "id": "ge_a2_llm",
+        "type": "llmAgent",
+        "position": {
+          "x": 1840,
+          "y": 870
+        },
+        "data": {
+          "label": "模型节点",
+          "model": "元景大模型Qwen2.5-72B",
+          "mlModelRef": "kpi_contribution_decomposer_v1",
+          "temperature": 0.1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "ge_e1",
+        "source": "ge_ontology_context_builder",
+        "target": "ge_data_analysis_agent",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "ge_e2",
+        "source": "ge_data_analysis_agent",
+        "target": "ge_root_cause_reasoner_agent",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "ge_e3",
+        "source": "ge_root_cause_reasoner_agent",
+        "target": "ge_business_rule_branch",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "ge_eb1",
+        "source": "ge_business_rule_branch",
+        "target": "ge_action_data_audit",
+        "sourceHandle": "source-0",
+        "label": "① 大规模异常",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "ge_eb2",
+        "source": "ge_business_rule_branch",
+        "target": "ge_action_clarify_accountability",
+        "sourceHandle": "source-0",
+        "label": "② 要客流失",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "ge_eb3",
+        "source": "ge_business_rule_branch",
+        "target": "ge_action_collection_escalation",
+        "sourceHandle": "source-0",
+        "label": "③ 逾期应收",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "ge_eb4",
+        "source": "ge_business_rule_branch",
+        "target": "ge_action_comprehensive_review",
+        "sourceHandle": "source-0",
+        "label": "④ 多维异常",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "ge_eb5",
+        "source": "ge_business_rule_branch",
+        "target": "ge_action_archive_analysis",
+        "sourceHandle": "source-0",
+        "label": "⑤ 正常",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "ge_es1_s",
+        "source": "ge_data_analysis_agent",
+        "target": "ge_a1_skills",
+        "sourceHandle": "sub-skill",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#10b981",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "ge_es1_m",
+        "source": "ge_data_analysis_agent",
+        "target": "ge_a1_memory",
+        "sourceHandle": "sub-memory",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#7c3aed",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "ge_es1_t",
+        "source": "ge_data_analysis_agent",
+        "target": "ge_a1_tools",
+        "sourceHandle": "sub-tool",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#0ea5e9",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "ge_es2_s",
+        "source": "ge_root_cause_reasoner_agent",
+        "target": "ge_a2_skills",
+        "sourceHandle": "sub-skill",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#10b981",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "ge_es2_m",
+        "source": "ge_root_cause_reasoner_agent",
+        "target": "ge_a2_memory",
+        "sourceHandle": "sub-memory",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#7c3aed",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "ge_es2_t",
+        "source": "ge_root_cause_reasoner_agent",
+        "target": "ge_a2_tools",
+        "sourceHandle": "sub-tool",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#0ea5e9",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "ge_es1_l",
+        "source": "ge_data_analysis_agent",
+        "target": "ge_a1_llm",
+        "sourceHandle": "sub-llm",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#f59e0b",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "ge_es2_l",
+        "source": "ge_root_cause_reasoner_agent",
+        "target": "ge_a2_llm",
+        "sourceHandle": "sub-llm",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#f59e0b",
+          "strokeDasharray": "4 2"
+        }
+      }
+    ]
+  },
+  "refund_attribution": {
+    "nodes": [
+      {
+        "id": "refund_query_ontology",
+        "type": "ontologyQuery",
+        "position": {
+          "x": -180,
+          "y": 200
+        },
+        "data": {
+          "label": "本体查询",
+          "objectType": "InstallOrder",
+          "objectTypes": [
+            "InstallOrder",
+            "InstallChurn",
+            "Customer",
+            "Product",
+            "Channel",
+            "DispatchRecord",
+            "InstallEngineer",
+            "Address",
+            "PendingPool",
+            "EngineerCall",
+            "CallbackCall",
+            "MarketingCall",
+            "CompetitorCall"
+          ]
+        }
+      },
+      {
+        "id": "refund_skill_evidence",
+        "type": "agentNode",
+        "position": {
+          "x": 440,
+          "y": 200
+        },
+        "data": {
+          "label": "退单证据提取 Agent",
+          "objectTypes": [
+            "InstallChurn",
+            "InstallOrder",
+            "Customer",
+            "InstallEngineer",
+            "Address",
+            "DispatchRecord",
+            "PendingPool",
+            "Product",
+            "Channel",
+            "CompetitorCall",
+            "EngineerCall",
+            "CallbackCall"
+          ],
+          "primarySkillId": "skill_nlp_evidence_extract",
+          "llmNodeId": "rfa1_llm"
+        }
+      },
+      {
+        "id": "refund_skill_reasoning",
+        "type": "agentNode",
+        "position": {
+          "x": 840,
+          "y": 200
+        },
+        "data": {
+          "label": "退单根因归因 Agent",
+          "objectTypes": [
+            "InstallChurn",
+            "InstallOrder"
+          ],
+          "primarySkillId": "skill_hierarchical_attribution",
+          "llmNodeId": "rfa2_llm"
+        }
+      },
+      {
+        "id": "refund_branch",
+        "type": "condition",
+        "position": {
+          "x": 1220,
+          "y": 200
+        },
+        "data": {
+          "label": "归因分支",
+          "expression": {
+            "field": "routing_decision",
+            "operator": "switch",
+            "value": "自动归档|强制回访|补充回访|升级审核"
+          },
+          "branches": [
+            {
+              "label": "自动归档",
+              "condition": "二级根因 = R1 区域无资源",
+              "action": "提交人工资源核实"
+            },
+            {
+              "label": "强制回访",
+              "condition": "一级根因 = 用户原因",
+              "action": "创建强制回访外呼"
+            },
+            {
+              "label": "补充回访",
+              "condition": "一级置信度 ≥ 0.85",
+              "action": "自动归档稽核结果"
+            },
+            {
+              "label": "升级审核",
+              "condition": "一级置信度 < 0.85",
+              "action": "转人工审核"
+            }
+          ]
+        }
+      },
+      {
+        "id": "refund_action_archive",
+        "type": "actionSystem",
+        "position": {
+          "x": 1660,
+          "y": 20
+        },
+        "data": {
+          "label": "动作 · 提交人工资源核实",
+          "targetObjectType": "Address"
+        }
+      },
+      {
+        "id": "refund_action_verify",
+        "type": "actionSystem",
+        "position": {
+          "x": 1660,
+          "y": 200
+        },
+        "data": {
+          "label": "动作 · 创建强制回访外呼",
+          "targetObjectType": "CallbackCall"
+        }
+      },
+      {
+        "id": "refund_action_callback",
+        "type": "actionSystem",
+        "position": {
+          "x": 1660,
+          "y": 380
+        },
+        "data": {
+          "label": "动作 · 自动归档稽核结果",
+          "targetObjectType": "InstallChurn"
+        }
+      },
+      {
+        "id": "refund_action_marketing",
+        "type": "actionSystem",
+        "position": {
+          "x": 1660,
+          "y": 560
+        },
+        "data": {
+          "label": "动作 · 转人工审核",
+          "targetObjectType": "InstallChurn"
+        }
+      },
+      {
+        "id": "rfa1_skills",
+        "type": "skillNode",
+        "position": {
+          "x": 160,
+          "y": 640
+        },
+        "data": {
+          "label": "技能子节点",
+          "skills": [
+            {
+              "name": "语义证据抽取技能（26 条大模型函数）"
+            },
+            {
+              "name": "规则证据计算技能（11 条规则函数）"
+            }
+          ]
+        }
+      },
+      {
+        "id": "rfa1_memory",
+        "type": "memoryNode",
+        "position": {
+          "x": 440,
+          "y": 640
+        },
+        "data": {
+          "label": "记忆子节点",
+          "memories": []
+        }
+      },
+      {
+        "id": "rfa1_tools",
+        "type": "toolNode",
+        "position": {
+          "x": 720,
+          "y": 640
+        },
+        "data": {
+          "label": "工具子节点",
+          "tools": [
+            {
+              "name": "本体引擎工具"
+            },
+            {
+              "name": "知识增长工具"
+            }
+          ]
+        }
+      },
+      {
+        "id": "rfa2_skills",
+        "type": "skillNode",
+        "position": {
+          "x": 920,
+          "y": 640
+        },
+        "data": {
+          "label": "技能子节点",
+          "skills": [
+            {
+              "name": "分层归因技能（3 个函数：评分 + 聚合 + 微调）"
+            }
+          ]
+        }
+      },
+      {
+        "id": "rfa2_memory",
+        "type": "memoryNode",
+        "position": {
+          "x": 1200,
+          "y": 640
+        },
+        "data": {
+          "label": "记忆子节点",
+          "memories": []
+        }
+      },
+      {
+        "id": "rfa2_tools",
+        "type": "toolNode",
+        "position": {
+          "x": 1480,
+          "y": 640
+        },
+        "data": {
+          "label": "工具子节点",
+          "tools": [
+            {
+              "name": "本体引擎工具"
+            },
+            {
+              "name": "知识增长工具"
+            }
+          ]
+        }
+      },
+      {
+        "id": "rfa1_llm",
+        "type": "llmAgent",
+        "position": {
+          "x": 720,
+          "y": 870
+        },
+        "data": {
+          "label": "模型节点",
+          "model": "元景大模型DeepSeek-V3-0324",
+          "mlModelRef": "refund_risk_classifier_v1",
+          "temperature": 0.2
+        }
+      },
+      {
+        "id": "rfa2_llm",
+        "type": "llmAgent",
+        "position": {
+          "x": 1480,
+          "y": 870
+        },
+        "data": {
+          "label": "模型节点",
+          "model": "元景大模型DeepSeek-V3-0324",
+          "mlModelRef": "install_success_predictor_v1",
+          "temperature": 0.1
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "rf_e1",
+        "source": "refund_query_ontology",
+        "target": "refund_skill_evidence",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "rf_e2",
+        "source": "refund_skill_evidence",
+        "target": "refund_skill_reasoning",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "rf_e3",
+        "source": "refund_skill_reasoning",
+        "target": "refund_branch",
+        "animated": true,
+        "style": {
+          "stroke": "#4a90d9"
+        }
+      },
+      {
+        "id": "rf_eb1",
+        "source": "refund_branch",
+        "target": "refund_action_archive",
+        "sourceHandle": "source-0",
+        "label": "① 二级根因=R1 区域无资源",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "rf_eb2",
+        "source": "refund_branch",
+        "target": "refund_action_verify",
+        "sourceHandle": "source-0",
+        "label": "② 一级根因=用户原因",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "rf_eb3",
+        "source": "refund_branch",
+        "target": "refund_action_callback",
+        "sourceHandle": "source-0",
+        "label": "③ 一级置信度 ≥ 0.85",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "rf_eb4",
+        "source": "refund_branch",
+        "target": "refund_action_marketing",
+        "sourceHandle": "source-0",
+        "label": "④ 一级置信度 < 0.85",
+        "animated": true,
+        "style": {
+          "stroke": "#059669"
+        }
+      },
+      {
+        "id": "rf_es1_s",
+        "source": "refund_skill_evidence",
+        "target": "rfa1_skills",
+        "sourceHandle": "sub-skill",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#10b981",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "rf_es1_m",
+        "source": "refund_skill_evidence",
+        "target": "rfa1_memory",
+        "sourceHandle": "sub-memory",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#7c3aed",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "rf_es1_t",
+        "source": "refund_skill_evidence",
+        "target": "rfa1_tools",
+        "sourceHandle": "sub-tool",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#0ea5e9",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "rf_es2_s",
+        "source": "refund_skill_reasoning",
+        "target": "rfa2_skills",
+        "sourceHandle": "sub-skill",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#10b981",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "rf_es2_m",
+        "source": "refund_skill_reasoning",
+        "target": "rfa2_memory",
+        "sourceHandle": "sub-memory",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#7c3aed",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "rf_es2_t",
+        "source": "refund_skill_reasoning",
+        "target": "rfa2_tools",
+        "sourceHandle": "sub-tool",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#0ea5e9",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "rf_es1_l",
+        "source": "refund_skill_evidence",
+        "target": "rfa1_llm",
+        "sourceHandle": "sub-llm",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#f59e0b",
+          "strokeDasharray": "4 2"
+        }
+      },
+      {
+        "id": "rf_es2_l",
+        "source": "refund_skill_reasoning",
+        "target": "rfa2_llm",
+        "sourceHandle": "sub-llm",
+        "targetHandle": "target-top",
+        "style": {
+          "stroke": "#f59e0b",
+          "strokeDasharray": "4 2"
+        }
+      }
+    ]
+  }
+}

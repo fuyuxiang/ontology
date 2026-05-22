@@ -16,6 +16,9 @@ from app.models.version import (
     OntologyVersionAttribute, OntologyVersionRelation,
 )
 from app.models.pipeline import Pipeline, PipelineRun
+from app.models.scene import (
+    AipScene, AipSceneVersion, AipSceneExecution, AipSceneTrigger,
+)
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
@@ -27,4 +30,5 @@ __all__ = [
     "OntologyVersion", "OntologyVersionEntity",
     "OntologyVersionAttribute", "OntologyVersionRelation",
     "Pipeline", "PipelineRun",
+    "AipScene", "AipSceneVersion", "AipSceneExecution", "AipSceneTrigger",
 ]

@@ -116,13 +116,15 @@ export const NODE_TYPES: NodeTypeMeta[] = [
   { type: 'agentNode', label: 'Agent 节点', group: 'Agent 节点', color: '#10B981', description: '挂多个 Skill / Memory / Tool 子节点', icon: 'robot' },
   { type: 'skillNode', label: 'Skill 节点', group: 'Agent 子节点', color: '#10B981', description: 'Skill 注册', icon: 'thunder' },
   { type: 'memoryNode', label: 'Memory 节点', group: 'Agent 子节点', color: '#7C3AED', description: 'Working / Episodic / Semantic / Procedural', icon: 'memory' },
-  { type: 'toolNode', label: 'Action 节点', group: 'Agent 子节点', color: '#0EA5E9', description: 'OntologyEngine / MLModel / LLM / KnowledgeGrowth', icon: 'tool' },
+  { type: 'toolNode', label: 'Tool 节点', group: 'Agent 子节点', color: '#0EA5E9', description: 'OntologyEngine / MLModel / LLM / KnowledgeGrowth', icon: 'tool' },
+  { type: 'function', label: 'Function 计算', group: '函数节点', color: '#0EA5E9', description: '调用 OntologyFunction', icon: 'tool' },
   { type: 'writebackOntology', label: '写回本体', group: '动作节点', color: '#059669', description: '写回本体对象', icon: 'save' },
-  { type: 'actionSystem', label: '动作执行', group: '动作节点', color: '#059669', description: '执行系统动作', icon: 'send' },
+  { type: 'actionSystem', label: '动作执行', group: '动作节点', color: '#059669', description: '调用 EntityAction', icon: 'send' },
+  { type: 'subscene', label: '子场景', group: '编排节点', color: '#7C3AED', description: '嵌套执行其他场景', icon: 'robot' },
   { type: 'condition', label: '条件分支', group: '控制节点', color: '#64748B', description: '条件判断分流', icon: 'branch' },
 ]
 
-export const NODE_GROUPS = ['数据节点', '逻辑节点', 'Agent 节点', 'Agent 子节点', '动作节点', '控制节点']
+export const NODE_GROUPS = ['数据节点', '逻辑节点', 'Agent 节点', 'Agent 子节点', '函数节点', '动作节点', '编排节点', '控制节点']
 
 /* ========== LLM / ML 模型选项 ========== */
 export const LLM_MODELS = [
