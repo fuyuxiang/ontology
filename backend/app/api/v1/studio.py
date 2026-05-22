@@ -10,8 +10,10 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models.entity import OntologyEntity, EntityAttribute
 from app.models.relation import EntityRelation
@@ -471,9 +473,84 @@ def get_events(limit: int = 30, db: Session = Depends(get_db)) -> dict[str, Any]
     }
 
 
-# ─── 数据刷新：手动触发所有 datasource 实例计数 ──────────────────────
+# ─── AI 业务解读（OntologyNarrator）─────────────────────────────────
 
-@router.post("/refresh-counts")
+class NarratorRequest(BaseModel):
+    apiName: str
+    displayName: str
+    tier: int
+    instanceCount: int = 0
+    propCount: int = 0
+    relCount: int = 0
+    ruleCount: int = 0
+    actionCount: int = 0
+    kpiSummary: str = ""
+
+
+# 14 个核心对象的 hardcoded fallback 文案（LLM 不可用时用）
+_NARRATOR_FALLBACK = {
+    "Customer": "客户是整个业务的核心主体。客户与订单、产品、地址、分群都有直接关联，是所有推理链的起点。建议关注 ARPU 中价值区间——这是转化率最高的黄金区间。",
+    "Order": "订单记录了客户的每一笔交易行为。订单连接了客户和产品，是衡量策略效果的核心指标。通过分析订单数据，可以追溯哪个渠道、哪个话术、哪个产品组合带来了最高转化。",
+    "Product": "产品是策略的核心载体。低门槛产品更容易促成转化。产品与客户分群通过匹配规则关联，不同分群推荐不同产品。",
+    "InstallOrder": "装机订单是宽带退单稽核的关键起点。它连接了客户、地址、工程师、派单记录，是归因分析的核心证据来源。",
+    "InstallChurn": "装机退单是退单稽核的核心对象。通过 35 项证据推理（E1-E35），系统自动给出归因结论：客户责任 / 工程师责任 / 业务责任 / 第三方责任 / 异常情况。",
+    "DispatchRecord": "派单记录承载了工程师与工单的派遣关系，是工程师责任归因的核心证据。",
+    "EngineerCall": "工程师与客户的通话录音，经过语音质检后产出客户意向、工程师服务质量等关键证据。",
+    "Channel": "渠道定义了触达通路。不同渠道的转化率和覆盖面差异显著。当前策略是多渠道协同——先线上预热，再线下跟进。",
+    "Staff": "员工是触达和服务的核心执行力量。客户经理人均管户百余户，他们的执行效率直接影响转化。",
+    "RegionalOrg": "组织架构覆盖各盟市分公司。不同分公司的渗透率和转化率差异显著，需要将经验向其他盟市推广。",
+}
+
+
+@router.post("/narrator/explain")
+def narrator_explain(req: NarratorRequest) -> dict[str, Any]:
+    """对本体对象生成业务解读（fttr OntologyNarrator 复刻）"""
+    tier_label = {1: "核心层", 2: "领域层", 3: "场景层"}.get(req.tier, "未知层")
+    prompt = f"""你是 Agentic Ontology 智能本体平台的业务解说员。请用简洁生动的中文，对以下本体对象进行全方位业务解读。
+
+对象：{req.displayName}（{req.apiName}）
+层级：Tier {req.tier}（{tier_label}）
+实例数：{req.instanceCount}｜属性数：{req.propCount}｜关系数：{req.relCount}｜规则数：{req.ruleCount}｜动作数：{req.actionCount}
+业务指标：{req.kpiSummary or '暂无'}
+
+请从以下维度解读（每个维度 1-2 句话，总共不超过 150 字）：
+1. 业务角色：这个对象在业务中扮演什么角色？
+2. 关键价值：它的核心业务价值是什么？
+3. 当前状态：基于数据，当前业务状态如何？
+4. 关联影响：它与哪些对象的关系最关键？
+5. 推荐关注：当前最需要关注什么？
+
+用口语化的方式，像一个资深业务专家在给新同事介绍。不要用 markdown 格式。"""
+
+    try:
+        from app.services.copilot import get_llm_client
+        client = get_llm_client()
+        response = client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=300,
+        )
+        content = response.choices[0].message.content or ""
+        # 剥离推理模型的 <think>...</think> 块
+        import re
+        content = re.sub(r"<think>.*?</think>\s*", "", content, flags=re.DOTALL).strip()
+        if content:
+            return {"source": "llm", "content": content}
+    except Exception as e:
+        print(f"narrator LLM failed: {e}")
+
+    # Fallback 到 hardcoded 模板
+    fallback = _NARRATOR_FALLBACK.get(
+        req.apiName,
+        f"{req.displayName} 是本体中的{tier_label}对象，当前有 {req.instanceCount} 个实例。"
+        f"它在业务中承担重要角色，与多个对象存在关联关系。"
+        f"建议点击查看详情面板了解更多属性和规则信息。"
+    )
+    return {"source": "fallback", "content": fallback}
+
+
+# ─── 数据刷新：手动触发所有 datasource 实例计数 ──────────────────────
 def refresh_counts(db: Session = Depends(get_db)) -> dict[str, Any]:
     """触发所有启用的数据源重新统计 record_count，刷新 A-Box 实例数"""
     from app.models.datasource import DataSource

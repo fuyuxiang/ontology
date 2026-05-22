@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>数据工坊 · 水合演练</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif; background: #f0f2f5; color: #262626; font-size: 13px; }
+
+.page { display: flex; flex-direction: column; min-height: 100vh; }
+.page-header { background: #fff; border-bottom: 1px solid #f0f0f0; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 52px; flex-shrink: 0; position: sticky; top: 0; z-index: 10; }
+.breadcrumb { font-size: 12px; color: #bfbfbf; }
+.breadcrumb span { color: #434343; font-weight: 600; }
+.header-meta { font-size: 11px; color: #bfbfbf; display: flex; align-items: center; gap: 12px; }
+.main { padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; }
+
+/* ===== Buttons ===== */
+.btn { display: inline-flex; align-items: center; gap: 5px; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 500; cursor: pointer; border: none; transition: all 0.15s; }
+.btn-primary { background: #1890FF; color: #fff; }
+.btn-primary:hover { background: #096DD9; }
+.btn-success { background: #389e0d; color: #fff; font-size: 13px; padding: 8px 20px; }
+.btn-success:hover { background: #237804; }
+.btn-default { background: #fff; color: #595959; border: 1px solid #d9d9d9; }
+.btn-default:hover { border-color: #1890FF; color: #1890FF; }
+.btn-sm { padding: 4px 12px; font-size: 11px; }
+.btn-back { background: #fff; color: #1890FF; border: 1px solid #1890FF; font-size: 12px; padding: 5px 14px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; font-weight: 500; transition: all 0.15s; }
+.btn-back:hover { background: #e6f4ff; }
+
+/* ===== Section ===== */
+.section { margin-bottom: 20px; }
+.section-title { font-size: 13px; font-weight: 700; color: #262626; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.section-title::before { content: ''; width: 3px; height: 15px; background: #1890FF; border-radius: 2px; display: inline-block; }
+.section-title .badge-ok { background: #d9f7be; color: #389e0d; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; }
+
+/* ===== Status Banner ===== */
+.status-banner { background: linear-gradient(135deg, #389e0d 0%, #52c41a 60%, #34d399 100%); border-radius: 12px; padding: 20px 28px; display: flex; align-items: center; gap: 24px; margin-bottom: 20px; color: #fff; }
+.banner-icon { font-size: 40px; flex-shrink: 0; }
+.banner-center { flex: 1; }
+.banner-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.banner-sub { font-size: 12px; opacity: 0.85; margin-bottom: 10px; }
+.banner-checks { display: flex; gap: 16px; flex-wrap: wrap; }
+.banner-check { display: flex; align-items: center; gap: 5px; font-size: 11px; background: rgba(255,255,255,0.2); border-radius: 16px; padding: 3px 10px; }
+.score-ring { width: 72px; height: 72px; border-radius: 50%; background: rgba(255,255,255,0.2); border: 4px solid rgba(255,255,255,0.6); display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.score-num { font-size: 22px; font-weight: 800; line-height: 1; }
+.score-label { font-size: 10px; opacity: 0.8; }
+
+/* ===== Stats Row ===== */
+.stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+.stat-card { background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; padding: 14px 18px; }
+.stat-card.blue { border-left: 3px solid #1890FF; }
+.stat-card.green { border-left: 3px solid #52c41a; }
+.stat-card.amber { border-left: 3px solid #fa8c16; }
+.stat-card.purple { border-left: 3px solid #722ed1; }
+.stat-num { font-size: 24px; font-weight: 800; color: #262626; line-height: 1.1; }
+.stat-label { font-size: 11px; color: #8c8c8c; margin-top: 3px; }
+.stat-sub { font-size: 10px; color: #bfbfbf; margin-top: 2px; }
+
+/* ===== Table ===== */
+.table-wrap { background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; overflow: hidden; }
+table { width: 100%; border-collapse: collapse; }
+thead th { background: #fafafa; padding: 9px 14px; text-align: left; font-size: 11px; font-weight: 600; color: #8c8c8c; border-bottom: 1px solid #f0f0f0; }
+tbody td { padding: 10px 14px; font-size: 12px; color: #434343; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #fafafa; cursor: pointer; }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+.badge-pass { background: #d9f7be; color: #389e0d; }
+.badge-fail { background: #fff1f0; color: #cf1322; }
+
+/* ===== Pipeline ===== */
+.pipeline-wrap { background: #fff; border: 1px solid #f0f0f0; border-radius: 10px; padding: 20px 24px; }
+.pipeline-customer { display: flex; align-items: stretch; gap: 20px; }
+.customer-card { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 14px; width: 180px; flex-shrink: 0; }
+.cust-title { font-size: 11px; font-weight: 700; color: #8c8c8c; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+.cust-row { display: flex; justify-content: space-between; padding: 3px 0; font-size: 11px; border-bottom: 1px solid #f0f0f0; }
+.cust-row:last-child { border-bottom: none; }
+.cust-key { color: #8c8c8c; }
+.cust-val { color: #262626; font-weight: 600; font-family: monospace; font-size: 10px; }
+.cust-seg { margin-top: 8px; background: #e6f4ff; border-radius: 4px; padding: 4px 8px; font-size: 11px; color: #1890FF; font-weight: 600; text-align: center; }
+
+.pipeline-steps { flex: 1; display: flex; align-items: center; gap: 0; }
+.pipe-step { flex: 1; position: relative; }
+.pipe-step-inner { background: #fff; border: 1.5px solid #1890FF; border-radius: 8px; padding: 10px 12px; margin: 0 4px; }
+.pipe-step-num { font-size: 10px; color: #1890FF; font-weight: 700; margin-bottom: 4px; }
+.pipe-step-title { font-size: 11px; font-weight: 700; color: #262626; margin-bottom: 4px; line-height: 1.3; }
+.pipe-step-detail { font-size: 10px; color: #8c8c8c; line-height: 1.5; }
+.pipe-step-result { font-size: 10px; color: #389e0d; font-weight: 600; margin-top: 4px; padding-top: 4px; border-top: 1px solid #f0f0f0; }
+.pipe-arrow { color: #1890FF; font-size: 18px; flex-shrink: 0; margin: 0 -2px; z-index: 1; }
+
+.verdict-box { background: #f6ffed; border: 1.5px solid #95de64; border-radius: 8px; padding: 12px 16px; margin-top: 14px; display: flex; align-items: flex-start; gap: 8px; font-size: 11px; color: #135200; line-height: 1.7; }
+.verdict-icon { font-size: 16px; flex-shrink: 0; }
+
+/* ===== ROI ===== */
+.roi-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.roi-card { border-radius: 10px; padding: 20px 24px; }
+.roi-card.baseline { background: #fafafa; border: 1px solid #f0f0f0; }
+.roi-card.target { background: linear-gradient(135deg, #e6f4ff, #f6ffed); border: 1.5px solid #95de64; }
+.roi-num { font-size: 36px; font-weight: 900; line-height: 1; margin: 8px 0 4px; }
+.roi-num.baseline { color: #8c8c8c; }
+.roi-num.target { color: #389e0d; }
+.roi-label { font-size: 12px; color: #8c8c8c; }
+.roi-sub { font-size: 11px; color: #bfbfbf; margin-bottom: 12px; }
+.roi-detail { font-size: 11px; color: #595959; line-height: 1.7; }
+.roi-uplift { display: inline-flex; align-items: center; gap: 4px; background: #d9f7be; color: #389e0d; border-radius: 12px; padding: 2px 10px; font-size: 11px; font-weight: 700; margin-top: 6px; }
+
+.mini-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+.mini-table th { font-size: 10px; color: #bfbfbf; padding: 4px 8px; text-align: left; border-bottom: 1px solid #f0f0f0; }
+.mini-table td { font-size: 11px; padding: 6px 8px; border-bottom: 1px solid #f0f0f0; color: #434343; }
+.mini-table tr:last-child td { border-bottom: none; }
+.conv-rate { color: #389e0d; font-weight: 700; }
+
+/* ===== Publish Box ===== */
+.publish-box { background: #fff; border: 2px solid #1890FF; border-radius: 12px; padding: 24px 28px; }
+.pub-title { font-size: 15px; font-weight: 800; color: #262626; margin-bottom: 4px; }
+.pub-sub { font-size: 12px; color: #8c8c8c; margin-bottom: 20px; }
+.consumers-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 20px; }
+.consumer-card { background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 10px; text-align: center; }
+.consumer-icon { font-size: 20px; margin-bottom: 4px; }
+.consumer-name { font-size: 11px; font-weight: 600; color: #434343; margin-bottom: 2px; }
+.consumer-desc { font-size: 10px; color: #bfbfbf; }
+.pub-action { text-align: center; }
+.pub-note { font-size: 10px; color: #bfbfbf; margin-top: 8px; }
+
+/* ===== View A: History List ===== */
+.toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.filter-group { display: flex; gap: 0; border: 1px solid #d9d9d9; border-radius: 6px; overflow: hidden; }
+.filter-btn { padding: 6px 16px; font-size: 12px; cursor: pointer; background: #fff; border: none; color: #595959; transition: all 0.15s; border-right: 1px solid #d9d9d9; }
+.filter-btn:last-child { border-right: none; }
+.filter-btn.active { background: #1890FF; color: #fff; }
+.filter-btn:hover:not(.active) { background: #fafafa; color: #1890FF; }
+.search-input { flex: 1; max-width: 280px; padding: 6px 12px; border: 1px solid #d9d9d9; border-radius: 6px; font-size: 12px; color: #262626; outline: none; transition: border-color 0.15s; font-family: inherit; }
+.search-input:focus { border-color: #1890FF; box-shadow: 0 0 0 2px rgba(24,144,255,0.1); }
+.search-input::placeholder { color: #bfbfbf; }
+
+.history-table-wrap { background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; overflow: hidden; }
+.history-table-wrap table { width: 100%; border-collapse: collapse; }
+.history-table-wrap thead th { background: #fafafa; padding: 10px 14px; text-align: left; font-size: 11px; font-weight: 600; color: #8c8c8c; border-bottom: 1px solid #f0f0f0; white-space: nowrap; }
+.history-table-wrap tbody td { padding: 11px 14px; font-size: 12px; color: #434343; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+.history-table-wrap tbody tr:last-child td { border-bottom: none; }
+.history-table-wrap tbody tr:hover td { background: #fafafa; cursor: pointer; }
+.row-fail { border-left: 3px solid #ff4d4f; }
+.row-fail td:first-child { padding-left: 11px; }
+
+.page-title { font-size: 16px; font-weight: 700; color: #262626; }
+.page-subtitle { font-size: 12px; color: #8c8c8c; margin-top: 2px; }
+.title-area { margin-bottom: 16px; }
+
+.score-cell { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; color: #262626; }
+.score-dot { width: 8px; height: 8px; border-radius: 50%; }
+.score-dot.high { background: #52c41a; }
+.score-dot.mid { background: #fa8c16; }
+.score-dot.low { background: #ff4d4f; }
+
+.empty-hint { text-align: center; padding: 32px; color: #bfbfbf; font-size: 12px; }
+
+/* ===== Report view header row ===== */
+.report-header-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; }
+.report-header-actions { display: flex; align-items: center; gap: 8px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== VIEW A: History List ===================== -->
+<div id="viewA" class="page">
+  <div class="page-header">
+    <div class="breadcrumb">数据工坊 / <span>水合演练历史</span></div>
+    <div class="header-meta">
+      <span>共 6 条记录</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="title-area">
+      <div class="page-title">数据工坊 · 水合演练历史</div>
+      <div class="page-subtitle">记录每次 T-box 水合验证的执行结果与评分</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-group">
+        <button class="filter-btn active" onclick="filterRows('all', this)">全部</button>
+        <button class="filter-btn" onclick="filterRows('pass', this)">通过</button>
+        <button class="filter-btn" onclick="filterRows('fail', this)">失败</button>
+      </div>
+      <input type="text" class="search-input" placeholder="搜索场景、版本、时间…" oninput="searchRows(this.value)" />
+    </div>
+
+    <div class="history-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>序号</th>
+            <th>执行时间</th>
+            <th>T-box 版本</th>
+            <th>场景</th>
+            <th>客户实例数</th>
+            <th>验证结果</th>
+            <th>综合评分</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="historyTbody">
+          <!-- rows injected by JS -->
+        </tbody>
+      </table>
+      <div id="emptyHint" class="empty-hint" style="display:none">暂无匹配记录</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== VIEW B: Report Detail ===================== -->
+<div id="viewB" class="page" style="display:none">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div class="report-header-row" style="flex:1;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="btn-back" onclick="showViewA()">← 返回历史列表</button>
+        <div class="breadcrumb">数据工坊 / 水合演练 / <span>水合验证报告</span></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="header-meta" style="margin-right:8px">报告编号 RPT-20260425-001&nbsp;&nbsp;生成时间 2026-04-25 14:32</span>
+        <button class="btn btn-default btn-sm">⬇ 导出PDF</button>
+        <button class="btn btn-success">🚀 发布本体 →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- Status Banner -->
+    <div class="status-banner">
+      <div class="banner-icon">✅</div>
+      <div class="banner-center">
+        <div class="banner-title">水合验证通过</div>
+        <div class="banner-sub">T-box v1.2 · 17类 · 56关系 · 40929实例 · FTTR续约场景 S2 · 内蒙古</div>
+        <div class="banner-checks">
+          <span class="banner-check">✓ 验证项 7/7通过</span>
+          <span class="banner-check">✓ ROI验证达标</span>
+          <span class="banner-check">✓ 逻辑闭环</span>
+          <span class="banner-check">✓ 资源约束</span>
+        </div>
+      </div>
+      <div class="score-ring">
+        <div class="score-num">94</div>
+        <div class="score-label">综合评分</div>
+      </div>
+    </div>
+
+    <!-- Section 1: Stats -->
+    <div class="section">
+      <div class="stats-row">
+        <div class="stat-card blue">
+          <div class="stat-num">40,929</div>
+          <div class="stat-label">客户实例</div>
+          <div class="stat-sub">Customer 类</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-num">40,929</div>
+          <div class="stat-label">合约实例</div>
+          <div class="stat-sub">Contract 类</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-num">82,757</div>
+          <div class="stat-label">工单记录</div>
+          <div class="stat-sub">WorkOrder 类</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-num">651</div>
+          <div class="stat-label">成功订单</div>
+          <div class="stat-sub">Order 类 · 转化率 0.79%</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Validation Checklist -->
+    <div class="section">
+      <div class="section-title">
+        水合验证项（Hydration Validation）
+        <span class="badge-ok">7 / 7 通过</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>验证项</th>
+              <th>规则描述</th>
+              <th>结果</th>
+              <th>通过数 / 总数</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Customer 实例一致性</strong></td>
+              <td>user_id 与工单表/合约表对齐，无孤立实例</td>
+              <td><span class="badge badge-pass">✅ 通过</span></td>
+              <td><strong style="color:#389e0d">40,929</strong> / 40,929</td>
+            </tr>
+            <tr>
+              <td><strong>Contract 产品约束</strong></td>
+              <td>contract.product_id 在 4449 行产品白名单内</td>
+              <td><span class="badge badge-pass">✅ 通过</span></td>
+              <td><strong style="color:#389e0d">40,929</strong> / 40,929</td>
+            </tr>
+            <tr>
+              <td><strong>WorkOrder 用户关联</strong></td>
+              <td>work_order.user_id 在 Customer 实例集合内</td>
+              <td><span class="badge badge-pass">✅ 通过</span></td>
+              <td><strong style="color:#389e0d">82,757</strong> / 82,757</td>
+            </tr>
+            <tr>
+              <td><strong>Order 工单关联</strong></td>
+              <td>order.work_order_id 对应 WorkOrder 存在</td>
+              <td><span class="badge badge-pass">✅ 通过</span></td>
+              <td><strong style="color:#389e0d">651</strong> / 651</td>
+            </tr>
+            <tr>
+              <td><strong>MarketingMoment 规则覆盖</strong></td>
+              <td>trigger_type 命中 BR-MOMENT-001~004 之一</td>
+              <td><span class="badge badge-pass">✅ 通过</span></td>
+              <td><strong style="color:#389e0d">4 个规则</strong>全覆盖</td>
+            </tr>
+            <tr>
+              <td><strong>Script 客群映射</strong></td>
+              <td>script.target_segment 在 TYPE_1 / TYPE_5 内</td>
+              <td><span class="badge badge-pass">✅ 通过</span></td>
+              <td><strong style="color:#389e0d">10</strong> / 10 话术</td>
+            </tr>
+            <tr>
+              <td><strong>Strategy 客群对齐</strong></td>
+              <td>Strategy → appliesToSegment → TYPE_1 / TYPE_5</td>
+              <td><span class="badge badge-pass">✅ 通过</span></td>
+              <td><strong style="color:#389e0d">Segment</strong> 命名已校准</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 3: C05 Pipeline -->
+    <div class="section">
+      <div class="section-title">C05 端到端场景验证</div>
+      <div class="pipeline-wrap">
+        <div class="pipeline-customer">
+
+          <!-- Customer Card -->
+          <div class="customer-card">
+            <div class="cust-title">演示客户 C05</div>
+            <div class="cust-row"><span class="cust-key">user_id</span><span class="cust-val">101905...5678</span></div>
+            <div class="cust-row"><span class="cust-key">contract_id</span><span class="cust-val">CTR-NMG-001</span></div>
+            <div class="cust-row"><span class="cust-key">在网月数</span><span class="cust-val">45月</span></div>
+            <div class="cust-row"><span class="cust-key">剩余合约</span><span class="cust-val">2月</span></div>
+            <div class="cust-seg">Segment: TYPE_1</div>
+          </div>
+
+          <!-- Pipeline Steps -->
+          <div class="pipeline-steps">
+
+            <div class="pipe-step">
+              <div class="pipe-step-inner">
+                <div class="pipe-step-num">Step ①</div>
+                <div class="pipe-step-title">水合读取</div>
+                <div class="pipe-step-detail">Contract.remaining_months = 2<br>is_expiring_soon = true</div>
+                <div class="pipe-step-result">合约剩余2月 ✓</div>
+              </div>
+            </div>
+            <div class="pipe-arrow">›</div>
+
+            <div class="pipe-step">
+              <div class="pipe-step-inner">
+                <div class="pipe-step-num">Step ②</div>
+                <div class="pipe-step-title">规则触发</div>
+                <div class="pipe-step-detail">BR-MOMENT-001<br>remaining ≤ 3月</div>
+                <div class="pipe-step-result">CONTRACT_EXPIRY ✓</div>
+              </div>
+            </div>
+            <div class="pipe-arrow">›</div>
+
+            <div class="pipe-step">
+              <div class="pipe-step-inner">
+                <div class="pipe-step-num">Step ③</div>
+                <div class="pipe-step-title">账期匹配</div>
+                <div class="pipe-step-detail">innet_months = 45月<br>account_period = GROWING</div>
+                <div class="pipe-step-result">GROWING期 ✓</div>
+              </div>
+            </div>
+            <div class="pipe-arrow">›</div>
+
+            <div class="pipe-step">
+              <div class="pipe-step-inner">
+                <div class="pipe-step-num">Step ④</div>
+                <div class="pipe-step-title">话术推荐</div>
+                <div class="pipe-step-detail">Script = SC01<br>免调测费钩子</div>
+                <div class="pipe-step-result">合约临期千兆升级 ✓</div>
+              </div>
+            </div>
+            <div class="pipe-arrow">›</div>
+
+            <div class="pipe-step">
+              <div class="pipe-step-inner">
+                <div class="pipe-step-num">Step ⑤</div>
+                <div class="pipe-step-title">产品推荐</div>
+                <div class="pipe-step-detail">联通FTTR千兆<br>宽带299元套餐</div>
+                <div class="pipe-step-result">FAM_RENEWAL=0元 ✓</div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="verdict-box">
+          <span class="verdict-icon">✅</span>
+          <span><strong>专家验收：</strong>推理链完整跑通，无孤立节点。SC01推荐符合GROWING期/TYPE_1客户预期，免调测费钩子（FAM_RENEWAL=0元）正确触发，产品推荐在4449行白名单内。C05端到端场景验证通过。</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: ROI -->
+    <div class="section">
+      <div class="section-title">ROI验证 · 转化率预估 vs 基线</div>
+      <div class="roi-wrap">
+        <div class="roi-card baseline">
+          <div class="roi-label">当前基线</div>
+          <div class="roi-num baseline">0.79%</div>
+          <div class="roi-sub">651成功订单 / 82,757工单（order_result=0000）</div>
+          <div class="roi-detail">
+            全量工单转化，未区分策略优先级和客群分层。
+          </div>
+        </div>
+        <div class="roi-card target">
+          <div class="roi-label">本次优化目标</div>
+          <div class="roi-num target">1.0%</div>
+          <div class="roi-sub">Top 5 策略 × TYPE_1 / TYPE_5 客群</div>
+          <div class="roi-detail">
+            TYPE_1: 21,648户 · TYPE_5: 19,281户<br>
+            精准分层推荐，话术与客群强匹配
+          </div>
+          <div class="roi-uplift">↑ +0.21pp · 提升幅度 +26.6%</div>
+          <table class="mini-table">
+            <thead>
+              <tr><th>话术</th><th>目标客群</th><th>预期转化率</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>SC01 合约临期千兆升级</td><td>GROWING/TYPE_1</td><td class="conv-rate">1.2%</td></tr>
+              <tr><td>SC02 成熟期续约保障</td><td>MATURE/TYPE_5</td><td class="conv-rate">1.5%</td></tr>
+              <tr><td>SC03 长期客高价值保留</td><td>LONG_TERM/TYPE_1</td><td class="conv-rate">2.0%</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 5: Publish -->
+    <div class="section">
+      <div class="section-title">发布本体</div>
+      <div class="publish-box">
+        <div class="pub-title">本体已就绪，发布到本体工作室</div>
+        <div class="pub-sub">T-box v1.2 将冻结并写入本体工作室，版本快照标注构建路径（双路径·场景驱动+导入驱动），其他省分可从本体集市订购</div>
+        <div class="consumers-row">
+          <div class="consumer-card">
+            <div class="consumer-icon">🎯</div>
+            <div class="consumer-name">AIP场景平台</div>
+            <div class="consumer-desc">消费本体对象<br>编排工作流执行</div>
+          </div>
+          <div class="consumer-card">
+            <div class="consumer-icon">🤖</div>
+            <div class="consumer-name">AI助手</div>
+            <div class="consumer-desc">本体查询<br>推理解释</div>
+          </div>
+          <div class="consumer-card">
+            <div class="consumer-icon">🧪</div>
+            <div class="consumer-name">Agent Harness</div>
+            <div class="consumer-desc">A/B测试<br>反馈闭环回写</div>
+          </div>
+          <div class="consumer-card">
+            <div class="consumer-icon">🏙️</div>
+            <div class="consumer-name">其他省分</div>
+            <div class="consumer-desc">本体集市订购<br>多租户隔离</div>
+          </div>
+        </div>
+        <div class="pub-action">
+          <button class="btn btn-success" style="font-size:14px;padding:12px 36px;border-radius:8px">🚀 发布本体 T-box v1.2</button>
+          <div class="pub-note">发布后版本冻结，如需修改请联系本体架构师创建新版本</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /viewB -->
+
+<script>
+// ===== Mock Data =====
+const MOCK_RECORDS = [
+  {
+    id: 1,
+    time: '2026-04-25 14:32',
+    tboxVersion: 'v1.2',
+    scene: 'FTTR续约 S2 · 内蒙古',
+    customerCount: '40,929',
+    result: 'pass',
+    score: 94
+  },
+  {
+    id: 2,
+    time: '2026-04-18 10:15',
+    tboxVersion: 'v1.1',
+    scene: 'FTTR续约 S2 · 内蒙古',
+    customerCount: '38,741',
+    result: 'pass',
+    score: 91
+  },
+  {
+    id: 3,
+    time: '2026-04-10 16:04',
+    tboxVersion: 'v1.1',
+    scene: 'FTTR续约 S1 · 内蒙古',
+    customerCount: '35,200',
+    result: 'pass',
+    score: 88
+  },
+  {
+    id: 4,
+    time: '2026-04-02 09:51',
+    tboxVersion: 'v1.0',
+    scene: 'FTTR续约 S2 · 内蒙古',
+    customerCount: '32,015',
+    result: 'fail',
+    score: 61
+  },
+  {
+    id: 5,
+    time: '2026-03-20 14:22',
+    tboxVersion: 'v1.0',
+    scene: 'FTTR续约 S1 · 内蒙古',
+    customerCount: '30,889',
+    result: 'pass',
+    score: 85
+  },
+  {
+    id: 6,
+    time: '2026-03-01 11:08',
+    tboxVersion: 'v0.9',
+    scene: 'FTTR续约 S1 · 内蒙古',
+    customerCount: '28,400',
+    result: 'pass',
+    score: 79
+  }
+];
+
+let currentFilter = 'all';
+let currentSearch = '';
+
+function scoreClass(s) {
+  if (s >= 85) return 'high';
+  if (s >= 70) return 'mid';
+  return 'low';
+}
+
+function renderRows() {
+  const tbody = document.getElementById('historyTbody');
+  const empty = document.getElementById('emptyHint');
+  const kw = currentSearch.toLowerCase();
+
+  const filtered = MOCK_RECORDS.filter(r => {
+    const matchFilter = currentFilter === 'all' ||
+      (currentFilter === 'pass' && r.result === 'pass') ||
+      (currentFilter === 'fail' && r.result === 'fail');
+    const matchSearch = !kw ||
+      r.tboxVersion.toLowerCase().includes(kw) ||
+      r.scene.toLowerCase().includes(kw) ||
+      r.time.includes(kw);
+    return matchFilter && matchSearch;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  tbody.innerHTML = filtered.map(r => {
+    const failClass = r.result === 'fail' ? ' row-fail' : '';
+    const badge = r.result === 'pass'
+      ? '<span class="badge badge-pass">✅ 通过</span>'
+      : '<span class="badge badge-fail">❌ 失败</span>';
+    const dotClass = scoreClass(r.score);
+    return `<tr class="${failClass}" onclick="showViewB()">
+      <td style="color:#8c8c8c">${r.id}</td>
+      <td style="font-family:monospace;font-size:11px">${r.time}</td>
+      <td><span style="background:#e6f4ff;color:#1890FF;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:600">${r.tboxVersion}</span></td>
+      <td>${r.scene}</td>
+      <td style="font-weight:600">${r.customerCount}</td>
+      <td>${badge}</td>
+      <td><span class="score-cell"><span class="score-dot ${dotClass}"></span>${r.score}</span></td>
+      <td><button class="btn btn-primary btn-sm" onclick="event.stopPropagation();showViewB()">查看报告</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function filterRows(type, btn) {
+  currentFilter = type;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderRows();
+}
+
+function searchRows(val) {
+  currentSearch = val;
+  renderRows();
+}
+
+function showViewB() {
+  document.getElementById('viewA').style.display = 'none';
+  document.getElementById('viewB').style.display = 'flex';
+  window.scrollTo(0, 0);
+}
+
+function showViewA() {
+  document.getElementById('viewB').style.display = 'none';
+  document.getElementById('viewA').style.display = 'flex';
+  window.scrollTo(0, 0);
+}
+
+// Init
+renderRows();
+</script>
+</body>
+</html>
