@@ -164,4 +164,9 @@ export const studioApi = {
   stats: () => get<StudioStats>('/studio/stats'),
   events: (limit = 30) => get<StudioEventStream>(`/studio/events?limit=${limit}`),
   refreshCounts: () => post<{ refreshedAt: string; total: number; success: number; results: unknown[] }>('/studio/refresh-counts', {}),
+  narratorExplain: (req: {
+    apiName: string; displayName: string; tier: number;
+    instanceCount?: number; propCount?: number; relCount?: number;
+    ruleCount?: number; actionCount?: number; kpiSummary?: string;
+  }) => post<{ source: 'llm' | 'fallback'; content: string }>('/studio/narrator/explain', req),
 }

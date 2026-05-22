@@ -133,7 +133,12 @@
 
       <div class="studio__detail-meta">
         <p v-if="selectedObject.description" class="studio__detail-desc">{{ selectedObject.description }}</p>
-        <button class="studio__detail-link" @click="openInDetail">在实体详情中打开 →</button>
+        <div class="studio__detail-actions">
+          <button class="studio__detail-link" @click="narratorVisible = true">
+            <span style="color:#f59e0b">⚡</span> AI 解读
+          </button>
+          <button class="studio__detail-link" @click="openInDetail">在实体详情中打开 →</button>
+        </div>
       </div>
 
       <div class="studio__detail-tabs">
@@ -222,6 +227,13 @@
         </template>
       </div>
     </aside>
+
+    <OntologyNarrator
+      :visible="narratorVisible"
+      :obj="selectedObject"
+      :rel-count="narratorRelCount"
+      @close="narratorVisible = false"
+    />
   </div>
 </template>
 
@@ -236,6 +248,7 @@ import StudioThreeBox from './StudioThreeBox.vue'
 import StudioBusinessView from './StudioBusinessView.vue'
 import StudioTwinView from './StudioTwinView.vue'
 import StudioSemanticView from './StudioSemanticView.vue'
+import OntologyNarrator from './OntologyNarrator.vue'
 
 const router = useRouter()
 
@@ -339,6 +352,13 @@ watch(activeDetailTab, (tab) => {
 function openInDetail() {
   if (selectedObject.value) router.push(`/ontology/${selectedObject.value.id}`)
 }
+
+const narratorVisible = ref(false)
+const narratorRelCount = computed(() => {
+  if (!selectedObject.value || !tbox.value) return 0
+  const name = selectedObject.value.apiName
+  return tbox.value.linkTypes.filter(l => l.source === name || l.target === name).length
+})
 
 function formatNumber(n: number) {
   return n.toLocaleString('en-US')
@@ -659,6 +679,11 @@ onMounted(async () => {
 .studio__detail-link:hover {
   background: #eff6ff;
   border-color: #bfdbfe;
+}
+.studio__detail-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* 详情 tab */
