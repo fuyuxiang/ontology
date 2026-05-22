@@ -106,6 +106,7 @@ const navGroups = [
   ]},
   { label: '本体中心', items: [
     { path: '/datasource', label: '数据工坊', icon: ico.datasource },
+    { path: '/marketplace', label: '本体原料集市', icon: ico.catalog },
     { path: '/builder', label: '本体构建器', icon: ico.tool },
     { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },
     { path: '/studio', label: '本体工作室', icon: ico.graph },
