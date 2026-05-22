@@ -94,6 +94,102 @@ def _seed_skills(db):
         db.add(s)
     db.commit()
 
+
+def _seed_aip_scenes(db):
+    """从 backend/app/data/aip_scenes_seed.json 把内置场景导入数据库（仅当表空时）。"""
+    from app.models.scene import AipScene, AipSceneTrigger
+    if db.query(AipScene).count() > 0:
+        return
+    import json as _json
+    import os as _os
+    from app.utils.identifiers import gen_uuid as _gen
+    seed_path = _os.path.join(_os.path.dirname(__file__), "data", "aip_scenes_seed.json")
+    if not _os.path.exists(seed_path):
+        return
+    try:
+        with open(seed_path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+    except Exception:
+        return
+
+    meta_map = {
+        "fttr_renewal": {
+            "name": "包头 FTTR 或组网到期续约",
+            "group": "FTTR续约策划",
+            "description": "FTTR 到期客户续约智能策划 v1.3：⓪ 本体查询 → ① 客群洞察 → ② 产品推荐 → ③ 触点选择 → ④ 八段式话术 → ⑤ 续约策略执行包",
+            "ontology_bindings": ["Customer", "Segment", "Contract", "FTTRSubscription", "Product", "Strategy", "Script", "Channel", "TouchEvent", "WorkOrder", "RenewalStrategyPackage", "Order"],
+            "stats": {"users": 40929, "conversion": "4.64%", "strategies": 7},
+            "trigger": {"type": "schedule", "enabled": False, "schedule": {"frequency": "daily", "hour": 8, "minute": 0, "timezone": "Asia/Shanghai"}},
+        },
+        "refund_attribution": {
+            "name": "宽带装机退单智能归因",
+            "group": "退单智能归因",
+            "description": "基于装机工单和 4 类外呼通话记录，37 条证据抽取配合分层归因推理，识别资源 / 施工 / 用户 / 业务四类根因，驱动自动归档 / 现场核实 / 强制回访 / 营销外呼 4 条动作闭环",
+            "ontology_bindings": ["InstallOrder", "InstallChurn", "Customer", "Product", "Channel", "DispatchRecord", "Engineer", "Address", "PendingPool", "EngineerCall", "CallbackCall", "MarketingCall", "CompetitorCall"],
+            "stats": {"orders": 8536, "accuracy": "90%+", "functions": 37, "reasons": 23},
+            "trigger": {"type": "schedule", "enabled": False, "schedule": {"frequency": "daily", "hour": 10, "minute": 0, "timezone": "Asia/Shanghai"}},
+        },
+        "ge_insight_qa": {
+            "name": "政企智能问数及归因分析",
+            "group": "政企智能问数",
+            "description": "4 节点流水线：本体语义理解 → 政企数据分析 Agent → 政企归因推理 Agent → 业务规则分支 → 5 个动作执行",
+            "ontology_bindings": ["KPIIndicatorDef", "GeCustomerSegment", "GeProject", "GeOpportunity", "Contract", "GeProductService", "GeAccountManager", "GeBusinessEvent", "GeRegionOrg"],
+            "stats": {"queries": 1247, "branches": 5, "actions": 5},
+            "trigger": {"type": "schedule", "enabled": False, "schedule": {"frequency": "daily", "hour": 9, "minute": 0, "timezone": "Asia/Shanghai"}},
+        },
+    }
+
+    for slug, payload in data.items():
+        meta = meta_map.get(slug, {
+            "name": slug, "group": "自定义", "description": "",
+            "ontology_bindings": [], "stats": {}, "trigger": {"type": "manual", "enabled": False},
+        })
+        s = AipScene(
+            id=_gen(),
+            name=meta["name"],
+            description=meta["description"],
+            group_name=meta["group"],
+            nodes_json=payload.get("nodes", []),
+            edges_json=payload.get("edges", []),
+            ontology_bindings=meta.get("ontology_bindings", []),
+            datasource_bindings=[],
+            stats_json=meta.get("stats", {}),
+            trigger_config=meta.get("trigger", {}),
+            status="published",
+            version=1,
+        )
+        db.add(s)
+        db.flush()
+        # 若有 schedule 配置，写入触发器表（默认 disabled，避免误触发）
+        cfg = meta.get("trigger", {}) or {}
+        if cfg.get("type"):
+            trg = AipSceneTrigger(
+                id=_gen(),
+                scene_id=s.id,
+                type=cfg.get("type", "manual"),
+                enabled=False,
+                schedule_payload=cfg.get("schedule") or {},
+                cron_expr=_seed_cron(cfg.get("schedule") or {}),
+                timezone=(cfg.get("schedule") or {}).get("timezone") or "Asia/Shanghai",
+            )
+            db.add(trg)
+    db.commit()
+
+
+def _seed_cron(schedule: dict) -> str:
+    if not schedule:
+        return ""
+    freq = schedule.get("frequency", "daily")
+    h = int(schedule.get("hour", 9))
+    m = int(schedule.get("minute", 0))
+    if freq == "daily":
+        return f"{m} {h} * * *"
+    if freq == "weekly":
+        return f"{m} {h} * * 1"
+    if freq == "monthly":
+        return f"{m} {h} 1 * *"
+    return schedule.get("cron", f"{m} {h} * * *")
+
 from app.api.v1.rules import router as rules_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.copilot import router as copilot_router
@@ -121,6 +217,9 @@ from app.api.v1.monitor import router as monitor_router
 from app.api.v1.studio import router as studio_router
 from app.api.v1.pipelines import router as pipelines_router, start_worker as start_pipeline_worker
 from app.api.v1.lineage import router as lineage_router
+from app.api.v1.aip_scenes import router as aip_scenes_router
+from app.api.v1.aip_executions import router as aip_executions_router
+from app.api.v1.aip_webhooks import router as aip_webhooks_router
 
 logger = logging.getLogger(__name__)
 
@@ -201,12 +300,20 @@ async def lifespan(app: FastAPI):
         seed_admin(db)
         _seed_agents(db)
         _seed_skills(db)
+        _seed_aip_scenes(db)
     finally:
         db.close()
 
     # Neo4j 初始化暂时跳过（需要修复 numpy/pandas 版本冲突后启用）
     # 基础功能（实体CRUD、规则、看板）不依赖 Neo4j
     logger.info("服务启动完成（Neo4j 待配置）")
+
+    # 启动 AIP 调度器（schedule 触发器轮询）
+    try:
+        from app.services.aip.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        logger.warning(f"AIP 调度器启动失败: {e}")
 
     # 预热携号转网案例用户缓存（后台执行，不阻塞启动）
     import asyncio
@@ -280,6 +387,9 @@ app.include_router(monitor_router, prefix="/api/v1")
 app.include_router(studio_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")
 app.include_router(lineage_router, prefix="/api/v1")
+app.include_router(aip_scenes_router, prefix="/api/v1")
+app.include_router(aip_executions_router, prefix="/api/v1")
+app.include_router(aip_webhooks_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
