@@ -115,18 +115,70 @@ const filteredEdges = computed(() => {
 
 const tierColor: Record<1 | 2 | 3, string> = { 1: '#2E5BFF', 2: '#00C7B1', 3: '#FF6B35' }
 
-// 按 tier 分层布局：T1 顶部 / T2 中部 / T3 底部
-function layoutByTier(objs: StudioObjectType[]): Record<string, { x: number; y: number }> {
-  const bands: Record<1 | 2 | 3, StudioObjectType[]> = { 1: [], 2: [], 3: [] }
-  for (const o of objs) bands[o.tier as 1 | 2 | 3].push(o)
-  const map: Record<string, { x: number; y: number }> = {}
-  const bandY: Record<1 | 2 | 3, number> = { 1: 80, 2: 320, 3: 560 }
-  const colWidth = 220
-  for (const tier of [1, 2, 3] as const) {
-    const arr = bands[tier]
-    const startX = -(arr.length - 1) * colWidth / 2
-    arr.forEach((o, i) => { map[o.apiName] = { x: startX + i * colWidth, y: bandY[tier] } })
+// 各场景的"列分组"配置：把对象按业务功能分到不同 X 列
+type ColumnLayout = { columns: { label: string; matchers: (string | RegExp)[] }[]; colWidth?: number; rowHeight?: number }
+const sceneColumnLayouts: Record<Exclude<ScenarioTab, 'tier1'>, ColumnLayout> = {
+  fttr: {
+    columns: [
+      { label: '客户/订单',     matchers: ['Customer', 'Order', 'Address', 'Product'] },
+      { label: '续约决策',      matchers: [/Renewal/, /Strategy/, /Policy/, /Segment/] },
+      { label: '营销时机',      matchers: [/Marketing/, /Moment/, /Touch/, /Script/, 'Objection'] },
+      { label: '执行/反馈',     matchers: [/Execution/, /Result/, /Wave/, /Campaign/] },
+    ],
+    colWidth: 260, rowHeight: 110,
+  },
+  churn: {
+    columns: [
+      { label: '客户/工单',     matchers: ['Customer', 'Order', 'InstallOrder', 'Address'] },
+      { label: '工程师/派单',    matchers: ['InstallEngineer', 'DispatchRecord', 'Staff', 'Channel'] },
+      { label: '通话证据',      matchers: [/Call/, 'EngineerCall', 'CallbackCall', 'CompetitorCall', 'MarketingCall'] },
+      { label: '归因结论',      matchers: ['InstallChurn', 'PendingPool', 'UserDemand'] },
+    ],
+    colWidth: 240, rowHeight: 100,
+  },
+  ge: {
+    columns: [
+      { label: '基础对象',     matchers: ['Customer', 'Staff', 'RegionalOrg', 'Product'] },
+      { label: '客户群/账户',    matchers: [/CustomerSegment/, /AccountManager/, /RegionOrg/] },
+      { label: '产品/商机',     matchers: [/ProductService/, /Project/, /Opportunity/] },
+      { label: 'KPI/事件',     matchers: [/KPI/, /BusinessEvent/, /Indicator/] },
+    ],
+    colWidth: 260, rowHeight: 100,
+  },
+}
+
+function matchObjectToColumn(obj: StudioObjectType, layout: ColumnLayout): number {
+  for (let i = 0; i < layout.columns.length; i++) {
+    for (const m of layout.columns[i].matchers) {
+      if (typeof m === 'string') {
+        if (obj.apiName === m || obj.displayName.includes(m)) return i
+      } else {
+        if (m.test(obj.apiName) || m.test(obj.displayName)) return i
+      }
+    }
   }
+  return -1
+}
+
+// 场景列布局：按业务流程从左到右分列
+function layoutByScene(objs: StudioObjectType[], layout: ColumnLayout): Record<string, { x: number; y: number }> {
+  const colW = layout.colWidth ?? 240
+  const rowH = layout.rowHeight ?? 100
+  const buckets: StudioObjectType[][] = layout.columns.map(() => [])
+  const overflow: StudioObjectType[] = []
+  for (const o of objs) {
+    const col = matchObjectToColumn(o, layout)
+    if (col >= 0) buckets[col].push(o)
+    else overflow.push(o)
+  }
+  // overflow 平均分配到列，避免节点漏掉
+  overflow.forEach((o, i) => buckets[i % buckets.length].push(o))
+
+  const map: Record<string, { x: number; y: number }> = {}
+  buckets.forEach((bucket, ci) => {
+    const startY = -(bucket.length - 1) * rowH / 2
+    bucket.forEach((o, ri) => { map[o.apiName] = { x: ci * colW, y: startY + ri * rowH } })
+  })
   return map
 }
 
@@ -147,7 +199,12 @@ const flowEdges = ref<Edge[]>([])
 
 function rebuild() {
   const objs = filteredObjects.value
-  const layout = activeTab.value === 'tier1' ? layoutCircle(objs) : layoutByTier(objs)
+  let layout: Record<string, { x: number; y: number }>
+  if (activeTab.value === 'tier1') {
+    layout = layoutCircle(objs)
+  } else {
+    layout = layoutByScene(objs, sceneColumnLayouts[activeTab.value])
+  }
 
   flowNodes.value = objs.map(o => ({
     id: o.apiName,

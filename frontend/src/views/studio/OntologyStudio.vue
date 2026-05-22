@@ -1,7 +1,7 @@
 <template>
-  <div class="studio">
+  <div class="studio" :class="{ 'studio--fullscreen': fullscreen }">
     <!-- 左栏：搜索 + 按 tier 分组的对象列表 -->
-    <aside class="studio__sider">
+    <aside class="studio__sider" v-show="!fullscreen">
       <div class="studio__search">
         <input v-model="searchText" placeholder="搜索对象类型..." class="studio__search-input" />
       </div>
@@ -63,6 +63,14 @@
           <span v-if="refreshing">⟳ 刷新中</span>
           <span v-else>⟳ 刷新数据</span>
         </button>
+        <button
+          v-if="canFullscreen"
+          class="studio__fullscreen-btn"
+          @click="fullscreen = !fullscreen"
+          :title="fullscreen ? '退出全屏' : '进入全屏'"
+        >
+          {{ fullscreen ? '✕ 退出全屏' : '⛶ 全屏' }}
+        </button>
       </header>
 
       <div class="studio__body" v-if="!loading && tbox">
@@ -111,7 +119,7 @@
     </main>
 
     <!-- 右栏：详情面板（选中对象时显示）-->
-    <aside v-if="selectedObject" class="studio__detail">
+    <aside v-if="selectedObject && !fullscreen" class="studio__detail">
       <div class="studio__detail-header">
         <div class="studio__detail-icon" :style="{ background: tierColor[selectedObject.tier] + '20', color: tierColor[selectedObject.tier] }">
           {{ selectedObject.displayName.charAt(0) }}
@@ -123,36 +131,113 @@
         <button class="studio__detail-close" @click="selectedObject = null">×</button>
       </div>
 
-      <div class="studio__detail-section">
-        <p class="studio__detail-desc">{{ selectedObject.description || '暂无描述' }}</p>
-        <div class="studio__detail-tags">
-          <span class="studio__tag">{{ selectedObject.properties.length }} 属性</span>
-          <span class="studio__tag">{{ selectedObject.ruleCount }} 规则</span>
-          <span class="studio__tag">{{ selectedObject.actionCount }} 动作</span>
-          <span class="studio__tag">{{ selectedObject.functionCount }} 函数</span>
-        </div>
+      <div class="studio__detail-meta">
+        <p v-if="selectedObject.description" class="studio__detail-desc">{{ selectedObject.description }}</p>
+        <button class="studio__detail-link" @click="openInDetail">在实体详情中打开 →</button>
       </div>
 
-      <div class="studio__detail-section">
-        <h4>属性定义 ({{ selectedObject.properties.length }})</h4>
-        <div v-for="p in selectedObject.properties" :key="p.apiName" class="studio__prop-row">
-          <span class="studio__prop-name">{{ p.displayName }}</span>
-          <span class="studio__prop-type">{{ p.dataType }}</span>
-          <span v-if="p.required" class="studio__prop-required">必填</span>
-        </div>
+      <div class="studio__detail-tabs">
+        <button
+          v-for="t in detailTabs"
+          :key="t.value"
+          class="studio__detail-tab"
+          :class="{ 'studio__detail-tab--active': activeDetailTab === t.value }"
+          @click="activeDetailTab = t.value"
+        >
+          {{ t.label }} <span class="studio__detail-tab-count">{{ tabCount(t.value) }}</span>
+        </button>
+      </div>
+
+      <div class="studio__detail-body">
+        <!-- 属性 -->
+        <template v-if="activeDetailTab === 'attributes'">
+          <div v-if="selectedObject.properties.length === 0" class="studio__detail-empty">暂无属性</div>
+          <div v-for="p in selectedObject.properties" :key="p.apiName" class="studio__detail-row">
+            <div class="studio__detail-row-main">
+              <span class="studio__detail-row-name">{{ p.displayName }}</span>
+              <span class="studio__detail-row-tag">{{ p.dataType }}</span>
+              <span v-if="p.required" class="studio__detail-row-required">必填</span>
+            </div>
+            <div v-if="p.sourceTable" class="studio__detail-row-sub">
+              <code>{{ p.sourceTable }}.{{ p.sourceColumn || '?' }}</code>
+            </div>
+            <div v-else class="studio__detail-row-sub studio__detail-row-sub--muted">未映射</div>
+          </div>
+        </template>
+
+        <!-- 关系 -->
+        <template v-else-if="activeDetailTab === 'relations'">
+          <div v-if="relatedLinks.length === 0" class="studio__detail-empty">暂无关系</div>
+          <div v-for="r in relatedLinks" :key="r.apiName + r.source + r.target" class="studio__detail-row">
+            <div class="studio__detail-row-main">
+              <span class="studio__detail-row-arrow">{{ r.source === selectedObject.apiName ? '→' : '←' }}</span>
+              <span class="studio__detail-row-name">{{ r.displayName }}</span>
+              <span class="studio__detail-row-tag studio__detail-row-tag--blue">{{ r.cardinality }}</span>
+            </div>
+            <div class="studio__detail-row-sub">
+              <code>{{ r.source === selectedObject.apiName ? r.target : r.source }}</code>
+            </div>
+          </div>
+        </template>
+
+        <!-- 规则 -->
+        <template v-else-if="activeDetailTab === 'rules'">
+          <div v-if="detailLoading" class="studio__detail-empty">加载中...</div>
+          <div v-else-if="entityDetail?.rules?.length === 0" class="studio__detail-empty">暂无规则</div>
+          <div v-for="r in entityDetail?.rules ?? []" :key="r.id" class="studio__detail-row">
+            <div class="studio__detail-row-main">
+              <span class="studio__detail-row-name">{{ r.name }}</span>
+              <span class="studio__detail-row-tag studio__detail-row-tag--orange">P{{ r.priority || 5 }}</span>
+            </div>
+            <div class="studio__detail-row-sub">{{ r.action_desc || r.condition_expr }}</div>
+          </div>
+        </template>
+
+        <!-- 动作 -->
+        <template v-else-if="activeDetailTab === 'actions'">
+          <div v-if="detailLoading" class="studio__detail-empty">加载中...</div>
+          <div v-else-if="entityDetail?.actions?.length === 0" class="studio__detail-empty">暂无动作</div>
+          <div v-for="a in entityDetail?.actions ?? []" :key="a.id" class="studio__detail-row">
+            <div class="studio__detail-row-main">
+              <span class="studio__detail-row-name">{{ a.name }}</span>
+              <span class="studio__detail-row-tag studio__detail-row-tag--purple">{{ a.type }}</span>
+            </div>
+            <div v-if="a.impact_count" class="studio__detail-row-sub">影响 {{ a.impact_count }} 实体</div>
+          </div>
+        </template>
+
+        <!-- 函数 -->
+        <template v-else-if="activeDetailTab === 'functions'">
+          <div v-if="detailLoading" class="studio__detail-empty">加载中...</div>
+          <div v-else-if="entityDetail?.functions?.length === 0" class="studio__detail-empty">暂无函数</div>
+          <div v-for="f in entityDetail?.functions ?? []" :key="f.id" class="studio__detail-row">
+            <div class="studio__detail-row-main">
+              <span class="studio__detail-row-name">{{ f.name }}</span>
+              <span class="studio__detail-row-tag" :class="f.is_derived_property ? 'studio__detail-row-tag--green' : 'studio__detail-row-tag--blue'">
+                {{ f.is_derived_property ? '派生属性' : '函数' }}
+              </span>
+            </div>
+            <div v-if="f.description" class="studio__detail-row-sub">{{ f.description }}</div>
+          </div>
+        </template>
       </div>
     </aside>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { studioApi, type StudioTBox, type StudioABox, type StudioRBox, type StudioStats, type StudioObjectType, type StudioHydration } from '../../api/studio'
+import { entityApi } from '../../api/ontology'
+import type { OntologyEntity } from '../../types/ontology'
 import StudioCardView from './StudioCardView.vue'
 import StudioThreeBox from './StudioThreeBox.vue'
 import StudioBusinessView from './StudioBusinessView.vue'
 import StudioTwinView from './StudioTwinView.vue'
 import StudioSemanticView from './StudioSemanticView.vue'
+
+const router = useRouter()
 
 const tbox = ref<StudioTBox | null>(null)
 const abox = ref<StudioABox | null>(null)
@@ -163,6 +248,13 @@ const loading = ref(true)
 const activeView = ref<'card' | 'threebox' | 'business' | 'twin' | 'flow'>('card')
 const selectedObject = ref<StudioObjectType | null>(null)
 const searchText = ref('')
+const fullscreen = ref(false)
+
+const canFullscreen = computed(() => ['business', 'twin', 'flow'].includes(activeView.value))
+
+watch(activeView, (v) => {
+  if (!['business', 'twin', 'flow'].includes(v)) fullscreen.value = false
+})
 
 const viewOptions = [
   { value: 'card' as const, label: '卡片视图' },
@@ -190,6 +282,62 @@ function filteredByTier(tier: 1 | 2 | 3) {
 
 function selectObject(o: StudioObjectType) {
   selectedObject.value = o
+  // 切换对象时若 tab 是规则/动作/函数，触发详情懒加载
+  if (['rules', 'actions', 'functions'].includes(activeDetailTab.value)) {
+    loadEntityDetail(o.id)
+  }
+}
+
+// 详情面板 tab
+type DetailTab = 'attributes' | 'relations' | 'rules' | 'actions' | 'functions'
+const detailTabs: { value: DetailTab; label: string }[] = [
+  { value: 'attributes', label: '属性' },
+  { value: 'relations', label: '关系' },
+  { value: 'rules', label: '规则' },
+  { value: 'actions', label: '动作' },
+  { value: 'functions', label: '函数' },
+]
+const activeDetailTab = ref<DetailTab>('attributes')
+const entityDetail = ref<OntologyEntity | null>(null)
+const detailLoading = ref(false)
+
+function tabCount(tab: DetailTab): number {
+  if (!selectedObject.value) return 0
+  switch (tab) {
+    case 'attributes': return selectedObject.value.properties.length
+    case 'relations': return relatedLinks.value.length
+    case 'rules': return selectedObject.value.ruleCount
+    case 'actions': return selectedObject.value.actionCount
+    case 'functions': return selectedObject.value.functionCount
+  }
+}
+
+const relatedLinks = computed(() => {
+  if (!selectedObject.value || !tbox.value) return []
+  const name = selectedObject.value.apiName
+  return tbox.value.linkTypes.filter(l => l.source === name || l.target === name)
+})
+
+async function loadEntityDetail(entityId: string) {
+  if (entityDetail.value?.id === entityId) return
+  detailLoading.value = true
+  try {
+    entityDetail.value = await entityApi.detail(entityId)
+  } catch (e) {
+    console.error('加载实体详情失败', e)
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+watch(activeDetailTab, (tab) => {
+  if (selectedObject.value && ['rules', 'actions', 'functions'].includes(tab)) {
+    loadEntityDetail(selectedObject.value.id)
+  }
+})
+
+function openInDetail() {
+  if (selectedObject.value) router.push(`/ontology/${selectedObject.value.id}`)
 }
 
 function formatNumber(n: number) {
@@ -241,6 +389,11 @@ onMounted(async () => {
   display: flex;
   height: 100%;
   background: #f8fafc;
+}
+.studio--fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
 }
 
 /* 左栏 */
@@ -444,7 +597,9 @@ onMounted(async () => {
   min-width: 280px;
   background: #fff;
   border-left: 1px solid #e5e7eb;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .studio__detail-header {
   display: flex;
@@ -481,40 +636,146 @@ onMounted(async () => {
 }
 .studio__detail-close:hover { background: #f1f5f9; color: #1e293b; }
 
-.studio__detail-section { padding: 14px 20px; border-bottom: 1px solid #f1f5f9; }
-.studio__detail-section h4 { font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 10px; }
-.studio__detail-desc { font-size: 12px; color: #64748b; line-height: 1.6; margin-bottom: 10px; }
-.studio__detail-tags { display: flex; gap: 6px; flex-wrap: wrap; }
-.studio__tag {
-  font-size: 10px;
-  background: #f1f5f9;
-  color: #475569;
-  padding: 2px 8px;
-  border-radius: 4px;
+.studio__detail-meta {
+  padding: 12px 20px;
+  border-bottom: 1px solid #f1f5f9;
 }
-.studio__prop-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
-  margin-bottom: 4px;
-  background: #f8fafc;
+.studio__detail-desc {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+.studio__detail-link {
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  color: #4f6ef7;
+  padding: 4px 10px;
   border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.studio__detail-link:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+/* 详情 tab */
+.studio__detail-tabs {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+  background: #fafbfc;
+  padding: 0 12px;
+  overflow-x: auto;
+}
+.studio__detail-tab {
+  position: relative;
+  padding: 10px 12px;
+  font-size: 12px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.studio__detail-tab:hover { color: #1e293b; }
+.studio__detail-tab--active {
+  color: #4f6ef7;
+  border-bottom-color: #4f6ef7;
+  font-weight: 600;
+}
+.studio__detail-tab-count {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.studio__detail-tab--active .studio__detail-tab-count {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* 详情正文 */
+.studio__detail-body {
+  padding: 12px 16px;
+  flex: 1;
+  overflow-y: auto;
+}
+.studio__detail-empty {
+  text-align: center;
+  padding: 24px 0;
+  color: #94a3b8;
   font-size: 12px;
 }
-.studio__prop-name { flex: 1; color: #1e293b; }
-.studio__prop-type {
+.studio__detail-row {
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: #fafbfc;
+  border: 1px solid #f1f5f9;
+  border-radius: 6px;
+  transition: background 0.1s;
+}
+.studio__detail-row:hover {
+  background: #f0f7ff;
+  border-color: #bfdbfe;
+}
+.studio__detail-row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.studio__detail-row-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e293b;
+  min-width: 0;
+}
+.studio__detail-row-arrow {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 700;
+}
+.studio__detail-row-tag {
   font-size: 10px;
-  background: #e2e8f0;
-  color: #475569;
   padding: 1px 6px;
   border-radius: 3px;
+  background: #e2e8f0;
+  color: #475569;
+  font-weight: 500;
 }
-.studio__prop-required {
+.studio__detail-row-tag--blue { background: #dbeafe; color: #1d4ed8; }
+.studio__detail-row-tag--orange { background: #fed7aa; color: #c2410c; }
+.studio__detail-row-tag--purple { background: #ede9fe; color: #6d28d9; }
+.studio__detail-row-tag--green { background: #d1fae5; color: #047857; }
+.studio__detail-row-required {
   font-size: 10px;
   background: #fef3c7;
   color: #92400e;
   padding: 1px 6px;
   border-radius: 3px;
+}
+.studio__detail-row-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+.studio__detail-row-sub--muted { color: #cbd5e1; font-style: italic; }
+.studio__detail-row-sub code {
+  font-family: monospace;
+  font-size: 10px;
+  background: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid #e5e7eb;
 }
 </style>

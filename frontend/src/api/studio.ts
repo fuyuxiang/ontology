@@ -18,6 +18,7 @@ export interface StudioProperty {
 export interface StudioObjectType {
   apiName: string
   displayName: string
+  id: string
   primaryKey: string
   titleProperty: string
   tier: 1 | 2 | 3
@@ -141,11 +142,26 @@ export interface StudioStats {
   }
 }
 
+export interface StudioEvent {
+  id: string
+  ts: string
+  type: string
+  icon: string
+  desc: string
+}
+
+export interface StudioEventStream {
+  generatedAt: string
+  total: number
+  events: StudioEvent[]
+}
+
 export const studioApi = {
   tbox: () => get<StudioTBox>('/studio/tbox'),
   abox: () => get<StudioABox>('/studio/abox'),
   rbox: () => get<StudioRBox>('/studio/rbox'),
   capability: () => get<unknown>('/studio/capability'),
   stats: () => get<StudioStats>('/studio/stats'),
+  events: (limit = 30) => get<StudioEventStream>(`/studio/events?limit=${limit}`),
   refreshCounts: () => post<{ refreshedAt: string; total: number; success: number; results: unknown[] }>('/studio/refresh-counts', {}),
 }
