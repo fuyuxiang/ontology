@@ -69,6 +69,7 @@ def get_tbox(db: Session = Depends(get_db)) -> dict[str, Any]:
         object_types.append({
             "apiName": e.name,
             "displayName": e.name_cn,
+            "id": e.id,
             "primaryKey": _primary_key_of(e),
             "titleProperty": _title_property_of(e),
             "tier": e.tier,
@@ -402,6 +403,71 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
             "failed": 0,
             "checks": [],
         },
+    }
+
+
+# ─── 实时事件流：聚合 traces + audit_log + 规则触发 ──────────────────
+
+@router.get("/events")
+def get_events(limit: int = 30, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """聚合本体平台的实时事件，供数字孪生视图的事件流卡片消费"""
+    from app.models.trace import AgentTrace
+    from app.models.audit import AuditLog
+    from app.models.agent import Agent
+
+    events: list[dict[str, Any]] = []
+
+    # 1. Agent traces（智能体调用记录）
+    traces = db.query(AgentTrace).order_by(AgentTrace.created_at.desc()).limit(limit).all()
+    agent_names = {a.id: a.name for a in db.query(Agent).all()}
+    for t in traces:
+        events.append({
+            "id": f"trace-{t.id}",
+            "ts": t.created_at.isoformat() if t.created_at else "",
+            "type": "skill" if t.status == "ok" else "alert",
+            "icon": "✦" if t.status == "ok" else "▲",
+            "desc": f"{agent_names.get(t.agent_id, '智能体')} {'完成' if t.status == 'ok' else '异常'}: {(t.output_text or t.input_text or '')[:60]}",
+        })
+
+    # 2. AuditLog（实体/规则/动作的 CRUD）
+    audits = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(limit).all()
+    for a in audits:
+        type_map = {"entity": "state_change", "rule": "rule", "action": "skill", "agent": "skill"}
+        icon_map = {"entity": "●", "rule": "◇", "action": "✦", "agent": "▸"}
+        action_label = {"create": "创建", "update": "更新", "delete": "删除", "publish": "发布"}.get(a.action, a.action)
+        events.append({
+            "id": f"audit-{a.id}",
+            "ts": a.timestamp.isoformat() if a.timestamp else "",
+            "type": type_map.get(a.target_type, "state_change"),
+            "icon": icon_map.get(a.target_type, "●"),
+            "desc": f"{a.user_name or '系统'} {action_label} {a.target_type} {a.target_name}",
+        })
+
+    # 3. 高频触发规则（trigger_count Top N）
+    rules = (
+        db.query(BusinessRule)
+        .filter(BusinessRule.trigger_count > 0)
+        .filter(BusinessRule.last_triggered.isnot(None))
+        .order_by(BusinessRule.last_triggered.desc())
+        .limit(10)
+        .all()
+    )
+    for r in rules:
+        if r.last_triggered:
+            events.append({
+                "id": f"rule-{r.id}",
+                "ts": r.last_triggered.isoformat(),
+                "type": "rule",
+                "icon": "◇",
+                "desc": f"规则 {r.name} 触发 (累计 {r.trigger_count} 次)",
+            })
+
+    # 时间倒序合并裁剪
+    events.sort(key=lambda e: e["ts"], reverse=True)
+    return {
+        "generatedAt": _now_iso(),
+        "total": len(events),
+        "events": events[:limit],
     }
 
 
