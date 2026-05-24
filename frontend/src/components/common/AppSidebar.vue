@@ -1,13 +1,9 @@
 <template>
   <aside class="sidebar">
     <div class="sidebar__logo">
-      <div class="sidebar__logo-icon">
-        <img src="/images/ontology/BONC.png" alt="BONC" class="sidebar__logo-img" />
-      </div>
-      <div class="sidebar__logo-info">
-        <span class="sidebar__logo-text">元枢</span>
-        <span class="sidebar__logo-subtext">Ontology</span>
-      </div>
+      <img src="/images/ontology/BONC.png" alt="BONC" class="sidebar__logo-img" />
+      <span class="sidebar__logo-divider"></span>
+      <span class="sidebar__logo-text">元枢 Ontology</span>
     </div>
 
     <nav class="sidebar__nav">
@@ -163,20 +159,29 @@ const navGroups = [
 .sidebar__logo {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   padding: 20px 20px 16px;
   flex-shrink: 0;
 }
-.sidebar__logo-icon {
-  width: 36px; height: 36px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(135deg, var(--semantic-500), var(--semantic-700));
-  box-shadow: 0 2px 8px rgba(76, 110, 245, 0.2);
+.sidebar__logo-img {
+  height: 18px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
 }
-.sidebar__logo-img { width: 22px; height: 22px; border-radius: 0; object-fit: contain; filter: brightness(10); }
-.sidebar__logo-info { display: flex; flex-direction: column; line-height: 1.2; }
-.sidebar__logo-text { font-size: 16px; font-weight: 700; color: var(--sidebar-text-active); letter-spacing: -0.3px; }
-.sidebar__logo-subtext { font-size: 11px; font-weight: 500; color: var(--sidebar-text-muted); letter-spacing: 0.02em; }
+.sidebar__logo-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--sidebar-border);
+  flex-shrink: 0;
+}
+.sidebar__logo-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sidebar-text-active);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
 .sidebar__nav {
   flex: 1;
   overflow-y: auto;
