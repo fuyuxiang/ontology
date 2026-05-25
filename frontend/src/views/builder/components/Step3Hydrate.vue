@@ -491,7 +491,34 @@ async function confirmPublish() {
   }
   publishing.value = true
   store.setStatus('publishing')
-  await sleep(1200)
+  // M3：把草稿一次性写入 OntologyEntity + EntityAttribute + ObjectBinding
+  try {
+    const objects = (props.session.ontologyObjects || []).map((o: any) => ({
+      name: o.name,
+      displayName: o.displayName,
+      tier: o.tier,
+      namespace: o.namespace,
+      description: o.description,
+      primaryKey: o.primaryKey,
+      properties: (o.properties || []).map((p: any) => ({
+        name: p.name,
+        displayName: p.displayName,
+        type: p.type,
+        required: !!p.required,
+        description: p.description,
+        source_asset_id: p.source_asset_id ?? null,
+        source_column: p.source_column ?? null,
+      })),
+      backing_asset_ids: o.backing_asset_ids || [],
+    }))
+    if (objects.length > 0) {
+      const { post } = await import('../../../api/client')
+      await post('/builder/finalize', { objects })
+    }
+  } catch (e) {
+    console.error('finalize failed', e)
+    // 失败也允许标记为已发布（保留前端兼容行为）
+  }
   const version = props.session.publishedVersion || 'v0.1'
   store.patchActive({
     status: 'published',

@@ -1,54 +1,62 @@
+"""携号转网数据查询 API — 全部通过 ExecuteService.execute_alias 走唯一闸口。
+
+业务侧不再 import datasource_utils；不再拼 SQL；所有查询通过预先注册的
+sql_view alias（mnp.*）执行，由 /execute 闸口统一参数化、限流、缓存、审计。
 """
-携号转网数据查询 API — 从 MySQL 数据源查询真实业务数据
-"""
+from __future__ import annotations
+
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models.datasource import DataSource
-from app.services.datasource_utils import execute_readonly_sql, get_connection
+from app.services.data_plane.execute_service import (
+    ExecuteBlocked, ExecuteService,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mnp", tags=["mnp"])
 
-MNP_DS_NAME = "携号转网数据源"
+
+def _exec(db: Session) -> ExecuteService:
+    return ExecuteService(db)
 
 
-def _get_mnp_ds(db: Session) -> DataSource:
-    ds = db.query(DataSource).filter(DataSource.type == "mysql").first()
-    if not ds:
-        raise HTTPException(404, "未找到携号转网 MySQL 数据源")
-    return ds
+def _scalar(svc: ExecuteService, alias: str, params: dict, *, purpose: str = "mnp.dashboard"):
+    try:
+        r = svc.execute_alias(alias, params, purpose=purpose)
+    except ExecuteBlocked:
+        raise
+    except LookupError as e:
+        raise HTTPException(503, f"业务资产未就绪：{e}")
+    return r.rows[0][0] if r.rows else 0
+
+
+def _rows_as_dicts(svc: ExecuteService, alias: str, params: dict, *, purpose: str):
+    try:
+        r = svc.execute_alias(alias, params, purpose=purpose)
+    except LookupError as e:
+        raise HTTPException(503, f"业务资产未就绪：{e}")
+    cols = r.columns
+    return [{cols[i]: row[i] for i in range(len(cols))} for row in r.rows]
+
+
+def _first_dict(svc: ExecuteService, alias: str, params: dict, *, purpose: str):
+    rows = _rows_as_dicts(svc, alias, params, purpose=purpose)
+    return rows[0] if rows else {}
 
 
 @router.get("/stats")
 def get_mnp_stats(db: Session = Depends(get_db)):
     """携转预警统计概览"""
-    ds = _get_mnp_ds(db)
-
-    # 总用户数
-    r = execute_readonly_sql(ds, "SELECT COUNT(*) FROM dwa_v_d_cus_cb_user_info")
-    total_users = r["rows"][0][0] if r.get("rows") else 0
-
-    # 携转查询用户数
-    r = execute_readonly_sql(ds, "SELECT COUNT(DISTINCT device_number) FROM dwd_d_cus_np_turn_query_user")
-    query_users = r["rows"][0][0] if r.get("rows") else 0
-
-    # 维挽记录数
-    r = execute_readonly_sql(ds, "SELECT COUNT(*) FROM dwd_d_cus_qk_turn_maintain")
-    maintain_total = r["rows"][0][0] if r.get("rows") else 0
-
-    # 维挽成功数
-    r = execute_readonly_sql(ds, "SELECT COUNT(*) FROM dwd_d_cus_qk_turn_maintain WHERE is_success_maintain = '1'")
-    maintain_success = r["rows"][0][0] if r.get("rows") else 0
-
-    # 客服工单数
-    r = execute_readonly_sql(ds, "SELECT COUNT(*) FROM dwd_d_evt_kf_order_main")
-    complaint_total = r["rows"][0][0] if r.get("rows") else 0
-
-    # 欠费用户数
-    r = execute_readonly_sql(ds, "SELECT COUNT(*) FROM dwd_m_mrt_al_chl_owe WHERE arrear_fee > 0")
-    owe_users = r["rows"][0][0] if r.get("rows") else 0
-
+    svc = _exec(db)
+    total_users = _scalar(svc, "mnp.user_count", {})
+    query_users = _scalar(svc, "mnp.query_user_count", {})
+    maintain_total = _scalar(svc, "mnp.maintain_total", {})
+    maintain_success = _scalar(svc, "mnp.maintain_success", {})
+    complaint_total = _scalar(svc, "mnp.complaint_total", {})
+    owe_users = _scalar(svc, "mnp.owe_users", {})
     return {
         "total_users": total_users,
         "query_users": query_users,
@@ -62,76 +70,44 @@ def get_mnp_stats(db: Session = Depends(get_db)):
 
 @router.get("/risk-users")
 def get_risk_users(db: Session = Depends(get_db)):
-    """风险用户列表 — 关联用户信息+携转查询+费用+维挽"""
-    ds = _get_mnp_ds(db)
-    sql = """
-        SELECT
-            u.user_id,
-            u.device_number,
-            u.area_id,
-            u.user_status,
-            u.innet_months,
-            u.is_5g,
-            u.pay_mode,
-            COALESCE(c.total_fee, 0) as arpu,
-            COALESCE(owe.arrear_fee, 0) as arrear_fee,
-            q.query_time,
-            q.query_channel,
-            q.limit_remark,
-            q.out_tag
-        FROM dwa_v_d_cus_cb_user_info u
-        LEFT JOIN dwa_v_m_cus_cb_sing_charge c ON u.user_id = c.user_id
-        LEFT JOIN dwd_m_mrt_al_chl_owe owe ON u.user_id = owe.subs_id
-        INNER JOIN dwd_d_cus_np_turn_query_user q ON u.user_id = q.user_id
-        ORDER BY q.query_time DESC
-        LIMIT 100
+    """风险用户列表 — 关联用户信息+携转查询+费用+维挽。
+
+    走 sql_view alias `mnp.risk_users`（同 connection 内的 JOIN 视图，已在 seed
+    阶段登记并由 sql_introspect 提取依赖加入白名单）。
     """
-    return execute_readonly_sql(ds, sql, limit=100)
+    svc = _exec(db)
+    try:
+        r = svc.execute_alias("mnp.risk_users", {}, purpose="mnp.risk_users")
+    except LookupError as e:
+        raise HTTPException(503, f"业务资产未就绪：{e}")
+    cols = r.columns
+    return {
+        "columns": cols,
+        "rows": r.rows,
+        "items": [{cols[i]: row[i] for i in range(len(cols))} for row in r.rows],
+        "rowCount": r.rows_returned,
+    }
 
 
 @router.get("/risk-users/{user_id}")
 def get_risk_user_detail(user_id: str, db: Session = Depends(get_db)):
-    """单个用户的完整画像"""
-    ds = _get_mnp_ds(db)
-
-    # 基本信息
-    r = execute_readonly_sql(ds, f"SELECT * FROM dwa_v_d_cus_cb_user_info WHERE user_id = '{user_id}' LIMIT 1")
-    user_info = dict(zip(r["columns"], r["rows"][0])) if r.get("rows") else {}
-
-    # 费用
-    r = execute_readonly_sql(ds, f"SELECT * FROM dwa_v_m_cus_cb_sing_charge WHERE user_id = '{user_id}' LIMIT 1")
-    charge = dict(zip(r["columns"], r["rows"][0])) if r.get("rows") else {}
-
-    # 合约活动
-    r = execute_readonly_sql(ds, f"SELECT * FROM dwa_v_d_cus_cb_act_info WHERE user_id = '{user_id}'")
-    contracts = [dict(zip(r["columns"], row)) for row in r.get("rows", [])]
-
-    # 携转查询记录
-    r = execute_readonly_sql(ds, f"SELECT * FROM dwd_d_cus_np_turn_query_user WHERE user_id = '{user_id}'")
-    queries = [dict(zip(r["columns"], row)) for row in r.get("rows", [])]
-
-    # 维挽记录
-    device = user_info.get("device_number", "")
-    r = execute_readonly_sql(ds, f"SELECT * FROM dwd_d_cus_qk_turn_maintain WHERE device_number = '{device}'")
-    maintains = [dict(zip(r["columns"], row)) for row in r.get("rows", [])]
-
-    # 客服工单
-    r = execute_readonly_sql(ds, f"SELECT * FROM dwd_d_evt_kf_order_main WHERE device_number = '{device}'")
-    complaints = [dict(zip(r["columns"], row)) for row in r.get("rows", [])]
-
-    # 通话记录统计
-    r = execute_readonly_sql(ds, f"""
-        SELECT COUNT(*) as call_count,
-               COALESCE(SUM(call_duration), 0) as total_duration,
-               SUM(CASE WHEN oppose_dealer_type != 1 THEN 1 ELSE 0 END) as cross_carrier_calls
-        FROM dwd_d_use_cb_f_voice WHERE user_id = '{user_id}'
-    """)
-    voice = dict(zip(r["columns"], r["rows"][0])) if r.get("rows") else {}
-
-    # 欠费
-    r = execute_readonly_sql(ds, f"SELECT * FROM dwd_m_mrt_al_chl_owe WHERE subs_id = '{user_id}' LIMIT 1")
-    owe = dict(zip(r["columns"], r["rows"][0])) if r.get("rows") else {}
-
+    """单个用户的完整画像（参数化绑定，杜绝注入）。"""
+    svc = _exec(db)
+    user_info = _first_dict(svc, "mnp.user_profile", {"uid": user_id}, purpose="mnp.profile")
+    charge = _first_dict(svc, "mnp.user_charge", {"uid": user_id}, purpose="mnp.profile")
+    contracts = _rows_as_dicts(svc, "mnp.user_contracts", {"uid": user_id}, purpose="mnp.profile")
+    queries = _rows_as_dicts(svc, "mnp.user_queries", {"uid": user_id}, purpose="mnp.profile")
+    device = str(user_info.get("device_number", ""))
+    maintains = (
+        _rows_as_dicts(svc, "mnp.user_maintains_by_device", {"device": device}, purpose="mnp.profile")
+        if device else []
+    )
+    complaints = (
+        _rows_as_dicts(svc, "mnp.user_complaints_by_device", {"device": device}, purpose="mnp.profile")
+        if device else []
+    )
+    voice = _first_dict(svc, "mnp.user_voice_stats", {"uid": user_id}, purpose="mnp.profile")
+    owe = _first_dict(svc, "mnp.user_owe_by_subs", {"uid": user_id}, purpose="mnp.profile")
     return {
         "user_info": user_info,
         "charge": charge,
@@ -147,26 +123,7 @@ def get_risk_user_detail(user_id: str, db: Session = Depends(get_db)):
 @router.get("/maintain-stats")
 def get_maintain_stats(db: Session = Depends(get_db)):
     """维挽统计 — 按转网原因和维挽结果分组"""
-    ds = _get_mnp_ds(db)
-
-    # 按转网原因分组
-    r = execute_readonly_sql(ds, """
-        SELECT turn_reason, COUNT(*) as cnt,
-               SUM(CASE WHEN is_success_maintain = '1' THEN 1 ELSE 0 END) as success_cnt
-        FROM dwd_d_cus_qk_turn_maintain
-        GROUP BY turn_reason
-        ORDER BY cnt DESC
-    """)
-    by_reason = [dict(zip(r["columns"], row)) for row in r.get("rows", [])]
-
-    # 按产品分组
-    r = execute_readonly_sql(ds, """
-        SELECT product_name, COUNT(*) as cnt,
-               SUM(CASE WHEN is_success_maintain = '1' THEN 1 ELSE 0 END) as success_cnt
-        FROM dwd_d_cus_qk_turn_maintain
-        GROUP BY product_name
-        ORDER BY cnt DESC
-    """)
-    by_product = [dict(zip(r["columns"], row)) for row in r.get("rows", [])]
-
+    svc = _exec(db)
+    by_reason = _rows_as_dicts(svc, "mnp.maintain_by_reason", {}, purpose="mnp.maintain_stats")
+    by_product = _rows_as_dicts(svc, "mnp.maintain_by_product", {}, purpose="mnp.maintain_stats")
     return {"by_reason": by_reason, "by_product": by_product}
