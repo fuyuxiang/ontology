@@ -58,7 +58,7 @@
     <div v-else class="hd-report-view">
       <div class="hd-report-bar">
         <a-button @click="activeReport = null">← 返回历史列表</a-button>
-        <div class="hd-breadcrumb">数据工坊 / 水合演练 / <span>水合验证报告</span></div>
+        <div class="hd-breadcrumb">数据集成 / 水合演练 / <span>水合验证报告</span></div>
         <span style="flex:1"></span>
         <span class="hd-meta">报告编号 {{ reportNo(activeReport) }} · 生成时间 {{ activeReport.time }}</span>
         <a-button>⬇ 导出PDF</a-button>

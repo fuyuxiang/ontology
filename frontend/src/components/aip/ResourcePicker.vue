@@ -75,7 +75,7 @@ const jumpUrl = computed(() => {
     function: '/logic/functions',
     entity: '/browser',
     model: '/settings/models',
-    datasource: '/datasource',
+    datasource: '/data/ingest',
   }
   return map[props.type] || ''
 })

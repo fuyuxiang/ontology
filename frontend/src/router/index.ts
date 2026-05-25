@@ -27,9 +27,15 @@ const router = createRouter({
     { path: '/ontology/create', name: 'ontology-create', component: () => import('../views/ontology/EntityCreateView.vue'), meta: { title: '新建本体对象' } },
     { path: '/ontology/:id', name: 'ontology-detail', component: () => import('../views/detail/EntityDetail.vue'), meta: { title: '实体详情' } },
 
-    // 数据中心
-    { path: '/datasource', name: 'datasource', component: () => import('../views/datasource/DataWorkshopView.vue'), meta: { title: '数据工坊' } },
-    { path: '/data/workshop', name: 'data-workshop', component: () => import('../views/datasource/DataWorkshopView.vue'), meta: { title: '数据工坊' } },
+    // 数据集成
+    { path: '/datasource', redirect: '/data/ingest' },
+    { path: '/data/workshop', redirect: '/data/ingest' },
+    { path: '/data/ingest', name: 'data-ingest', component: () => import('../views/datasource/pages/DataIngestPage.vue'), meta: { title: '数据接入' } },
+    { path: '/data/pipeline', name: 'data-pipeline', component: () => import('../views/datasource/pages/DataPipelinePage.vue'), meta: { title: '数据管道' } },
+    { path: '/data/catalog', name: 'data-catalog', component: () => import('../views/datasource/pages/DataCatalogPage.vue'), meta: { title: '数据目录' } },
+    { path: '/data/lineage', name: 'data-lineage', component: () => import('../views/datasource/pages/DataLineagePage.vue'), meta: { title: '数据血缘' } },
+    { path: '/data/quality', name: 'data-quality', component: () => import('../views/datasource/pages/DataQualityPage.vue'), meta: { title: '数据质量' } },
+    { path: '/data/hydration', name: 'data-hydration', component: () => import('../views/datasource/pages/HydrationDrillPage.vue'), meta: { title: '水合演练' } },
     { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射' } },
     { path: '/data/resolution', name: 'data-resolution', component: () => import('../views/resolution/ResolutionView.vue'), meta: { title: '实体解析' } },
 
