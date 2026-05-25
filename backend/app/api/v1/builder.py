@@ -14,6 +14,7 @@ from typing import Any, Generator
 
 from fastapi import APIRouter, Depends, File, Form, UploadFile
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -296,3 +297,121 @@ async def builder_chat(
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+# ── M3: 发布草稿 → OntologyEntity + EntityAttribute + ObjectBinding ─────
+
+class _DraftProperty(BaseModel):
+    name: str
+    displayName: str | None = None
+    type: str = "string"
+    required: bool = False
+    description: str | None = None
+    source_asset_id: str | None = None
+    source_column: str | None = None
+
+
+class _DraftObject(BaseModel):
+    name: str
+    displayName: str | None = None
+    tier: int = 2
+    namespace: str | None = None
+    description: str | None = None
+    primaryKey: str | None = None
+    properties: list[_DraftProperty] = []
+    backing_asset_ids: list[str] = []
+
+
+class FinalizeRequest(BaseModel):
+    objects: list[_DraftObject]
+
+
+@router.post("/finalize")
+def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
+    """把 builder 草稿一次性落库：每个对象创建 OntologyEntity + EntityAttribute；
+    若 backing_asset_ids 非空，自动创建 primary ObjectBinding（含 field_mappings）。
+
+    幂等：实体已存在时跳过；binding 已存在时也跳过。
+    """
+    from app.models.entity import EntityAttribute, OntologyEntity
+    from app.repositories.asset_repo import AssetRepository
+    from app.services.data_plane.object_binding_service import ObjectBindingService
+
+    asset_repo = AssetRepository(db)
+    binding_svc = ObjectBindingService(db)
+
+    created_entities = 0
+    created_bindings = 0
+    skipped = 0
+
+    for obj in body.objects:
+        eid = (f"{obj.namespace}_{obj.name}" if obj.namespace else obj.name)
+        existing = db.get(OntologyEntity, eid)
+        if existing:
+            skipped += 1
+            entity = existing
+        else:
+            entity = OntologyEntity(
+                id=eid, name=obj.name, name_cn=obj.displayName or obj.name,
+                tier=int(obj.tier or 2), status="active",
+                description=obj.description,
+                schema_json={"primary_key": obj.primaryKey,
+                             "backing_asset_ids": obj.backing_asset_ids},
+            )
+            db.add(entity)
+            db.flush()
+            created_entities += 1
+
+        # 属性（按 name 去重）
+        attr_by_name: dict[str, EntityAttribute] = {a.name: a for a in entity.attributes}
+        for p in obj.properties:
+            if p.name in attr_by_name:
+                continue
+            attr = EntityAttribute(
+                entity_id=entity.id, name=p.name, type=p.type,
+                description=p.description or p.displayName or p.name,
+                required=p.required,
+            )
+            db.add(attr)
+            db.flush()
+            attr_by_name[p.name] = attr
+        db.flush()
+
+        # ObjectBinding（每个 backing_asset_id 一个 primary，role 区分）
+        for idx, asset_id in enumerate(obj.backing_asset_ids):
+            asset = asset_repo.get_by_id(asset_id)
+            if not asset:
+                continue
+            role = "primary" if idx == 0 else "enrichment"
+            existing_binding = binding_svc.repo.find_existing(entity.id, asset_id, role)
+            if existing_binding:
+                continue
+            field_mappings = []
+            for p in obj.properties:
+                if p.source_asset_id == asset_id and p.source_column:
+                    attr = attr_by_name.get(p.name)
+                    if attr:
+                        field_mappings.append({
+                            "attribute_id": attr.id,
+                            "source_column": p.source_column,
+                            "transform": None,
+                        })
+            try:
+                binding_svc.create(
+                    object_type_id=entity.id,
+                    asset_id=asset_id,
+                    role=role,
+                    field_mappings=field_mappings,
+                    id_column=obj.primaryKey,
+                )
+                created_bindings += 1
+            except Exception:
+                logger.exception("create binding failed for %s", entity.id)
+
+    db.commit()
+    return {
+        "created_entities": created_entities,
+        "created_bindings": created_bindings,
+        "skipped": skipped,
+        "total": len(body.objects),
+    }

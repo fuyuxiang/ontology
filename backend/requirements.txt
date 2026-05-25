@@ -18,3 +18,5 @@ python-docx>=1.0
 pdfplumber>=0.11
 openpyxl>=3.1
 pandas>=2.0
+sqlglot>=30.0
+sse-starlette>=3.0

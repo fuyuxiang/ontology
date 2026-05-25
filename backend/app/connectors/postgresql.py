@@ -78,3 +78,13 @@ class PostgreSQLConnector:
         rows = [list(row) for row in cur.fetchall()]
         cur.close()
         return {"columns": columns, "rows": rows, "rowCount": len(rows)}
+
+    def execute_sql_with_params(self, conn: Any, sql: str, params: dict) -> dict:
+        from app.connectors._param_style import to_pyformat
+        rendered, args = to_pyformat(sql, params)
+        cur = conn.cursor()
+        cur.execute(rendered, args)
+        columns = [desc[0] for desc in cur.description] if cur.description else []
+        rows = [list(row) for row in cur.fetchall()]
+        cur.close()
+        return {"columns": columns, "rows": rows, "rowCount": len(rows)}

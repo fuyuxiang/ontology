@@ -223,6 +223,17 @@ from app.api.v1.aip_scenes import router as aip_scenes_router
 from app.api.v1.aip_executions import router as aip_executions_router
 from app.api.v1.aip_webhooks import router as aip_webhooks_router
 
+# ── Data Plane（M1 新增 7 个 router）──
+from app.api.v1.data_plane.connections import router as dp_connections_router
+from app.api.v1.data_plane.assets import router as dp_assets_router
+from app.api.v1.data_plane.execute import router as dp_execute_router
+from app.api.v1.data_plane.probes import router as dp_probes_router
+from app.api.v1.data_plane.lineage import router as dp_lineage_router
+from app.api.v1.data_plane.events import router as dp_events_router
+from app.api.v1.data_plane.audit import router as dp_audit_router
+from app.api.v1.data_plane.object_bindings import router as dp_bindings_router
+from app.api.v1.data_plane.compat import install as install_compat_middleware
+
 logger = logging.getLogger(__name__)
 
 
@@ -317,6 +328,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"AIP 调度器启动失败: {e}")
 
+    # 注册 Data Plane 跨模块事件 handler
+    try:
+        from app.services.data_plane.event_handlers import register_event_handlers
+        register_event_handlers()
+        logger.info("Data Plane 事件 handler 已注册")
+    except Exception as e:
+        logger.warning(f"Data Plane 事件 handler 注册失败: {e}")
+
+    # 注册业务侧 sql_view Asset（mnp / scenes / broadband）
+    try:
+        from scripts.seed_business_assets import seed as seed_business_assets
+        bs_stats = seed_business_assets()
+        logger.info(f"业务资产 seed 完成: {bs_stats}")
+    except Exception as e:
+        logger.warning(f"业务资产 seed 失败: {e}")
+
     # 预热携号转网案例用户缓存（后台执行，不阻塞启动）
     import asyncio
 
@@ -359,6 +386,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Data Plane 兼容层：给 deprecated 路由添加 Deprecation / Sunset / Link 响应头
+install_compat_middleware(app)
+
 app.include_router(entities_router, prefix="/api/v1")
 app.include_router(rules_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
@@ -394,6 +424,16 @@ app.include_router(aip_executions_router, prefix="/api/v1")
 app.include_router(aip_webhooks_router, prefix="/api/v1")
 app.include_router(builder_router, prefix="/api/v1")
 app.include_router(business_documents_router, prefix="/api/v1")
+
+# ── Data Plane router 挂载 ──
+app.include_router(dp_connections_router, prefix="/api/v1")
+app.include_router(dp_assets_router, prefix="/api/v1")
+app.include_router(dp_execute_router, prefix="/api/v1")
+app.include_router(dp_probes_router, prefix="/api/v1")
+app.include_router(dp_lineage_router, prefix="/api/v1")
+app.include_router(dp_events_router, prefix="/api/v1")
+app.include_router(dp_audit_router, prefix="/api/v1")
+app.include_router(dp_bindings_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

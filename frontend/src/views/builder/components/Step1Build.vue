@@ -345,11 +345,20 @@ function confirmAll() {
     primaryKey: e.primary_key || 'id',
     icon: e.icon || '🔷',
     instanceCount: 0,
+    // M2.2：自动落 backing —— 来自 LLM 抽取时启发式匹配的 source asset
+    backing_asset_ids: Array.isArray(e.backing_asset_ids) && e.backing_asset_ids.length
+      ? e.backing_asset_ids
+      : (selectedDsIds.value.length ? [...selectedDsIds.value] : []),
+    evidence_asset_ids: Array.isArray(e.evidence_asset_ids)
+      ? e.evidence_asset_ids
+      : [...selectedDocIds.value],
     properties: (e.properties || []).map((p: any, pi: number) => ({
       id: `prop-${Date.now().toString(36)}-${i}-${pi}`,
       name: p.name, displayName: p.display_name || p.name,
       type: p.type || 'string', required: !!p.required,
       description: p.description || '',
+      source_asset_id: p.source_asset_id ?? null,
+      source_column: p.source_column ?? null,
     } as OntologyProperty)),
     derivedProperties: [], rules: [], actions: [], approved: false,
   }))

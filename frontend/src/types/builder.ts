@@ -51,6 +51,9 @@ export interface OntologyProperty {
   type: 'string' | 'number' | 'date' | 'boolean' | 'enum' | string
   required: boolean
   description?: string
+  // M2.2：AI 召回回写 backing —— 让发布链路可自动落 ObjectBinding
+  source_asset_id?: string | null
+  source_column?: string | null
 }
 
 export interface OntologyObjectDraft {
@@ -68,6 +71,9 @@ export interface OntologyObjectDraft {
   rules: string[]               // BusinessRule ID 数组
   actions: string[]             // EntityAction ID 数组
   approved?: boolean
+  // M2.2：AI 召回回写 backing
+  backing_asset_ids?: string[]
+  evidence_asset_ids?: string[]
 }
 
 // ── LLM 抽取/对话生成产生的"规则/动作建议"（只放 hints，不直接落库） ──

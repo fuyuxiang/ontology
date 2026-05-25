@@ -22,4 +22,13 @@ class DataSourceConnector(Protocol):
 
     def execute_sql(self, conn: Any, sql: str) -> dict: ...
 
+    def execute_sql_with_params(self, conn: Any, sql: str, params: dict) -> dict:
+        """参数化执行（驱动层绑定，杜绝注入）。
+
+        sql 中占位符为 :name 风格；各 connector 在内部转成本驱动需要的形式。
+        params 是 {name: value} 字典；按 sql 中出现顺序展开为 driver 实际参数。
+        """
+        ...
+
     def quote_identifier(self) -> str: ...
+
