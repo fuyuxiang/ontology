@@ -100,9 +100,16 @@ const navGroups = [
   { label: '', items: [
     { path: '/dashboard', label: '平台总览', icon: ico.dashboard, exact: true },
   ]},
-  { label: '本体中心', items: [
-    { path: '/datasource', label: '数据工坊', icon: ico.datasource },
+  { label: '数据集成', items: [
     { path: '/marketplace', label: '本体原料集市', icon: ico.catalog },
+    { path: '/data/ingest', label: '数据接入', icon: ico.datasource },
+    { path: '/data/pipeline', label: '数据管道', icon: ico.workflow },
+    { path: '/data/catalog', label: '数据目录', icon: ico.catalog },
+    { path: '/data/lineage', label: '数据血缘', icon: ico.graph },
+    { path: '/data/quality', label: '数据质量', icon: ico.quality },
+    { path: '/data/hydration', label: '水合演练', icon: ico.sandbox },
+  ]},
+  { label: '本体中心', items: [
     { path: '/builder', label: '本体构建器', icon: ico.tool },
     { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },
     { path: '/studio', label: '本体工作室', icon: ico.graph },

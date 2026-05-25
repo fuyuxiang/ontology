@@ -13,7 +13,9 @@ class PostgreSQLConnector:
         import psycopg2
         return psycopg2.connect(
             host=host, port=port, user=username,
-            password=password, dbname=database, connect_timeout=5,
+            password=password,
+            dbname=database or "postgres",
+            connect_timeout=5,
         )
 
     def close(self, conn: Any) -> None:
