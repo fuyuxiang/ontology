@@ -1,28 +1,5 @@
 <template>
   <div class="ds-page">
-    <div class="ds-page__header">
-      <div>
-        <h1 class="ds-page__title">数据源管理</h1>
-        <p class="ds-page__subtitle">连接配置 · 状态监控 · 数据接入</p>
-      </div>
-      <a-space>
-        <a-button @click="handleSyncAll" :loading="syncingAll" :disabled="store.items.length === 0">
-          <template #icon><SyncOutlined /></template>
-          全部同步
-        </a-button>
-        <a-popconfirm title="确认删除全部数据源？此操作不可恢复！" @confirm="handleDeleteAll" :disabled="store.items.length === 0">
-          <a-button danger :disabled="store.items.length === 0">
-            <template #icon><DeleteOutlined /></template>
-            全部删除
-          </a-button>
-        </a-popconfirm>
-        <a-button type="primary" @click="openCreate">
-          <template #icon><PlusOutlined /></template>
-          新增数据源
-        </a-button>
-      </a-space>
-    </div>
-
     <!-- 统计行（紧凑横排，仿 DataFoundry） -->
     <div class="ds-stats-row">
       <a-statistic title="数据源总数" :value="store.stats.total">
@@ -31,12 +8,14 @@
       <a-statistic title="在线" :value="store.stats.enabled" :value-style="{ color: 'var(--status-success)' }">
         <template #prefix><CheckCircleOutlined style="color: var(--status-success)" /></template>
       </a-statistic>
-      <a-statistic title="同步中" :value="syncingCount" :value-style="{ color: 'var(--status-warning)' }">
-        <template #prefix><SyncOutlined style="color: var(--status-warning)" /></template>
-      </a-statistic>
       <a-statistic title="离线" :value="store.stats.stopped" :value-style="{ color: 'var(--status-error)' }">
         <template #prefix><CloseCircleOutlined style="color: var(--status-error)" /></template>
       </a-statistic>
+      <span class="ds-stats-row__spacer"></span>
+      <a-button type="primary" @click="openCreate">
+        <template #icon><PlusOutlined /></template>
+        新增数据源
+      </a-button>
     </div>
 
     <!-- 工具栏 -->
@@ -68,28 +47,11 @@
           <span class="ds-status">
             <span class="ds-status__dot" :style="{ background: statusColor(record) }"></span>
             <span :style="{ color: statusColor(record) }">{{ statusLabel(record) }}</span>
-            <SyncOutlined v-if="refreshing === record.id" spin :style="{ marginLeft: '4px', color: 'var(--status-warning)', fontSize: '12px' }" />
+            <SyncOutlined v-if="testing === record.id" spin :style="{ marginLeft: '4px', color: 'var(--status-warning)', fontSize: '12px' }" />
           </span>
         </template>
         <template v-else-if="column.key === 'host'">
           <span class="ds-cell-code">{{ record.host }}:{{ record.port }}</span>
-        </template>
-        <template v-else-if="column.key === 'records'">
-          {{ formatRecords(record.record_count) }}
-        </template>
-        <template v-else-if="column.key === 'last_sync'">
-          <span class="ds-cell-secondary">{{ formatTime(record.updated_at || record.created_at) }}</span>
-        </template>
-        <template v-else-if="column.key === 'quality'">
-          <a-progress
-            :percent="qualityScore(record)"
-            size="small"
-            :stroke-color="qualityColor(qualityScore(record))"
-            :style="{ width: '100px' }"
-          />
-        </template>
-        <template v-else-if="column.key === 'enabled'">
-          <a-switch :checked="record.enabled" :loading="toggling === record.id" @change="handleToggle(record)" size="small" checked-children="运行" un-checked-children="停止" />
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4" wrap>
@@ -97,21 +59,14 @@
               <template #icon><EyeOutlined /></template>
               详情
             </a-button>
-            <a-button type="link" size="small" :loading="refreshing === record.id" @click="handleRefresh(record)">
-              <template #icon><SyncOutlined /></template>
-              同步
+            <a-button type="link" size="small" :loading="testing === record.id" @click="handleTestConnection(record)">
+              <template #icon><LinkOutlined /></template>
+              测试连接
             </a-button>
-            <a-tooltip :title="record.enabled ? '已连接' : '测试数据源连通性'">
-              <a-button
-                type="link"
-                size="small"
-                :style="record.enabled ? { color: 'var(--status-success)' } : {}"
-                @click="handleToggle(record)"
-              >
-                <template #icon><LinkOutlined /></template>
-                {{ record.enabled ? '已连接' : '测试连接' }}
-              </a-button>
-            </a-tooltip>
+            <a-button type="link" size="small" @click="handleCreateDataset(record)">
+              <template #icon><PlusOutlined /></template>
+              新建数据集
+            </a-button>
             <a-popconfirm :title="`确认删除「${TABLE_NAME_MAP[record.table_name] || record.name}」？`" @confirm="handleDelete(record)">
               <a-button type="link" size="small" danger>
                 <template #icon><DeleteOutlined /></template>
@@ -122,7 +77,7 @@
         </template>
       </template>
       <template #emptyText>
-        <a-empty description="暂无数据源，点击「新增数据源」添加" />
+        <a-empty description="暂无数据源，点击上方「新增数据源」按钮添加外部数据连接" />
       </template>
     </a-table>
 
@@ -138,7 +93,7 @@
       </div>
 
       <!-- Step 2: 数据库 -->
-      <a-form v-else-if="createStep === 2 && createCategory === 'database'" layout="vertical" @finish="handleSave">
+      <a-form v-else-if="createStep === 2 && createCategory === 'database'" layout="vertical">
         <a-button type="link" size="small" @click="createStep = 1" style="padding:0;margin-bottom:12px">← 返回</a-button>
         <a-row :gutter="16">
           <a-col :span="12">
@@ -175,7 +130,7 @@
         </a-form-item>
         <div class="ds-form__footer">
           <a-button @click="showModal = false">取消</a-button>
-          <a-button type="primary" html-type="submit" :loading="saving">保存</a-button>
+          <a-button type="primary" :loading="saving" @click="handleSave">保存</a-button>
         </div>
       </a-form>
 
@@ -399,6 +354,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useDataSourceStore } from '../../store/datasource'
 import * as api from '../../api/datasource'
 import type { DataSource, DataSourceCreate } from '../../types/datasource'
@@ -411,23 +367,19 @@ import {
 } from '@ant-design/icons-vue'
 
 const store = useDataSourceStore()
+const router = useRouter()
 
 const search = ref('')
 const activeType = ref('全部')
 const showModal = ref(false)
 const saving = ref(false)
-const toggling = ref<string | null>(null)
-const refreshing = ref<string | null>(null)
-const syncingAll = ref(false)
+const testing = ref<string | null>(null)
 
 const columns = ref([
-  { title: '数据源名称', key: 'name', width: 220, resizable: true, ellipsis: true },
-  { title: '引擎', key: 'engine', width: 100, resizable: true },
-  { title: '状态', key: 'status', width: 110, resizable: true },
-  { title: '连接地址', key: 'host', width: 180, resizable: true, ellipsis: true },
-  { title: '记录数', key: 'records', width: 100, resizable: true },
-  { title: '最后同步', key: 'last_sync', width: 150, resizable: true },
-  { title: '数据质量', key: 'quality', width: 130, resizable: true },
+  { title: '数据源名称', key: 'name', width: 240, resizable: true, ellipsis: true },
+  { title: '数据源类型', key: 'engine', width: 140, resizable: true },
+  { title: '状态', key: 'status', width: 120, resizable: true },
+  { title: '连接地址', key: 'host', width: 220, resizable: true, ellipsis: true },
   { title: '操作', key: 'actions', width: 280, fixed: 'right' as const },
 ])
 
@@ -534,14 +486,14 @@ function engineColor(type?: string) {
 }
 
 function statusLabel(record: DataSource) {
-  if (refreshing.value === record.id) return '同步中'
-  if (record.status === 'error') return '异常'
+  if (testing.value === record.id) return '测试中'
+  if (record.status === 'error') return '连接异常'
   if (record.enabled) return '在线'
   return '离线'
 }
 
 function statusColor(record: DataSource) {
-  if (refreshing.value === record.id) return 'var(--status-warning)'
+  if (testing.value === record.id) return 'var(--status-warning)'
   if (record.status === 'error') return 'var(--status-error)'
   if (record.enabled) return 'var(--status-success)'
   return 'var(--status-error)'
@@ -553,23 +505,6 @@ function formatRecords(n: number) {
   if (n >= 1e4) return (n / 1e4).toFixed(1).replace(/\.0$/, '') + '万'
   return n.toLocaleString()
 }
-
-function qualityScore(record: DataSource) {
-  if (record.status === 'error') return 0
-  if (!record.enabled) return 0
-  // 基线 90，按记录数细微浮动
-  const n = record.record_count || 0
-  const bonus = Math.min(8, Math.floor(Math.log10(n + 1)))
-  return Math.min(99, 87 + bonus)
-}
-
-function qualityColor(score: number) {
-  if (score >= 90) return 'var(--status-success)'
-  if (score >= 85) return 'var(--status-warning)'
-  return 'var(--status-error)'
-}
-
-const syncingCount = computed(() => (refreshing.value || syncingAll.value ? 1 : 0))
 
 onMounted(() => store.fetchList())
 
@@ -715,16 +650,21 @@ async function handleMqSource() {
   }
 }
 
-async function handleToggle(ds: DataSource) {
-  toggling.value = ds.id
+async function handleTestConnection(ds: DataSource) {
+  testing.value = ds.id
   try {
-    await api.toggleDataSource(ds.id)
+    const res = await api.testConnection(ds.id)
+    alert(res.success ? `连接正常：${res.message || 'OK'}` : `连接失败：${res.message || '请检查配置'}`)
     onSearch()
-  } catch {
-    alert('操作失败')
+  } catch (e: any) {
+    alert(e.response?.data?.detail || '测试连接失败')
   } finally {
-    toggling.value = null
+    testing.value = null
   }
+}
+
+async function handleCreateDataset(ds: DataSource) {
+  await router.push({ path: '/data/mapping', query: { datasourceId: ds.id } })
 }
 
 async function handleDelete(ds: DataSource) {
@@ -734,51 +674,6 @@ async function handleDelete(ds: DataSource) {
   } catch {
     alert('删除失败')
   }
-}
-
-async function handleRefresh(ds: DataSource) {
-  refreshing.value = ds.id
-  try {
-    const res = await api.refreshTables(ds.id)
-    alert(`同步完成，共 ${res.record_count} 条记录`)
-    onSearch()
-  } catch (e: any) {
-    alert(e.response?.data?.detail || '同步失败')
-  } finally {
-    refreshing.value = null
-  }
-}
-
-async function handleSyncAll() {
-  syncingAll.value = true
-  let success = 0
-  let fail = 0
-  for (const ds of store.items) {
-    try {
-      await api.refreshTables(ds.id)
-      success++
-    } catch {
-      fail++
-    }
-  }
-  syncingAll.value = false
-  alert(`同步完成：成功 ${success} 个${fail ? `，失败 ${fail} 个` : ''}`)
-  onSearch()
-}
-
-async function handleDeleteAll() {
-  let success = 0
-  let fail = 0
-  for (const ds of store.items) {
-    try {
-      await api.deleteDataSource(ds.id)
-      success++
-    } catch {
-      fail++
-    }
-  }
-  alert(`删除完成：成功 ${success} 个${fail ? `，失败 ${fail} 个` : ''}`)
-  onSearch()
 }
 
 async function openDetail(ds: DataSource) {
@@ -834,6 +729,7 @@ async function openDetail(ds: DataSource) {
   font-size: 22px; font-weight: 600; line-height: 1.2;
 }
 .ds-stats-row :deep(.ant-statistic-content-prefix) { margin-right: 6px; font-size: 18px; }
+.ds-stats-row__spacer { flex: 1; }
 
 /* 工具栏 */
 .ds-toolbar {
