@@ -1,37 +1,105 @@
 """
 宽带装机退单稽核 — 场景 API
-数据源: 123.56.188.16:3306 / mnp_risk_warning (bb_* 表)
-字段严格对齐本体设计规范(ONT_*)
+数据源：通过 Data Plane Connection（默认名 bb_audit_db）走 ExecuteService 执行；
+DB 配置 / 凭据 / 限流 / 缓存 / 审计 / 列级脱敏全部由数据集成模块统一管理。
 """
-from fastapi import APIRouter, Query, HTTPException
-from pydantic import BaseModel
-from typing import Any
-import pymysql
+from datetime import datetime as _dt, date as _date
+from decimal import Decimal
 import hashlib
-import uuid
 import json
 import logging
+import re
+import uuid
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.database import SessionLocal, get_db
+from app.repositories.connection_repo import ConnectionRepository
+from app.services.data_plane.execute_service import (
+    ExecuteBlocked, ExecuteService,
+)
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/scenes/broadband", tags=["broadband-audit"])
 
-DB_CFG = dict(host="123.56.188.16", port=3306, user="bonc", password="bonc123",
-              database="mnp_risk_warning", charset="utf8mb4")
+# 业务连接由 seed_business_assets 自动注册。
+_BB_CONN_NAME = "bb_audit_db"
 
 
-def _conn():
-    return pymysql.connect(**DB_CFG, cursorclass=pymysql.cursors.DictCursor)
+# ── 工具：%s 参数 → :p0/:p1/... + dict ───────────────────────────
+
+_PYFORMAT = re.compile(r"%s")
 
 
-def _query(sql: str, args=None) -> list[dict]:
-    conn = _conn()
+def _to_named(sql: str, args) -> tuple[str, dict]:
+    if args is None:
+        return sql, {}
+    if isinstance(args, dict):
+        return sql, dict(args)
+    if not isinstance(args, (list, tuple)):
+        args = (args,)
+    placeholders = []
+    out = []
+    last = 0
+    idx = 0
+    for m in _PYFORMAT.finditer(sql):
+        out.append(sql[last:m.start()])
+        out.append(f":p{idx}")
+        placeholders.append(f"p{idx}")
+        idx += 1
+        last = m.end()
+    out.append(sql[last:])
+    if idx != len(args):
+        raise ValueError(f"参数数量不匹配: 占位符 {idx}, 实参 {len(args)}")
+    return "".join(out), {f"p{i}": args[i] for i in range(idx)}
+
+
+def _ser_value(v: Any) -> Any:
+    if isinstance(v, _dt):
+        return v.strftime("%Y-%m-%d %H:%M:%S")
+    if isinstance(v, _date):
+        return v.isoformat()
+    if isinstance(v, Decimal):
+        return float(v)
+    return v
+
+
+def _ser(row: dict) -> dict:
+    return {k: _ser_value(v) for k, v in row.items()}
+
+
+# ── 通过 Data Plane 走的等价 helper ───────────────────────────────
+
+def _resolve_connection_id(db: Session) -> str:
+    repo = ConnectionRepository(db)
+    conn = repo.find_by_name(_BB_CONN_NAME)
+    if not conn:
+        raise HTTPException(503, f"业务连接未就绪：{_BB_CONN_NAME}")
+    return conn.id
+
+
+def _query(sql: str, args=None, *, write: bool = False, purpose: str = "scene.bb") -> list[dict]:
+    """走 ExecuteService.execute_on_connection；返回 list[dict] 保持原 API 语义。"""
+    db = SessionLocal()
     try:
-        with conn.cursor() as cur:
-            cur.execute(sql, args or ())
-            return cur.fetchall()
+        conn_id = _resolve_connection_id(db)
+        named_sql, params = _to_named(sql, args)
+        try:
+            r = ExecuteService(db).execute_on_connection(
+                connection_id=conn_id,
+                sql=named_sql, params=params,
+                purpose=purpose, write=write,
+            )
+        except ExecuteBlocked as e:
+            raise HTTPException(400, f"SQL 被拒绝：{e.reason} {e.detail}")
+        cols = r.columns
+        return [{cols[i]: row[i] for i in range(len(cols))} for row in r.rows]
     finally:
-        conn.close()
+        db.close()
 
 
 def _query_one(sql: str, args=None) -> dict | None:
@@ -41,21 +109,29 @@ def _query_one(sql: str, args=None) -> dict | None:
 
 def _scalar(sql: str, args=None):
     r = _query_one(sql, args)
-    return list(r.values())[0] if r else 0
+    if not r:
+        return 0
+    return list(r.values())[0]
 
 
-def _ser(row: dict) -> dict:
-    from datetime import datetime, date
-    from decimal import Decimal
-    out = {}
-    for k, v in row.items():
-        if isinstance(v, (datetime, date)):
-            out[k] = v.strftime("%Y-%m-%d %H:%M:%S") if isinstance(v, datetime) else v.isoformat()
-        elif isinstance(v, Decimal):
-            out[k] = float(v)
-        else:
-            out[k] = v
-    return out
+def _execute(sql: str, args=None) -> int:
+    """写入：返回 rowcount。"""
+    db = SessionLocal()
+    try:
+        conn_id = _resolve_connection_id(db)
+        named_sql, params = _to_named(sql, args)
+        try:
+            r = ExecuteService(db).execute_on_connection(
+                connection_id=conn_id,
+                sql=named_sql, params=params,
+                purpose="scene.bb.write", write=True,
+            )
+        except ExecuteBlocked as e:
+            raise HTTPException(400, f"写入被拒绝：{e.reason} {e.detail}")
+        return r.rows_returned
+    finally:
+        db.close()
+
 
 # ── 响应模型 ──────────────────────────────────────────────
 
@@ -363,49 +439,32 @@ def broadband_audit_action(churn_id: str, req: AuditActionReq):
     if not churn:
         raise HTTPException(404, "退单记录不存在")
 
-    conn = _conn()
-    try:
-        with conn.cursor() as cur:
-            if req.action == "archive":
-                cur.execute(
-                    "UPDATE bb_install_churn SET audit_status='完成', "
-                    "manual_review_status='审核通过', archive_time=NOW(), "
-                    "audit_completed_time=NOW() WHERE churn_id=%s",
-                    (churn_id,)
-                )
-            elif req.action == "override":
-                cur.execute(
-                    "UPDATE bb_install_churn SET manual_review_status='已覆盖', "
-                    "manual_override_label=%s, root_cause_confidence=1.0, "
-                    "audit_status='完成', archive_time=NOW(), "
-                    "audit_completed_time=NOW() WHERE churn_id=%s",
-                    (req.override_label, churn_id)
-                )
-            elif req.action == "flag_anomaly":
-                cur.execute(
-                    "UPDATE bb_install_churn SET manual_review_status='审核驳回', "
-                    "escalate_reason=%s WHERE churn_id=%s",
-                    (req.reason or "证据异常", churn_id)
-                )
-            conn.commit()
-    finally:
-        conn.close()
+    if req.action == "archive":
+        _execute(
+            "UPDATE bb_install_churn SET audit_status='完成', "
+            "manual_review_status='审核通过', archive_time=NOW(), "
+            "audit_completed_time=NOW() WHERE churn_id=%s",
+            (churn_id,)
+        )
+    elif req.action == "override":
+        _execute(
+            "UPDATE bb_install_churn SET manual_review_status='已覆盖', "
+            "manual_override_label=%s, root_cause_confidence=1.0, "
+            "audit_status='完成', archive_time=NOW(), "
+            "audit_completed_time=NOW() WHERE churn_id=%s",
+            (req.override_label, churn_id)
+        )
+    elif req.action == "flag_anomaly":
+        _execute(
+            "UPDATE bb_install_churn SET manual_review_status='审核驳回', "
+            "escalate_reason=%s WHERE churn_id=%s",
+            (req.reason or "证据异常", churn_id)
+        )
 
     return {"ok": True, "churn_id": churn_id, "action": req.action}
 
 
 # ── 写入辅助 ────────────────────────────────────────────
-
-def _execute(sql: str, args=None):
-    conn = _conn()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(sql, args or ())
-            conn.commit()
-            return cur.rowcount
-    finally:
-        conn.close()
-
 
 def _insert_trail(churn_id: str, event_type: str, event_detail: str, operator: str = "system"):
     tid = f"TRL{hashlib.md5(uuid.uuid4().bytes).hexdigest()[:12]}"

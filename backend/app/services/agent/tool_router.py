@@ -288,20 +288,31 @@ class ToolRouter:
     # ── 本体构建器（chat 模式）三件套 ────────────────────────────
 
     def _tool_list_business_datasources(self, args: dict) -> tuple[Any, str, int]:
-        """列出业务数据源（带前 3 张表名），返回 display_card=asset_picker。"""
-        from app.services.datasource_utils import get_table_schema as _get_schema  # noqa: F401
+        """召回结构化资产候选（Asset.kind in ['table','sql_view']）。
+
+        M2.2 改造：底层从 DataSource 表切换到 Asset Catalog（按 kind 过滤）。
+        前端 display_card.kind="datasource" 仍渲染到「结构化资产」栏，
+        返回字段保持兼容（id/name/description/sample_tables 等）。
+        """
+        from app.models.asset import Asset
 
         domain = str(args.get("domain", "")).strip()
         keywords = args.get("keywords") or []
         if not isinstance(keywords, list):
             keywords = []
 
-        q = self.db.query(DataSource).filter(DataSource.enabled == True)  # noqa: E712
-        rows = q.all()
+        rows = (
+            self.db.query(Asset)
+            .filter(Asset.status == "active",
+                    Asset.kind.in_(["table", "sql_view"]))
+            .all()
+        )
 
-        def matches(ds: DataSource) -> bool:
+        def matches(a: Asset) -> bool:
             blob = " ".join(filter(None, [
-                ds.name or "", ds.description or "", ds.table_name or "", ds.database or "",
+                a.name or "", a.alias or "", a.description or "",
+                a.domain or "", " ".join(a.tags or []),
+                ((a.locator or {}).get("table") or ""),
             ])).lower()
             if domain and domain.lower() not in blob:
                 return False
@@ -310,27 +321,22 @@ class ToolRouter:
             return True
 
         items = []
-        for ds in rows:
-            if not matches(ds):
+        for a in rows:
+            if not matches(a):
                 continue
-            tables = []
-            try:
-                # tables_json 可能是 list[str] 或 list[dict]
-                t = getattr(ds, "tables_json", None) or []
-                for x in t[:3]:
-                    if isinstance(x, dict):
-                        tables.append(x.get("table_name") or x.get("name") or "")
-                    else:
-                        tables.append(str(x))
-            except Exception:
-                pass
-            if not tables and ds.table_name:
-                tables = [ds.table_name]
+            sample_tables: list[str] = []
+            loc = a.locator or {}
+            if a.kind == "table" and loc.get("table"):
+                sample_tables = [loc["table"]]
+            elif a.kind == "sql_view":
+                sample_tables = list(loc.get("dependencies") or [])[:3]
             items.append({
-                "id": ds.id, "name": ds.name, "description": ds.description or "",
-                "table_count": len(tables) or (1 if ds.table_name else 0),
-                "domain_tags": [],
-                "sample_tables": [t for t in tables if t][:3],
+                "id": a.id, "name": a.name + (f" @{a.alias}" if a.alias else ""),
+                "description": a.description or "",
+                "table_count": len(sample_tables) or 1,
+                "domain_tags": list(a.tags or []),
+                "sample_tables": sample_tables[:3],
+                "kind": a.kind,
             })
 
         result = {
@@ -338,36 +344,48 @@ class ToolRouter:
             "display_card": {
                 "type": "asset_picker",
                 "kind": "datasource",
-                "title": f"为「{domain or '该业务'}」匹配到 {len(items)} 个数据源",
+                "title": f"为「{domain or '该业务'}」匹配到 {len(items)} 个结构化资产",
                 "items": items,
             },
         }
-        return result, f"匹配 {len(items)} 个数据源", len(items)
+        return result, f"匹配 {len(items)} 个结构化资产", len(items)
 
     def _tool_list_business_documents(self, args: dict) -> tuple[Any, str, int]:
-        """列出业务文档库候选文档，返回 display_card=asset_picker。"""
-        from app.models import BusinessDocument
+        """召回非结构化资产候选（Asset.kind='document'）。
+
+        M2.2 改造：底层从 BusinessDocument 表切换到 Asset Catalog（kind=document，
+        含 file/oss/directory/api/mq 各 source_type）。返回字段保持兼容。
+        """
+        from app.models.asset import Asset
 
         domain = str(args.get("domain", "")).strip()
         ds_ids = args.get("datasource_ids") or []
-        rows = self.db.query(BusinessDocument).all()
+        rows = (
+            self.db.query(Asset)
+            .filter(Asset.status == "active", Asset.kind == "document")
+            .all()
+        )
 
-        def matches(d: BusinessDocument) -> bool:
+        def matches(a: Asset) -> bool:
             if not domain:
                 return True
-            tags = " ".join(d.domain_tags or [])
-            blob = f"{d.name or ''} {tags} {d.summary or ''}".lower()
+            tags = " ".join(a.tags or [])
+            blob = f"{a.name or ''} {tags} {(a.parsed_summary or '')[:1000]} {a.description or ''}".lower()
             return domain.lower() in blob
 
         items = []
-        for d in rows:
-            if not matches(d):
+        for a in rows:
+            if not matches(a):
                 continue
+            loc = a.locator or {}
+            file_type = loc.get("file_type") or a.document_source_type or ""
+            size_bytes = 0  # Asset 模型未保存原始 size；前端展示位
             items.append({
-                "id": d.id, "name": d.name, "file_type": d.file_type or "",
-                "size_bytes": d.size_bytes or 0,
-                "domain_tags": list(d.domain_tags or []),
-                "summary": d.summary or "",
+                "id": a.id, "name": a.name, "file_type": file_type,
+                "size_bytes": size_bytes,
+                "domain_tags": list(a.tags or []),
+                "summary": (a.parsed_summary or "")[:1000],
+                "source_type": a.document_source_type,
             })
 
         result = {
@@ -376,17 +394,23 @@ class ToolRouter:
             "display_card": {
                 "type": "asset_picker",
                 "kind": "document",
-                "title": f"为「{domain or '该业务'}」匹配到 {len(items)} 份业务文档",
+                "title": f"为「{domain or '该业务'}」匹配到 {len(items)} 份非结构化资产",
                 "items": items,
             },
         }
-        return result, f"匹配 {len(items)} 份文档", len(items)
+        return result, f"匹配 {len(items)} 份非结构化资产", len(items)
 
     def _tool_analyze_assets_for_ontology(self, args: dict) -> tuple[Any, str, int]:
-        """根据已选数据源 + 文档 + 上下文，让 LLM 抽取本体草稿（含规则/动作建议）。"""
-        from app.services.datasource_utils import get_table_schema
-        from app.models import BusinessDocument
+        """根据已选结构化资产 + 非结构化资产 + 业务上下文，让 LLM 抽取本体草稿。
+
+        M2.2 改造：
+        - 输入参数 datasource_ids / document_ids 都按 Asset.id 处理（兼容老 id：通过
+          legacy_datasource_id / legacy_business_document_id 反查）。
+        - 输出强制带 backing_asset_ids（每个 entity）+ source_asset_id / source_column（每个 property），
+          让前端 Step1Build.confirmAll 能直接落地，省掉一次手工映射。
+        """
         from app.config import settings as _settings
+        from app.models.asset import Asset
         from app.services.copilot import get_llm_client
         import json as _json
         import re as _re
@@ -395,40 +419,27 @@ class ToolRouter:
         doc_ids = args.get("document_ids") or []
         ctx = str(args.get("business_context") or "").strip()
 
-        # 1. 拼数据源 schema
+        # 1. 解析 Asset（兼容老 id）
+        table_assets = self._resolve_assets(ds_ids, kinds=("table", "sql_view"))
+        doc_assets = self._resolve_assets(doc_ids, kinds=("document",))
+
+        # 2. 拼结构化资产 schema
         ds_blocks: list[str] = []
-        for did in ds_ids:
-            ds = self.db.get(DataSource, did)
-            if not ds:
-                continue
-            tables = []
-            try:
-                tables = list(getattr(ds, "tables_json", None) or [])
-            except Exception:
-                tables = []
-            if not tables and ds.table_name:
-                tables = [{"table_name": ds.table_name}]
-            for t in tables[:5]:
-                tname = t["table_name"] if isinstance(t, dict) else str(t)
-                try:
-                    cols = get_table_schema(ds, tname) or []
-                except Exception:
-                    cols = []
-                col_lines = "\n".join(
-                    f"  - {c.get('name')} ({c.get('type','?')}){' PK' if c.get('is_pk') else ''}: {c.get('comment') or ''}"
-                    for c in cols[:30]
-                )
-                ds_blocks.append(f"### 数据源 {ds.name} · 表 {tname}\n{col_lines}")
+        for a in table_assets:
+            cols = a.schema_snapshot or []
+            col_lines = "\n".join(
+                f"  - {c.get('name')} ({c.get('type','?')}){' PK' if c.get('is_pk') else ''}: {c.get('comment') or ''}"
+                for c in cols[:30]
+            )
+            tname = (a.locator or {}).get("table") or a.alias or a.name
+            ds_blocks.append(f"### Asset {a.name} (id={a.id}) · 表 {tname}\n{col_lines}")
 
-        # 2. 拼文档正文
+        # 3. 拼文档正文
         doc_blocks: list[str] = []
-        for did in doc_ids:
-            d = self.db.get(BusinessDocument, did)
-            if not d:
-                continue
-            doc_blocks.append(f"### 文档 {d.name}\n{(d.parsed_text or '')[:6000]}")
+        for a in doc_assets:
+            doc_blocks.append(f"### 文档 {a.name} (id={a.id})\n{(a.parsed_summary or '')[:6000]}")
 
-        prompt = """你是本体建模专家，要从用户提供的数据源 schema + 业务文档中抽取本体草稿。
+        prompt = """你是本体建模专家，要从用户提供的资产 schema + 业务文档中抽取本体草稿。
 术语规范：对象（Object）/ 属性（Property）/ 关系（Relation）/ 规则（Rule）/ 动作（Action）。
 
 严格返回 JSON：
@@ -442,8 +453,8 @@ class ToolRouter:
 """
         user_content = (
             f"## 业务上下文\n{ctx or '（无）'}\n\n"
-            f"## 数据源 Schema\n" + ("\n\n".join(ds_blocks) or "（无）") + "\n\n"
-            f"## 业务文档\n" + ("\n\n".join(doc_blocks) or "（无）")
+            f"## 结构化资产 Schema\n" + ("\n\n".join(ds_blocks) or "（无）") + "\n\n"
+            f"## 非结构化资产\n" + ("\n\n".join(doc_blocks) or "（无）")
         )[:18000]
 
         client = get_llm_client()
@@ -478,11 +489,97 @@ class ToolRouter:
         rels = data.get("relations", []) or []
         s_rules = data.get("suggested_rules", []) or []
         s_actions = data.get("suggested_actions", []) or []
+
+        # 4. 关键：自动回写 backing_asset_ids + source_asset_id + source_column
+        for ent in ents:
+            asset_for_ent = self._guess_backing_asset(ent, table_assets)
+            ent["backing_asset_ids"] = [asset_for_ent.id] if asset_for_ent else [a.id for a in table_assets]
+            ent["evidence_asset_ids"] = [a.id for a in doc_assets]
+            for prop in (ent.get("properties") or []):
+                src_asset, src_col = self._guess_source(prop, table_assets)
+                prop["source_asset_id"] = src_asset.id if src_asset else None
+                prop["source_column"] = src_col
+
         result = {
             "entities": ents,
             "relations": rels,
             "suggested_rules": s_rules,
             "suggested_actions": s_actions,
         }
-        summary = f"产出 {len(ents)} 对象 / {len(rels)} 关系 / {len(s_rules)} 规则建议 / {len(s_actions)} 动作建议"
+        summary = f"产出 {len(ents)} 对象 / {len(rels)} 关系 / {len(s_rules)} 规则建议 / {len(s_actions)} 动作建议（已自动绑定 backing）"
         return result, summary, len(ents)
+
+    # ── 启发式：guess backing / source 列 ────────────────────
+
+    def _resolve_assets(self, ids: list, *, kinds: tuple[str, ...]) -> list:
+        """把 ids（可能是 Asset.id 也可能是老 DataSource.id 或 BusinessDocument.id）
+        全部解析到 Asset 实例。"""
+        from app.models.asset import Asset
+        out: list[Asset] = []
+        seen: set[str] = set()
+        for raw_id in ids or []:
+            a = self.db.get(Asset, raw_id) if raw_id else None
+            if not a:
+                a = (self.db.query(Asset)
+                     .filter((Asset.legacy_datasource_id == raw_id)
+                             | (Asset.legacy_business_document_id == raw_id))
+                     .first())
+            if a and a.kind in kinds and a.id not in seen:
+                out.append(a)
+                seen.add(a.id)
+        return out
+
+    @staticmethod
+    def _normalize_name(s: str) -> str:
+        return (s or "").lower().replace("_", "").replace("-", "")
+
+    def _guess_backing_asset(self, entity: dict, candidates: list):
+        """启发式选最可能 backing 这个 entity 的资产。
+
+        简单规则：name 与 alias / table 名 / 资产名 normalize 后字符串相似度最高的。
+        无明显匹配返回 None（让前端用 candidates 第一个或人工选）。
+        """
+        from app.models.asset import Asset
+        ent_n = self._normalize_name(entity.get("name", ""))
+        if not ent_n or not candidates:
+            return None
+        best = None
+        best_score = 0.0
+        for a in candidates:
+            target = self._normalize_name(
+                ((a.locator or {}).get("table") or a.alias or a.name or "")
+            )
+            if not target:
+                continue
+            score = self._sim(ent_n, target)
+            if score > best_score:
+                best, best_score = a, score
+        return best if best_score >= 0.5 else None
+
+    def _guess_source(self, prop: dict, candidates: list):
+        """启发式：找 prop.name 对应的 (asset, column)。"""
+        prop_n = self._normalize_name(prop.get("name", ""))
+        if not prop_n or not candidates:
+            return None, None
+        best_asset = None
+        best_col = None
+        best_score = 0.0
+        for a in candidates:
+            for c in (a.schema_snapshot or []):
+                cname = c.get("name", "")
+                score = self._sim(prop_n, self._normalize_name(cname))
+                if score > best_score:
+                    best_score = score
+                    best_asset = a
+                    best_col = cname
+        if best_score >= 0.6:
+            return best_asset, best_col
+        return None, None
+
+    @staticmethod
+    def _sim(a: str, b: str) -> float:
+        """SequenceMatcher 比 ratio 简单封装。"""
+        if not a or not b:
+            return 0.0
+        from difflib import SequenceMatcher
+        return SequenceMatcher(None, a, b).ratio()

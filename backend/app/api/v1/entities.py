@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction
@@ -301,6 +302,110 @@ def create_from_datasource(
     db.commit()
     return get_entity(eid, db)
 
+
+# ── M2: 从 Asset 创建本体（自动落 ObjectBinding）──────────────
+
+class FromAssetRequest(BaseModel):
+    asset_id: str
+    name_cn: str
+    tier: int = 1
+    namespace: str = ""
+
+
+@router.post("/from-asset", response_model=EntityDetail, status_code=201)
+def create_from_asset(
+    body: FromAssetRequest,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    """从 Asset（kind=table）创建 OntologyEntity，并自动建立 primary ObjectBinding。
+
+    与老 /entities/from-datasource 的区别：
+    - 输入是 asset_id（Asset Catalog 的强类型引用），不再依赖 DataSource.id + table_name
+    - 创建后自动写 ObjectBinding，把每个 EntityAttribute 与 Asset.schema_snapshot 的列对应起来
+    - binding.created 事件会同步反写 EntityAttribute.source_table/source_field（兼容期）
+    """
+    from app.models.asset import Asset
+    from app.services.data_plane.asset_service import AssetService
+    from app.services.data_plane.object_binding_service import ObjectBindingService
+
+    asset = db.get(Asset, body.asset_id)
+    if not asset:
+        raise HTTPException(status_code=404, detail="资产不存在")
+    if asset.kind != "table":
+        raise HTTPException(status_code=400, detail="仅 kind=table 资产支持从中创建本体对象")
+
+    # 确保 schema_snapshot 已就绪
+    if not asset.schema_snapshot:
+        AssetService(db).sync_schema(asset.id)
+        db.refresh(asset)
+    columns = asset.schema_snapshot or []
+    if not columns:
+        raise HTTPException(status_code=400, detail="资产无列信息（请先同步 Schema）")
+
+    table_name = (asset.locator or {}).get("table") or asset.name
+    table_pascal = table_name.replace("_", " ").title().replace(" ", "")
+    eid = f"{body.namespace}_{table_pascal}" if body.namespace else table_pascal
+
+    repo = EntityRepository(db)
+    if repo.get_by_id(eid):
+        raise HTTPException(status_code=409, detail=f"实体 {eid} 已存在")
+
+    pk_cols = [c["name"] for c in columns if c.get("is_pk")]
+    primary_key = pk_cols[0] if pk_cols else None
+
+    entity = OntologyEntity(
+        id=eid,
+        name=table_pascal,
+        name_cn=body.name_cn,
+        tier=body.tier,
+        status="active",
+        description=f"从 Asset {asset.name} 自动生成",
+        schema_json={
+            "asset_id": asset.id,
+            "asset_alias": asset.alias,
+            "table_name": table_name,
+            "primary_key": primary_key,
+        },
+        created_by=user.id if user else None,
+    )
+    db.add(entity)
+    field_mappings = []
+    for col in columns:
+        attr = EntityAttribute(
+            entity_id=eid,
+            name=col["name"],
+            type=_map_db_type(col["type"]),
+            description=col.get("comment") or col["name"],
+            required=not col.get("nullable", True),
+        )
+        db.add(attr)
+        db.flush()
+        field_mappings.append({
+            "attribute_id": attr.id,
+            "source_column": col["name"],
+            "transform": None,
+        })
+
+    # 落 ObjectBinding（primary）
+    ObjectBindingService(db).create(
+        object_type_id=eid,
+        asset_id=asset.id,
+        role="primary",
+        field_mappings=field_mappings,
+        id_column=primary_key,
+        user_id=user.id if user else None,
+    )
+
+    write_audit(
+        db, user_id=user.id if user else None,
+        user_name=user.name if user else None,
+        action="create", target_type="entity",
+        target_id=eid, target_name=table_pascal,
+        snapshot_after={"source": "asset", "asset_id": asset.id},
+    )
+    db.commit()
+    return get_entity(eid, db)
 
 @router.post("/from-file", response_model=FileImportResult, status_code=201)
 async def create_from_file(

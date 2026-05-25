@@ -340,6 +340,11 @@
         <EntityLineageGraph :entity-id="entityId" />
       </template>
 
+      <!-- 绑定数据（M3：替代旧 MappingView，基于 ObjectBinding 强类型） -->
+      <template v-else-if="activeTab === '绑定数据'">
+        <BindingTab :object-type-id="entityId" />
+      </template>
+
       <!-- 其他占位 -->
       <template v-else>
         <div class="placeholder-tab">
@@ -360,6 +365,7 @@ import { useRoute, useRouter } from 'vue-router'
 import OntologyBreadcrumb from '../../components/common/OntologyBreadcrumb.vue'
 import MetricCard from '../../components/common/MetricCard.vue'
 import EntityLineageGraph from '../../components/canvas/EntityLineageGraph.vue'
+import BindingTab from '../ontology/object-types/BindingTab.vue'
 import { useOntologyStore } from '../../store/ontology'
 import { entityApi } from '../../api/ontology'
 import { resolutionApi } from '../../api/resolution'
@@ -370,7 +376,7 @@ const route = useRoute()
 const router = useRouter()
 const store = useOntologyStore()
 const activeTab = ref('属性')
-const tabs = ['属性', '关系', '规则', '动作', '函数', '数据实例', '智能体', '血缘']
+const tabs = ['属性', '关系', '规则', '动作', '函数', '数据实例', '智能体', '血缘', '绑定数据']
 
 const entityId = computed(() => route.params.id as string)
 

@@ -2,6 +2,8 @@
 场景 API — 携号转网预警全流程编排
 复用本体数据源查询和规则引擎，为前端提供真实实例数据
 """
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -103,25 +105,37 @@ def _get_entity_and_ds(db: Session, entity_name: str) -> tuple[OntologyEntity | 
 
 
 def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: str = "") -> dict[str, Any]:
-    """查询某实体下指定用户的一行数据，支持按 user_id 或 device_number 关联"""
+    """查询某实体下指定用户的一行数据，支持按 user_id 或 device_number 关联。
+
+    M2 改造：改用参数化绑定 + ExecuteService.execute_on_connection 走统一闸口。
+    """
+    from app.repositories.asset_repo import AssetRepository
+    from app.services.data_plane.execute_service import ExecuteBlocked, ExecuteService
+
     entity, ds = _get_entity_and_ds(db, entity_name)
     if not entity or not ds or not ds.table_name:
         return {}
 
     pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
 
-    # 根据主键类型选择关联字段和值
+    # 选择参数化 WHERE
     if pk_field in ("sheet_id",) and device_number:
-        where = f"device_number = '{device_number}'"
+        where_col, where_val = "device_number", device_number
     elif pk_field == "device_number" and device_number:
-        where = f"device_number = '{device_number}'"
+        where_col, where_val = "device_number", device_number
     elif pk_field == "subs_id":
-        where = f"subs_id = '{user_id}'"
+        where_col, where_val = "subs_id", user_id
     else:
-        where = f"{pk_field} = '{user_id}'"
+        where_col, where_val = pk_field, user_id
 
-    # 用 SELECT * 避免列名不匹配问题
-    sql = f"SELECT * FROM {ds.table_name} WHERE {where} LIMIT 1"
+    # 列名校验防注入（仅允许 [a-zA-Z0-9_]）
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", where_col):
+        return {}
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", ds.table_name):
+        return {}
+
+    sql = f"SELECT * FROM {ds.table_name} WHERE {where_col} = :v LIMIT 1"
+    # 通过 datasource_utils 兼容层转发（自动走 ExecuteService）
     result = execute_readonly_sql(ds, sql, limit=1)
     if result.get("error") or not result.get("rows"):
         return {}

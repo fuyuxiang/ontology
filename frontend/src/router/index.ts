@@ -28,16 +28,26 @@ const router = createRouter({
     { path: '/ontology/:id', name: 'ontology-detail', component: () => import('../views/detail/EntityDetail.vue'), meta: { title: '实体详情' } },
 
     // 数据集成
-    { path: '/datasource', redirect: '/data/ingest' },
-    { path: '/data/workshop', redirect: '/data/ingest' },
-    { path: '/data/ingest', name: 'data-ingest', component: () => import('../views/datasource/pages/DataIngestPage.vue'), meta: { title: '数据接入' } },
-    { path: '/data/pipeline', name: 'data-pipeline', component: () => import('../views/datasource/pages/DataPipelinePage.vue'), meta: { title: '数据管道' } },
-    { path: '/data/catalog', name: 'data-catalog', component: () => import('../views/datasource/pages/DataCatalogPage.vue'), meta: { title: '数据目录' } },
+    { path: '/datasource', redirect: '/data/connections' },
+    { path: '/data/workshop', redirect: '/data/connections' },
+    { path: '/data/ingest', redirect: '/data/connections' },
+
+    // 新一代数据集成路由（M1）
+    { path: '/data/connections', name: 'data-connections', component: () => import('../views/datasource/ConnectionsPage.vue'), meta: { title: '数据接入 · 连接' } },
+    { path: '/data/assets', name: 'data-assets', component: () => import('../views/datasource/AssetsPage.vue'), meta: { title: '数据接入 · 资产目录' } },
+    { path: '/data/audit', name: 'data-audit', component: () => import('../views/datasource/ExecutionAuditPage.vue'), meta: { title: '数据接入 · 执行审计' } },
+
+    // 旧路由（M1 期间保留兼容；M3 起 mapping/hydration 已迁出）
+    { path: '/data/pipeline', name: 'data-pipeline', component: () => import('../views/datasource/pages/DataPipelinePage.vue'), meta: { title: '数据管道（已弃用）' } },
+    { path: '/data/catalog', redirect: '/data/assets' },
     { path: '/data/lineage', name: 'data-lineage', component: () => import('../views/datasource/pages/DataLineagePage.vue'), meta: { title: '数据血缘' } },
     { path: '/data/quality', name: 'data-quality', component: () => import('../views/datasource/pages/DataQualityPage.vue'), meta: { title: '数据质量' } },
-    { path: '/data/hydration', name: 'data-hydration', component: () => import('../views/datasource/pages/HydrationDrillPage.vue'), meta: { title: '水合演练' } },
-    { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射' } },
+    { path: '/data/hydration', redirect: '/governance/pre-release' },
+    { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '本体映射（M3 起请到 ObjectType 详情页 · 绑定数据）' } },
     { path: '/data/resolution', name: 'data-resolution', component: () => import('../views/resolution/ResolutionView.vue'), meta: { title: '实体解析' } },
+
+    // 治理（M3 新增 — 发布前关卡）
+    { path: '/governance/pre-release', name: 'governance-pre-release', component: () => import('../views/governance/PreReleasePage.vue'), meta: { title: '治理 · 发布前关卡' } },
 
     // 逻辑中心
     { path: '/logic/actions', name: 'logic-actions', component: () => import('../views/logic/ActionsView.vue'), meta: { title: 'Actions 管理' } },
