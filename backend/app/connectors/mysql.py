@@ -11,11 +11,13 @@ class MySQLConnector:
     def connect(self, *, host: str, port: int, username: str,
                 password: str, database: str) -> Any:
         import pymysql
-        return pymysql.connect(
+        kwargs = dict(
             host=host, port=port, user=username,
-            password=password, database=database,
-            connect_timeout=5, charset="utf8mb4",
+            password=password, connect_timeout=5, charset="utf8mb4",
         )
+        if database:
+            kwargs["database"] = database
+        return pymysql.connect(**kwargs)
 
     def close(self, conn: Any) -> None:
         conn.close()
@@ -33,6 +35,18 @@ class MySQLConnector:
         tables = [row[0] for row in cur.fetchall()]
         cur.close()
         return tables
+
+    def list_databases(self, conn: Any) -> list[str]:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT schema_name FROM information_schema.schemata "
+            "WHERE schema_name NOT IN "
+            "('information_schema','mysql','performance_schema','sys') "
+            "ORDER BY schema_name"
+        )
+        dbs = [row[0] for row in cur.fetchall()]
+        cur.close()
+        return dbs
 
     def preview_table(self, conn: Any, table_name: str, limit: int = 20) -> dict:
         cur = conn.cursor()
