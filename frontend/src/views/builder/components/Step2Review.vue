@@ -114,7 +114,12 @@
 
           <div class="step2-editor-section-head">
             <span>属性 ({{ selected.properties.length }})</span>
-            <button @click="addProp">+ 增加属性</button>
+            <div style="display:flex;gap:6px">
+              <button class="step2-ai-btn" :disabled="aiSuggesting" @click="suggestAttributes">
+                {{ aiSuggesting ? 'AI 思考中...' : 'AI 补全' }}
+              </button>
+              <button @click="addProp">+ 增加属性</button>
+            </div>
           </div>
           <div class="step2-editor-props">
             <div v-for="p in selected.properties" :key="p.id" class="step2-editor-prop">
@@ -155,6 +160,9 @@
         <div class="step2-editor-card step2-relation-card">
           <div class="step2-editor-head">
             <span>🔗 关系</span>
+            <button class="step2-ai-btn" :disabled="aiRelSuggesting" @click="suggestRelations" style="margin-left:auto">
+              {{ aiRelSuggesting ? 'AI 思考中...' : 'AI 推断' }}
+            </button>
           </div>
           <div v-for="r in relations" :key="r.id" class="step2-rel-row">
             <span>{{ objectName(r.source) }}</span>
@@ -219,6 +227,8 @@ const router = useRouter()
 const selectedId = ref<string | null>(props.session.ontologyObjects[0]?.id || null)
 const objects = ref([...props.session.ontologyObjects])
 const relations = ref([...props.session.ontologyRelations])
+const aiSuggesting = ref(false)
+const aiRelSuggesting = ref(false)
 const hints = ref<OntologyHints>({
   suggested_rules: [...(props.session.hints?.suggested_rules || [])],
   suggested_actions: [...(props.session.hints?.suggested_actions || [])],
@@ -291,6 +301,107 @@ function addProp() {
     required: false,
   })
   syncStore()
+}
+
+async function suggestAttributes() {
+  if (!selected.value || aiSuggesting.value) return
+  aiSuggesting.value = true
+  try {
+    const resp = await fetch('/api/v1/builder/suggest-attributes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        object_name: selected.value.name,
+        display_name: selected.value.displayName,
+        tier: selected.value.tier,
+        description: selected.value.description,
+        existing_properties: selected.value.properties.map(p => ({
+          name: p.name, displayName: p.displayName, type: p.type, required: p.required,
+        })),
+      }),
+    })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}))
+      throw new Error(err.detail || `HTTP ${resp.status}`)
+    }
+    const data = await resp.json()
+    const existingNames = new Set(selected.value.properties.map(p => p.name))
+    let added = 0
+    for (const sp of data.suggested_properties || []) {
+      if (!sp.name || existingNames.has(sp.name)) continue
+      selected.value.properties.push({
+        id: 'p-' + Date.now() + '-' + added,
+        name: sp.name,
+        displayName: sp.displayName || sp.name,
+        type: sp.type || 'string',
+        required: sp.required || false,
+        description: sp.description,
+      })
+      existingNames.add(sp.name)
+      added++
+    }
+    syncStore()
+    if (added > 0) message.success(`AI 补全了 ${added} 个属性`)
+    else message.info('没有新属性可建议')
+  } catch (e: any) {
+    message.error('AI 补全失败：' + (e.message || e))
+  } finally {
+    aiSuggesting.value = false
+  }
+}
+
+async function suggestRelations() {
+  if (aiRelSuggesting.value) return
+  if (objects.value.length < 2) { message.warning('至少需要 2 个对象才能推断关系'); return }
+  aiRelSuggesting.value = true
+  try {
+    const resp = await fetch('/api/v1/builder/suggest-relations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        objects: objects.value.map(o => ({
+          name: o.name, displayName: o.displayName, tier: o.tier,
+          properties: o.properties.map(p => p.name),
+        })),
+        existing_relations: relations.value.map(r => ({
+          source: r.source, target: r.target, name: r.name,
+        })),
+      }),
+    })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}))
+      throw new Error(err.detail || `HTTP ${resp.status}`)
+    }
+    const data = await resp.json()
+    const existingPairs = new Set(relations.value.map(r => `${r.source}->${r.target}`))
+    let added = 0
+    for (const sr of data.suggested_relations || []) {
+      const key = `${sr.source}->${sr.target}`
+      const revKey = `${sr.target}->${sr.source}`
+      if (!sr.source || !sr.target) continue
+      if (existingPairs.has(key) || existingPairs.has(revKey)) continue
+      relations.value.push({
+        id: 'r-' + Date.now() + '-' + added,
+        name: sr.name || 'relates_to',
+        displayName: sr.displayName || sr.name || '关联',
+        source: sr.source,
+        target: sr.target,
+        cardinality: sr.cardinality || '1:N',
+        description: sr.description || '',
+        relationType: sr.relationType || 'ObjectProperty',
+        semanticType: sr.semanticType || 'association',
+      })
+      existingPairs.add(key)
+      added++
+    }
+    syncStore()
+    if (added > 0) message.success(`AI 推断了 ${added} 条关系`)
+    else message.info('没有新关系可推断')
+  } catch (e: any) {
+    message.error('AI 推断失败：' + (e.message || e))
+  } finally {
+    aiRelSuggesting.value = false
+  }
 }
 function removeProp(id: string) {
   if (!selected.value) return
@@ -428,6 +539,13 @@ watch(() => props.session.ontologyObjects, (v) => {
 .step2-editor-link:hover { text-decoration: underline; }
 .step2-approve-hint { font-size: 11px; color: #b45309; text-align: center; margin-top: 6px; }
 .step2-attach-tip { padding: 8px 12px; font-size: 11px; color: #b45309; background: rgba(245,158,11,0.08); border-radius: 8px; margin: 12px; }
+.step2-ai-btn {
+  padding: 2px 10px; border-radius: 6px; font-size: 11px; cursor: pointer;
+  background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; border: none;
+  transition: opacity 0.2s;
+}
+.step2-ai-btn:hover { opacity: 0.85; }
+.step2-ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .step2-rel-row {
   display: grid; grid-template-columns: 1fr 14px 1fr 1.4fr 24px; gap: 6px;
