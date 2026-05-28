@@ -97,55 +97,51 @@ const ico = {
 }
 
 const navGroups = [
-  { label: '', items: [
+  { label: '工作台', items: [
+    { path: '/workspace/business', label: '业务总览', icon: ico.dashboard },
     { path: '/dashboard', label: '平台总览', icon: ico.dashboard, exact: true },
   ]},
+  { label: '本体管理', items: [
+    { path: '/browser', label: '本体目录', icon: ico.catalog, exact: true },
+    { path: '/studio', label: '本体全景', icon: ico.graph },
+    { path: '/data/instances', label: '对象实例浏览', icon: ico.catalog },
+  ]},
   { label: '数据集成', items: [
-    { path: '/marketplace', label: '本体原料集市', icon: ico.catalog },
     { path: '/data/connections', label: '数据接入', icon: ico.datasource },
     { path: '/data/assets', label: '资产目录', icon: ico.catalog },
     { path: '/data/lineage', label: '数据血缘', icon: ico.graph },
     { path: '/data/quality', label: '数据质量', icon: ico.quality },
-    { path: '/data/audit', label: '执行审计', icon: ico.sandbox },
   ]},
-  { label: '本体中心', items: [
-    { path: '/builder', label: '本体构建器', icon: ico.tool },
-    { path: '/browser', label: '本体建模', icon: ico.catalog, exact: true },
-    { path: '/studio', label: '本体工作室', icon: ico.graph },
-    { path: '/browser/graph', label: '本体图谱', icon: ico.graph },
-    { path: '/ontology/publish', label: '本体发布', icon: ico.version },
-    { path: '/governance/pre-release', label: '发布前关卡', icon: ico.sandbox },
-  ]},
-  { label: '逻辑中心', items: [
-    { path: '/logic/actions', label: 'Actions 管理', icon: ico.workflow },
-    { path: '/logic/functions', label: 'Functions 管理', icon: ico.sdk },
-    { path: '/logic/rules', label: 'Rules 管理', icon: ico.rules },
-    { path: '/logic/skills', label: 'Skills 管理', icon: ico.tool },
+  { label: '规则与行动', items: [
+    { path: '/logic/rules', label: '规则管理', icon: ico.rules },
+    { path: '/logic/actions', label: '行动管理', icon: ico.workflow },
+    { path: '/logic/functions', label: '函数管理', icon: ico.sdk },
   ]},
   { label: '本体服务', items: [
-    { path: '/service/api', label: 'API 服务', icon: ico.api },
-    { path: '/service/osdk', label: 'OSDK 生成', icon: ico.sdk },
-    { path: '/service/agent', label: 'Agent 交互', icon: ico.agent },
+    { path: '/service/api', label: '服务定义', icon: ico.api },
+    { path: '/service/osdk', label: 'API 与 OSDK', icon: ico.sdk },
+    { path: '/service/monitor', label: '调用监控', icon: ico.tracking },
+  ]},
+  { label: '智能体平台', items: [
+    { path: '/service/agent', label: 'Agent 管理', icon: ico.agent },
+    { path: '/logic/skills', label: 'Skills 管理', icon: ico.tool },
     { path: '/service/workflow', label: '流程编排', icon: ico.workflow },
+    { path: '/ops/traces', label: '运行链路', icon: ico.tracking },
   ]},
-  { label: '业务场景', items: [
-    { path: '/aip', label: 'AIP 场景平台', icon: ico.workflow },
-    { path: '/scene', label: '场景总览', icon: ico.scene, exact: true, children: [
-      { path: '/scene/fttr', label: 'FTTR续约' },
-      { path: '/scene/broadband', label: '宽带退单' },
-      { path: '/scene/enterprise', label: '政企根因' },
-      { path: '/scene/mnp', label: '携号转网' },
-    ]},
+  { label: '应用中心', items: [
+    { path: '/scene', label: '场景列表', icon: ico.scene, exact: true },
+    { path: '/aip', label: '场景模板库', icon: ico.workflow },
   ]},
-  { label: '运营观测', items: [
-    { path: '/harness', label: '本体试车场', icon: ico.sandbox },
-    { path: '/ops/evals', label: 'Agent 评测', icon: ico.evals },
-    { path: '/ops/traces', label: '运行追踪', icon: ico.tracking },
+  { label: '治理', items: [
+    { path: '/governance/permissions', label: '权限管理', icon: ico.audit },
+    { path: '/governance/audit', label: '操作审计', icon: ico.audit },
+    { path: '/governance/impact', label: '影响分析', icon: ico.graph },
   ]},
-  { label: '系统设置', items: [
-    { path: '/settings/models', label: '模型管理', icon: ico.model },
-    { path: '/governance/audit', label: '权限审计', icon: ico.audit },
-    { path: '/settings/monitor', label: '运维监控', icon: ico.tracking },
+  { label: '设置', items: [
+    { path: '/settings/models', label: '模型配置', icon: ico.model },
+    { path: '/harness', label: '试车场', icon: ico.sandbox },
+    { path: '/settings/monitor', label: '系统监控', icon: ico.tracking },
+    { path: '/settings/tenants', label: '租户管理', icon: ico.settings },
     { path: '/settings/general', label: '系统配置', icon: ico.settings },
   ]},
 ]

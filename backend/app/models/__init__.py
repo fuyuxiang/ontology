@@ -29,6 +29,7 @@ from app.models.execution_log import ExecutionLog
 from app.models.lineage_edge import LineageEdge
 from app.models.object_binding import ObjectBinding
 from app.models.quality_metric import QualityMetric
+from app.models.quality_rule import QualityRule, HealthStatus
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
@@ -45,4 +46,5 @@ __all__ = [
     # Data Plane
     "Connection", "Asset", "AssetUsage", "ExecutionLog",
     "LineageEdge", "ObjectBinding", "QualityMetric",
+    "QualityRule", "HealthStatus",
 ]

@@ -1,7 +1,4 @@
-"""/lineage v2 — 本体侧血缘（Asset → ObjectType → Action）。
-
-替代 lineage_seed 静态种子；旧 /lineage/workshop 由 compat 层代理到这里。
-"""
+"""/lineage v2 — 本体侧血缘（Asset → ObjectType → Action）。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +9,12 @@ from app.schemas.data_plane import LineageGraph
 from app.services.data_plane.lineage_service import LineageService
 
 router = APIRouter(prefix="/lineage", tags=["data-plane:lineage"])
+
+
+@router.get("/overview", response_model=LineageGraph)
+def get_overview(db: Session = Depends(get_db)):
+    """全局血缘大图：所有非废弃边 + 节点元数据。"""
+    return LineageService(db).get_overview()
 
 
 @router.get("", response_model=LineageGraph)

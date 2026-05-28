@@ -4,8 +4,24 @@ from typing import Any, Protocol, runtime_checkable
 
 
 @runtime_checkable
+class BaseConnector(Protocol):
+    """所有连接器的最小公约数协议。
+
+    每个 connector 都必须能 test()，返回 (ok, message)。
+    各 category 的具体能力由子协议或鸭子类型决定。
+    """
+
+    category: str  # database | object_storage | file_transfer | message_queue | api
+    type: str
+
+    def test(self, *, params: dict, credential: dict | None) -> tuple[bool, str]:
+        """检测连通性。不抛异常，返回 (ok, msg)。"""
+        ...
+
+
+@runtime_checkable
 class DataSourceConnector(Protocol):
-    """异构数据源连接器协议"""
+    """关系型数据库连接器协议（category=database）。"""
 
     def connect(self, *, host: str, port: int, username: str,
                 password: str, database: str) -> Any: ...
@@ -31,4 +47,30 @@ class DataSourceConnector(Protocol):
         ...
 
     def quote_identifier(self) -> str: ...
+
+
+@runtime_checkable
+class ObjectStorageConnector(Protocol):
+    """对象存储连接器协议（category=object_storage）。"""
+    def list_objects(self, *, params: dict, credential: dict | None,
+                     prefix: str = "", limit: int = 200) -> list[dict]: ...
+
+
+@runtime_checkable
+class FileTransferConnector(Protocol):
+    """文件传输连接器协议（category=file_transfer）。"""
+    def list_paths(self, *, params: dict, credential: dict | None,
+                   path: str = "/", limit: int = 200) -> list[dict]: ...
+
+
+@runtime_checkable
+class MessageQueueConnector(Protocol):
+    """消息队列连接器协议（category=message_queue）。"""
+    def list_topics(self, *, params: dict, credential: dict | None) -> list[str]: ...
+
+
+@runtime_checkable
+class HTTPApiConnector(Protocol):
+    """HTTP API 连接器协议（category=api）。"""
+    def probe(self, *, params: dict, credential: dict | None) -> dict: ...
 

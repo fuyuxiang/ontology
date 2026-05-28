@@ -1,16 +1,15 @@
 <template>
   <div class="ap-page">
     <div class="ap-page__header">
-      <h1 class="ap-page__title">数据接入 · 资产目录</h1>
-      <p class="ap-page__subtitle">本平台所有可用的结构化与非结构化资产；本体绑定、AI 召回、规则、动作均从此选取</p>
+      <h1 class="ap-page__title">资产目录</h1>
+      <p class="ap-page__subtitle">统一管理可用数据资产</p>
     </div>
 
     <!-- KPI -->
     <div class="ap-stats">
       <a-statistic title="资产总数" :value="store.stats.total" />
-      <a-statistic title="表" :value="store.stats.tables" :value-style="{ color: '#3b82f6' }" />
-      <a-statistic title="SQL 视图" :value="store.stats.views" :value-style="{ color: '#06b6d4' }" />
-      <a-statistic title="文档" :value="store.stats.documents" :value-style="{ color: '#f59e0b' }" />
+      <a-statistic title="结构化" :value="store.stats.structured" :value-style="{ color: '#3b82f6' }" />
+      <a-statistic title="非结构化" :value="store.stats.unstructured" :value-style="{ color: '#f59e0b' }" />
       <span class="ap-spacer" />
       <a-dropdown>
         <a-button type="primary">
@@ -19,28 +18,31 @@
         </a-button>
         <template #overlay>
           <a-menu>
-            <a-menu-item @click="openCreate('table')">表 / SQL 视图</a-menu-item>
+            <a-menu-item-group title="结构化">
+              <a-menu-item @click="openCreate('table')">表 / SQL 视图</a-menu-item>
+            </a-menu-item-group>
             <a-menu-divider />
-            <a-menu-item @click="openDoc('file')">文档：上传文件</a-menu-item>
-            <a-menu-item @click="openDoc('oss')">文档：对象存储 OSS</a-menu-item>
-            <a-menu-item @click="openDoc('directory')">文档：目录扫描</a-menu-item>
-            <a-menu-item @click="openDoc('api')">文档：HTTP API</a-menu-item>
-            <a-menu-item @click="openDoc('mq')">文档：MQ topic</a-menu-item>
+            <a-menu-item-group title="非结构化">
+              <a-menu-item @click="openDoc('file')">上传文件</a-menu-item>
+              <a-menu-item @click="openDoc('oss')">对象存储 OSS</a-menu-item>
+              <a-menu-item @click="openDoc('directory')">目录扫描</a-menu-item>
+              <a-menu-item @click="openDoc('api')">HTTP API</a-menu-item>
+              <a-menu-item @click="openDoc('mq')">MQ topic</a-menu-item>
+            </a-menu-item-group>
           </a-menu>
         </template>
       </a-dropdown>
     </div>
 
-    <!-- 二级 tab -->
-    <a-tabs v-model:activeKey="activeKind" class="ap-tabs" @change="reload">
+    <!-- 二级 tab：结构化 / 非结构化 -->
+    <a-tabs v-model:activeKey="activeCategory" class="ap-tabs" @change="onCategoryChange">
       <a-tab-pane key="all" tab="全部" />
-      <a-tab-pane key="table" tab="表" />
-      <a-tab-pane key="sql_view" tab="SQL 视图" />
-      <a-tab-pane key="document" tab="文档" />
+      <a-tab-pane key="structured" tab="结构化" />
+      <a-tab-pane key="unstructured" tab="非结构化" />
     </a-tabs>
 
-    <!-- 文档 source_type 子过滤 -->
-    <a-segmented v-if="activeKind === 'document'" v-model:value="docSubFilter"
+    <!-- 非结构化 source_type 子过滤 -->
+    <a-segmented v-if="activeCategory === 'unstructured'" v-model:value="docSubFilter"
                  :options="docFilterOptions" class="ap-doc-filter" @change="reload" />
 
     <!-- 工具栏 -->
@@ -49,10 +51,79 @@
                       allow-clear @search="reload" @change="reload" />
       <a-select v-model:value="domainFilter" placeholder="按 domain 过滤" allow-clear style="width:200px"
                 :options="domainOptions" @change="reload" />
+      <span style="flex:1" />
+      <a-segmented v-model:value="viewMode" :options="viewModeOptions" />
     </div>
 
-    <!-- 列表 -->
-    <a-table size="middle" :columns="columns" :data-source="store.items"
+    <!-- 卡片网格视图 -->
+    <div v-if="viewMode === 'grid'">
+      <a-empty v-if="!store.loading && store.items.length === 0"
+               description="暂无资产，点击「新建资产」开始登记" style="padding:64px 0" />
+      <a-row v-else :gutter="[16, 16]">
+        <a-col v-for="record in store.items" :key="record.id" :xs="24" :sm="12" :lg="8" :xl="6">
+          <a-card hoverable class="ap-card" :body-style="{ padding: '16px' }" @click="openDetail(record)">
+            <!-- 第一行：名称 + 类型 + 别名 + 状态 -->
+            <div class="ap-card__row">
+              <a-typography-text strong class="ap-card__name" :ellipsis="{ tooltip: record.name }">
+                {{ record.name }}
+              </a-typography-text>
+              <a-tag :color="kindColor(record.kind)" class="ap-card__tag">{{ kindLabel(record) }}</a-tag>
+            </div>
+
+            <div class="ap-card__row" style="margin-top:6px">
+              <a-tag v-if="record.alias" color="purple" class="ap-card__tag">@{{ record.alias }}</a-tag>
+              <a-tag :color="statusColor(record.status)" class="ap-card__tag">{{ record.status }}</a-tag>
+            </div>
+
+            <!-- 描述（2 行省略） -->
+            <a-typography-paragraph type="secondary" class="ap-card__desc"
+                                    :ellipsis="{ rows: 2, tooltip: record.description }">
+              {{ record.description || locatorBrief(record) || '—' }}
+            </a-typography-paragraph>
+
+            <!-- 标签 -->
+            <div v-if="(record.tags || []).length" class="ap-card__tags">
+              <a-tag v-for="t in (record.tags || []).slice(0, 4)" :key="t" class="ap-card__tag-sm">{{ t }}</a-tag>
+              <span v-if="(record.tags || []).length > 4" class="ap-muted">+{{ (record.tags || []).length - 4 }}</span>
+            </div>
+
+            <!-- 底部：行数 / 刷新策略 / owner -->
+            <div class="ap-card__meta">
+              <span>
+                <span class="ap-muted">记录:</span>
+                <span class="ap-card__num">{{ record.profile?.row_count?.toLocaleString() || '—' }}</span>
+              </span>
+              <span>
+                <span class="ap-muted">刷新:</span>
+                <span>{{ record.refresh_policy }}</span>
+              </span>
+            </div>
+            <div class="ap-card__owner">
+              <span class="ap-muted">连接:</span> {{ connectionName(record.connection_id) }}
+              <span v-if="record.owner" style="margin-left:12px">· {{ record.owner }}</span>
+            </div>
+
+            <!-- 卡片悬停操作（点击不冒泡）-->
+            <div class="ap-card__actions" @click.stop>
+              <a-button type="link" size="small"
+                        :disabled="record.kind === 'document'" @click="syncOne(record)">
+                同步 Schema
+              </a-button>
+              <a-button type="link" size="small"
+                        :disabled="record.kind === 'document'" @click="profileOne(record)">
+                Profile
+              </a-button>
+              <a-popconfirm :title="`确认删除「${record.name}」？`" @confirm="del(record)">
+                <a-button type="link" size="small" danger>删除</a-button>
+              </a-popconfirm>
+            </div>
+          </a-card>
+        </a-col>
+      </a-row>
+    </div>
+
+    <!-- 列表视图（保留兼容） -->
+    <a-table v-else size="middle" :columns="columns" :data-source="store.items"
              :loading="store.loading" :pagination="{ pageSize: 20 }" row-key="id">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'name'">
@@ -122,12 +193,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
-  Button as AButton, Dropdown as ADropdown, Empty as AEmpty,
-  InputSearch as AInputSearch, Menu as AMenu, MenuItem as AMenuItem,
-  MenuDivider as AMenuDivider, Popconfirm as APopconfirm,
-  Segmented as ASegmented, Select as ASelect, Space as ASpace,
-  Statistic as AStatistic, TabPane as ATabPane, Tabs as ATabs,
-  Table as ATable, Tag as ATag, message,
+  Button as AButton, Card as ACard, Col as ACol, Dropdown as ADropdown,
+  Empty as AEmpty, InputSearch as AInputSearch, Menu as AMenu,
+  MenuItem as AMenuItem, MenuDivider as AMenuDivider,
+  Popconfirm as APopconfirm, Row as ARow, Segmented as ASegmented,
+  Select as ASelect, Space as ASpace, Statistic as AStatistic,
+  TabPane as ATabPane, Tabs as ATabs, Table as ATable, Tag as ATag,
+  Typography, message,
 } from 'ant-design-vue'
 import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { useAssetStore } from '../../store/asset'
@@ -137,13 +209,24 @@ import AssetDetailDrawer from '../../components/asset/AssetDetailDrawer.vue'
 import CreateTableAssetDrawer from './components/CreateTableAssetDrawer.vue'
 import CreateDocumentAssetDrawer from './components/CreateDocumentAssetDrawer.vue'
 
+const ATypographyText = Typography.Text
+const ATypographyParagraph = Typography.Paragraph
+const AMenuItemGroup = AMenu.ItemGroup
+
 const store = useAssetStore()
 const connStore = useConnectionStore()
 
-const activeKind = ref<string>('all')
+type AssetCategory = 'all' | 'structured' | 'unstructured'
+const activeCategory = ref<AssetCategory>('all')
 const docSubFilter = ref<string>('all')
 const search = ref('')
 const domainFilter = ref<string | undefined>(undefined)
+const viewMode = ref<'grid' | 'list'>('grid')
+
+const viewModeOptions = [
+  { label: '卡片', value: 'grid' },
+  { label: '列表', value: 'list' },
+]
 
 const docFilterOptions = [
   { label: '全部', value: 'all' },
@@ -182,13 +265,20 @@ async function reload() {
 }
 function buildFilters() {
   const f: any = {}
-  if (activeKind.value !== 'all') f.kind = activeKind.value
-  if (activeKind.value === 'document' && docSubFilter.value !== 'all') {
-    f.document_source_type = docSubFilter.value
+  if (activeCategory.value === 'structured') {
+    f.kinds = ['table', 'sql_view']
+  } else if (activeCategory.value === 'unstructured') {
+    f.kind = 'document'
+    if (docSubFilter.value !== 'all') f.document_source_type = docSubFilter.value
   }
   if (search.value) f.q = search.value
   if (domainFilter.value) f.domain = domainFilter.value
   return f
+}
+
+function onCategoryChange() {
+  if (activeCategory.value !== 'unstructured') docSubFilter.value = 'all'
+  reload()
 }
 
 function openDetail(record: Asset) {
@@ -277,9 +367,59 @@ onMounted(reload)
 .ap-spacer { flex: 1; }
 .ap-tabs { background: #fff; padding: 0 16px; border-radius: 8px; margin-bottom: 12px; }
 .ap-doc-filter { margin-bottom: 12px; }
-.ap-toolbar { display: flex; gap: 12px; padding: 12px 16px; background: #fff; border-radius: 8px; margin-bottom: 12px; }
+.ap-toolbar { display: flex; gap: 12px; padding: 12px 16px; background: #fff; border-radius: 8px; margin-bottom: 12px; align-items: center; }
 .ap-name { color: #1d4ed8; cursor: pointer; }
 .ap-name:hover { text-decoration: underline; }
 .ap-mono { font-family: 'Menlo','Consolas',monospace; font-size: 11px; color: #4b5563; }
-.ap-muted { color: #9ca3af; }
+.ap-muted { color: #9ca3af; font-size: 12px; }
+
+/* 卡片网格视图 */
+.ap-card {
+  height: 100%;
+  border: 1px solid var(--neutral-100, #e5e7eb);
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.ap-card:hover {
+  border-color: var(--semantic-300, #93c5fd);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+  transform: translateY(-1px);
+}
+.ap-card__row {
+  display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+.ap-card__name {
+  font-size: 14px; flex: 1; color: #111827;
+  min-width: 0;
+}
+.ap-card__tag { font-size: 11px; }
+.ap-card__tag-sm { font-size: 11px; line-height: 1.4; }
+.ap-card__desc {
+  margin: 8px 0 !important;
+  font-size: 12px;
+  color: var(--neutral-600, #4b5563);
+  min-height: 36px;
+}
+.ap-card__tags {
+  display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;
+  min-height: 22px;
+}
+.ap-card__meta {
+  display: flex; justify-content: space-between;
+  font-size: 12px; color: var(--neutral-700, #374151);
+  padding-top: 8px;
+  border-top: 1px dashed var(--neutral-100, #e5e7eb);
+}
+.ap-card__num { font-weight: 600; color: #111827; margin-left: 4px; }
+.ap-card__owner {
+  font-size: 11px; color: var(--neutral-500, #6b7280); margin-top: 4px;
+}
+.ap-card__actions {
+  display: flex; gap: 4px; margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--neutral-100, #e5e7eb);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ap-card:hover .ap-card__actions { opacity: 1; }
 </style>

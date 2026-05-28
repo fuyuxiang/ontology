@@ -8,8 +8,10 @@
 - 或独立运行：python -m backend.scripts.seed_business_assets
 
 依赖：
-- 需要先有目标 Connection（mysql/...）和 base table Asset（kind=table）。
-- 如果 base table Asset 不存在，会自动注册（前提是 Connection 已就绪 + 表存在）。
+- 目标 Connection 必须由用户在"数据接入·连接"页面预先创建（或通过 /api/v1/connections 创建）。
+  本脚本仅按名称 (BB_CONN_NAME，默认 bb_audit_db) 查找，**不再写死 host/账号/密码**。
+- 找不到 Connection 时，仅记录 warning 并跳过业务资产 seed，不阻断启动。
+- base table Asset / sql_view Asset 在 Connection 已就绪时自动注册。
 """
 from __future__ import annotations
 
@@ -25,22 +27,12 @@ from app.models.connection import Connection
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.connection_repo import ConnectionRepository
 from app.services.data_plane.asset_service import AssetService
-from app.services.data_plane.connection_service import ConnectionService
 
 logger = logging.getLogger(__name__)
 
 
-# ── Connection 种子配置（默认从环境变量读，缺省值与 broadband.py 历史值一致）──
-
-_BB_CONN = {
-    "name": os.getenv("BB_CONN_NAME", "bb_audit_db"),
-    "type": "mysql",
-    "host": os.getenv("BB_DB_HOST", "123.56.188.16"),
-    "port": int(os.getenv("BB_DB_PORT", "3306")),
-    "database": os.getenv("BB_DB_NAME", "mnp_risk_warning"),
-    "username": os.getenv("BB_DB_USER", "bonc"),
-    "password": os.getenv("BB_DB_PASSWORD", "bonc123"),
-}
+# 业务连接名称（用户需在"数据接入·连接"页面提前创建该名称的 Connection）
+_BB_CONN_NAME = os.getenv("BB_CONN_NAME", "bb_audit_db")
 
 
 # ── 业务侧 Asset 配置 ────────────────────────────────────────────
@@ -136,10 +128,14 @@ def seed(db: Session | None = None) -> dict:
         db = SessionLocal()
     stats = {"connections_created": 0, "table_assets_created": 0, "sql_views_created": 0}
     try:
-        # 1. Connection
-        conn = _ensure_connection(db, _BB_CONN, stats)
+        # 1. 仅查 Connection（用户需在"数据接入·连接"页提前创建）
+        conn = _resolve_connection(db, _BB_CONN_NAME)
         if not conn:
-            logger.warning("无法确保 broadband 连接，跳过业务资产 seed")
+            logger.info(
+                "未发现业务连接「%s」，跳过业务资产 seed。"
+                "请在前端「数据接入·连接」页创建该连接后重启，或调用 /api/v1/connections 创建。",
+                _BB_CONN_NAME,
+            )
             return stats
 
         # 2. base table Asset 注册（broadband + mnp 共用同一连接的不同表）
@@ -202,19 +198,8 @@ def seed(db: Session | None = None) -> dict:
 
 # ── 内部工具 ────────────────────────────────────────────
 
-def _ensure_connection(db: Session, cfg: dict, stats: dict) -> Connection | None:
-    repo = ConnectionRepository(db)
-    existing = repo.find_by_name(cfg["name"])
-    if existing:
-        return existing
-    try:
-        conn = ConnectionService(db).create(**cfg, description="业务侧自动注册（broadband / mnp 共用）")
-        stats["connections_created"] += 1
-        logger.info("已注册业务连接: %s", conn.name)
-        return conn
-    except Exception:
-        logger.exception("自动注册业务连接失败")
-        return None
+def _resolve_connection(db: Session, name: str) -> Connection | None:
+    return ConnectionRepository(db).find_by_name(name)
 
 
 def _find_table_asset(repo: AssetRepository, conn_id: str, table_name: str) -> Asset | None:

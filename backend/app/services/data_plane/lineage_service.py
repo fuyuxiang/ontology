@@ -12,6 +12,11 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.models.asset import Asset
+from app.models.connection import Connection
+from app.models.entity import OntologyEntity
+from app.models.lineage_edge import LineageEdge
+from app.models.rule import EntityAction
 from app.repositories.lineage_edge_repo import LineageEdgeRepository
 
 logger = logging.getLogger(__name__)
@@ -66,15 +71,104 @@ class LineageService:
     def get_for_object_type(self, ot_id: str, depth: int = 2) -> dict:
         return self._collect("object_type", ot_id, depth)
 
+    def get_overview(self) -> dict:
+        """全局血缘：所有非废弃边 + 涉及节点的元数据。"""
+        edges = (
+            self.db.query(LineageEdge)
+            .filter(LineageEdge.weight > 0)
+            .all()
+        )
+        node_keys: set[tuple[str, str]] = set()
+        for e in edges:
+            node_keys.add((e.source_kind, e.source_id))
+            node_keys.add((e.target_kind, e.target_id))
+        node_payload = self._enrich_nodes(node_keys)
+        edge_payload = [self._edge_dict(e) for e in edges]
+        return {"nodes": node_payload, "edges": edge_payload}
+
     def _collect(self, kind: str, node_id: str, depth: int) -> dict:
         edges, nodes = self.repo.find_neighbors(kind, node_id, depth=depth)
-        node_payload = [{"kind": k, "id": i} for k, i in nodes]
-        edge_payload = [{
+        node_payload = self._enrich_nodes(nodes)
+        edge_payload = [self._edge_dict(e) for e in edges]
+        return {"nodes": node_payload, "edges": edge_payload}
+
+    @staticmethod
+    def _edge_dict(e: LineageEdge) -> dict:
+        return {
             "source": {"kind": e.source_kind, "id": e.source_id},
             "target": {"kind": e.target_kind, "id": e.target_id},
             "relation": e.relation,
             "via_module": e.via_module,
             "via_purpose": e.via_purpose,
             "weight": e.weight,
-        } for e in edges]
-        return {"nodes": node_payload, "edges": edge_payload}
+        }
+
+    def _enrich_nodes(self, node_keys) -> list[dict]:
+        asset_ids = [i for k, i in node_keys if k == "asset"]
+        ot_ids = [i for k, i in node_keys if k == "object_type"]
+        action_ids = [i for k, i in node_keys if k == "action"]
+
+        assets: dict[str, Asset] = {}
+        conns: dict[str, Connection] = {}
+        if asset_ids:
+            asset_rows = self.db.query(Asset).filter(Asset.id.in_(asset_ids)).all()
+            assets = {a.id: a for a in asset_rows}
+            conn_ids = {a.connection_id for a in asset_rows if a.connection_id}
+            if conn_ids:
+                conns = {
+                    c.id: c for c in
+                    self.db.query(Connection).filter(Connection.id.in_(conn_ids)).all()
+                }
+
+        ots: dict[str, OntologyEntity] = {}
+        if ot_ids:
+            ots = {
+                o.id: o for o in
+                self.db.query(OntologyEntity).filter(OntologyEntity.id.in_(ot_ids)).all()
+            }
+
+        actions: dict[str, EntityAction] = {}
+        if action_ids:
+            actions = {
+                a.id: a for a in
+                self.db.query(EntityAction).filter(EntityAction.id.in_(action_ids)).all()
+            }
+
+        out: list[dict] = []
+        for kind, ident in sorted(node_keys):
+            label: str | None = None
+            sub_label: str | None = None
+            extra: dict = {}
+            if kind == "asset":
+                a = assets.get(ident)
+                if a:
+                    label = a.alias or a.name
+                    sub_label = a.kind
+                    extra = {
+                        "name": a.name,
+                        "alias": a.alias,
+                        "kind": a.kind,
+                        "connection_id": a.connection_id,
+                        "connection_name": (conns.get(a.connection_id).name if a.connection_id and conns.get(a.connection_id) else None),
+                        "status": a.status,
+                    }
+            elif kind == "object_type":
+                o = ots.get(ident)
+                if o:
+                    label = o.name_cn or o.name
+                    sub_label = o.name
+                    extra = {"name": o.name, "name_cn": o.name_cn, "tier": o.tier}
+            elif kind == "action":
+                act = actions.get(ident)
+                if act:
+                    label = act.name
+                    sub_label = act.type
+                    extra = {"name": act.name, "type": act.type, "entity_id": act.entity_id}
+            out.append({
+                "kind": kind,
+                "id": ident,
+                "label": label,
+                "sub_label": sub_label,
+                "extra": extra or None,
+            })
+        return out
