@@ -503,6 +503,93 @@ async def suggest_relations(body: SuggestRelRequest):
     return {"suggested_relations": suggested}
 
 
+# ── AI 辅助：数据源自动映射 ───────────────────────────────────────
+
+class AutoMapProperty(BaseModel):
+    name: str
+    type: str = "string"
+    description: str | None = None
+
+
+class AutoMapObject(BaseModel):
+    id: str
+    properties: list[AutoMapProperty] = []
+
+
+class AutoMapRequest(BaseModel):
+    objects: list[AutoMapObject]
+    asset_ids: list[str]
+
+
+class _AttrAdapter:
+    """轻量 adapter，让 Pydantic 属性能传给 _heuristic_score()。"""
+    __slots__ = ("name", "type", "description")
+    def __init__(self, name: str, type_: str, desc: str | None):
+        self.name = name
+        self.type = type_
+        self.description = desc or ""
+
+
+@router.post("/auto-map")
+async def auto_map(body: AutoMapRequest, db: Session = Depends(get_db)):
+    """根据启发式打分，自动为草稿属性推荐数据源列映射。"""
+    from app.models.asset import Asset
+    from app.services.data_plane.mapping_suggest_service import _heuristic_score
+
+    if not body.asset_ids or not body.objects:
+        return {"mappings": {}}
+
+    assets = db.query(Asset).filter(Asset.id.in_(body.asset_ids)).all()
+    # 按 asset_id 建立 schema 索引
+    asset_schemas: list[tuple[str, list[dict]]] = []
+    for a in assets:
+        schema = a.schema_snapshot or []
+        if schema:
+            asset_schemas.append((a.id, schema))
+
+    if not asset_schemas:
+        return {"mappings": {}}
+
+    result: dict[str, dict] = {}
+    for obj in body.objects:
+        best_asset_id: str | None = None
+        prop_mappings: dict[str, dict] = {}
+        total_score = 0.0
+
+        # 对每个 asset 计算总分，选最佳
+        for asset_id, schema in asset_schemas:
+            obj_score = 0.0
+            obj_mappings: dict[str, dict] = {}
+            for prop in obj.properties:
+                adapter = _AttrAdapter(prop.name, prop.type, prop.description)
+                best_s = 0.0
+                best_col = None
+                for col in schema:
+                    s, _r = _heuristic_score(adapter, col)
+                    if s > best_s:
+                        best_s = s
+                        best_col = col.get("name")
+                if best_col and best_s > 0:
+                    obj_mappings[prop.name] = {
+                        "column": best_col,
+                        "score": round(best_s, 3),
+                        "asset_id": asset_id,
+                    }
+                    obj_score += best_s
+            if obj_score > total_score:
+                total_score = obj_score
+                best_asset_id = asset_id
+                prop_mappings = obj_mappings
+
+        if best_asset_id:
+            result[obj.id] = {
+                "asset_id": best_asset_id,
+                "property_mappings": prop_mappings,
+            }
+
+    return {"mappings": result}
+
+
 # ── 水合演练（hydrate）── 验证本体草稿与真实数据的映射 ──────────────
 
 @router.post("/hydrate")
