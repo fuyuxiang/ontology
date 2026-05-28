@@ -299,6 +299,41 @@ async def builder_chat(
     )
 
 
+# ── 水合演练（hydrate）── 验证本体草稿与真实数据的映射 ──────────────
+
+@router.post("/hydrate")
+async def builder_hydrate(body: dict, db: Session = Depends(get_db)):
+    """SSE 流式水合演练：验证本体草稿与真实数据的映射。"""
+    from app.services.builder.hydration_service import HydrationRequest, HydrationService
+
+    try:
+        req = HydrationRequest(**body)
+    except Exception as e:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=422, content={"detail": str(e)})
+
+    def _emit(ev: dict) -> str:
+        return f"data: {json.dumps(ev, ensure_ascii=False, default=str)}\n\n"
+
+    def event_stream() -> Generator[str, None, None]:
+        try:
+            yield _emit({"type": "hydrate_started", "session_id": req.session_id})
+            svc = HydrationService(db)
+            for ev in svc.run(req):
+                yield _emit(ev)
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            logger.exception("hydrate failed")
+            yield _emit({"type": "error", "content": str(e)})
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 # ── M3: 发布草稿 → OntologyEntity + EntityAttribute + ObjectBinding ─────
 
 class _DraftProperty(BaseModel):

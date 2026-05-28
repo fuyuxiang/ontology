@@ -125,9 +125,10 @@
           <div class="step3-panel">
             <div class="step3-panel__title">📦 数据源选择</div>
             <div class="step3-data-source-card">
-              <div class="step3-data-source-list">
+              <!-- 有真实 backing assets 时显示 -->
+              <div v-if="hasBackingAssets" class="step3-data-source-list">
                 <label
-                  v-for="ds in SAMPLE_DATA_SOURCES"
+                  v-for="ds in availableAssets"
                   :key="ds.id"
                   class="step3-data-source-item"
                   :class="{ 'step3-data-source-item--selected': selectedSourceIds.includes(ds.id) }"
@@ -138,15 +139,23 @@
                     v-model="selectedSourceIds"
                   />
                   <div class="ds-main">
-                    <div class="ds-name">{{ ds.fileName }}</div>
-                    <div class="ds-meta">{{ ds.rows }} 行 × {{ ds.columns }} 列 · {{ ds.system }}<span v-if="ds.targetClass"> · 映射 {{ ds.targetClass }}</span></div>
+                    <div class="ds-name">{{ ds.objectName }}</div>
+                    <div class="ds-meta">资产 ID: {{ ds.name }}...</div>
                   </div>
                 </label>
               </div>
-              <div class="step3-data-source-tip" v-if="!selectedSourceIds.length">请至少选择 1 张样例表后再开始演练。</div>
+              <!-- 无 backing assets 时显示提示 -->
+              <div v-else class="step3-data-source-list">
+                <div class="step3-data-source-empty">
+                  <div class="step3-data-source-empty__icon">📭</div>
+                  <div class="step3-data-source-empty__text">本体对象未绑定数据资产</div>
+                  <div class="step3-data-source-empty__hint">演练将仅验证本体结构完整性，跳过数据验证阶段。</div>
+                </div>
+              </div>
+              <div class="step3-data-source-tip" v-if="hasBackingAssets && !selectedSourceIds.length">请至少选择 1 个数据资产后再开始演练。</div>
               <button
                 class="step3-drill-btn"
-                :disabled="selectedSourceIds.length === 0"
+                :disabled="hasBackingAssets && selectedSourceIds.length === 0"
                 @click="startDrill"
               >
                 🚀 开始演练
@@ -281,7 +290,7 @@ const drillStatus = ref<'pass' | 'warn' | 'error' | undefined>(props.session.dri
 const drillLogs = ref<DrillLogLine[]>([])
 const drillElapsed = ref(0)
 const drillResult = ref<DrillResult | null>(props.session.drillResult || null)
-const selectedSourceIds = ref<string[]>(props.session.selectedSampleSourceIds.length ? props.session.selectedSampleSourceIds : SAMPLE_DATA_SOURCES.slice(0, 4).map(d => d.id))
+const selectedSourceIds = ref<string[]>(props.session.selectedSampleSourceIds.length ? props.session.selectedSampleSourceIds : [])
 const publishModalOpen = ref(false)
 const publishing = ref(false)
 const warnAction = ref<'ignore' | 'rollback'>('ignore')
@@ -306,6 +315,20 @@ const frozenAt = computed(() => {
 
 const baselines = computed(() => MONITORING_BASELINES[props.session.scenarioId || ''] || MONITORING_BASELINES['refund-root-cause'])
 const relationAccuracy = computed(() => drillStatus.value === 'pass' ? '98.2' : drillStatus.value === 'warn' ? '92.4' : '0')
+
+// 从本体对象的 backing_asset_ids 派生可用数据源列表
+const availableAssets = computed(() => {
+  const assetMap = new Map<string, { id: string; name: string; objectName: string }>()
+  for (const obj of props.session.ontologyObjects) {
+    for (const aid of (obj.backing_asset_ids || [])) {
+      if (!assetMap.has(aid)) {
+        assetMap.set(aid, { id: aid, name: aid.slice(0, 8), objectName: obj.displayName || obj.name })
+      }
+    }
+  }
+  return Array.from(assetMap.values())
+})
+const hasBackingAssets = computed(() => availableAssets.value.length > 0)
 
 const consumerColumns = [
   { title: '消费方', dataIndex: 'name' },
@@ -369,8 +392,8 @@ function pushLog(level: 'OK' | 'RUN' | 'ERR', msg: string) {
 }
 
 async function startDrill() {
-  if (selectedSourceIds.value.length === 0) {
-    message.warning('请至少选择 1 张样例表后再开始演练。')
+  if (hasBackingAssets.value && selectedSourceIds.value.length === 0) {
+    message.warning('请至少选择 1 个数据资产后再开始演练。')
     return
   }
   drillStarted.value = true
@@ -383,103 +406,133 @@ async function startDrill() {
   if (drillTimer) clearInterval(drillTimer)
   drillTimer = window.setInterval(() => drillElapsed.value++, 1000)
 
-  const sources = SAMPLE_DATA_SOURCES.filter(d => selectedSourceIds.value.includes(d.id))
-  const totalRows = sources.reduce((s, d) => s + d.rows, 0)
-  const totalCols = sources.reduce((s, d) => s + d.columns, 0)
+  pushLog('RUN', '启动水合演练...')
 
-  // 阶段 1：数据接入
-  pushLog('RUN', `准备装载 ${sources.length} 张样例表...`)
-  for (const ds of sources) {
-    await sleep(280)
-    pushLog('OK', `装载 ${ds.fileName.split(' / ').pop()}：${ds.rows} 条样例 / ${ds.columns} 列`)
+  try {
+    const payload = {
+      session_id: props.session.sessionId || '',
+      objects: (props.session.ontologyObjects || []).map(o => ({
+        name: o.name,
+        displayName: o.displayName,
+        tier: o.tier,
+        primaryKey: o.primaryKey,
+        properties: (o.properties || []).map(p => ({
+          name: p.name,
+          displayName: p.displayName,
+          type: p.type,
+          required: !!p.required,
+          source_asset_id: p.source_asset_id ?? null,
+          source_column: p.source_column ?? null,
+        })),
+        backing_asset_ids: o.backing_asset_ids || [],
+      })),
+      relations: (props.session.ontologyRelations || []).map(r => ({
+        name: r.name,
+        displayName: r.displayName,
+        source: r.source,
+        target: r.target,
+        cardinality: r.cardinality || '1:N',
+      })),
+      asset_ids: selectedSourceIds.value,
+    }
+
+    const resp = await fetch('/api/v1/builder/hydrate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!resp.ok || !resp.body) {
+      throw new Error(`HTTP ${resp.status}`)
+    }
+
+    const reader = resp.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buf = ''
+    const phaseData: Record<string, DrillPhase> = {}
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      let idx
+      while ((idx = buf.indexOf('\n\n')) >= 0) {
+        const chunk = buf.slice(0, idx).trim()
+        buf = buf.slice(idx + 2)
+        if (!chunk.startsWith('data:')) continue
+        const raw = chunk.slice(5).trim()
+        if (raw === '[DONE]') continue
+        try {
+          const ev = JSON.parse(raw)
+          handleHydrationEvent(ev, phaseData)
+        } catch { /* ignore parse errors */ }
+      }
+    }
+  } catch (e: any) {
+    pushLog('ERR', `演练异常: ${e.message || e}`)
+    drillStatus.value = 'error'
+  } finally {
+    if (drillTimer) clearInterval(drillTimer)
   }
-  drillProgress.value = 0.25
-
-  // 阶段 2：实例化
-  pushLog('RUN', `字段映射检查：${totalCols}/${totalCols} 字段全部命中`)
-  for (const c of props.session.ontologyObjects.slice(0, 4)) {
-    await sleep(280)
-    pushLog('OK', `创建 ${c.displayName} 实例 × ${Math.round(totalRows / 4).toLocaleString()}...`)
-  }
-  drillProgress.value = 0.5
-
-  // 阶段 3：关系映射
-  pushLog('RUN', `关系映射：${props.session.ontologyRelations.length} 种关系类型实例化`)
-  await sleep(600)
-  pushLog('OK', `关系映射验证完成：${props.session.ontologyRelations.length} 关系全部命中`)
-  drillProgress.value = 0.75
-
-  // 阶段 4：策略输出
-  for (const c of props.session.ontologyObjects.slice(0, 2)) {
-    await sleep(260)
-    pushLog('RUN', `执行规则：${c.name}_validation（结构验证）...`)
-    await sleep(220)
-    pushLog('OK', `${c.displayName} 规则通过率 98.2%`)
-  }
-  await sleep(300)
-  pushLog('OK', '生成样例归因结果：高置信 184 条，人工复核 23 条')
-  drillProgress.value = 1
-
-  if (drillTimer) clearInterval(drillTimer)
-  drillStatus.value = 'pass'
-
-  const phases: DrillPhase[] = [
-    {
-      key: 'ingest', label: '数据接入', status: 'pass',
-      metrics: [
-        { label: '装载行数', value: totalRows.toLocaleString() },
-        { label: '装载列数', value: totalCols.toLocaleString() },
-        { label: '装载耗时', value: drillElapsed.value + 's' },
-      ],
-    },
-    {
-      key: 'instantiate', label: '本体实例化', status: 'pass',
-      metrics: [
-        { label: '实体实例数', value: totalRows.toLocaleString(), tone: 'pass' },
-        { label: '字段映射准确率', value: '100%', tone: 'pass' },
-        { label: '映射耗时', value: '4.2s' },
-      ],
-    },
-    {
-      key: 'match', label: '关系映射验证', status: 'pass',
-      metrics: [
-        { label: '关系实例数', value: (props.session.ontologyRelations.length * Math.round(totalRows * 1.5)).toLocaleString() },
-        { label: '关系映射准确率', value: '98.2%', tone: 'pass' },
-        { label: '匹配覆盖率', value: '94.6%', tone: 'pass' },
-      ],
-    },
-    {
-      key: 'strategy', label: '策略输出', status: 'pass',
-      metrics: [
-        { label: '规则执行成功率', value: '100%', tone: 'pass' },
-        { label: '高置信归因', value: '184 条', tone: 'pass' },
-        { label: '人工复核', value: '23 条', tone: 'warn' },
-      ],
-    },
-  ]
-  drillResult.value = {
-    phases,
-    logs: drillLogs.value,
-    selectedRows: totalRows,
-    selectedColumns: totalCols,
-    selectedSources: sources.length,
-    entityCount: totalRows,
-    relationCount: props.session.ontologyRelations.length * Math.round(totalRows * 1.5),
-    attributionAccuracy: '94.6%',
-    highConfidenceAttribution: 184,
-    manualReview: 23,
-  }
-  store.patchActive({
-    drillStatus: 'pass',
-    drillResult: drillResult.value,
-    selectedSampleSourceIds: selectedSourceIds.value,
-    status: 'pending_publish',
-  })
-  message.success('水合演练完成')
 }
 
-function sleep(ms: number) {
-  return new Promise(r => setTimeout(r, ms))
+function handleHydrationEvent(ev: any, phaseData: Record<string, DrillPhase>) {
+  switch (ev.type) {
+    case 'phase_log':
+      pushLog(ev.level || 'OK', ev.msg || '')
+      break
+    case 'phase_progress':
+      if (typeof ev.progress === 'number') {
+        drillProgress.value = ev.progress
+      }
+      break
+    case 'phase_complete': {
+      const phase = ev.phase as string
+      const phaseLabel = HYDRATION_PHASES.find(p => p.key === phase)?.label || phase
+      phaseData[phase] = {
+        key: phase as any,
+        label: phaseLabel,
+        status: ev.status || 'pass',
+        metrics: ev.metrics || [],
+      }
+      break
+    }
+    case 'drill_complete': {
+      // 组装最终结果
+      const phases = (ev.result?.phases || []).map((p: any) => ({
+        key: p.key,
+        label: p.label || HYDRATION_PHASES.find(h => h.key === p.key)?.label || p.key,
+        status: p.status || 'pass',
+        metrics: p.metrics || [],
+      }))
+      drillResult.value = {
+        phases,
+        logs: drillLogs.value,
+        selectedRows: ev.result?.selectedRows || 0,
+        selectedColumns: ev.result?.selectedColumns || 0,
+        selectedSources: ev.result?.selectedSources || 0,
+        entityCount: ev.result?.entityCount || 0,
+        relationCount: ev.result?.relationCount || 0,
+        attributionAccuracy: ev.result?.attributionAccuracy,
+        highConfidenceAttribution: ev.result?.highConfidenceAttribution,
+        manualReview: ev.result?.manualReview,
+      }
+      drillStatus.value = ev.status || 'pass'
+      drillProgress.value = 1
+      if (drillTimer) clearInterval(drillTimer)
+      store.patchActive({
+        drillStatus: drillStatus.value,
+        drillResult: drillResult.value,
+        selectedSampleSourceIds: selectedSourceIds.value,
+        status: 'pending_publish',
+      })
+      message.success('水合演练完成')
+      break
+    }
+    case 'error':
+      pushLog('ERR', ev.content || '未知错误')
+      drillStatus.value = 'error'
+      break
+  }
 }
 
 async function confirmPublish() {
@@ -547,7 +600,7 @@ watch(() => props.session.sessionId, () => {
   drillResult.value = props.session.drillResult || null
   drillStatus.value = props.session.drillStatus
   drillProgress.value = props.session.drillResult ? 1 : 0
-  selectedSourceIds.value = props.session.selectedSampleSourceIds.length ? [...props.session.selectedSampleSourceIds] : SAMPLE_DATA_SOURCES.slice(0, 4).map(d => d.id)
+  selectedSourceIds.value = props.session.selectedSampleSourceIds.length ? [...props.session.selectedSampleSourceIds] : []
   success.value = props.session.status === 'published'
 })
 
@@ -611,6 +664,13 @@ onUnmounted(() => {
 .ds-name { font-size: 12px; font-weight: 500; color: #0f172a; word-break: break-all; }
 .ds-meta { font-size: 11px; color: #94a3b8; margin-top: 2px; }
 .step3-data-source-tip { padding: 8px; font-size: 11px; color: #b45309; background: rgba(245, 158, 11, 0.1); border-radius: 6px; margin-top: 8px; }
+.step3-data-source-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 32px 16px; text-align: center;
+}
+.step3-data-source-empty__icon { font-size: 36px; margin-bottom: 8px; }
+.step3-data-source-empty__text { font-size: 13px; font-weight: 600; color: #475569; }
+.step3-data-source-empty__hint { font-size: 11px; color: #94a3b8; margin-top: 4px; }
 
 .step3-drill-btn {
   margin-top: 12px;
