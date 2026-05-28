@@ -1,6 +1,10 @@
 """
 将场景5v2.json中的本体实体、属性、关系三元组写入Neo4j
-Neo4j: bolt://123.56.188.16:7687, user=bonc, password=bonc12345
+
+连接信息通过环境变量传入（无默认值）：
+  NEO4J_URI       必填，例如 bolt://10.0.0.5:7687
+  NEO4J_USER      必填
+  NEO4J_PASSWORD  必填
 """
 import json
 import sys
@@ -9,12 +13,16 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "场景5v2.json")
-NEO4J_URI = "bolt://123.56.188.16:7687"
-NEO4J_USER = "bonc"
-NEO4J_PASSWORD = "bonc12345"
+NEO4J_URI = os.getenv("NEO4J_URI", "")
+NEO4J_USER = os.getenv("NEO4J_USER", "")
+NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "")
 
 
 def write_to_neo4j(schema_path: str):
+    if not (NEO4J_URI and NEO4J_USER and NEO4J_PASSWORD):
+        print("ERROR: 必须通过环境变量提供 NEO4J_URI / NEO4J_USER / NEO4J_PASSWORD")
+        return False
+
     with open(schema_path, encoding="utf-8") as f:
         schema = json.load(f)
 

@@ -11,13 +11,15 @@ from pydantic import BaseModel, Field, ConfigDict
 
 class ConnectionCreate(BaseModel):
     name: str
-    type: Literal["mysql", "postgresql", "oracle", "sqlserver", "hive", "clickhouse", "fake"]
-    host: str
-    port: int
+    category: Literal["database", "object_storage", "file_transfer", "message_queue", "api"] | None = None
+    type: str
+    host: str = ""
+    port: int = 0
     database: str = ""
-    username: str
-    password: str
+    username: str = ""
+    password: str = ""
     params: dict | None = None
+    credential: dict | None = None
     writable: bool = False
     pool_size: int = 4
     rate_limit_qps: int = 20
@@ -32,6 +34,7 @@ class ConnectionUpdate(BaseModel):
     username: str | None = None
     password: str | None = None
     params: dict | None = None
+    credential: dict | None = None
     writable: bool | None = None
     pool_size: int | None = None
     rate_limit_qps: int | None = None
@@ -42,6 +45,7 @@ class ConnectionUpdate(BaseModel):
 class ConnectionDetail(BaseModel):
     id: str
     name: str
+    category: str
     type: str
     host: str
     port: int
@@ -311,6 +315,9 @@ class BindingDetail(BaseModel):
 class LineageNode(BaseModel):
     kind: str
     id: str
+    label: str | None = None
+    sub_label: str | None = None
+    extra: dict | None = None
 
 
 class LineageEdgeOut(BaseModel):

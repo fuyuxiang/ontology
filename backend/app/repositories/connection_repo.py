@@ -13,12 +13,15 @@ class ConnectionRepository(BaseRepository[Connection]):
     def list(
         self,
         type: str | None = None,
+        category: str | None = None,
         status: str | None = None,
         q: str | None = None,
     ) -> list[Connection]:
         query = self.db.query(Connection)
         if type:
             query = query.filter(Connection.type == type)
+        if category:
+            query = query.filter(Connection.category == category)
         if status:
             query = query.filter(Connection.status == status)
         if q:
