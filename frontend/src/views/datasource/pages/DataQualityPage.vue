@@ -2,7 +2,7 @@
   <div class="di-page">
     <div class="di-page__header">
       <h1 class="di-page__title">数据质量</h1>
-      <p class="di-page__subtitle">质量评分 · 维度分布 · 异常告警 · 整改建议</p>
+      <p class="di-page__subtitle">资产健康度 · 规则契约 · 状态历史 · 评估结果聚合</p>
     </div>
     <DataQualityTab />
   </div>

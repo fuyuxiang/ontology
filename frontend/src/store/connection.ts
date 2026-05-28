@@ -17,7 +17,7 @@ export const useConnectionStore = defineStore('connection', () => {
     return { total, active, enabled, stopped, error: errorCount }
   })
 
-  async function fetchList(params?: { type?: string; status?: string; q?: string }) {
+  async function fetchList(params?: { type?: string; category?: string; status?: string; q?: string }) {
     loading.value = true
     error.value = null
     try {

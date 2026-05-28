@@ -218,7 +218,6 @@ from app.api.v1.functions import router as functions_router
 from app.api.v1.monitor import router as monitor_router
 from app.api.v1.studio import router as studio_router
 from app.api.v1.pipelines import router as pipelines_router, start_worker as start_pipeline_worker
-from app.api.v1.lineage import router as lineage_router
 from app.api.v1.aip_scenes import router as aip_scenes_router
 from app.api.v1.aip_executions import router as aip_executions_router
 from app.api.v1.aip_webhooks import router as aip_webhooks_router
@@ -232,6 +231,8 @@ from app.api.v1.data_plane.lineage import router as dp_lineage_router
 from app.api.v1.data_plane.events import router as dp_events_router
 from app.api.v1.data_plane.audit import router as dp_audit_router
 from app.api.v1.data_plane.object_bindings import router as dp_bindings_router
+from app.api.v1.data_plane.quality import router as dp_quality_router
+from app.api.v1.data_plane.mapping import router as dp_mapping_router
 from app.api.v1.data_plane.compat import install as install_compat_middleware
 
 logger = logging.getLogger(__name__)
@@ -418,7 +419,6 @@ app.include_router(functions_router, prefix="/api/v1")
 app.include_router(monitor_router, prefix="/api/v1")
 app.include_router(studio_router, prefix="/api/v1")
 app.include_router(pipelines_router, prefix="/api/v1")
-app.include_router(lineage_router, prefix="/api/v1")
 app.include_router(aip_scenes_router, prefix="/api/v1")
 app.include_router(aip_executions_router, prefix="/api/v1")
 app.include_router(aip_webhooks_router, prefix="/api/v1")
@@ -434,6 +434,8 @@ app.include_router(dp_lineage_router, prefix="/api/v1")
 app.include_router(dp_events_router, prefix="/api/v1")
 app.include_router(dp_audit_router, prefix="/api/v1")
 app.include_router(dp_bindings_router, prefix="/api/v1")
+app.include_router(dp_quality_router, prefix="/api/v1")
+app.include_router(dp_mapping_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

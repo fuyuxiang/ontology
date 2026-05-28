@@ -163,6 +163,18 @@ class AssetService:
         self.repo.commit()
         self.repo.refresh(asset)
         self.bus.emit("asset.created", {"asset_id": asset.id, "kind": asset.kind})
+
+        # 自动同步 schema（仅 table 类型；失败不阻断创建）
+        if asset.kind == "table" and asset.connection_id:
+            try:
+                self.sync_schema(asset.id)
+                self.repo.refresh(asset)
+            except Exception as e:
+                logger.warning(
+                    "auto sync_schema failed for asset %s (%s): %s",
+                    asset.id, asset.name, e,
+                )
+
         return asset
 
     def update(self, asset_id: str, **changes) -> Asset:
@@ -476,7 +488,7 @@ class AssetService:
                 raise ValueError("sql_view 资产 locator 必须含 base_asset_id 与 sql")
         elif kind == "document":
             st = locator.get("source_type")
-            if st not in ("file", "oss", "directory", "api", "mq"):
+            if st not in ("file", "oss", "s3", "directory", "api", "mq"):
                 raise ValueError("document 资产 locator.source_type 非法")
 
     @staticmethod

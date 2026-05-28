@@ -8,6 +8,7 @@ import type { QualityMetric } from '../types/quality'
 
 export interface AssetFilters {
   kind?: string
+  kinds?: string[]
   connection_id?: string
   domain?: string
   document_source_type?: DocumentSourceType

@@ -1,51 +1,37 @@
 import { get } from './client'
 
-export interface LineageRow {
-  key: string
-  source: string  // 多行文本以 \n 分隔
-  etl: string
-  ontologyId: string
-  objectName: string
-  ontologyLabel: string
-  tier: number
-  app: string
-}
+export type LineageNodeKind = 'asset' | 'object_type' | 'action' | 'rule'
 
-export interface LineageCrossEdge {
+export interface LineageNode {
+  kind: LineageNodeKind
   id: string
-  source: string  // ontologyId
-  target: string
+  label: string | null
+  sub_label: string | null
+  extra: Record<string, unknown> | null
 }
 
-export interface LineageWorkshopGraph {
-  rows: LineageRow[]
-  crossEdges: LineageCrossEdge[]
+export interface LineageEdge {
+  source: { kind: LineageNodeKind; id: string }
+  target: { kind: LineageNodeKind; id: string }
+  relation: string
+  via_module: string | null
+  via_purpose: string | null
+  weight: number
 }
 
-export interface FieldMapping {
-  from: string
-  to: string
-  apiName: string
-  type: string
-}
-
-export interface FieldLineageGroup {
-  source: string
-  fields: FieldMapping[]
-}
-
-export interface FieldLineageResponse {
-  ontologyId: string
-  objectName: string
-  ontologyLabel: string
-  groups: FieldLineageGroup[]
+export interface LineageGraph {
+  nodes: LineageNode[]
+  edges: LineageEdge[]
 }
 
 export const lineageApi = {
-  workshop() {
-    return get<LineageWorkshopGraph>('/lineage/workshop')
+  overview() {
+    return get<LineageGraph>('/lineage/overview')
   },
-  objectFields(ontologyId: string) {
-    return get<FieldLineageResponse>(`/lineage/workshop/objects/${ontologyId}`)
+  forAsset(assetId: string, depth = 2) {
+    return get<LineageGraph>(`/lineage?asset_id=${encodeURIComponent(assetId)}&depth=${depth}`)
+  },
+  forObjectType(objectTypeId: string, depth = 2) {
+    return get<LineageGraph>(`/lineage?object_type_id=${encodeURIComponent(objectTypeId)}&depth=${depth}`)
   },
 }

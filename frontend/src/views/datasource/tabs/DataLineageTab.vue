@@ -6,21 +6,29 @@
           <span class="ln-title__dot"></span>
           数据血缘追踪
         </div>
-        <div class="ln-subtitle">按行对齐 数据源 → ETL → 本体 → 应用；点击本体节点查看字段级血缘</div>
+        <div class="ln-subtitle">数据资产 → 本体类型 → 动作；边由本体映射 (Binding) 与执行日志自动写入</div>
+      </div>
+      <div class="ln-stats" v-if="!loading && stats.total > 0">
+        <span><b>{{ stats.assets }}</b> 资产</span>
+        <span><b>{{ stats.objectTypes }}</b> 本体</span>
+        <span><b>{{ stats.actions }}</b> 动作</span>
+        <span><b>{{ stats.bindsTo }}</b> 绑定</span>
+        <span><b>{{ stats.reads }}</b> 读取</span>
       </div>
     </div>
 
     <div class="ln-canvas-wrapper">
       <VueFlow
+        v-if="flowNodes.length > 0"
         v-model:nodes="flowNodes"
         v-model:edges="flowEdges"
         :node-types="nodeTypes"
         :default-edge-options="defaultEdgeOptions"
         :fit-view-on-init="true"
-        :fit-view-options="{ padding: 0.08 }"
+        :fit-view-options="{ padding: 0.12 }"
         :nodes-draggable="true"
         :nodes-connectable="false"
-        :pan-on-drag="false"
+        :pan-on-drag="true"
         :zoom-on-double-click="false"
         :pro-options="{ hideAttribution: true }"
         @node-click="onNodeClick"
@@ -33,47 +41,51 @@
         <div class="ln-loading__spinner"></div>
         <span>加载血缘数据...</span>
       </div>
+
+      <div v-else-if="flowNodes.length === 0" class="ln-empty">
+        <div class="ln-empty__icon">↯</div>
+        <div class="ln-empty__title">暂无血缘记录</div>
+        <div class="ln-empty__desc">
+          血缘边由 <b>本体映射 (ObjectBinding)</b> 与 <b>执行日志</b> 自动写入。
+          <br />
+          请先在「数据接入」注册资产，并在「本体管理」为对象类型建立映射。
+        </div>
+      </div>
     </div>
 
     <a-drawer
       v-model:open="detailOpen"
       :title="detailTitle"
-      width="640"
+      width="560"
       placement="right"
       :body-style="{ paddingBottom: '24px' }"
     >
-      <div v-if="detailLoading" class="ln-drawer__loading">
-        <a-spin />
-      </div>
-      <div v-else-if="detailData">
-        <div v-if="detailData.groups.length === 0" class="ln-drawer__empty">
-          暂无字段级血缘记录
+      <div v-if="detailNode">
+        <div class="ln-detail__row">
+          <span class="ln-detail__label">类型</span>
+          <a-tag :color="kindTagColor(detailNode.kind)">{{ kindLabel(detailNode.kind) }}</a-tag>
         </div>
-        <div v-for="(group, gi) in detailData.groups" :key="gi" class="ln-detail__group">
-          <div class="ln-detail__src">
-            <span class="ln-detail__src-tag">来源</span>
-            <span class="ln-detail__src-text">{{ group.source }}</span>
+        <div class="ln-detail__row" v-for="[k, v] in detailExtraEntries" :key="k">
+          <span class="ln-detail__label">{{ extraLabel(k) }}</span>
+          <span class="ln-detail__value">{{ v ?? '-' }}</span>
+        </div>
+
+        <a-divider />
+        <div class="ln-detail__section-title">相关边 ({{ detailEdges.length }})</div>
+        <div v-if="detailEdges.length === 0" class="ln-detail__empty">无</div>
+        <div v-else>
+          <div v-for="(edge, ei) in detailEdges" :key="ei" class="ln-edge-card">
+            <div class="ln-edge-card__main">
+              <span class="ln-edge-card__node">{{ nodeLabel(edge.source) }}</span>
+              <span class="ln-edge-card__arrow">{{ relationLabel(edge.relation) }} →</span>
+              <span class="ln-edge-card__node">{{ nodeLabel(edge.target) }}</span>
+            </div>
+            <div class="ln-edge-card__meta">
+              <span v-if="edge.via_module">via {{ edge.via_module }}</span>
+              <span v-if="edge.via_purpose">· purpose: <code>{{ edge.via_purpose }}</code></span>
+              <span>· weight: {{ edge.weight }}</span>
+            </div>
           </div>
-          <table class="ln-detail__table">
-            <thead>
-              <tr>
-                <th>源字段</th>
-                <th>本体属性（中文名）</th>
-                <th>API 名称</th>
-                <th>类型</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(f, fi) in group.fields" :key="fi">
-                <td><span class="ln-mono">{{ f.from }}</span></td>
-                <td>{{ f.to }}</td>
-                <td><span class="ln-mono">{{ f.apiName }}</span></td>
-                <td>
-                  <span class="ln-tag" :class="`ln-tag--${f.type.toLowerCase()}`">{{ f.type }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </div>
     </a-drawer>
@@ -90,53 +102,74 @@ import { message } from 'ant-design-vue'
 
 import LineageLayerNode from '../../../components/lineage/LineageLayerNode.vue'
 import LineageSourceNode from '../../../components/lineage/LineageSourceNode.vue'
-import LineageETLNode from '../../../components/lineage/LineageETLNode.vue'
 import LineageOntologyNode from '../../../components/lineage/LineageOntologyNode.vue'
 import LineageAppNode from '../../../components/lineage/LineageAppNode.vue'
 
-import { lineageApi, type LineageRow, type LineageCrossEdge, type FieldLineageResponse } from '../../../api/lineage'
+import { lineageApi, type LineageGraph, type LineageNode as LNode, type LineageNodeKind } from '../../../api/lineage'
 
 const nodeTypes = {
   lineageLayer: markRaw(LineageLayerNode),
-  lineageSource: markRaw(LineageSourceNode),
-  lineageETL: markRaw(LineageETLNode),
+  lineageAsset: markRaw(LineageSourceNode),
   lineageOntology: markRaw(LineageOntologyNode),
-  lineageApp: markRaw(LineageAppNode),
-}
+  lineageAction: markRaw(LineageAppNode),
+} as any
 
 const defaultEdgeOptions = {
   type: 'default',
   markerEnd: MarkerType.ArrowClosed,
 }
 
-// X 坐标参考原版 bn / Sn / xn
-const COL_X = { source: 0, etl: 290, ontology: 580, app: 870 }
-const ROW_GAP = 52
+const COL_X = { asset: 0, ontology: 360, action: 720 }
+const ROW_GAP = 64
 const HEADER_Y = -62
 
 const flowNodes = ref<Node[]>([])
 const flowEdges = ref<Edge[]>([])
 const loading = ref(false)
+const graphCache = ref<LineageGraph | null>(null)
+const nodeIndex = ref<Record<string, LNode>>({})
 
-const rowsCache = ref<LineageRow[]>([])
+const stats = computed(() => {
+  const g = graphCache.value
+  if (!g) return { total: 0, assets: 0, objectTypes: 0, actions: 0, bindsTo: 0, reads: 0 }
+  return {
+    total: g.nodes.length,
+    assets: g.nodes.filter(n => n.kind === 'asset').length,
+    objectTypes: g.nodes.filter(n => n.kind === 'object_type').length,
+    actions: g.nodes.filter(n => n.kind === 'action').length,
+    bindsTo: g.edges.filter(e => e.relation === 'binds_to').length,
+    reads: g.edges.filter(e => e.relation === 'reads').length,
+  }
+})
 
 const detailOpen = ref(false)
-const detailLoading = ref(false)
-const detailData = ref<FieldLineageResponse | null>(null)
-const detailTitle = computed(() =>
-  detailData.value
-    ? `${detailData.value.ontologyLabel} (${detailData.value.objectName}) — 字段级血缘`
-    : '字段级血缘',
-)
+const detailNode = ref<LNode | null>(null)
+const detailTitle = computed(() => {
+  if (!detailNode.value) return '节点详情'
+  return `${detailNode.value.label || detailNode.value.id.slice(0, 8)} — ${kindLabel(detailNode.value.kind)}`
+})
+const detailExtraEntries = computed<[string, unknown][]>(() => {
+  const extra = detailNode.value?.extra
+  if (!extra) return []
+  return Object.entries(extra).filter(([, v]) => v !== null && v !== undefined && v !== '')
+})
+const detailEdges = computed(() => {
+  if (!detailNode.value || !graphCache.value) return []
+  const key = `${detailNode.value.kind}:${detailNode.value.id}`
+  return graphCache.value.edges.filter(
+    e => `${e.source.kind}:${e.source.id}` === key || `${e.target.kind}:${e.target.id}` === key,
+  )
+})
 
 onMounted(loadGraph)
 
 async function loadGraph() {
   loading.value = true
   try {
-    const data = await lineageApi.workshop()
-    rowsCache.value = data.rows
-    buildGraph(data.rows, data.crossEdges)
+    const data = await lineageApi.overview()
+    graphCache.value = data
+    nodeIndex.value = Object.fromEntries(data.nodes.map(n => [`${n.kind}:${n.id}`, n]))
+    buildGraph(data)
   } catch (e: unknown) {
     message.error(`加载血缘数据失败：${getErrorMessage(e)}`)
   } finally {
@@ -144,67 +177,99 @@ async function loadGraph() {
   }
 }
 
-function buildGraph(rows: LineageRow[], crossEdges: LineageCrossEdge[]) {
+function buildGraph(g: LineageGraph) {
+  if (g.nodes.length === 0) {
+    flowNodes.value = []
+    flowEdges.value = []
+    return
+  }
+
+  const groups: Record<LineageNodeKind, LNode[]> = {
+    asset: [],
+    object_type: [],
+    action: [],
+    rule: [],
+  }
+  for (const n of g.nodes) groups[n.kind].push(n)
+
   const headerNodes: Node[] = [
-    { id: 'lh-source', type: 'lineageLayer', position: { x: COL_X.source + 19, y: HEADER_Y },
-      data: { label: '数据源层', tone: 'source' }, draggable: false, selectable: false },
-    { id: 'lh-etl', type: 'lineageLayer', position: { x: COL_X.etl + 7, y: HEADER_Y },
-      data: { label: 'ETL层', tone: 'etl' }, draggable: false, selectable: false },
-    { id: 'lh-ontology', type: 'lineageLayer', position: { x: COL_X.ontology + 1, y: HEADER_Y },
-      data: { label: '本体层', tone: 'ontology' }, draggable: false, selectable: false },
-    { id: 'lh-app', type: 'lineageLayer', position: { x: COL_X.app, y: HEADER_Y },
-      data: { label: '应用层', tone: 'app' }, draggable: false, selectable: false },
+    { id: 'lh-asset', type: 'lineageLayer', position: { x: COL_X.asset + 40, y: HEADER_Y },
+      data: { label: '数据资产', tone: 'source' }, draggable: false, selectable: false },
+    { id: 'lh-ontology', type: 'lineageLayer', position: { x: COL_X.ontology + 40, y: HEADER_Y },
+      data: { label: '本体类型', tone: 'ontology' }, draggable: false, selectable: false },
+    { id: 'lh-action', type: 'lineageLayer', position: { x: COL_X.action + 40, y: HEADER_Y },
+      data: { label: '动作', tone: 'app' }, draggable: false, selectable: false },
   ]
 
-  const rowNodes: Node[] = rows.flatMap((r, i) => {
-    const y = i * ROW_GAP
-    return [
-      { id: `ls-${r.key}`, type: 'lineageSource', position: { x: COL_X.source, y },
-        data: { label: r.source } },
-      { id: `le-${r.key}`, type: 'lineageETL', position: { x: COL_X.etl, y: y + 2 },
-        data: { label: r.etl } },
-      { id: r.ontologyId, type: 'lineageOntology', position: { x: COL_X.ontology, y: y - 4 },
-        data: { label: r.ontologyLabel, objectName: r.objectName, tier: r.tier } },
-      { id: `la-${r.key}`, type: 'lineageApp', position: { x: COL_X.app, y: y + 2 },
-        data: { label: r.app } },
-    ]
-  })
+  const flowNs: Node[] = [...headerNodes]
+  for (const [kind, list] of Object.entries(groups) as [LineageNodeKind, LNode[]][]) {
+    const x = kind === 'asset' ? COL_X.asset : kind === 'object_type' ? COL_X.ontology : COL_X.action
+    const type = kind === 'asset' ? 'lineageAsset' : kind === 'object_type' ? 'lineageOntology' : 'lineageAction'
+    list.forEach((n, i) => {
+      flowNs.push({
+        id: `${kind}:${n.id}`,
+        type,
+        position: { x, y: i * ROW_GAP },
+        data: {
+          label: n.label || n.id.slice(0, 8),
+          objectName: n.sub_label || '',
+          tier: (n.extra?.tier as number) || undefined,
+        },
+      })
+    })
+  }
 
-  const linkEdges: Edge[] = rows.flatMap((r) => [
-    { id: `l-${r.key}-source-etl`, source: `ls-${r.key}`, target: `le-${r.key}`,
-      style: { stroke: '#94a3b8' } },
-    { id: `l-${r.key}-etl-ontology`, source: `le-${r.key}`, target: r.ontologyId,
-      style: { stroke: '#8B5CF6' } },
-    { id: `l-${r.key}-ontology-app`, source: r.ontologyId, target: `la-${r.key}`,
-      style: { stroke: '#f59e0b' } },
-  ])
-
-  const ontologyEdges: Edge[] = crossEdges.map((e) => ({
-    id: e.id,
-    source: e.source,
-    target: e.target,
-    style: { stroke: '#8B5CF6', strokeDasharray: '5 3' },
+  const edgeColor = (rel: string) => {
+    if (rel === 'binds_to') return '#8B5CF6'
+    if (rel === 'reads') return '#3b82f6'
+    if (rel === 'writes') return '#f59e0b'
+    return '#94a3b8'
+  }
+  const flowEs: Edge[] = g.edges.map((e, i) => ({
+    id: `e-${i}`,
+    source: `${e.source.kind}:${e.source.id}`,
+    target: `${e.target.kind}:${e.target.id}`,
+    label: e.weight > 1 ? `×${e.weight}` : undefined,
+    style: { stroke: edgeColor(e.relation), strokeWidth: Math.min(3, 1 + Math.log2(e.weight || 1)) },
+    labelStyle: { fontSize: '10px', fill: '#6b7280' },
   }))
 
-  flowNodes.value = [...headerNodes, ...rowNodes]
-  flowEdges.value = [...linkEdges, ...ontologyEdges]
+  flowNodes.value = flowNs
+  flowEdges.value = flowEs
 }
 
-async function onNodeClick(event: { node: Node }) {
-  const node = event.node
-  if (node.type !== 'lineageOntology') return
-
+function onNodeClick(event: { node: Node }) {
+  const id = event.node.id
+  if (id.startsWith('lh-')) return
+  const n = nodeIndex.value[id]
+  if (!n) return
+  detailNode.value = n
   detailOpen.value = true
-  detailLoading.value = true
-  detailData.value = null
-  try {
-    detailData.value = await lineageApi.objectFields(node.id)
-  } catch (e: unknown) {
-    message.error(`加载字段级血缘失败：${getErrorMessage(e)}`)
-    detailOpen.value = false
-  } finally {
-    detailLoading.value = false
-  }
+}
+
+function nodeLabel(ref: { kind: LineageNodeKind; id: string }) {
+  const n = nodeIndex.value[`${ref.kind}:${ref.id}`]
+  return n?.label || ref.id.slice(0, 8)
+}
+
+function kindLabel(k: LineageNodeKind) {
+  return ({ asset: '数据资产', object_type: '本体类型', action: '动作', rule: '规则' })[k] || k
+}
+
+function kindTagColor(k: LineageNodeKind) {
+  return ({ asset: 'blue', object_type: 'purple', action: 'orange', rule: 'green' })[k] || 'default'
+}
+
+function relationLabel(r: string) {
+  return ({ binds_to: '映射 (binds_to)', reads: '读取 (reads)', writes: '写入 (writes)', derives_from: '派生 (derives_from)' } as Record<string, string>)[r] || r
+}
+
+function extraLabel(k: string) {
+  return ({
+    name: '名称', alias: '别名', kind: '类型',
+    connection_id: '连接 ID', connection_name: '所属连接', status: '状态',
+    name_cn: '中文名', tier: '层级', entity_id: '所属实体', type: '类型',
+  } as Record<string, string>)[k] || k
 }
 
 function getErrorMessage(error: unknown): string {
@@ -229,6 +294,10 @@ function getErrorMessage(error: unknown): string {
 .ln-subtitle {
   font-size: 12px; color: var(--neutral-500); margin-top: 2px;
 }
+.ln-stats {
+  display: flex; gap: 16px; font-size: 12px; color: var(--neutral-600);
+}
+.ln-stats b { color: var(--neutral-900); font-weight: 600; margin-right: 2px; }
 
 .ln-canvas-wrapper {
   position: relative;
@@ -254,49 +323,53 @@ function getErrorMessage(error: unknown): string {
 }
 @keyframes ln-spin { to { transform: rotate(360deg); } }
 
-.ln-drawer__loading { display: flex; justify-content: center; padding: 40px; }
-.ln-drawer__empty { padding: 24px; text-align: center; color: var(--neutral-500); font-size: 13px; }
+.ln-empty {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 40px; text-align: center; color: var(--neutral-500);
+}
+.ln-empty__icon {
+  font-size: 36px; color: #c4b5fd; line-height: 1;
+}
+.ln-empty__title { font-size: 14px; font-weight: 600; color: var(--neutral-700); }
+.ln-empty__desc { font-size: 12px; line-height: 1.7; max-width: 480px; }
+.ln-empty__desc b { color: var(--neutral-700); font-weight: 600; }
 
-.ln-detail__group { margin-bottom: 20px; }
-.ln-detail__group:last-child { margin-bottom: 0; }
+.ln-detail__row {
+  display: flex; gap: 16px; padding: 6px 0;
+  font-size: 13px;
+}
+.ln-detail__label { width: 96px; color: var(--neutral-500); flex-shrink: 0; }
+.ln-detail__value { color: var(--neutral-800); word-break: break-all; }
+.ln-detail__section-title {
+  font-size: 12px; font-weight: 600; color: var(--neutral-700); margin-bottom: 8px;
+}
+.ln-detail__empty { color: var(--neutral-400); font-size: 12px; padding: 8px 0; }
 
-.ln-detail__src {
-  display: flex; align-items: center; gap: 8px;
+.ln-edge-card {
+  border: 1px solid var(--neutral-200);
+  border-radius: 8px;
+  padding: 8px 12px;
   margin-bottom: 8px;
+  background: var(--neutral-50);
+}
+.ln-edge-card__main {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   font-size: 12px;
 }
-.ln-detail__src-tag {
-  font-size: 11px; font-weight: 600;
-  color: #5b21b6; background: #EDE9FE;
-  padding: 2px 8px; border-radius: 4px;
-  flex-shrink: 0;
+.ln-edge-card__node {
+  font-weight: 600; color: var(--neutral-800);
+  background: #fff; padding: 2px 8px; border-radius: 4px;
+  border: 1px solid var(--neutral-200);
 }
-.ln-detail__src-text { color: var(--neutral-700); word-break: break-all; }
-
-.ln-detail__table { width: 100%; border-collapse: collapse; }
-.ln-detail__table thead th {
-  background: var(--neutral-50); padding: 8px 12px; text-align: left;
-  font-size: 11px; font-weight: 600; color: var(--neutral-600);
-  border-bottom: 1px solid var(--neutral-200);
+.ln-edge-card__arrow { color: #8B5CF6; font-size: 11px; }
+.ln-edge-card__meta {
+  margin-top: 4px; font-size: 11px; color: var(--neutral-500);
 }
-.ln-detail__table tbody td {
-  padding: 8px 12px; font-size: 12px; color: var(--neutral-700);
-  border-bottom: 1px solid var(--neutral-100);
+.ln-edge-card__meta code {
+  background: var(--neutral-100); padding: 1px 4px; border-radius: 3px;
+  font-size: 10px;
 }
-.ln-mono { font-family: var(--font-mono, monospace); font-size: 11px; color: var(--neutral-800); }
-
-.ln-tag {
-  display: inline-block; padding: 1px 8px;
-  font-size: 10px; font-weight: 600; border-radius: 4px;
-  background: var(--neutral-100); color: var(--neutral-600);
-}
-.ln-tag--string { background: #DBEAFE; color: #1d4ed8; }
-.ln-tag--int, .ln-tag--decimal, .ln-tag--integer { background: #FEF3C7; color: #92400e; }
-.ln-tag--fk { background: #EDE9FE; color: #5b21b6; }
-.ln-tag--enum { background: #FFE4E6; color: #be123c; }
-.ln-tag--timestamp, .ln-tag--date, .ln-tag--datetime { background: #ECFEFF; color: #0e7490; }
-.ln-tag--json, .ln-tag--text { background: #F3F4F6; color: #374151; }
-.ln-tag--boolean { background: #DCFCE7; color: #166534; }
 
 :deep(.vue-flow__edge-path) { stroke-width: 1.5; }
 :deep(.vue-flow__controls) {
