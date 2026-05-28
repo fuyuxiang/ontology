@@ -120,7 +120,7 @@
 |---|---|---|
 | **本体建模** — 实体、属性、关系与对象图谱统一治理 | **规则动作** — 声明式规则、计算函数与可执行动作 | **服务输出** — API 服务、OSDK 生成、Agent 接口三种赋能形态 |
 | **数据接入** — 多源数据库连接、表发现与字段映射 | **流程编排** — 拖拽式可视化工作流，支持节点 / 连线 / 主题切换 | **场景应用** — 携号转网、FTTR、宽带退单、政企根因等行业样板 |
-| **实体解析** — 跨源对象识别、ID 归一与冲突仲裁 | **AI Copilot** — 对话模式 + Agent 模式，本体上下文感知 | **治理运维** — 版本发布、审批、回滚、审计、追踪与 Agent 评测 |
+| **水合验证** — 发布前 4 阶段真实数据端到端校验（接入/映射/关系/策略） | **AI Copilot** — 对话模式 + Agent 模式，本体上下文感知 | **治理运维** — 版本发布、审批、回滚、审计、追踪与 Agent 评测 |
 
 ---
 
@@ -176,6 +176,57 @@
 | 本体映射 | `/data/mapping` | 本体字段 ↔ 物理字段映射、覆盖率统计 |
 | 实体解析 | `/data/resolution` | ID 归一与冲突仲裁，支撑跨源同名实体识别 |
 | 本体发布 | `/ontology/publish` | 草稿 → 校验 → 审批 → 上线 / 回滚，全过程留痕 |
+
+#### 本体构建器（4 步流水线）
+
+本体构建器支持 4 种构建方式，统一走 **构建 → 走测审批 → 水合验证 → 发布** 流水线：
+
+```text
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│   Step 1     │    │   Step 2     │    │   Step 3     │    │   Step 4     │
+│   构建本体    │ →  │   走测审批    │ →  │   水合验证    │ →  │   发布上线    │
+│              │    │              │    │              │    │              │
+│ · 手工建模   │    │ · 逐对象审核  │    │ · 数据接入   │    │ · 版本冻结   │
+│ · 文件导入   │    │ · 主键校验   │    │ · 字段映射   │    │ · 7 道门禁   │
+│ · 文档抽取   │    │ · 规则/动作   │    │ · 关系 JOIN  │    │ · 消费方对接  │
+│ · 对话生成   │    │   建议处理   │    │ · PK/空值率  │    │ · 回滚方案   │
+└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+```
+
+**水合验证**（Hydration Drill）是发布前的关键质量门禁，通过 SSE 流式调用后端 4 阶段验证：
+
+1. **数据接入** — 验证连接器可达性、同步 schema、采样 preview、计算 profile
+2. **本体实例化** — 启发式打分（token Jaccard + 模糊匹配 + 类型相容）+ LLM 兜底映射
+3. **关系映射验证** — JOIN key 存在性检查、同连接样本 JOIN 查询
+4. **策略输出** — 主键唯一性校验、必填字段空值率检查
+
+### 数据集成
+
+> 连接数据源、发现资产、建立映射、追踪血缘、监控质量。
+
+| 模块 | 路由 | 能力简述 |
+|------|------|----------|
+| 数据接入 | `/data/connections` | 连接器管理（MySQL / PostgreSQL / Oracle / SQL Server / Hive / ClickHouse / S3 / FTP / Kafka / REST） |
+| 资产目录 | `/data/assets` | 数据资产注册、schema 自动同步、profile 分析、preview 预览 |
+| 数据血缘 | `/data/lineage` | 端到端血缘追踪，支持列级映射可视化 |
+| 数据质量 | `/data/quality` | 质量规则定义、探针执行、质量指标监控 |
+| 字段映射 | `/data/mapping` | 本体属性 ↔ 物理列的半自动映射推荐（启发式 + LLM） |
+| 执行审计 | `/data/audit` | SQL 执行审计日志、限流、脱敏 |
+
+**连接器能力矩阵：**
+
+| 连接器 | Schema 发现 | 数据预览 | Profile | SQL 执行 |
+|--------|:-----------:|:--------:|:-------:|:--------:|
+| MySQL | ✅ | ✅ | ✅ | ✅ |
+| PostgreSQL | ✅ | ✅ | ✅ | ✅ |
+| Oracle | ✅ | ✅ | ✅ | ✅ |
+| SQL Server | ✅ | ✅ | ✅ | ✅ |
+| Hive | ✅ | ✅ | ✅ | ✅ |
+| ClickHouse | ✅ | ✅ | ✅ | ✅ |
+| S3 | - | ✅ | - | - |
+| FTP/SFTP | - | ✅ | - | - |
+| Kafka | - | ✅ | - | - |
+| REST API | - | ✅ | - | - |
 
 ### 逻辑中心
 
@@ -410,19 +461,33 @@ http://localhost:8001/docs
 .
 ├── backend
 │   ├── app
-│   │   ├── api
-│   │   ├── models
-│   │   ├── services
-│   │   ├── schemas
+│   │   ├── api/v1/
+│   │   │   ├── builder.py          # 本体构建（extract/chat/hydrate/finalize）
+│   │   │   └── data_plane/         # 数据平面（assets/connections/execute/quality）
+│   │   ├── connectors/             # 数据库连接器（mysql/pg/oracle/s3/ftp/kafka）
+│   │   ├── models/                 # SQLAlchemy 数据模型
+│   │   ├── repositories/           # 数据访问层
+│   │   ├── services/
+│   │   │   ├── agent/              # Agent 编排、工具路由、图引擎
+│   │   │   ├── builder/            # 水合验证服务
+│   │   │   └── data_plane/         # 资产/连接/执行/质量/血缘服务
+│   │   ├── schemas/
 │   │   └── main.py
 │   └── .env
 │
 ├── frontend
 │   ├── src
-│   │   ├── views
-│   │   ├── components
-│   │   ├── router
-│   │   ├── stores
+│   │   ├── api/                    # API 客户端（asset/connection/quality/lineage）
+│   │   ├── components/             # 通用组件（asset/lineage/sql 等）
+│   │   ├── store/                  # Pinia 状态管理
+│   │   ├── types/                  # TypeScript 类型定义
+│   │   ├── views/
+│   │   │   ├── builder/            # 本体构建器（4 步流水线）
+│   │   │   ├── datasource/         # 数据集成（连接/资产/血缘/质量）
+│   │   │   ├── ontology/           # 本体浏览与编辑
+│   │   │   ├── governance/         # 治理（权限/审计/影响分析）
+│   │   │   └── workspace/          # 工作台与总览
+│   │   ├── router/
 │   │   └── main.ts
 │   └── package.json
 │
