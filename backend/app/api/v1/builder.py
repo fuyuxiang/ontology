@@ -299,6 +299,210 @@ async def builder_chat(
     )
 
 
+# ── AI 辅助：属性补全 ─────────────────────────────────────────────
+
+class SuggestAttrProperty(BaseModel):
+    name: str
+    displayName: str | None = None
+    type: str = "string"
+    required: bool = False
+
+
+class SuggestAttrRequest(BaseModel):
+    object_name: str
+    display_name: str | None = None
+    tier: int = 2
+    description: str | None = None
+    existing_properties: list[SuggestAttrProperty] = []
+
+
+_SUGGEST_ATTR_PROMPT = """你是本体建模专家。给定一个业务对象的基本信息和已有属性，请建议缺失的重要属性。
+
+## 输入
+- 对象名（英文 + 中文）
+- 对象层级（T1/T2/T3）
+- 已有属性列表
+
+## 输出格式
+严格返回 JSON 数组，每个元素：
+{"name":"snake_case英文名","displayName":"中文名","type":"string|number|date|boolean|enum","required":true|false,"description":"一句话说明"}
+
+## 要求
+- 只建议不在已有属性列表中的属性
+- 建议 3~8 个最核心的属性
+- 属性名用 snake_case，中文名用业务术语
+- required=true 只用于业务上必须有值的字段
+- 不要包含其他文字，只返回 JSON 数组
+"""
+
+
+@router.post("/suggest-attributes")
+async def suggest_attributes(body: SuggestAttrRequest):
+    """AI 补全属性：根据对象信息和已有属性，让 LLM 建议缺失属性。"""
+    existing_names = {p.name for p in body.existing_properties}
+    existing_desc = "\n".join(
+        f"  - {p.name} ({p.displayName or p.name}, {p.type}, {'必填' if p.required else '可选'})"
+        for p in body.existing_properties
+    ) or "  （暂无）"
+
+    user_msg = (
+        f"对象：{body.object_name}（{body.display_name or body.object_name}）\n"
+        f"层级：T{body.tier}\n"
+        f"描述：{body.description or '无'}\n\n"
+        f"已有属性：\n{existing_desc}"
+    )
+
+    client = get_llm_client()
+    try:
+        resp = client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=[
+                {"role": "system", "content": _SUGGEST_ATTR_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.1,
+            max_tokens=2000,
+            timeout=30,
+        )
+    except Exception as e:
+        logger.error("suggest-attributes LLM 调用失败: %s", e)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=502, content={"detail": f"LLM 调用失败: {e}"})
+
+    text = (resp.choices[0].message.content or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```\w*\n", "", text)
+        text = re.sub(r"\n```\s*$", "", text)
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("[")
+        end = text.rfind("]")
+        if start < 0 or end < 0:
+            return {"suggested_properties": []}
+        data = json.loads(text[start:end + 1])
+
+    if not isinstance(data, list):
+        data = []
+
+    # 过滤已有属性
+    suggested = [
+        item for item in data
+        if isinstance(item, dict) and item.get("name") and item["name"] not in existing_names
+    ]
+    return {"suggested_properties": suggested}
+
+
+# ── AI 辅助：关系推断 ─────────────────────────────────────────────
+
+class SuggestRelObject(BaseModel):
+    name: str
+    displayName: str | None = None
+    tier: int = 2
+    properties: list[str] = []
+
+
+class SuggestRelExisting(BaseModel):
+    source: str
+    target: str
+    name: str | None = None
+
+
+class SuggestRelRequest(BaseModel):
+    objects: list[SuggestRelObject]
+    existing_relations: list[SuggestRelExisting] = []
+
+
+_SUGGEST_REL_PROMPT = """你是本体建模专家。给定一组业务对象及其属性，请推断对象之间可能存在的关系。
+
+## 输入
+- 对象列表（含名称、层级、属性名）
+
+## 输出格式
+严格返回 JSON 数组，每个元素：
+{"name":"snake_case英文名","displayName":"中文名","source":"源对象英文名","target":"目标对象英文名","cardinality":"1:1|1:N|N:N","relationType":"ObjectProperty|SymmetricProperty|TransitiveProperty|FunctionalProperty","semanticType":"composition|event|inheritance|dependency|association","description":"一句话说明"}
+
+## 判断依据
+1. 两个对象有同名外键属性（如都有 customer_id）→ 关联关系
+2. 层级包含关系（T1 包含 T2）→ 组合关系
+3. 业务语义（预警、工单、事件）→ 事件关系
+4. 继承关系（子类型）→ 继承关系
+
+## 要求
+- source 和 target 必须是输入对象中的 name
+- 不要重复已有的关系
+- 最多建议 5 条最核心的关系
+- 不要包含其他文字，只返回 JSON 数组
+"""
+
+
+@router.post("/suggest-relations")
+async def suggest_relations(body: SuggestRelRequest):
+    """AI 推断关系：根据对象信息让 LLM 推断可能的关系。"""
+    if len(body.objects) < 2:
+        return {"suggested_relations": []}
+
+    existing_pairs = {(r.source, r.target) for r in body.existing_relations}
+
+    obj_desc = "\n".join(
+        f"  - {o.name}（{o.displayName or o.name}，T{o.tier}）属性：{', '.join(o.properties) or '无'}"
+        for o in body.objects
+    )
+    user_msg = f"对象列表：\n{obj_desc}"
+
+    client = get_llm_client()
+    try:
+        resp = client.chat.completions.create(
+            model=settings.LLM_MODEL,
+            messages=[
+                {"role": "system", "content": _SUGGEST_REL_PROMPT},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.1,
+            max_tokens=2000,
+            timeout=30,
+        )
+    except Exception as e:
+        logger.error("suggest-relations LLM 调用失败: %s", e)
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=502, content={"detail": f"LLM 调用失败: {e}"})
+
+    text = (resp.choices[0].message.content or "").strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```\w*\n", "", text)
+        text = re.sub(r"\n```\s*$", "", text)
+
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        start = text.find("[")
+        end = text.rfind("]")
+        if start < 0 or end < 0:
+            return {"suggested_relations": []}
+        data = json.loads(text[start:end + 1])
+
+    if not isinstance(data, list):
+        data = []
+
+    # 过滤已有关系 + 校验 source/target 存在
+    obj_names = {o.name for o in body.objects}
+    suggested = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        src, tgt = item.get("source"), item.get("target")
+        if not src or not tgt:
+            continue
+        if src not in obj_names or tgt not in obj_names:
+            continue
+        if (src, tgt) in existing_pairs or (tgt, src) in existing_pairs:
+            continue
+        suggested.append(item)
+
+    return {"suggested_relations": suggested}
+
+
 # ── 水合演练（hydrate）── 验证本体草稿与真实数据的映射 ──────────────
 
 @router.post("/hydrate")
