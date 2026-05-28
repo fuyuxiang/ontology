@@ -15,6 +15,10 @@
 
 </div>
 
+<div align="center">
+<img src="docs/images/hero_banner.png" alt="Yuanshu Ontology Platform" width="100%" />
+</div>
+
 ---
 
 ## Overview
@@ -81,6 +85,10 @@ The platform moves enterprise data from static table structures into a business 
 
 ## System Architecture
 
+<div align="center">
+<img src="docs/images/architecture.png" alt="Three-Layer Architecture" width="600" />
+</div>
+
 ```text
 ┌───────────────────────────────────────────────────────────────┐
 │                          Frontend                              │
@@ -106,6 +114,10 @@ The platform moves enterprise data from static table structures into a business 
 ## Feature Modules
 
 ### Ontology Center
+
+<div align="center">
+<img src="docs/images/ontology_graph.png" alt="Ontology Knowledge Graph" width="500" />
+</div>
 
 | Module | Route | Description |
 |--------|-------|-------------|
@@ -140,6 +152,10 @@ The platform moves enterprise data from static table structures into a business 
 4. **Strategy Output** — Primary key uniqueness, required field null-ratio checks
 
 ### Data Integration
+
+<div align="center">
+<img src="docs/images/data_integration.png" alt="Data Integration Pipeline" width="600" />
+</div>
 
 | Module | Route | Description |
 |--------|-------|-------------|
@@ -202,6 +218,10 @@ The platform moves enterprise data from static table structures into a business 
 ---
 
 ## AI Copilot
+
+<div align="center">
+<img src="docs/images/ai_agent.png" alt="AI Agent" width="400" />
+</div>
 
 Copilot is an intelligent assistant woven throughout the platform. It reads ontology context, data sources, entity relationships, rules, and execution results to assist with queries, analysis, and decision-making.
 
