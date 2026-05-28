@@ -15,6 +15,10 @@
 
 </div>
 
+<div align="center">
+<img src="docs/images/hero_banner.png" alt="元枢 Ontology 平台" width="100%" />
+</div>
+
 ---
 
 ## 概述
@@ -80,6 +84,10 @@
 
 ## 系统架构
 
+<div align="center">
+<img src="docs/images/architecture.png" alt="三层架构" width="600" />
+</div>
+
 ```text
 ┌───────────────────────────────────────────────────────────────┐
 │                          Frontend                              │
@@ -105,6 +113,10 @@
 ## 功能模块
 
 ### 本体中心
+
+<div align="center">
+<img src="docs/images/ontology_graph.png" alt="本体知识图谱" width="500" />
+</div>
 
 | 模块 | 路由 | 能力简述 |
 |------|------|----------|
@@ -138,6 +150,10 @@
 4. **策略输出** — 主键唯一性校验、必填字段空值率检查
 
 ### 数据集成
+
+<div align="center">
+<img src="docs/images/data_integration.png" alt="数据集成管线" width="600" />
+</div>
 
 | 模块 | 路由 | 能力简述 |
 |------|------|----------|
@@ -209,6 +225,10 @@
 ---
 
 ## AI Copilot
+
+<div align="center">
+<img src="docs/images/ai_agent.png" alt="AI Agent" width="400" />
+</div>
 
 Copilot 是贯穿平台的智能助手能力。它可以读取本体上下文、数据源摘要、实体关系、规则配置与运行结果，辅助用户完成对象查询、规则分析、流程解释与场景决策。
 
