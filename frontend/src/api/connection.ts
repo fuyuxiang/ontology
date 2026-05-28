@@ -1,9 +1,16 @@
 import { get, post, put, del } from './client'
-import type { Connection, ConnectionCreate, ConnectionUpdate, TestResult } from '../types/connection'
+import type {
+  Capabilities, Connection, ConnectionCreate, ConnectionUpdate,
+  ObjectEntry, PathEntry, TestResult,
+} from '../types/connection'
 import type { SchemaColumn } from '../types/asset'
 
-export function listConnections(params?: { type?: string; status?: string; q?: string }) {
+export function listConnections(params?: { type?: string; category?: string; status?: string; q?: string }) {
   return get<Connection[]>('/connections', { params })
+}
+
+export function getCapabilities() {
+  return get<Capabilities>('/connections/_capabilities')
 }
 
 export function getConnection(id: string) {
@@ -43,4 +50,16 @@ export function getConnectionTableSchema(id: string, tableName: string, database
     `/connections/${id}/tables/${encodeURIComponent(tableName)}/schema`,
     { params: database ? { database } : {} },
   )
+}
+
+export function listObjects(id: string, prefix = '', limit = 200) {
+  return get<ObjectEntry[]>(`/connections/${id}/objects`, { params: { prefix, limit } })
+}
+
+export function listPaths(id: string, path = '/', limit = 200) {
+  return get<PathEntry[]>(`/connections/${id}/paths`, { params: { path, limit } })
+}
+
+export function listTopics(id: string) {
+  return get<string[]>(`/connections/${id}/topics`)
 }

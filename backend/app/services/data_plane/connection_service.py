@@ -23,8 +23,11 @@ from typing import Any, Iterator
 
 from sqlalchemy.orm import Session
 
-from app.connectors import ConnectorRegistry
-from app.models.connection import Connection
+from app.connectors import ConnectorRegistry, DATABASE_TYPES
+from app.models.connection import (
+    Connection, CATEGORY_DATABASE, CATEGORY_OBJECT_STORAGE,
+    CATEGORY_FILE_TRANSFER, CATEGORY_MESSAGE_QUEUE, CATEGORY_API,
+)
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.connection_repo import ConnectionRepository
 from app.services.data_plane.credential_vault import get_vault
@@ -131,12 +134,14 @@ class ConnectionService:
         *,
         name: str,
         type: str,
-        host: str,
-        port: int,
+        category: str | None = None,
+        host: str = "",
+        port: int = 0,
         database: str = "",
-        username: str,
-        password: str,
+        username: str = "",
+        password: str = "",
         params: dict | None = None,
+        credential: dict | None = None,
         writable: bool = False,
         pool_size: int = 4,
         rate_limit_qps: int = 20,
@@ -145,10 +150,24 @@ class ConnectionService:
     ) -> Connection:
         if self.repo.find_by_name(name):
             raise ValueError(f"连接名称已存在: {name}")
-        ConnectorRegistry.get(type)  # 触发不支持类型抛错
-        ref = self.vault.store({"username": username, "password": password})
+        category = category or (CATEGORY_DATABASE if type in DATABASE_TYPES else None)
+        if not category:
+            raise ValueError(f"无法推断 category，请显式指定。type={type}")
+        ConnectorRegistry.get_by_category(category, type)  # 触发不支持类型抛错
+        # DB 类沿用 username/password 顶级参数；其他类用 credential dict
+        cred_payload: dict = {}
+        if category == CATEGORY_DATABASE:
+            cred_payload = {"username": username, "password": password}
+        else:
+            cred_payload = dict(credential or {})
+            if username:
+                cred_payload.setdefault("username", username)
+            if password:
+                cred_payload.setdefault("password", password)
+        ref = self.vault.store(cred_payload) if cred_payload else ""
         conn = Connection(
-            name=name, type=type, host=host, port=port, database=database,
+            name=name, category=category, type=type,
+            host=host or "", port=port or 0, database=database,
             params=params, credential_ref=ref, credential_type="local-fernet",
             writable=writable, pool_size=pool_size, rate_limit_qps=rate_limit_qps,
             description=description, status="active", enabled=True,
@@ -229,13 +248,19 @@ class ConnectionService:
     def test(self, conn_id: str) -> dict:
         conn = self._must_get(conn_id)
         started = time.time()
-        try:
-            with self.with_conn(conn_id):
-                ok = True
-                msg = "连接成功"
-        except Exception as e:
-            ok = False
-            msg = f"连接失败: {e}"
+        if conn.category == CATEGORY_DATABASE:
+            try:
+                with self.with_conn(conn_id):
+                    ok, msg = True, "连接成功"
+            except Exception as e:
+                ok, msg = False, f"连接失败: {e}"
+        else:
+            try:
+                connector = ConnectorRegistry.get_by_category(conn.category, conn.type)
+                cred = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+                ok, msg = connector.test(params=conn.params or {}, credential=cred)
+            except Exception as e:
+                ok, msg = False, f"连接失败: {e}"
         latency_ms = int((time.time() - started) * 1000)
         conn.last_test_at = datetime.utcnow()
         conn.last_test_ok = ok
@@ -246,8 +271,39 @@ class ConnectionService:
             self.bus.emit("connection.test.failed", {"connection_id": conn.id, "message": msg})
         return {"success": ok, "message": msg, "latency_ms": latency_ms}
 
+    # ── 浏览：按 category 分发 ─────────────────────────────
+    def list_objects(self, conn_id: str, *, prefix: str = "", limit: int = 200) -> list[dict]:
+        conn = self._must_get(conn_id)
+        if conn.category != CATEGORY_OBJECT_STORAGE:
+            raise ValueError(f"list_objects 仅适用对象存储，当前 category={conn.category}")
+        connector = ConnectorRegistry.get_by_category(conn.category, conn.type)
+        cred = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+        return connector.list_objects(params=conn.params or {}, credential=cred,
+                                      prefix=prefix, limit=limit)
+
+    def list_paths(self, conn_id: str, *, path: str = "/", limit: int = 200) -> list[dict]:
+        conn = self._must_get(conn_id)
+        if conn.category != CATEGORY_FILE_TRANSFER:
+            raise ValueError(f"list_paths 仅适用文件传输，当前 category={conn.category}")
+        connector = ConnectorRegistry.get_by_category(conn.category, conn.type)
+        cred = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+        params = dict(conn.params or {})
+        params.setdefault("host", conn.host)
+        params.setdefault("port", conn.port)
+        return connector.list_paths(params=params, credential=cred, path=path, limit=limit)
+
+    def list_topics(self, conn_id: str) -> list[str]:
+        conn = self._must_get(conn_id)
+        if conn.category != CATEGORY_MESSAGE_QUEUE:
+            raise ValueError(f"list_topics 仅适用消息队列，当前 category={conn.category}")
+        connector = ConnectorRegistry.get_by_category(conn.category, conn.type)
+        cred = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+        return connector.list_topics(params=conn.params or {}, credential=cred)
+
     def list_databases(self, conn_id: str) -> list[str]:
         conn = self._must_get(conn_id)
+        if conn.category != CATEGORY_DATABASE:
+            return [conn.database] if conn.database else []
         connector = ConnectorRegistry.get(conn.type)
         if not hasattr(connector, "list_databases"):
             return [conn.database] if conn.database else []
@@ -260,6 +316,8 @@ class ConnectionService:
 
     def list_tables(self, conn_id: str, database: str | None = None) -> list[str]:
         conn = self._must_get(conn_id)
+        if conn.category != CATEGORY_DATABASE:
+            raise ValueError(f"list_tables 仅适用数据库，当前 category={conn.category}")
         connector = ConnectorRegistry.get(conn.type)
         with self.with_conn(conn_id) as raw:
             return connector.list_tables(raw, database or conn.database)
@@ -275,9 +333,11 @@ class ConnectionService:
     def with_conn(self, conn_id: str) -> Iterator[Any]:
         """从池里借一条连接；用完自动归还（异常时关闭）。
 
-        ExecuteService 是这条 API 的唯一上层调用者。
+        仅 category=database 的连接走该路径；ExecuteService 是唯一上层调用者。
         """
         conn = self._must_get(conn_id)
+        if conn.category != CATEGORY_DATABASE:
+            raise RuntimeError(f"with_conn 仅适用数据库连接，当前 category={conn.category}")
         if not conn.enabled:
             raise RuntimeError(f"连接已禁用: {conn.name}")
         pool = _get_pool(conn.id, conn.pool_size)

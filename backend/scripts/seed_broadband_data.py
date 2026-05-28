@@ -1,9 +1,21 @@
 #!/usr/bin/env python3
 """
 宽带装机退单稽核 — MySQL 建库建表 + 1000条自洽模拟数据
-目标: 123.56.188.16:3306  user=bonc  password=bonc123  db=broadband_churn_audit
+
+数据库连接通过环境变量传入（无默认值，避免泄露内网地址 / 凭据）：
+  BB_DB_HOST     必填，MySQL 主机
+  BB_DB_PORT     可选，默认 3306
+  BB_DB_USER     必填，账号
+  BB_DB_PASSWORD 必填，密码
+  BB_DB_NAME     可选，目标库名，默认 mnp_risk_warning
+
+示例：
+  BB_DB_HOST=10.0.0.5 BB_DB_USER=bonc BB_DB_PASSWORD=*** \\
+    python -m backend.scripts.seed_broadband_data
 """
+import os
 import random
+import sys
 import uuid
 import hashlib
 import json
@@ -11,8 +23,27 @@ from datetime import datetime, timedelta
 
 import pymysql
 
-DB_CFG = dict(host="123.56.188.16", port=3306, user="bonc", password="bonc123")
-DB_NAME = "mnp_risk_warning"
+
+def _load_db_cfg() -> tuple[dict, str]:
+    host = os.getenv("BB_DB_HOST")
+    user = os.getenv("BB_DB_USER")
+    password = os.getenv("BB_DB_PASSWORD")
+    if not (host and user and password):
+        sys.stderr.write(
+            "ERROR: 必须通过环境变量提供 BB_DB_HOST / BB_DB_USER / BB_DB_PASSWORD\n"
+        )
+        sys.exit(2)
+    cfg = dict(
+        host=host,
+        port=int(os.getenv("BB_DB_PORT", "3306")),
+        user=user,
+        password=password,
+    )
+    db_name = os.getenv("BB_DB_NAME", "mnp_risk_warning")
+    return cfg, db_name
+
+
+DB_CFG, DB_NAME = _load_db_cfg()
 TABLE_PREFIX = "bb_"
 
 random.seed(42)

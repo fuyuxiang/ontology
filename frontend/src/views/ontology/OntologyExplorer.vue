@@ -8,11 +8,11 @@
           <h2 class="explorer__summary-title">对象概览</h2>
           <p class="explorer__summary-subtitle">左侧仅展示 Tier 1 到 Tier 3 的对象数量</p>
         </div>
-        <button class="explorer__add-btn" @click="router.push('/ontology/create')">
+        <button class="explorer__add-btn" @click="router.push('/builder')">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          新建本体对象
+          新建对象
         </button>
       </div>
 
@@ -271,7 +271,35 @@
             </template>
 
             <template v-else>
-              <div class="placeholder-tab">
+              <div class="placeholder-tab placeholder-tab--cta" v-if="activeTab === '数据绑定'">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                  <path d="M12 8h16a4 4 0 014 4v16a4 4 0 01-4 4H12a4 4 0 01-4-4V12a4 4 0 014-4z" stroke="var(--semantic-500, #3b82f6)" stroke-width="2"/>
+                  <path d="M14 20l4 4 8-8" stroke="var(--semantic-500, #3b82f6)" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <p class="text-h3" style="margin-top:8px">数据绑定</p>
+                <p class="text-caption" style="max-width:380px;text-align:center;line-height:1.7">
+                  AI 推荐数据资产 → 字段映射 → 落 ObjectBinding。
+                  打开数据绑定工作台为「{{ selected.nameCn }}」配置 backing datasets。
+                </p>
+                <button class="btn-primary" style="margin-top:12px" @click="openMapping">
+                  打开数据绑定工作台 →
+                </button>
+              </div>
+              <div class="placeholder-tab placeholder-tab--cta" v-else-if="activeTab === '版本'">
+                <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+                  <circle cx="20" cy="12" r="3" stroke="var(--semantic-500, #3b82f6)" stroke-width="2"/>
+                  <circle cx="20" cy="28" r="3" stroke="var(--semantic-500, #3b82f6)" stroke-width="2"/>
+                  <path d="M20 15v10M14 12h-2a4 4 0 00-4 4v8a4 4 0 004 4h2" stroke="var(--semantic-500, #3b82f6)" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <p class="text-h3" style="margin-top:8px">版本管理</p>
+                <p class="text-caption" style="max-width:380px;text-align:center;line-height:1.7">
+                  草稿 / 待审 / 已发布 / 历史快照；支持发布、对比、回滚。
+                </p>
+                <button class="btn-primary" style="margin-top:12px" @click="openPublish">
+                  打开版本管理 →
+                </button>
+              </div>
+              <div class="placeholder-tab" v-else>
                 <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
                   <rect x="8" y="8" width="24" height="24" rx="4" stroke="var(--neutral-300)" stroke-width="2"/>
                   <path d="M14 20h12M14 15h8M14 25h6" stroke="var(--neutral-300)" stroke-width="2" stroke-linecap="round"/>
@@ -332,7 +360,7 @@ const searchQuery = ref('')
 const activeTierFilter = ref<1 | 2 | 3 | null>(null)
 const selectedId = ref<string | null>(null)
 const activeTab = ref('属性')
-const tabs = ['属性', '关系', '规则', '动作', '血缘']
+const tabs = ['属性', '关系', '规则', '动作', '数据绑定', '版本', '血缘']
 
 const relForm = reactive({
   name: '',
@@ -500,6 +528,13 @@ const selectedActions = computed(() =>
 )
 
 const tierLabel = (t: number) => ({ 1: '核心对象', 2: '领域对象', 3: '场景对象' }[t] ?? '')
+
+function openMapping() {
+  router.push('/data/mapping')
+}
+function openPublish() {
+  router.push('/ontology/publish')
+}
 
 function selectEntity(entity: Entity) {
   selectedId.value = entity.id

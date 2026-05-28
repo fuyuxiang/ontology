@@ -4,9 +4,10 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.connectors import ConnectorRegistry
 from app.core.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
@@ -25,11 +26,18 @@ def _svc(db: Session) -> ConnectionService:
 @router.get("", response_model=list[ConnectionDetail])
 def list_connections(
     type: str | None = None,
+    category: str | None = None,
     status: str | None = None,
     q: str | None = None,
     db: Session = Depends(get_db),
 ):
-    return _svc(db).list(type=type, status=status, q=q)
+    return _svc(db).list(type=type, category=category, status=status, q=q)
+
+
+@router.get("/_capabilities")
+def list_capabilities():
+    """返回 {category: [type, ...]} —— 给前端动态渲染表单 / 类型选择。"""
+    return ConnectorRegistry.list_supported()
 
 
 @router.get("/{conn_id}", response_model=ConnectionDetail)
@@ -120,3 +128,44 @@ def get_table_schema(conn_id: str, table_name: str, database: str | None = None,
         raise HTTPException(404, str(e))
     except Exception as e:
         raise HTTPException(400, f"获取表结构失败: {e}")
+
+
+@router.get("/{conn_id}/objects")
+def list_objects(conn_id: str, prefix: str = "", limit: int = Query(200, ge=1, le=2000),
+                 db: Session = Depends(get_db)):
+    """对象存储 (S3/OSS/...) 列对象。"""
+    try:
+        return _svc(db).list_objects(conn_id, prefix=prefix, limit=limit)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"列对象失败: {e}")
+
+
+@router.get("/{conn_id}/paths")
+def list_paths(conn_id: str, path: str = "/", limit: int = Query(200, ge=1, le=2000),
+               db: Session = Depends(get_db)):
+    """文件传输 (FTP/SFTP/...) 列目录。"""
+    try:
+        return _svc(db).list_paths(conn_id, path=path, limit=limit)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"列目录失败: {e}")
+
+
+@router.get("/{conn_id}/topics", response_model=list[str])
+def list_topics(conn_id: str, db: Session = Depends(get_db)):
+    """消息队列 (Kafka/...) 列 topic。"""
+    try:
+        return _svc(db).list_topics(conn_id)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(400, f"列 topic 失败: {e}")

@@ -1,9 +1,10 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import * as api from '../api/asset'
+import type { AssetFilters } from '../api/asset'
 import type {
   Asset, AssetCreate, AssetUpdate, AssetWithUsage,
-  DocumentSourceType, AssetFilters,
+  DocumentSourceType,
 } from '../types/asset'
 
 export const useAssetStore = defineStore('asset', () => {
@@ -17,6 +18,8 @@ export const useAssetStore = defineStore('asset', () => {
     const tables = items.value.filter(a => a.kind === 'table').length
     const views = items.value.filter(a => a.kind === 'sql_view').length
     const documents = items.value.filter(a => a.kind === 'document').length
+    const structured = tables + views
+    const unstructured = documents
     const docByType: Record<DocumentSourceType, number> = {
       file: 0, oss: 0, directory: 0, api: 0, mq: 0,
     }
@@ -25,7 +28,7 @@ export const useAssetStore = defineStore('asset', () => {
         docByType[a.document_source_type] = (docByType[a.document_source_type] || 0) + 1
       }
     }
-    return { total, tables, views, documents, docByType }
+    return { total, tables, views, documents, structured, unstructured, docByType }
   })
 
   async function fetchList(params?: AssetFilters) {
