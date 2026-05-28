@@ -18,6 +18,38 @@
       >完成走测</button>
     </header>
 
+    <!-- 数据源绑定面板 -->
+    <div class="step2-binding-panel">
+      <div class="step2-binding-head" @click="bindingOpen = !bindingOpen">
+        <span>🔗 数据源绑定与自动映射</span>
+        <span class="step2-binding-toggle">{{ bindingOpen ? '收起' : '展开' }}</span>
+      </div>
+      <div v-if="bindingOpen" class="step2-binding-body">
+        <div class="step2-binding-row">
+          <label>选择数据源：</label>
+          <a-select
+            v-model:value="selectedAssetIds"
+            mode="multiple"
+            placeholder="选择要映射的数据资产"
+            :options="assetOptions"
+            :loading="assetLoading"
+            style="flex:1"
+            size="small"
+            @dropdown-visible-change="onAssetDropdownOpen"
+          />
+          <button class="step2-ai-btn" :disabled="autoMapping || !selectedAssetIds.length" @click="runAutoMap">
+            {{ autoMapping ? '映射中...' : '自动映射' }}
+          </button>
+        </div>
+        <div v-if="mapCoverage" class="step2-binding-stats">
+          <span class="step2-stat step2-stat--high">高置信：{{ mapCoverage.high }}</span>
+          <span class="step2-stat step2-stat--medium">中置信：{{ mapCoverage.medium }}</span>
+          <span class="step2-stat step2-stat--low">低置信：{{ mapCoverage.low }}</span>
+          <span class="step2-stat step2-stat--none">未匹配：{{ mapCoverage.none }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 顶部 LLM 建议区 -->
     <div v-if="hasHints" class="step2-hints">
       <div class="step2-hints-head">💡 LLM 建议（来自文档抽取/对话生成）</div>
@@ -34,7 +66,7 @@
             <span v-if="r.actionHint">动作提示：{{ r.actionHint }}</span>
           </div>
           <div class="step2-hint-actions">
-            <button class="btn-mini" @click="createFromHint(r, 'rule')">＋ 创建到 /logic/rules</button>
+            <button class="btn-mini" :disabled="hintCreating" @click="createFromHint(r, 'rule')">一键创建</button>
             <button class="btn-mini" @click="attachExisting(r, 'rule')">挂到已有规则</button>
             <button class="btn-mini btn-ghost" @click="ignoreHint(r.id, 'rule')">忽略</button>
           </div>
@@ -47,7 +79,7 @@
           </div>
           <div class="step2-hint-desc">{{ a.description }}</div>
           <div class="step2-hint-actions">
-            <button class="btn-mini" @click="createFromHint(a, 'action')">＋ 创建到 /logic/actions</button>
+            <button class="btn-mini" :disabled="hintCreating" @click="createFromHint(a, 'action')">一键创建</button>
             <button class="btn-mini" @click="attachExisting(a, 'action')">挂到已有动作</button>
             <button class="btn-mini btn-ghost" @click="ignoreHint(a.id, 'action')">忽略</button>
           </div>
@@ -210,6 +242,8 @@ import { computed, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import { useBuilderStore } from '../../../store/builder'
+import { ruleApi } from '../../../api/rules'
+import { actionApi } from '../../../api/actions'
 import type {
   BuilderSession,
   OntologyHints,
@@ -229,10 +263,19 @@ const objects = ref([...props.session.ontologyObjects])
 const relations = ref([...props.session.ontologyRelations])
 const aiSuggesting = ref(false)
 const aiRelSuggesting = ref(false)
+const hintCreating = ref(false)
 const hints = ref<OntologyHints>({
   suggested_rules: [...(props.session.hints?.suggested_rules || [])],
   suggested_actions: [...(props.session.hints?.suggested_actions || [])],
 })
+
+// ── 数据源绑定 ──
+const bindingOpen = ref(false)
+const selectedAssetIds = ref<string[]>([...(props.session.selectedAssetIds || [])])
+const assetOptions = ref<{ label: string; value: string }[]>([])
+const assetLoading = ref(false)
+const autoMapping = ref(false)
+const mapCoverage = ref<{ high: number; medium: number; low: number; none: number } | null>(null)
 
 const tierOptions = [
   { label: 'Tier 1 核心', value: 1 },
@@ -419,25 +462,47 @@ function ignoreHint(id: string, kind: 'rule' | 'action') {
   else hints.value.suggested_actions = hints.value.suggested_actions.filter(a => a.id !== id)
   syncStore()
 }
-function createFromHint(h: SuggestedRule | SuggestedAction, kind: 'rule' | 'action') {
-  // 把建议字段塞进 query，跳到 logic 页预填表单
+async function createFromHint(h: SuggestedRule | SuggestedAction, kind: 'rule' | 'action') {
   const objectId = h.targetObjectId || selected.value?.id || objects.value[0]?.id || ''
-  const path = kind === 'rule' ? '/logic/rules' : '/logic/actions'
-  router.push({
-    path,
-    query: {
-      from: 'builder',
-      session_id: props.session.sessionId,
-      object_id: objectId,
-      kind,
-      prefill_name: h.name,
-      prefill_desc: h.description,
-      prefill_condition: (h as SuggestedRule).conditionHint || '',
-      prefill_action: (h as SuggestedRule).actionHint || (h as SuggestedAction).effectHint || '',
-    },
-  })
-  // 同时把这条 hint 移除（避免重复创建）
-  ignoreHint(h.id, kind)
+  if (!objectId) { message.warning('没有可挂载的对象'); return }
+  hintCreating.value = true
+  try {
+    if (kind === 'rule') {
+      const rh = h as SuggestedRule
+      const created = await ruleApi.create({
+        entity_id: objectId,
+        name: rh.name,
+        condition_expr: rh.conditionHint || rh.description || '',
+        action_desc: rh.actionHint || '',
+        status: 'active',
+        priority: 'medium',
+      })
+      const obj = objects.value.find(o => o.id === objectId)
+      if (obj && created?.id) {
+        obj.rules = [...new Set([...obj.rules, created.id])]
+      }
+      message.success(`规则「${rh.name}」已创建`)
+    } else {
+      const ah = h as SuggestedAction
+      const created = await actionApi.create({
+        entity_id: objectId,
+        name: ah.name,
+        type: 'manual',
+        status: 'active',
+      })
+      const obj = objects.value.find(o => o.id === objectId)
+      if (obj && created?.id) {
+        obj.actions = [...new Set([...obj.actions, created.id])]
+      }
+      message.success(`动作「${ah.name}」已创建`)
+    }
+    ignoreHint(h.id, kind)
+    syncStore()
+  } catch (e: any) {
+    message.error('创建失败：' + (e.message || e))
+  } finally {
+    hintCreating.value = false
+  }
 }
 
 const attachModal = reactive<{ open: boolean; kind: 'rule' | 'action'; objectId: string; picked: string[]; hintId: string }>({
@@ -459,6 +524,83 @@ function confirmAttach() {
   attachModal.open = false
   syncStore()
   message.success('已挂载')
+}
+
+async function onAssetDropdownOpen(open: boolean) {
+  if (!open || assetOptions.value.length) return
+  assetLoading.value = true
+  try {
+    const resp = await fetch('/api/v1/assets?page=1&page_size=200')
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    const data = await resp.json()
+    const items = data.items || data || []
+    assetOptions.value = items.map((a: any) => ({
+      label: `${a.alias || a.name}（${a.kind || 'table'}）`,
+      value: a.id,
+    }))
+  } catch (e: any) {
+    message.error('加载数据源失败：' + (e.message || e))
+  } finally {
+    assetLoading.value = false
+  }
+}
+
+async function runAutoMap() {
+  if (!selectedAssetIds.value.length || autoMapping.value) return
+  autoMapping.value = true
+  mapCoverage.value = null
+  try {
+    const resp = await fetch('/api/v1/builder/auto-map', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        objects: objects.value.map(o => ({
+          id: o.id,
+          properties: o.properties.map(p => ({
+            name: p.name, type: p.type, description: p.description,
+          })),
+        })),
+        asset_ids: selectedAssetIds.value,
+      }),
+    })
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}))
+      throw new Error(err.detail || `HTTP ${resp.status}`)
+    }
+    const data = await resp.json()
+    const mappings = data.mappings || {}
+    let totalHigh = 0, totalMedium = 0, totalLow = 0, totalNone = 0
+
+    for (const obj of objects.value) {
+      const objMap = mappings[obj.id]
+      if (!objMap) { totalNone += obj.properties.length; continue }
+      // 回写 backing_asset_ids
+      if (!obj.backing_asset_ids?.length) {
+        obj.backing_asset_ids = [objMap.asset_id]
+      }
+      for (const prop of obj.properties) {
+        const pm = objMap.property_mappings?.[prop.name]
+        if (pm && pm.score > 0) {
+          prop.source_asset_id = pm.asset_id
+          prop.source_column = pm.column
+          if (pm.score >= 0.8) totalHigh++
+          else if (pm.score >= 0.5) totalMedium++
+          else totalLow++
+        } else {
+          totalNone++
+        }
+      }
+    }
+
+    mapCoverage.value = { high: totalHigh, medium: totalMedium, low: totalLow, none: totalNone }
+    syncStore()
+    const mapped = totalHigh + totalMedium + totalLow
+    message.success(`自动映射完成：${mapped} 个属性已匹配，${totalNone} 个未匹配`)
+  } catch (e: any) {
+    message.error('自动映射失败：' + (e.message || e))
+  } finally {
+    autoMapping.value = false
+  }
 }
 
 function finishReview() {
@@ -546,6 +688,33 @@ watch(() => props.session.ontologyObjects, (v) => {
 }
 .step2-ai-btn:hover { opacity: 0.85; }
 .step2-ai-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.step2-binding-panel {
+  margin: 8px 16px 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.step2-binding-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; cursor: pointer; font-size: 12px; font-weight: 600; color: #334155;
+}
+.step2-binding-head:hover { background: #f8fafc; }
+.step2-binding-toggle { font-size: 11px; color: #94a3b8; font-weight: 400; }
+.step2-binding-body { padding: 0 14px 12px; }
+.step2-binding-row {
+  display: flex; align-items: center; gap: 8px;
+}
+.step2-binding-row label { font-size: 11px; color: #64748b; white-space: nowrap; }
+.step2-binding-stats {
+  display: flex; gap: 12px; margin-top: 8px; font-size: 11px;
+}
+.step2-stat { padding: 2px 8px; border-radius: 4px; }
+.step2-stat--high { background: rgba(16,185,129,0.1); color: #059669; }
+.step2-stat--medium { background: rgba(245,158,11,0.1); color: #b45309; }
+.step2-stat--low { background: rgba(239,68,68,0.1); color: #dc2626; }
+.step2-stat--none { background: rgba(148,163,184,0.1); color: #64748b; }
 
 .step2-rel-row {
   display: grid; grid-template-columns: 1fr 14px 1fr 1.4fr 24px; gap: 6px;
