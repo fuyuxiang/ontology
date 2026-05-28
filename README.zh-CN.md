@@ -330,11 +330,11 @@ frontend/
 
 ## Star History
 
-<a href="https://star-history.com/#fuyuxiang/ontology&Date">
+<a href="https://star-history.com/#854875058/ontology-driven-platform&Date">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=fuyuxiang/ontology&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=fuyuxiang/ontology&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=fuyuxiang/ontology&type=Date" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=854875058/ontology-driven-platform&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=854875058/ontology-driven-platform&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=854875058/ontology-driven-platform&type=Date" />
  </picture>
 </a>
 
