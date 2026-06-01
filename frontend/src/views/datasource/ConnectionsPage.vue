@@ -62,9 +62,7 @@
               <template #icon><TableOutlined /></template>列表
             </a-button>
             <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-            <a-popconfirm :title="`确认删除「${record.name}」？资产被引用时会被拒绝。`" @confirm="del(record)">
-              <a-button type="link" size="small" danger>删除</a-button>
-            </a-popconfirm>
+            <a-button type="link" size="small" danger @click="openDelete(record)">删除</a-button>
           </a-space>
         </template>
       </template>
@@ -72,6 +70,24 @@
         <a-empty description="暂无数据源，点击「新增数据源」添加" />
       </template>
     </a-table>
+
+    <!-- 删除确认（按资产引用数提示，支持级联） -->
+    <a-modal :open="del_.open" title="删除数据源" :confirm-loading="del_.loading"
+             :ok-text="del_.cascade ? '级联删除' : '删除'" ok-type="danger" cancel-text="取消"
+             :ok-button-props="{ disabled: del_.assetCount > 0 && !del_.cascade }"
+             @ok="confirmDelete" @cancel="del_.open = false"
+             @update:open="(v) => del_.open = v" destroy-on-close>
+      <a-spin :spinning="del_.checking">
+        <p>确认删除数据源「<b>{{ del_.name }}</b>」？</p>
+        <template v-if="del_.assetCount > 0">
+          <p style="color:#ef4444">该数据源下有 <b>{{ del_.assetCount }}</b> 个资产。直接删除会被拒绝。</p>
+          <a-checkbox v-model:checked="del_.cascade">
+            同时删除这 {{ del_.assetCount }} 个资产（含对象绑定、质量规则等下游引用，<b>不可恢复</b>）
+          </a-checkbox>
+        </template>
+        <p v-else style="color:#6b7280">该数据源下没有资产，可直接删除。</p>
+      </a-spin>
+    </a-modal>
 
     <!-- 第一步：选大类（仅新建时显示） -->
     <a-modal :open="picker.open" title="选择数据源类型" width="720" :footer="null"
@@ -345,7 +361,7 @@ import {
   Button as AButton, Checkbox as ACheckbox, Col as ACol, Divider as ADivider, Drawer as ADrawer, Empty as AEmpty,
   Form as AForm, FormItem as AFormItem, Input as AInput, InputNumber as AInputNumber,
   InputPassword as AInputPassword, InputSearch as AInputSearch, List as AList,
-  ListItem as AListItem, Modal as AModal, Popconfirm as APopconfirm, Row as ARow,
+  ListItem as AListItem, Modal as AModal, Row as ARow,
   Segmented as ASegmented, Select as ASelect, Space as ASpace, Spin as ASpin,
   Statistic as AStatistic, Switch as ASwitch, Table as ATable, Tabs as ATabs,
   TabPane as ATabPane, Tag as ATag, Textarea as ATextarea, message,
@@ -359,6 +375,7 @@ import { useAssetStore } from '../../store/asset'
 import {
   getCapabilities, listObjects, listPaths, listTablesOfConnection, listTopics,
 } from '../../api/connection'
+import { listAssets } from '../../api/asset'
 import type {
   Capabilities, Connection, ConnectionCategory,
   ObjectEntry, PathEntry,
@@ -398,6 +415,10 @@ const saving = ref(false)
 
 const picker = reactive({ open: false })
 const modal = reactive({ open: false, editingId: '' as string })
+const del_ = reactive({
+  open: false, checking: false, loading: false, cascade: false,
+  id: '', name: '', assetCount: 0,
+})
 type FormShape = {
   name: string
   category: ConnectionCategory
@@ -615,11 +636,31 @@ async function testOne(record: Connection) {
   } finally { testing.value = null }
 }
 
-async function del(record: Connection) {
+async function openDelete(record: Connection) {
+  Object.assign(del_, {
+    open: true, checking: true, loading: false, cascade: false,
+    id: record.id, name: record.name, assetCount: 0,
+  })
   try {
-    await store.remove(record.id); message.success('已删除')
+    const assets = await listAssets({ connection_id: record.id, status: '' })
+    del_.assetCount = assets.length
+  } catch {
+    del_.assetCount = 0
+  } finally {
+    del_.checking = false
+  }
+}
+
+async function confirmDelete() {
+  del_.loading = true
+  try {
+    await store.remove(del_.id, del_.cascade)
+    message.success(del_.cascade ? `已删除数据源及 ${del_.assetCount} 个资产` : '已删除')
+    del_.open = false
   } catch (e: any) {
     message.error(e.response?.data?.detail || '删除失败')
+  } finally {
+    del_.loading = false
   }
 }
 

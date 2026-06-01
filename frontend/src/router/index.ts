@@ -35,7 +35,6 @@ const router = createRouter({
     // 新一代数据集成路由（M1）
     { path: '/data/connections', name: 'data-connections', component: () => import('../views/datasource/ConnectionsPage.vue'), meta: { title: '数据接入' } },
     { path: '/data/assets', name: 'data-assets', component: () => import('../views/datasource/AssetsPage.vue'), meta: { title: '资产目录' } },
-    { path: '/data/instances', name: 'data-instances', component: () => import('../views/datasource/pages/ObjectInstanceView.vue'), meta: { title: '对象实例浏览' } },
     { path: '/data/audit', name: 'data-audit', component: () => import('../views/datasource/ExecutionAuditPage.vue'), meta: { title: '执行审计' } },
 
     // 旧路由（M1 期间保留兼容；M3 起 mapping/hydration 已迁出）
