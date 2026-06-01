@@ -223,11 +223,17 @@ class ConnectionService:
             self.bus.emit("connection.updated.password", {"connection_id": conn.id})
         return conn
 
-    def delete(self, conn_id: str) -> None:
+    def delete(self, conn_id: str, *, cascade: bool = False) -> None:
         conn = self._must_get(conn_id)
-        in_use = self.asset_repo.count_by_connection(conn_id)
-        if in_use > 0:
-            raise ValueError(f"连接被 {in_use} 个资产引用，无法删除")
+        assets = self.asset_repo.list(connection_id=conn_id, status=None)
+        if assets and not cascade:
+            raise ValueError(f"连接被 {len(assets)} 个资产引用，无法删除")
+        if assets and cascade:
+            # 懒加载避免与 AssetService 循环引用；逐个级联删资产（含对象绑定/质量规则等）
+            from app.services.data_plane.asset_service import AssetService
+            asset_svc = AssetService(self.db)
+            for a in assets:
+                asset_svc.delete(a.id, cascade=True)
         if conn.credential_ref:
             try:
                 self.vault.delete(conn.credential_ref)
