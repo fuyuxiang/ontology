@@ -42,8 +42,8 @@ export const useConnectionStore = defineStore('connection', () => {
     return row
   }
 
-  async function remove(id: string) {
-    await api.deleteConnection(id)
+  async function remove(id: string, cascade = false) {
+    await api.deleteConnection(id, cascade)
     items.value = items.value.filter(c => c.id !== id)
   }
 

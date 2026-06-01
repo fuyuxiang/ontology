@@ -20,6 +20,9 @@ from sqlalchemy.orm import Session
 from app.models.asset import Asset
 from app.models.asset_usage import AssetUsage
 from app.models.business_document import BusinessDocument
+from app.models.execution_log import ExecutionLog
+from app.models.quality_metric import QualityMetric
+from app.models.quality_rule import HealthStatus, QualityRule
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.asset_usage_repo import AssetUsageRepository
 from app.repositories.connection_repo import ConnectionRepository
@@ -199,13 +202,55 @@ class AssetService:
         self.bus.emit("asset.deprecated", {"asset_id": asset.id, "reason": reason})
         return asset
 
-    def delete(self, asset_id: str) -> None:
+    def delete(self, asset_id: str, *, cascade: bool = False) -> None:
         asset = self._must_get(asset_id)
-        ref_count = self.usage.count_for_asset(asset_id)
-        if ref_count > 0:
-            raise ValueError(f"资产被 {ref_count} 处引用，无法删除")
+        if not cascade:
+            ref_count = self.usage.count_for_asset(asset_id)
+            if ref_count > 0:
+                raise ValueError(f"资产被 {ref_count} 处引用，无法删除")
+            self.repo.delete(asset)
+            self.repo.commit()
+            return
+        # 级联：连同对象绑定、质量规则/指标、引用台账一并强删
+        self._cascade_cleanup(asset)
         self.repo.delete(asset)
         self.repo.commit()
+        self.bus.emit("asset.deleted", {"asset_id": asset.id, "kind": asset.kind})
+
+    def _cascade_cleanup(self, asset: Asset) -> None:
+        """删除 Asset 前清理其全部下游依赖。
+
+        SQLite 默认不强制外键，模型上的 ondelete 不生效，故在应用层手动级联。
+        覆盖 6 张引用 assets.id 的表：
+        - object_bindings：复用 ObjectBindingService.delete（触发 binding.deleted
+          → 反写 EntityAttribute.source_* + 血缘弃用），保持兼容期逻辑一致
+        - asset_usage：清剩余反向引用台账（builder_session / rule / action 等）
+        - quality_rules + health_statuses：质量契约及其评估留痕
+        - quality_metrics：质量指标历史
+        - execution_logs：审计日志保留，仅置空 asset_id（等价 SET NULL）
+        另：document(oss/api/mq) 资产的 vault 凭据一并清理。
+        """
+        from app.services.data_plane.object_binding_service import ObjectBindingService
+
+        asset_id = asset.id
+        binding_svc = ObjectBindingService(self.db)
+        for b in self.bindings.list(asset_id=asset_id):
+            binding_svc.delete(b.id)
+        # 剩余反向引用台账（object_binding 已在上面随 binding 删除时清除）
+        self.db.query(AssetUsage).filter(AssetUsage.asset_id == asset_id).delete()
+        self.db.query(HealthStatus).filter(HealthStatus.asset_id == asset_id).delete()
+        self.db.query(QualityRule).filter(QualityRule.asset_id == asset_id).delete()
+        self.db.query(QualityMetric).filter(QualityMetric.asset_id == asset_id).delete()
+        self.db.query(ExecutionLog).filter(ExecutionLog.asset_id == asset_id).update(
+            {ExecutionLog.asset_id: None}
+        )
+        cred_ref = (asset.locator or {}).get("credential_ref")
+        if cred_ref:
+            try:
+                self.vault.delete(cred_ref)
+            except Exception:
+                logger.exception("vault delete failed for ref=%s", cred_ref)
+        self.db.flush()
 
     # ── 结构化资产元数据 ───────────────────────────────
     def sync_schema(self, asset_id: str) -> dict:

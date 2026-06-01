@@ -73,9 +73,9 @@ def update_connection(conn_id: str, body: ConnectionUpdate, db: Session = Depend
 
 
 @router.delete("/{conn_id}", status_code=204)
-def delete_connection(conn_id: str, db: Session = Depends(get_db)):
+def delete_connection(conn_id: str, cascade: bool = False, db: Session = Depends(get_db)):
     try:
-        _svc(db).delete(conn_id)
+        _svc(db).delete(conn_id, cascade=cascade)
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:
