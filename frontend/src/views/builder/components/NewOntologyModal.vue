@@ -143,7 +143,7 @@ watch(() => props.open, (v) => {
   form.ontologyName = ''
   form.buildMethod = props.defaultMethod || 'manual'
   nameError.value = ''
-})
+}, { immediate: true })
 
 const canNext = computed(() => {
   if (!methodFixed.value && step.value === 1) return !!form.buildMethod

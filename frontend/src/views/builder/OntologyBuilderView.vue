@@ -1,47 +1,49 @@
 <template>
-  <!-- 空状态欢迎页 -->
-  <EmptyWelcome
-    v-if="!sessions.length && !activeSession"
-    @open-method="openNewModal"
-  >
-    <template #modal>
-      <NewOntologyModal
-        v-if="newModalOpen"
-        :open="newModalOpen"
-        :default-method="defaultMethod"
-        @update:open="newModalOpen = $event"
-        @submit="onCreateSession"
-      />
-    </template>
-  </EmptyWelcome>
+  <div class="ob-builder-page">
+    <!-- 空状态欢迎页 -->
+    <EmptyWelcome
+      v-if="!sessions.length && !activeSession"
+      @open-method="openNewModal"
+    >
+      <template #modal>
+        <NewOntologyModal
+          v-if="newModalOpen"
+          :open="newModalOpen"
+          :default-method="defaultMethod"
+          @update:open="newModalOpen = $event"
+          @submit="onCreateSession"
+        />
+      </template>
+    </EmptyWelcome>
 
-  <!-- 最近构建表 -->
-  <RecentBuildTable
-    v-else-if="!activeSession"
-    :sessions="sessions"
-    @new="openNewModal()"
-    @resume="onResume"
-    @view="onView"
-    @delete="onDelete"
-  >
-    <template #modal>
-      <NewOntologyModal
-        v-if="newModalOpen"
-        :open="newModalOpen"
-        :default-method="defaultMethod"
-        @update:open="newModalOpen = $event"
-        @submit="onCreateSession"
-      />
-    </template>
-  </RecentBuildTable>
+    <!-- 最近构建表 -->
+    <RecentBuildTable
+      v-else-if="!activeSession"
+      :sessions="sessions"
+      @new="openNewModal()"
+      @resume="onResume"
+      @view="onView"
+      @delete="onDelete"
+    >
+      <template #modal>
+        <NewOntologyModal
+          v-if="newModalOpen"
+          :open="newModalOpen"
+          :default-method="defaultMethod"
+          @update:open="newModalOpen = $event"
+          @submit="onCreateSession"
+        />
+      </template>
+    </RecentBuildTable>
 
-  <!-- 构建流程外壳 -->
-  <BuilderShell
-    v-else
-    :session="activeSession"
-    @back="exitToList"
-    @goto-studio="gotoStudio"
-  />
+    <!-- 构建流程外壳 -->
+    <BuilderShell
+      v-else
+      :session="activeSession"
+      @back="exitToList"
+      @goto-studio="gotoStudio"
+    />
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -120,3 +122,11 @@ function captureBuilderReturn() {
 onMounted(captureBuilderReturn)
 watch(() => route.fullPath, captureBuilderReturn)
 </script>
+
+<style scoped>
+.ob-builder-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+</style>
