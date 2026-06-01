@@ -25,8 +25,8 @@ export function updateConnection(id: string, data: ConnectionUpdate) {
   return put<Connection>(`/connections/${id}`, data)
 }
 
-export function deleteConnection(id: string) {
-  return del<void>(`/connections/${id}`)
+export function deleteConnection(id: string, cascade = false) {
+  return del<void>(`/connections/${id}`, cascade ? { params: { cascade: true } } : undefined)
 }
 
 export function testConnection(id: string) {

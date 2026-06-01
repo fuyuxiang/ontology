@@ -104,7 +104,6 @@ const navGroups = [
   { label: '本体管理', items: [
     { path: '/browser', label: '本体目录', icon: ico.catalog, exact: true },
     { path: '/studio', label: '本体全景', icon: ico.graph },
-    { path: '/data/instances', label: '对象实例浏览', icon: ico.catalog },
   ]},
   { label: '数据集成', items: [
     { path: '/data/connections', label: '数据接入', icon: ico.datasource },
