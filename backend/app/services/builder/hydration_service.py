@@ -190,23 +190,41 @@ class HydrationService:
             obj_total = len(obj.properties)
             total_props += obj_total
 
-            # 收集 backing assets 的 schema
+            # 收集 backing assets 的 schema；为空时 fallback 到全局 req.asset_ids
+            effective_asset_ids = obj.backing_asset_ids if obj.backing_asset_ids else req.asset_ids
             all_columns: list[dict] = []
-            for aid in obj.backing_asset_ids:
+            for aid in effective_asset_ids:
                 asset = asset_cache.get(aid) or self.asset_svc.get(aid)
-                if asset and asset.schema_snapshot:
-                    for col in asset.schema_snapshot:
-                        col_copy = dict(col)
-                        col_copy["_asset_id"] = aid
-                        all_columns.append(col_copy)
+                if asset:
+                    if not asset_cache.get(aid):
+                        asset_cache[aid] = asset
+                    if asset.schema_snapshot:
+                        for col in asset.schema_snapshot:
+                            col_copy = dict(col)
+                            col_copy["_asset_id"] = aid
+                            all_columns.append(col_copy)
 
             for prop in obj.properties:
                 # 优先检查 source_asset_id + source_column 是否真实存在
                 if prop.source_asset_id and prop.source_column:
+                    # 先从已收集的列中查找
                     found = any(
                         c.get("name") == prop.source_column and c.get("_asset_id") == prop.source_asset_id
                         for c in all_columns
                     )
+                    # 如果不在 all_columns 中，尝试直接加载该资产验证
+                    if not found:
+                        src_asset = asset_cache.get(prop.source_asset_id) or self.asset_svc.get(prop.source_asset_id)
+                        if src_asset and src_asset.schema_snapshot:
+                            asset_cache[prop.source_asset_id] = src_asset
+                            found = any(
+                                c.get("name") == prop.source_column for c in src_asset.schema_snapshot
+                            )
+                            if found:
+                                for col in src_asset.schema_snapshot:
+                                    col_copy = dict(col)
+                                    col_copy["_asset_id"] = prop.source_asset_id
+                                    all_columns.append(col_copy)
                     if found:
                         obj_matched += 1
                         yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
@@ -288,8 +306,12 @@ class HydrationService:
         matched_relations = 0
         total_relations = len(req.relations)
 
-        # 构建对象名 -> 对象映射
-        obj_map = {o.name: o for o in req.objects}
+        # 构建对象查找映射（支持 name 和 displayName 作为 key，兼容前端可能传 id 的情况）
+        obj_map: dict[str, HydrateObject] = {}
+        for idx, o in enumerate(req.objects):
+            obj_map[o.name] = o
+            if o.displayName and o.displayName not in obj_map:
+                obj_map[o.displayName] = o
 
         for rel in req.relations:
             src_obj = obj_map.get(rel.source)
@@ -301,9 +323,9 @@ class HydrationService:
                 match_status = "warn"
                 continue
 
-            # 检查两端都有 backing assets
-            src_assets = src_obj.backing_asset_ids
-            tgt_assets = tgt_obj.backing_asset_ids
+            # 检查两端都有 backing assets（为空时 fallback 到全局资产）
+            src_assets = src_obj.backing_asset_ids if src_obj.backing_asset_ids else req.asset_ids
+            tgt_assets = tgt_obj.backing_asset_ids if tgt_obj.backing_asset_ids else req.asset_ids
 
             if not src_assets or not tgt_assets:
                 yield {"type": "phase_log", "phase": "match", "level": "WARN",
