@@ -33,7 +33,7 @@ def match_domain(business_desc: str) -> dict:
     domains = dwd_catalog.get_domains()
     domain_list = "\n".join(f"- {d}" for d in domains)
 
-    prompt = f"""你是数据中台领域专家。根据用户的业务描述，从以下一级主题域中选择最相关的1-2个：
+    prompt = f"""你是数据中台领域专家。根据用户的业务描述，从以下一级主题域中选择最相关的1-3个：
 
 可选主题域：
 {domain_list}
@@ -58,6 +58,47 @@ def match_domain(business_desc: str) -> dict:
         result = {"domains": domains[:2] if len(domains) >= 2 else domains, "reason": "解析失败，返回默认"}
     result["all_domains"] = domains
     return result
+
+
+def recommend_tables(business_desc: str, tables: list[dict]) -> list[str]:
+    """根据业务描述和表的 schema 信息，用 LLM 推荐相关的数据表"""
+    if not tables:
+        return []
+
+    table_summaries = []
+    for t in tables[:50]:
+        schema = dwd_catalog.get_table_schema(t["table_name"])
+        fields_preview = ", ".join(f["field_name"] + "(" + (f["field_desc"] or "") + ")" for f in schema[:10])
+        table_summaries.append(f"- {t['table_name']}: {t['table_desc'] or '无描述'} | 字段: {fields_preview}")
+
+    tables_text = "\n".join(table_summaries)
+    table_names = [t["table_name"] for t in tables[:50]]
+
+    prompt = f"""你是数据中台领域专家。根据用户的业务描述，从以下候选数据表中选出与该业务最相关的表。
+
+业务描述：{business_desc}
+
+候选数据表（表名: 描述 | 主要字段）：
+{tables_text}
+
+请选出与业务场景最相关的表，返回 JSON 格式（不要返回其他内容）：
+{{"recommended": ["表名1", "表名2", ...], "reason": "选择理由"}}"""
+
+    client = _get_llm_client()
+    resp = client.chat.completions.create(
+        model=settings.LLM_MODEL,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.2,
+    )
+    content = resp.choices[0].message.content or "{}"
+    content = _extract_json(content)
+    try:
+        result = json.loads(content)
+        recommended = [t for t in result.get("recommended", []) if t in table_names]
+        return recommended
+    except json.JSONDecodeError:
+        logger.warning("recommend_tables JSON 解析失败: %s", resp.choices[0].message.content)
+        return []
 
 
 def extract_ontology_stream(

@@ -13,14 +13,14 @@
       <div class="step-input__domains">
         <div v-for="d in result.all_domains" :key="d"
              class="step-input__domain-card"
-             :class="{ 'step-input__domain-card--selected': selectedDomain === d, 'step-input__domain-card--recommended': result.domains.includes(d) }"
-             @click="selectedDomain = d">
+             :class="{ 'step-input__domain-card--selected': selectedDomains.includes(d), 'step-input__domain-card--recommended': result.domains.includes(d) }"
+             @click="toggleDomain(d)">
           <span v-if="result.domains.includes(d)" class="step-input__badge">推荐</span>
           {{ d }}
         </div>
       </div>
-      <button class="step-input__btn step-input__btn--next" :disabled="!selectedDomain" @click="emit('next', { domain: selectedDomain, businessDesc: desc })">
-        下一步：选择数据表 →
+      <button class="step-input__btn step-input__btn--next" :disabled="!selectedDomains.length" @click="emit('next', { domains: selectedDomains, businessDesc: desc })">
+        已选 {{ selectedDomains.length }} 个主题域 → 下一步：选择数据表
       </button>
     </div>
   </div>
@@ -31,12 +31,21 @@ import { ref } from 'vue'
 import { matchDomain } from '../../../../api/aiBuilderV2'
 import type { DomainMatchResult } from '../../../../api/aiBuilderV2'
 
-const emit = defineEmits<{ (e: 'next', payload: { domain: string; businessDesc: string }): void }>()
+const emit = defineEmits<{ (e: 'next', payload: { domains: string[]; businessDesc: string }): void }>()
 
 const desc = ref('')
 const loading = ref(false)
 const result = ref<DomainMatchResult | null>(null)
-const selectedDomain = ref('')
+const selectedDomains = ref<string[]>([])
+
+function toggleDomain(d: string) {
+  const idx = selectedDomains.value.indexOf(d)
+  if (idx >= 0) {
+    selectedDomains.value.splice(idx, 1)
+  } else {
+    selectedDomains.value.push(d)
+  }
+}
 
 async function analyze() {
   if (!desc.value.trim()) return
@@ -44,7 +53,7 @@ async function analyze() {
   try {
     const resp = await matchDomain(desc.value)
     result.value = resp.data
-    if (resp.data.domains.length) selectedDomain.value = resp.data.domains[0]
+    if (resp.data.domains.length) selectedDomains.value = [...resp.data.domains]
   } catch (e) {
     console.error(e)
   } finally {

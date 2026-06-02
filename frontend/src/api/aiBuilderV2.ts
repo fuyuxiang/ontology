@@ -56,6 +56,20 @@ export function matchDomain(businessDesc: string) {
   return client.post<DomainMatchResult>('/ai-builder/match-domain', { business_desc: businessDesc })
 }
 
+export interface RecommendTablesResult {
+  tables: TableInfo[]
+  recommended: string[]
+}
+
+export function recommendTables(businessDesc: string, domains: string[], subDomains?: string[], themes?: string[]) {
+  return client.post<RecommendTablesResult>('/ai-builder/recommend-tables', {
+    business_desc: businessDesc,
+    domains,
+    sub_domains: subDomains || [],
+    themes: themes || [],
+  })
+}
+
 export function getDocuments(prefix?: string) {
   return client.get<{ documents: DocInfo[] }>('/ai-builder/documents', { params: { prefix: prefix || '' } })
 }

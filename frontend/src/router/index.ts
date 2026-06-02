@@ -18,9 +18,10 @@ const router = createRouter({
     { path: '/data/quality', name: 'data-quality', component: () => import('../views/datasource/pages/DataQualityPage.vue'), meta: { title: '数据质量' } },
 
     // 本体中心 — 本体构建
-    { path: '/builder', name: 'ontology-builder', component: () => import('../views/builder/OntologyBuilderView.vue'), meta: { title: '工具构建' } },
+    { path: '/builder', name: 'ontology-builder', component: () => import('../views/builder/OntologyBuilderView.vue'), meta: { title: '手动构建' } },
     { path: '/builder/template', name: 'ontology-builder-template', component: () => import('../views/builder/TemplateBuilderView.vue'), meta: { title: '模板构建' } },
-    { path: '/builder/ai', name: 'ontology-builder-ai', component: () => import('../views/builder/AiBuilderView.vue'), meta: { title: 'AI辅助构建' } },
+    { path: '/builder/doc', name: 'ontology-builder-doc', component: () => import('../views/builder/DocBuilderView.vue'), meta: { title: '文档构建' } },
+    { path: '/builder/ai', name: 'ontology-builder-ai', component: () => import('../views/builder/AiBuilderView.vue'), meta: { title: '资产构建' } },
 
     // 本体中心 — 本体管理
     {
@@ -55,7 +56,7 @@ const router = createRouter({
     { path: '/agent/manage', name: 'agent-manage', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: '智能体管理' } },
     { path: '/agent/manage/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
     { path: '/agent/toolbox', name: 'agent-toolbox', component: () => import('../views/agents/AgentToolboxView.vue'), meta: { title: '技能管理' } },
-    { path: '/agent/orchestration', name: 'agent-orchestration', component: () => import('../views/agents/TaskOrchestrationView.vue'), meta: { title: '任务编排' } },
+    { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '场景模版库' } },
 
     // 场景中心
     { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景中心' } },
@@ -78,7 +79,7 @@ const router = createRouter({
     { path: '/data/catalog', redirect: '/data/assets' },
     { path: '/data/hydration', redirect: '/ontology/publish' },
     { path: '/service/agent', redirect: '/agent/manage' },
-    { path: '/service/workflow', redirect: '/agent/orchestration' },
+    { path: '/service/workflow', redirect: '/harness' },
     { path: '/settings/monitor', redirect: '/ops/monitor' },
     { path: '/settings/general', redirect: '/ops/config' },
     { path: '/governance/permissions', redirect: '/ops/permissions' },

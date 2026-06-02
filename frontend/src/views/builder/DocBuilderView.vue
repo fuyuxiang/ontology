@@ -1,6 +1,5 @@
 <template>
   <div class="ai-builder">
-    <!-- Step indicator -->
     <div class="ai-builder__steps">
       <div v-for="(s, i) in steps" :key="i" class="ai-builder__step" :class="{ 'ai-builder__step--active': step === i, 'ai-builder__step--done': step > i }">
         <div class="ai-builder__step-num">{{ step > i ? '✓' : i + 1 }}</div>
@@ -8,71 +7,45 @@
       </div>
     </div>
 
-    <!-- Step content -->
     <div class="ai-builder__content">
-      <StepBusinessInput v-if="step === 0" @next="onDomainSelected" />
-      <StepDomainDrill v-else-if="step === 1" :domains="selectedDomains" :business-desc="businessDesc" @next="onTablesSelected" />
-      <StepDocumentPicker v-else-if="step === 2" :business-desc="businessDesc" @next="onDocsSelected" />
-      <StepExtraction v-else-if="step === 3" :table-names="selectedTables" :document-keys="selectedDocs" :business-desc="businessDesc" @next="onExtractionDone" />
-      <div v-else-if="step === 4" class="ai-builder__review">
-        <Step2Review :session="session!" @prev="step = 3" @next="step = 5" />
-      </div>
-      <div v-else-if="step === 5" class="ai-builder__hydrate">
-        <Step3Hydrate :session="session!" @prev="step = 4" @goto-studio="gotoStudio" />
-      </div>
+      <StepDocUpload v-if="step === 0" @next="onUploadDone" />
+      <StepDocChat v-else-if="step === 1" :session-id="sessionId" :business-desc="businessDesc" @next="onChatDone" />
+      <StepDocReview v-else-if="step === 2" :result="extractionResult!" @prev="step = 1" @confirm="onConfirm" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { storeToRefs } from 'pinia'
 import { useBuilderStore } from '../../store/builder'
-import StepBusinessInput from './components/ai/StepBusinessInput.vue'
-import StepDomainDrill from './components/ai/StepDomainDrill.vue'
-import StepDocumentPicker from './components/ai/StepDocumentPicker.vue'
-import StepExtraction from './components/ai/StepExtraction.vue'
-import Step2Review from './components/Step2Review.vue'
-import Step3Hydrate from './components/Step3Hydrate.vue'
+import StepDocUpload from './components/doc/StepDocUpload.vue'
+import StepDocChat from './components/doc/StepDocChat.vue'
+import StepDocReview from './components/doc/StepDocReview.vue'
 
 const router = useRouter()
 const store = useBuilderStore()
-const { sessions, activeSession } = storeToRefs(store)
 
-const steps = ['业务描述', '选择数据表', '选择文档', 'AI提取', '专家审核', '水合验证']
+const steps = ['需求与文档', 'AI对话抽取', '确认入库']
 const step = ref(0)
+const sessionId = ref('')
 const businessDesc = ref('')
-const selectedDomains = ref<string[]>([])
-const selectedTables = ref<string[]>([])
-const selectedDocs = ref<string[]>([])
+const extractionResult = ref<any>(null)
 
-const session = computed(() => {
-  if (activeSession.value && activeSession.value.buildMethod === 'chat') return activeSession.value
-  return sessions.value.find(s => s.buildMethod === 'chat' && s.status === 'drafting') || null
-})
-
-function onDomainSelected(payload: { domains: string[]; businessDesc: string }) {
-  selectedDomains.value = payload.domains
+function onUploadDone(payload: { sessionId: string; businessDesc: string }) {
+  sessionId.value = payload.sessionId
   businessDesc.value = payload.businessDesc
   step.value = 1
 }
 
-function onTablesSelected(tables: string[]) {
-  selectedTables.value = tables
+function onChatDone(ontology: any) {
+  extractionResult.value = ontology
   step.value = 2
 }
 
-function onDocsSelected(keys: string[]) {
-  selectedDocs.value = keys
-  step.value = 3
-}
-
-function onExtractionDone(result: any) {
-  if (!session.value) {
-    store.createSession({ ontologyName: `AI构建-${Date.now().toString(36).slice(-4)}`, buildMethod: 'chat' })
-  }
-  const objects = result.entities.map((e: any, i: number) => ({
+function onConfirm(ontology: any) {
+  store.createSession({ ontologyName: `文档构建-${Date.now().toString(36).slice(-4)}`, buildMethod: 'chat' })
+  const objects = ontology.entities.map((e: any, i: number) => ({
     id: `obj-${Date.now().toString(36)}-${i}`,
     name: e.name,
     displayName: e.displayName,
@@ -94,7 +67,7 @@ function onExtractionDone(result: any) {
     actions: [],
     approved: false,
   }))
-  const relations = result.relations.map((r: any, i: number) => ({
+  const relations = ontology.relations.map((r: any, i: number) => ({
     id: `rel-${Date.now().toString(36)}-${i}`,
     name: r.name,
     displayName: r.displayName,
@@ -106,20 +79,8 @@ function onExtractionDone(result: any) {
     semanticType: 'association' as const,
   }))
   store.patchActive({ ontologyObjects: objects, ontologyRelations: relations })
-  step.value = 4
-}
-
-function gotoStudio() {
   router.push('/studio')
 }
-
-onMounted(() => {
-  if (!session.value) {
-    store.createSession({ ontologyName: `AI构建-${Date.now().toString(36).slice(-4)}`, buildMethod: 'chat' })
-  } else {
-    store.setActiveSession(session.value.sessionId)
-  }
-})
 </script>
 
 <style scoped>
@@ -132,5 +93,4 @@ onMounted(() => {
 .ai-builder__step--active .ai-builder__step-num { background: #4a6fa5; color: #fff; border-color: #4a6fa5; }
 .ai-builder__step--done .ai-builder__step-num { background: #2e7d32; color: #fff; border-color: #2e7d32; }
 .ai-builder__content { flex: 1; overflow-y: auto; }
-.ai-builder__review, .ai-builder__hydrate { height: 100%; }
 </style>

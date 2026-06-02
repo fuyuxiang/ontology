@@ -44,6 +44,24 @@ def match_domain(req: MatchDomainRequest):
     return ai_builder_v2.match_domain(req.business_desc)
 
 
+class RecommendTablesRequest(BaseModel):
+    business_desc: str
+    domains: list[str]
+    sub_domains: list[str] = []
+    themes: list[str] = []
+
+
+@router.post("/recommend-tables")
+def recommend_tables(req: RecommendTablesRequest):
+    tables = dwd_catalog.get_tables_by_domains(
+        req.domains,
+        req.sub_domains if req.sub_domains else None,
+        req.themes if req.themes else None,
+    )
+    recommended = ai_builder_v2.recommend_tables(req.business_desc, tables)
+    return {"tables": tables, "recommended": recommended}
+
+
 @router.get("/documents")
 def list_documents(prefix: str = ""):
     return {"documents": minio_docs.list_documents(prefix)}
