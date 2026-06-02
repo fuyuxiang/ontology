@@ -18,8 +18,8 @@
       >完成走测</button>
     </header>
 
-    <!-- 数据源绑定面板 -->
-    <div class="step2-binding-panel">
+    <!-- 数据源绑定面板（仅手工建模/文档抽取路径显示） -->
+    <div class="step2-binding-panel" v-if="props.session.buildMethod !== 'chat'">
       <div class="step2-binding-head" @click="bindingOpen = !bindingOpen">
         <span>🔗 数据源绑定与自动映射</span>
         <span class="step2-binding-toggle">{{ bindingOpen ? '收起' : '展开' }}</span>
@@ -184,9 +184,6 @@
             :disabled="!canApprove(selected)"
             @click="approveSelected"
           >{{ selected.approved ? '✓ 已通过' : '确认通过' }}</button>
-          <div v-if="!canApprove(selected)" class="step2-approve-hint">
-            通过条件：至少 1 个必填属性作为主键候选
-          </div>
         </div>
 
         <div class="step2-editor-card step2-relation-card">
@@ -312,13 +309,12 @@ function syncStore() {
   })
 }
 
-function canApprove(o: typeof objects.value[0]) {
-  return o.properties.some(p => p.required)
+function canApprove(_o: typeof objects.value[0]) {
+  return true
 }
 
 function approveSelected() {
   if (!selected.value) return
-  if (!canApprove(selected.value)) { message.warning('至少 1 个必填属性'); return }
   selected.value.approved = true
   syncStore()
   const next = objects.value.find(c => !c.approved)
@@ -326,9 +322,6 @@ function approveSelected() {
 }
 
 function approveAll() {
-  for (const o of objects.value) {
-    if (!canApprove(o)) { message.warning(`对象 ${o.displayName} 缺少必填属性，无法通过`); return }
-  }
   objects.value = objects.value.map(c => ({ ...c, approved: true }))
   syncStore()
   message.success('已一键通过全部对象')
@@ -736,4 +729,7 @@ watch(() => props.session.ontologyObjects, (v) => {
 .step2-form-row label { font-size: 11px; color: #64748b; }
 .step2-form-row select { padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
 .step2-modal-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+.step2-right { overflow-y: auto; }
+.step2-editor-props { max-height: 360px; overflow-y: auto; }
 </style>
