@@ -10,28 +10,6 @@
       <a-statistic title="资产总数" :value="store.stats.total" />
       <a-statistic title="结构化" :value="store.stats.structured" :value-style="{ color: '#3b82f6' }" />
       <a-statistic title="非结构化" :value="store.stats.unstructured" :value-style="{ color: '#f59e0b' }" />
-      <span class="ap-spacer" />
-      <a-dropdown>
-        <a-button type="primary">
-          <template #icon><PlusOutlined /></template>
-          新建资产 <DownOutlined />
-        </a-button>
-        <template #overlay>
-          <a-menu>
-            <a-menu-item-group title="结构化">
-              <a-menu-item @click="openCreate('table')">表 / SQL 视图</a-menu-item>
-            </a-menu-item-group>
-            <a-menu-divider />
-            <a-menu-item-group title="非结构化">
-              <a-menu-item @click="openDoc('file')">上传文件</a-menu-item>
-              <a-menu-item @click="openDoc('oss')">对象存储 OSS</a-menu-item>
-              <a-menu-item @click="openDoc('directory')">目录扫描</a-menu-item>
-              <a-menu-item @click="openDoc('api')">HTTP API</a-menu-item>
-              <a-menu-item @click="openDoc('mq')">MQ topic</a-menu-item>
-            </a-menu-item-group>
-          </a-menu>
-        </template>
-      </a-dropdown>
     </div>
 
     <!-- 二级 tab：结构化 / 非结构化 -->
@@ -201,7 +179,6 @@ import {
   TabPane as ATabPane, Tabs as ATabs, Table as ATable, Tag as ATag,
   Typography, message,
 } from 'ant-design-vue'
-import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
 import { useAssetStore } from '../../store/asset'
 import { useConnectionStore } from '../../store/connection'
 import type { Asset, AssetKind, DocumentSourceType } from '../../types/asset'

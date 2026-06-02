@@ -3,16 +3,6 @@
     <div class="topbar__left">
       <OntologyBreadcrumb :items="breadcrumbs" />
     </div>
-    <div class="topbar__center">
-      <div class="topbar__search" @click="$emit('search')">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-          <circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <span class="topbar__search-text">搜索实体、关系、规则...</span>
-        <kbd class="topbar__search-kbd">⌘K</kbd>
-      </div>
-    </div>
     <div class="topbar__right">
       <button class="topbar__icon-btn" title="我的待办" @click="router.push('/todo')">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -39,7 +29,6 @@ import { useAuthStore } from '../../store/auth'
 import OntologyBreadcrumb from './OntologyBreadcrumb.vue'
 import SettingsDialog from './SettingsDialog.vue'
 
-defineEmits(['search'])
 
 const route = useRoute()
 const router = useRouter()
@@ -69,34 +58,6 @@ const breadcrumbs = computed(() => {
   gap: 16px;
 }
 .topbar__left { display: flex; align-items: center; flex-shrink: 0; }
-.topbar__center { flex: 1; display: flex; justify-content: center; max-width: 480px; margin: 0 auto; }
-.topbar__search {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 8px 14px;
-  border-radius: 10px;
-  background: var(--neutral-50);
-  border: 1px solid var(--neutral-200);
-  color: var(--neutral-500);
-  cursor: pointer;
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-.topbar__search:hover {
-  border-color: var(--neutral-300);
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-}
-.topbar__search-text { font-size: 13px; flex: 1; }
-.topbar__search-kbd {
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--neutral-100);
-  border: 1px solid var(--neutral-200);
-  color: var(--neutral-500);
-  font-family: var(--font-sans);
-}
 .topbar__right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .topbar__icon-btn {
   position: relative;
