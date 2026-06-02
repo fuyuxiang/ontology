@@ -1,9 +1,6 @@
 import type {
   ScenarioCard,
-  SampleDataSource,
   PublishGate,
-  ConsumerTarget,
-  MonitoringBaseline,
   UploadRecord,
   DataAsset,
   OntologyObjectDraft,
@@ -81,71 +78,12 @@ export const HYDRATION_PHASES = [
   { key: 'strategy' as const, label: '策略输出', color: '#10b981' },
 ]
 
-// ── 退单场景样例数据源 ──
-export const SAMPLE_DATA_SOURCES: SampleDataSource[] = [
-  { id: 'ds-install-order', fileName: '20260404-样例数据.xlsx / 装移机装维工单数据(日)', rows: 10, columns: 55, system: 'CBSS', targetClass: 'InstallOrder' },
-  { id: 'ds-dispatch', fileName: '20260404-样例数据.xlsx / 修障装维工单数据(日)', rows: 10, columns: 42, system: 'CBSS', targetClass: 'DispatchRecord' },
-  { id: 'ds-callback', fileName: '20260404-样例数据.xlsx / 语音转文本采集表(日)', rows: 12, columns: 19, system: '中台', targetClass: 'CallbackCall' },
-  { id: 'ds-pending-addr', fileName: '20260404-样例数据.xlsx / 待装订单信息表(日)', rows: 10, columns: 39, system: 'CBSS', targetClass: 'PendingAddress' },
-  { id: 'ds-resource-order', fileName: '20260404-样例数据.xlsx / 固网装机资源订单表(日)', rows: 15, columns: 35, system: 'CBSS', targetClass: 'Address' },
-  { id: 'ds-appoint-order', fileName: '20260404-样例数据.xlsx / 固网装机预约订单表(日)', rows: 20, columns: 20, system: 'CBSS', targetClass: 'DispatchRecord' },
-  { id: 'ds-complaint', fileName: '20260404-样例数据.xlsx / 投诉工单场景(日)', rows: 20, columns: 96, system: 'CBSS', targetClass: 'InstallChurn' },
-  { id: 'ds-vip-list', fileName: '20260404-样例数据.xlsx / CBSS高星级长高用户清单(月)', rows: 40, columns: 19, system: 'CBSS', targetClass: 'Customer' },
-  { id: 'ds-install-detail', fileName: '20260404-样例数据.xlsx / 装移机装维宽表明细(日)', rows: 30, columns: 70, system: 'CBSS', targetClass: 'InstallOrder' },
-  { id: 'ds-bss-main', fileName: '20260404-样例数据.xlsx / Bss业务台账主表(日)', rows: 30, columns: 85, system: 'BSS' },
-  { id: 'ds-cbss-history', fileName: '20260404-样例数据.xlsx / CBSS业务台账主表历史(日)', rows: 30, columns: 85, system: 'CBSS' },
-  { id: 'ds-product', fileName: '20260404-样例数据.xlsx / CBSS产品发布表(月)', rows: 30, columns: 18, system: 'CBSS', targetClass: 'Product' },
-  { id: 'ds-arrear', fileName: '20260404-样例数据.xlsx / cBss用户欠费信息表(日)', rows: 25, columns: 22, system: 'CBSS' },
-  { id: 'ds-agent', fileName: '20260404-样例数据.xlsx / 人工坐席接触记录信息(日)', rows: 22, columns: 28, system: '中台' },
-  { id: 'ds-channel', fileName: '20260404-样例数据.xlsx / 渠道合作方信息表(日)', rows: 18, columns: 16, system: 'CBSS' },
-  { id: 'ds-callback-tx', fileName: '20260404-样例数据.xlsx / 回访外呼转写明细(日)', rows: 24, columns: 18, system: '中台' },
-  { id: 'ds-audit-result', fileName: '20260404-样例数据.xlsx / 退单稽核结果明细(日)', rows: 18, columns: 24, system: '稽核中心' },
-  { id: 'ds-retain-result', fileName: '20260404-样例数据.xlsx / 退单挽留执行结果(日)', rows: 18, columns: 22, system: '运营平台' },
-  { id: 'ds-iron-army', fileName: '20260404-样例数据.xlsx / [网格]八大铁军有效人员明细数据(日)', rows: 16, columns: 25, system: 'OA' },
-  { id: 'ds-appoint-change', fileName: '20260404-样例数据.xlsx / 预约变更记录(日)', rows: 16, columns: 18, system: 'CBSS' },
-  { id: 'ds-addr-audit', fileName: '20260404-样例数据.xlsx / 地址资源核查结果(日)', rows: 18, columns: 20, system: 'CBSS' },
-]
-
 // ── 发布门禁（默认值） ──
 export const DEFAULT_PUBLISH_GATES: PublishGate[] = [
   { key: 'structure', label: '本体结构完整', desc: '本体 0 个', pass: false },
-  { key: 'walkthrough', label: '走测全部通过', desc: '通过节点 0 / 0', pass: false },
-  { key: 'drill', label: '演练验证', desc: '实体 0 · 关系 0', pass: false },
-  { key: 'hydration_report', label: '水合验证报告已归档', desc: '快照 v0.1', pass: false },
-  { key: 'expert_sign', label: '双专家签字记录可追溯', desc: '审批人 + 走测人', pass: false },
-  { key: 'version_consistency', label: '版本号一致', desc: '本体结构 / 本体引擎 / 集市统一为 v0.1', pass: false },
-  { key: 'rollback_ready', label: '回滚方案已准备', desc: '回滚目标：v0.0', pass: false },
+  { key: 'drill', label: '水合演练通过', desc: '未演练', pass: false },
+  { key: 'version_ready', label: '版本就绪', desc: '版本号自动生成', pass: true },
 ]
-
-// ── 消费方对接 ──
-export const CONSUMER_TARGETS: ConsumerTarget[] = [
-  { name: 'AIP 场景平台', usage: '消费本体对象，编排工作流执行', status: '⬜ 待对接' },
-  { name: 'AI 助手', usage: '本体查询 + 推理解释（SPARQL接口）', status: '⬜ 待对接' },
-  { name: 'Agent Harness', usage: 'A/B 测试 + 反馈闭环', status: '⬜ 待对接' },
-  { name: '其他省分', usage: '从本体集市订购，多租户隔离', status: '⬜ 待开放' },
-]
-
-// ── 监控基线（按场景） ──
-export const MONITORING_BASELINES: Record<string, MonitoringBaseline[]> = {
-  'refund-root-cause': [
-    { label: '归因准确率', value: '94.6%', target: '目标 90% · 日级监控', level: 'success' },
-    { label: '高置信归因占比', value: '78.2%', target: '目标 75% · 日级监控', level: 'success' },
-    { label: '回访覆盖率', value: '85.4%', target: '目标 80% · 实时监控', level: 'info' },
-    { label: '根因解释覆盖率', value: '88.1%', target: '阈值 < 85% 告警', level: 'warning' },
-  ],
-  'enterprise-qa': [
-    { label: '问数命中率', value: '92.3%', target: '目标 90% · 日级监控', level: 'success' },
-    { label: '字段映射准确率', value: '98.6%', target: '目标 95% · 日级监控', level: 'success' },
-    { label: '推理成功率', value: '95.4%', target: '阈值 < 90% 告警', level: 'warning' },
-    { label: '查询 P99 延迟', value: '480ms', target: '阈值 > 1s 告警', level: 'info' },
-  ],
-  'fttr-renewal': [
-    { label: '续约转化率', value: '12.6%', target: '目标 10% · 日级监控', level: 'success' },
-    { label: '触达成功率', value: '82.4%', target: '目标 80% · 日级监控', level: 'success' },
-    { label: 'ARPU 提升幅度', value: '+18.2%', target: '基线 + 15%', level: 'info' },
-    { label: '续约成功数', value: '2,840 户', target: '日级监控', level: 'info' },
-  ],
-}
 
 // ── 演示上传记录（builder-upload-records） ──
 export const DEMO_UPLOAD_RECORDS: UploadRecord[] = [
