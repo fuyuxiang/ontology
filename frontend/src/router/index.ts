@@ -39,9 +39,9 @@ const router = createRouter({
     // 本体中心 — 图谱探索
     { path: '/studio', name: 'studio', component: () => import('../views/studio/OntologyStudio.vue'), meta: { title: '图谱探索' } },
 
-    // 本体中心 — 发布与版本管理
-    { path: '/ontology/publish', name: 'ontology-publish', component: () => import('../views/ontology/OntologyPublishView.vue'), meta: { title: '本体发布与版本管理' } },
-    { path: '/ontology/version', name: 'ontology-version', component: () => import('../views/ontology/OntologyVersionView.vue'), meta: { title: '版本管理' } },
+    // 本体中心 — 本体发布
+    { path: '/ontology/publish', name: 'ontology-publish', component: () => import('../views/ontology/OntologyPublishView.vue'), meta: { title: '本体发布' } },
+    { path: '/ontology/version', redirect: '/ontology/publish' },
 
     // 本体中心 — 本体服务
     { path: '/service/api', name: 'service-api', component: () => import('../views/service/ApiServiceView.vue'), meta: { title: '本体服务' } },
@@ -54,7 +54,7 @@ const router = createRouter({
     // 智能体应用中心
     { path: '/agent/manage', name: 'agent-manage', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: '智能体管理' } },
     { path: '/agent/manage/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
-    { path: '/agent/toolbox', name: 'agent-toolbox', component: () => import('../views/agents/AgentToolboxView.vue'), meta: { title: '技能与工具箱' } },
+    { path: '/agent/toolbox', name: 'agent-toolbox', component: () => import('../views/agents/AgentToolboxView.vue'), meta: { title: '技能管理' } },
     { path: '/agent/orchestration', name: 'agent-orchestration', component: () => import('../views/agents/TaskOrchestrationView.vue'), meta: { title: '任务编排' } },
 
     // 场景中心
@@ -65,7 +65,7 @@ const router = createRouter({
     { path: '/scene/broadband/:id', name: 'scene-broadband-detail', component: () => import('../views/scene/BroadbandDetail.vue'), meta: { title: '退单详情' } },
 
     // 运维与安全中心
-    { path: '/ops/monitor', name: 'ops-monitor', component: () => import('../views/settings/MonitorView.vue'), meta: { title: '系统监控与告警' } },
+    { path: '/ops/monitor', name: 'ops-monitor', component: () => import('../views/settings/MonitorView.vue'), meta: { title: '运维监控' } },
     { path: '/ops/log-audit', name: 'ops-log-audit', component: () => import('../views/ops/LogAuditView.vue'), meta: { title: '日志与审计' } },
     { path: '/ops/permissions', name: 'ops-permissions', component: () => import('../views/governance/PermissionsView.vue'), meta: { title: '权限管理' } },
     { path: '/ops/config', name: 'ops-config', component: () => import('../views/settings/SystemConfigView.vue'), meta: { title: '系统配置' } },
