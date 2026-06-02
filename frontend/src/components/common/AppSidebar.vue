@@ -99,49 +99,44 @@ const ico = {
 const navGroups = [
   { label: '工作台', items: [
     { path: '/workspace/business', label: '业务总览', icon: ico.dashboard },
-    { path: '/dashboard', label: '平台总览', icon: ico.dashboard, exact: true },
-  ]},
-  { label: '本体管理', items: [
-    { path: '/browser', label: '本体目录', icon: ico.catalog, exact: true },
-    { path: '/studio', label: '本体全景', icon: ico.graph },
+    { path: '/dashboard', label: '系统看版', icon: ico.tracking, exact: true },
   ]},
   { label: '数据集成', items: [
     { path: '/data/connections', label: '数据接入', icon: ico.datasource },
     { path: '/data/assets', label: '资产目录', icon: ico.catalog },
+    { path: '/data/pipeline', label: '数据管道', icon: ico.workflow },
     { path: '/data/lineage', label: '数据血缘', icon: ico.graph },
     { path: '/data/quality', label: '数据质量', icon: ico.quality },
   ]},
-  { label: '规则与行动', items: [
-    { path: '/logic/rules', label: '规则管理', icon: ico.rules },
-    { path: '/logic/actions', label: '行动管理', icon: ico.workflow },
-    { path: '/logic/functions', label: '函数管理', icon: ico.sdk },
+  { label: '本体中心', items: [
+    { path: '/builder', label: '本体构建', icon: ico.model, children: [
+      { path: '/builder', label: '工具构建', exact: true },
+      { path: '/builder/template', label: '模板构建' },
+      { path: '/builder/ai', label: 'AI辅助构建' },
+    ]},
+    { path: '/browser', label: '本体管理', icon: ico.catalog, children: [
+      { path: '/browser', label: '对象与关系管理', exact: true },
+      { path: '/data/mapping', label: '映射管理' },
+      { path: '/logic/rules', label: '规则与函数管理' },
+      { path: '/logic/actions', label: '行动管理' },
+    ]},
+    { path: '/studio', label: '图谱探索', icon: ico.graph },
+    { path: '/ontology/publish', label: '发布与版本管理', icon: ico.version },
+    { path: '/service/api', label: '本体服务', icon: ico.api },
   ]},
-  { label: '本体服务', items: [
-    { path: '/service/api', label: '服务定义', icon: ico.api },
-    { path: '/service/osdk', label: 'API 与 OSDK', icon: ico.sdk },
-    { path: '/service/monitor', label: '调用监控', icon: ico.tracking },
+  { label: '智能体应用中心', items: [
+    { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
+    { path: '/agent/toolbox', label: '技能与工具箱', icon: ico.tool },
+    { path: '/agent/orchestration', label: '任务编排', icon: ico.workflow },
   ]},
-  { label: '智能体平台', items: [
-    { path: '/service/agent', label: 'Agent 管理', icon: ico.agent },
-    { path: '/logic/skills', label: 'Skills 管理', icon: ico.tool },
-    { path: '/service/workflow', label: '流程编排', icon: ico.workflow },
-    { path: '/ops/traces', label: '运行链路', icon: ico.tracking },
+  { label: '场景中心', items: [
+    { path: '/scene/broadband', label: '宽带退单稽核', icon: ico.scene },
   ]},
-  { label: '应用中心', items: [
-    { path: '/scene', label: '场景列表', icon: ico.scene, exact: true },
-    { path: '/aip', label: '场景模板库', icon: ico.workflow },
-  ]},
-  { label: '治理', items: [
-    { path: '/governance/permissions', label: '权限管理', icon: ico.audit },
-    { path: '/governance/audit', label: '操作审计', icon: ico.audit },
-    { path: '/governance/impact', label: '影响分析', icon: ico.graph },
-  ]},
-  { label: '设置', items: [
-    { path: '/settings/models', label: '模型配置', icon: ico.model },
-    { path: '/harness', label: '试车场', icon: ico.sandbox },
-    { path: '/settings/monitor', label: '系统监控', icon: ico.tracking },
-    { path: '/settings/tenants', label: '租户管理', icon: ico.settings },
-    { path: '/settings/general', label: '系统配置', icon: ico.settings },
+  { label: '运维与安全中心', items: [
+    { path: '/ops/monitor', label: '系统监控与告警', icon: ico.tracking },
+    { path: '/ops/log-audit', label: '日志与审计', icon: ico.audit },
+    { path: '/ops/permissions', label: '权限管理', icon: ico.settings },
+    { path: '/ops/config', label: '系统配置', icon: ico.settings },
   ]},
 ]
 </script>
