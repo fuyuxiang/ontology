@@ -1,132 +1,61 @@
 <template>
-  <div class="ob-builder-page">
-    <!-- 空状态欢迎页 -->
-    <EmptyWelcome
-      v-if="!sessions.length && !activeSession"
-      @open-method="openNewModal"
-    >
-      <template #modal>
-        <NewOntologyModal
-          v-if="newModalOpen"
-          :open="newModalOpen"
-          :default-method="defaultMethod"
-          @update:open="newModalOpen = $event"
-          @submit="onCreateSession"
-        />
-      </template>
-    </EmptyWelcome>
-
-    <!-- 最近构建表 -->
-    <RecentBuildTable
-      v-else-if="!activeSession"
-      :sessions="sessions"
-      @new="openNewModal()"
-      @resume="onResume"
-      @view="onView"
-      @delete="onDelete"
-    >
-      <template #modal>
-        <NewOntologyModal
-          v-if="newModalOpen"
-          :open="newModalOpen"
-          :default-method="defaultMethod"
-          @update:open="newModalOpen = $event"
-          @submit="onCreateSession"
-        />
-      </template>
-    </RecentBuildTable>
-
-    <!-- 构建流程外壳 -->
-    <BuilderShell
-      v-else
-      :session="activeSession"
-      @back="exitToList"
-      @goto-studio="gotoStudio"
-    />
+  <div class="builder-page">
+    <div class="builder-page__toolbar">
+      <span class="builder-page__toolbar-label">工具选择</span>
+      <select class="builder-page__select" v-model="editorMode">
+        <option value="protege">Protégé</option>
+        <option value="webowl">WebOWL</option>
+        <option value="vocbench">VocBench</option>
+      </select>
+    </div>
+    <ProtegeEditor v-if="editorMode === 'protege'" />
+    <WebVowlEditor v-else-if="editorMode === 'webowl'" />
+    <VocBenchEditor v-else />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
-import { storeToRefs } from 'pinia'
-import { useBuilderStore } from '../../store/builder'
-import type { BuildMethod, BuilderSession } from '../../types/builder'
+import { ref } from 'vue'
+import ProtegeEditor from './components/protege/ProtegeEditor.vue'
+import WebVowlEditor from './components/WebVowlEditor.vue'
+import VocBenchEditor from './components/VocBenchEditor.vue'
 
-import EmptyWelcome from './components/EmptyWelcome.vue'
-import RecentBuildTable from './components/RecentBuildTable.vue'
-import NewOntologyModal from './components/NewOntologyModal.vue'
-import BuilderShell from './components/BuilderShell.vue'
-
-const router = useRouter()
-const route = useRoute()
-const store = useBuilderStore()
-const { sessions, activeSession } = storeToRefs(store)
-
-const newModalOpen = ref(false)
-const defaultMethod = ref<BuildMethod | undefined>(undefined)
-
-function openNewModal(method?: BuildMethod) {
-  defaultMethod.value = method
-  newModalOpen.value = true
-}
-
-function onCreateSession(payload: {
-  ontologyName: string
-  buildMethod: BuildMethod
-}) {
-  store.createSession(payload)
-  newModalOpen.value = false
-}
-
-function onResume(s: BuilderSession) {
-  store.setActiveSession(s.sessionId)
-}
-function onView(s: BuilderSession) {
-  if (s.status === 'published') router.push('/studio')
-  else onResume(s)
-}
-function onDelete(s: BuilderSession) {
-  store.deleteSession(s.sessionId)
-}
-function exitToList() {
-  store.setActiveSession(null)
-}
-function gotoStudio() {
-  router.push('/studio')
-}
-
-// /logic/* 回流：?session_id=&attach_to=&new_id=&kind=rule|action|function
-function captureBuilderReturn() {
-  const q = route.query
-  const sid = (q.session_id || '') as string
-  const attachTo = (q.attach_to || '') as string
-  const newId = (q.new_id || '') as string
-  const kind = (q.kind || '') as 'rule' | 'action' | 'function' | ''
-  if (!sid || !attachTo || !newId || !kind) return
-  store.setActiveSession(sid)
-  const session = store.activeSession
-  if (!session) return
-  const objects = session.ontologyObjects.map(o => {
-    if (o.id !== attachTo) return o
-    if (kind === 'rule')      return { ...o, rules: [...new Set([...o.rules, newId])] }
-    if (kind === 'action')    return { ...o, actions: [...new Set([...o.actions, newId])] }
-    if (kind === 'function')  return { ...o, derivedProperties: [...new Set([...o.derivedProperties, newId])] }
-    return o
-  })
-  store.patchActive({ ontologyObjects: objects })
-  // 清掉 query
-  router.replace({ path: route.path })
-}
-
-onMounted(captureBuilderReturn)
-watch(() => route.fullPath, captureBuilderReturn)
+const editorMode = ref<'protege' | 'webowl' | 'vocbench'>('protege')
 </script>
 
 <style scoped>
-.ob-builder-page {
-  height: 100%;
+.builder-page { height: 100%; display: flex; flex-direction: column; }
+.builder-page__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #d8d8d8;
+  flex-shrink: 0;
+}
+.builder-page__toolbar-label {
+  font-size: 12px;
+  color: #555;
+}
+.builder-page__select {
+  font-size: 12px;
+  padding: 3px 8px;
+  border: 1px solid #c0c0c0;
+  border-radius: 3px;
+  background: #fff;
+  cursor: pointer;
+}
+.builder-page__placeholder {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #666;
 }
+.builder-page__placeholder-icon { font-size: 48px; }
+.builder-page__placeholder-title { font-size: 18px; font-weight: 600; color: #333; }
+.builder-page__placeholder-sub { font-size: 13px; color: #999; }
 </style>
