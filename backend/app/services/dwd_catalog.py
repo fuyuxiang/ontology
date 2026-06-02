@@ -1,7 +1,7 @@
 """DWD 数据目录查询服务 — 查询 dwd_table_list / dwd_table_details"""
 from __future__ import annotations
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, bindparam
 from app.config import settings
 
 _engine = None
@@ -55,3 +55,23 @@ def get_table_schema(table_name: str) -> list[dict]:
              "is_partition": r[4], "field_handle": r[5], "field_source_desc": r[6]}
             for r in rows
         ]
+
+
+def get_tables_by_domains(domain1_list: list[str], domain2_list: list[str] | None = None, domain3_list: list[str] | None = None) -> list[dict]:
+    """根据多个主题域组合查询表列表"""
+    with _get_engine().connect() as conn:
+        sql = "SELECT table_name, table_desc, layering, cycle FROM dwd_table_list WHERE theme_domain_1 IN :d1s"
+        params: dict = {"d1s": domain1_list}
+        expanding = [bindparam("d1s", expanding=True)]
+        if domain2_list:
+            sql += " AND theme_domain_2 IN :d2s"
+            params["d2s"] = domain2_list
+            expanding.append(bindparam("d2s", expanding=True))
+        if domain3_list:
+            sql += " AND theme_domain_3 IN :d3s"
+            params["d3s"] = domain3_list
+            expanding.append(bindparam("d3s", expanding=True))
+        sql += " ORDER BY serial_number"
+        stmt = text(sql).bindparams(*expanding)
+        rows = conn.execute(stmt, params)
+        return [{"table_name": r[0], "table_desc": r[1], "layering": r[2], "cycle": r[3]} for r in rows]

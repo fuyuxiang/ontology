@@ -6,10 +6,6 @@ from app.repositories.action_repo import ActionRepository
 from app.repositories.function_repo import FunctionRepository
 from app.repositories.datasource_repo import DataSourceRepository
 from app.repositories.dashboard_repo import DashboardRepository
-from app.repositories.workflow_repo import (
-    WorkflowRepository,
-    WorkflowExecutionRepository,
-)
 from app.repositories.scene_repo import (
     AipSceneRepository,
     AipSceneVersionRepository,
@@ -35,8 +31,6 @@ __all__ = [
     "FunctionRepository",
     "DataSourceRepository",
     "DashboardRepository",
-    "WorkflowRepository",
-    "WorkflowExecutionRepository",
     "AipSceneRepository",
     "AipSceneVersionRepository",
     "AipSceneExecutionRepository",
