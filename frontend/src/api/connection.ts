@@ -17,6 +17,10 @@ export function getConnection(id: string) {
   return get<Connection>(`/connections/${id}`)
 }
 
+export function getCredentialMask(id: string) {
+  return get<Record<string, string>>(`/connections/${id}/credential-mask`)
+}
+
 export function createConnection(data: ConnectionCreate) {
   return post<Connection>('/connections', data)
 }

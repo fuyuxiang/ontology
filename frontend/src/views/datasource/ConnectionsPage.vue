@@ -160,7 +160,7 @@
             <span class="cp-hint">非 AWS 兼容服务（MinIO 等）通常需要打开</span>
           </a-form-item>
           <a-row :gutter="12">
-            <a-col :span="12"><a-form-item label="Access Key *">
+            <a-col :span="12"><a-form-item :label="modal.editingId ? 'Access Key（留空不改）' : 'Access Key *'">
               <a-input v-model:value="credStr.access_key" /></a-form-item></a-col>
             <a-col :span="12"><a-form-item :label="modal.editingId ? 'Secret Key（留空不改）' : 'Secret Key *'">
               <a-input-password v-model:value="credStr.secret_key" /></a-form-item></a-col>
@@ -373,7 +373,7 @@ import {
 import { useConnectionStore } from '../../store/connection'
 import { useAssetStore } from '../../store/asset'
 import {
-  getCapabilities, listObjects, listPaths, listTablesOfConnection, listTopics,
+  getCapabilities, getCredentialMask, listObjects, listPaths, listTablesOfConnection, listTopics,
 } from '../../api/connection'
 import { listAssets } from '../../api/asset'
 import type {
@@ -564,6 +564,12 @@ function openEdit(record: Connection) {
     else if (typeof v === 'number') paramNum[k] = v
     else paramStr[k] = String(v ?? '')
   }
+  // 回填遮罩凭据，让用户知道当前已配了什么
+  getCredentialMask(record.id).then(mask => {
+    for (const [k, v] of Object.entries(mask)) {
+      credStr[k] = v
+    }
+  }).catch(() => {})
   modal.open = true
 }
 
@@ -577,7 +583,9 @@ function buildParams(): Record<string, unknown> {
 
 function buildCredential(): Record<string, unknown> | null {
   const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(credStr)) if (v !== '' && v !== undefined) out[k] = v
+  for (const [k, v] of Object.entries(credStr)) {
+    if (v !== '' && v !== undefined && !v.includes('••••')) out[k] = v
+  }
   return Object.keys(out).length ? out : null
 }
 
