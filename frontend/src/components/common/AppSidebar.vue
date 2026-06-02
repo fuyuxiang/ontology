@@ -110,9 +110,10 @@ const navGroups = [
   ]},
   { label: '本体中心', items: [
     { path: '/builder', label: '本体构建', icon: ico.model, children: [
-      { path: '/builder', label: '工具构建', exact: true },
+      { path: '/builder', label: '手动构建', exact: true },
       { path: '/builder/template', label: '模板构建' },
-      { path: '/builder/ai', label: 'AI辅助构建' },
+      { path: '/builder/doc', label: '文档构建' },
+      { path: '/builder/ai', label: '资产构建' },
     ]},
     { path: '/browser', label: '本体管理', icon: ico.catalog, children: [
       { path: '/browser', label: '对象与关系管理', exact: true },
@@ -127,7 +128,7 @@ const navGroups = [
   { label: '智能体应用中心', items: [
     { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
     { path: '/agent/toolbox', label: '技能管理', icon: ico.tool },
-    { path: '/agent/orchestration', label: '任务编排', icon: ico.workflow },
+    { path: '/harness', label: '场景模版库', icon: ico.workflow },
   ]},
   { label: '场景中心', items: [
     { path: '/scene/broadband', label: '宽带退单稽核', icon: ico.scene },
