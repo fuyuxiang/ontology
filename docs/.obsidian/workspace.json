@@ -1,0 +1,211 @@
+{
+  "main": {
+    "id": "03460296ea1d4deb",
+    "type": "split",
+    "children": [
+      {
+        "id": "d9a5a288871e1f0a",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "aa0be6f2e00b62e2",
+            "type": "leaf",
+            "state": {
+              "type": "empty",
+              "state": {},
+              "icon": "lucide-file",
+              "title": "新标签页"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "d4f88f0864782c8c",
+    "type": "split",
+    "children": [
+      {
+        "id": "8d599bed350c1dc7",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "14da8bfde6162baa",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "文件列表"
+            }
+          },
+          {
+            "id": "c971d6cbda8f5fef",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "搜索"
+            }
+          },
+          {
+            "id": "11c3db0dfbeb2185",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "书签"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "0ffb90d32bdc7442",
+    "type": "split",
+    "children": [
+      {
+        "id": "431a4390c8f75ba1",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "3cd15d4a1fc8cea1",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "ui-specs/03-data-connections.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "03-data-connections 的反向链接列表"
+            }
+          },
+          {
+            "id": "88958c0ffaf413bd",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "ui-specs/03-data-connections.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "03-data-connections 的出链列表"
+            }
+          },
+          {
+            "id": "2e82b55fc5568cf4",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "标签"
+            }
+          },
+          {
+            "id": "1c008b8141bf2e32",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "添加笔记属性"
+            }
+          },
+          {
+            "id": "68c1d8cc59755138",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "ui-specs/03-data-connections.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "03-data-connections 的大纲"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:打开快速切换": false,
+      "graph:查看关系图谱": false,
+      "canvas:新建白板": false,
+      "daily-notes:打开/创建今天的日记": false,
+      "templates:插入模板": false,
+      "command-palette:打开命令面板": false,
+      "bases:新建数据库": false
+    }
+  },
+  "active": "14da8bfde6162baa",
+  "lastOpenFiles": [
+    "ui-design/00-design-system.md",
+    "ui-design/06-ops-security/04-system-config.md",
+    "ui-design/06-ops-security/03-permissions.md",
+    "ui-design/06-ops-security/02-log-audit.md",
+    "ui-design/06-ops-security/01-monitor.md",
+    "ui-design/05-scene-center/01-宽带装机退单稽核 国杰拿过来对数.md",
+    "ui-design/04-agent-center/03-task-orchestration.md",
+    "ui-design/04-agent-center/02-skill-manage.md",
+    "ui-design/04-agent-center/01-agent-manage.md",
+    "ui-design/03-ontology-center/10-service.md",
+    "ui-design/03-ontology-center/09-publish.md",
+    "ui-design/03-ontology-center/08-graph-explorer 保持不变.md",
+    "ui-design/03-ontology-center/07-action-mgmt.md",
+    "ui-design/03-ontology-center/06-rule-function-mgmt.md",
+    "ui-design/03-ontology-center/05-mapping-mgmt.md",
+    "ui-design/03-ontology-center/04-object-relation-mgmt.md",
+    "ui-design/03-ontology-center/03-ai-builder 保持不变.md",
+    "ui-design/03-ontology-center/02-template-builder 保持不变.md",
+    "ui-design/03-ontology-center/01-tool-builder 保持不变.md",
+    "ui-design/02-data-integration/05-quality.md",
+    "ui-design/02-data-integration/04-lineage.md",
+    "ui-design/02-data-integration/01-connections.md",
+    "ui-design/02-data-integration/02-assets.md",
+    "ui-design/02-data-integration/03-pipeline.md",
+    "ui-design/01-workspace/02-system-dashboard.md",
+    "ui-design/01-workspace/01-business-overview.md"
+  ]
+}
