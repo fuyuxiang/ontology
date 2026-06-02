@@ -48,6 +48,15 @@ def get_connection(conn_id: str, db: Session = Depends(get_db)):
     return c
 
 
+@router.get("/{conn_id}/credential-mask")
+def get_credential_mask(conn_id: str, db: Session = Depends(get_db)):
+    """返回遮罩凭据，用于编辑表单回显（不暴露明文密码）。"""
+    try:
+        return _svc(db).get_credential_mask(conn_id)
+    except LookupError as e:
+        raise HTTPException(404, str(e))
+
+
 @router.post("", response_model=ConnectionDetail, status_code=201)
 def create_connection(
     body: ConnectionCreate,
