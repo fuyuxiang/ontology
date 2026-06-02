@@ -220,6 +220,7 @@ from app.api.v1.studio import router as studio_router
 from app.api.v1.pipelines import router as pipelines_router, start_worker as start_pipeline_worker
 from app.api.v1.aip_scenes import router as aip_scenes_router
 from app.api.v1.aip_executions import router as aip_executions_router
+from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
 from app.api.v1.aip_webhooks import router as aip_webhooks_router
 
 # ── Data Plane（M1 新增 7 个 router）──
@@ -436,6 +437,7 @@ app.include_router(dp_audit_router, prefix="/api/v1")
 app.include_router(dp_bindings_router, prefix="/api/v1")
 app.include_router(dp_quality_router, prefix="/api/v1")
 app.include_router(dp_mapping_router, prefix="/api/v1")
+app.include_router(ai_builder_v2_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

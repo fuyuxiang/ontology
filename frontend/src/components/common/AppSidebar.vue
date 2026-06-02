@@ -121,19 +121,19 @@ const navGroups = [
       { path: '/logic/actions', label: '行动管理' },
     ]},
     { path: '/studio', label: '图谱探索', icon: ico.graph },
-    { path: '/ontology/publish', label: '发布与版本管理', icon: ico.version },
+    { path: '/ontology/publish', label: '本体发布', icon: ico.version },
     { path: '/service/api', label: '本体服务', icon: ico.api },
   ]},
   { label: '智能体应用中心', items: [
     { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
-    { path: '/agent/toolbox', label: '技能与工具箱', icon: ico.tool },
+    { path: '/agent/toolbox', label: '技能管理', icon: ico.tool },
     { path: '/agent/orchestration', label: '任务编排', icon: ico.workflow },
   ]},
   { label: '场景中心', items: [
     { path: '/scene/broadband', label: '宽带退单稽核', icon: ico.scene },
   ]},
   { label: '运维与安全中心', items: [
-    { path: '/ops/monitor', label: '系统监控与告警', icon: ico.tracking },
+    { path: '/ops/monitor', label: '运维监控', icon: ico.tracking },
     { path: '/ops/log-audit', label: '日志与审计', icon: ico.audit },
     { path: '/ops/permissions', label: '权限管理', icon: ico.settings },
     { path: '/ops/config', label: '系统配置', icon: ico.settings },
