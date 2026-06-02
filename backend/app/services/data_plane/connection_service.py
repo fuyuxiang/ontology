@@ -129,6 +129,26 @@ class ConnectionService:
     def get(self, conn_id: str) -> Connection | None:
         return self.repo.get_by_id(conn_id)
 
+    def get_credential_mask(self, conn_id: str) -> dict:
+        """返回遮罩后的凭据，密码类字段显示 **** ，非敏感字段显示前4后4。"""
+        conn = self._must_get(conn_id)
+        if not conn.credential_ref:
+            return {}
+        raw = self.vault.fetch(conn.credential_ref)
+        if not raw:
+            return {}
+        masked: dict = {}
+        secret_keys = {"password", "secret_key", "secret", "token", "value"}
+        for k, v in raw.items():
+            sv = str(v) if v else ""
+            if k in secret_keys or "secret" in k.lower() or "password" in k.lower():
+                masked[k] = "••••••••"
+            elif len(sv) > 8:
+                masked[k] = sv[:4] + "••••" + sv[-4:]
+            else:
+                masked[k] = sv
+        return masked
+
     def create(
         self,
         *,
@@ -190,6 +210,7 @@ class ConnectionService:
         username: str | None = None,
         password: str | None = None,
         params: dict | None = None,
+        credential: dict | None = None,
         writable: bool | None = None,
         pool_size: int | None = None,
         rate_limit_qps: int | None = None,
@@ -208,14 +229,44 @@ class ConnectionService:
                          enabled=enabled).items():
             if v is not None:
                 setattr(conn, k, v)
-        if password is not None:
-            current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
-            new_user = username if username is not None else current.get("username", "")
-            self.vault.rotate(conn.credential_ref, {"username": new_user, "password": password})
-            password_changed = True
-        elif username is not None:
-            current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
-            self.vault.rotate(conn.credential_ref, {"username": username, "password": current.get("password", "")})
+        if conn.category == CATEGORY_DATABASE:
+            if password is not None:
+                current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+                new_user = username if username is not None else current.get("username", "")
+                self.vault.rotate(conn.credential_ref, {"username": new_user, "password": password})
+                password_changed = True
+            elif username is not None:
+                current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+                self.vault.rotate(conn.credential_ref, {"username": username, "password": current.get("password", "")})
+        else:
+            if credential is not None:
+                cred_payload = dict(credential)
+                if username:
+                    cred_payload["username"] = username
+                if password:
+                    cred_payload["password"] = password
+                current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+                if cred_payload != current:
+                    if conn.credential_ref:
+                        self.vault.rotate(conn.credential_ref, cred_payload)
+                    else:
+                        conn.credential_ref = self.vault.store(cred_payload)
+                    if cred_payload.get("password") != current.get("password"):
+                        password_changed = True
+            elif password is not None or username is not None:
+                current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+                if username is not None:
+                    current["username"] = username
+                if password is not None:
+                    current["password"] = password
+                old = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
+                if current != old:
+                    if conn.credential_ref:
+                        self.vault.rotate(conn.credential_ref, current)
+                    else:
+                        conn.credential_ref = self.vault.store(current)
+                    if current.get("password") != old.get("password"):
+                        password_changed = True
         self.repo.commit()
         self.repo.refresh(conn)
         if password_changed:
