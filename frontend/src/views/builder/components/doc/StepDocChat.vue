@@ -50,6 +50,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
+import { marked } from 'marked'
 import { docBuilderChat } from '../../../../api/docBuilder'
 
 interface OntologyData {
@@ -75,12 +76,8 @@ const latestOntology = ref<OntologyData | null>(null)
 const messagesEl = ref<HTMLElement>()
 
 function renderMarkdown(text: string): string {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/```json[\s\S]*?```/g, '')
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\n/g, '<br>')
+  const cleaned = text.replace(/```json[\s\S]*?```/g, '')
+  return marked.parse(cleaned, { async: false }) as string
 }
 
 function scrollToBottom() {
@@ -150,6 +147,15 @@ onMounted(() => {
 .step-chat__msg-body { max-width: 75%; }
 .step-chat__msg-text { font-size: 13px; line-height: 1.6; padding: 10px 14px; border-radius: 12px; }
 .step-chat__msg--assistant .step-chat__msg-text { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 4px 12px 12px; color: #334155; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(h2) { font-size: 15px; font-weight: 600; margin: 12px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(h3) { font-size: 14px; font-weight: 600; margin: 10px 0 4px; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(blockquote) { margin: 8px 0; padding: 6px 12px; border-left: 3px solid #94a3b8; background: #f1f5f9; color: #475569; font-size: 12px; border-radius: 0 4px 4px 0; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(code) { font-size: 12px; background: #e2e8f0; padding: 1px 4px; border-radius: 3px; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(hr) { border: none; border-top: 1px solid #e2e8f0; margin: 12px 0; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(ul), .step-chat__msg--assistant .step-chat__msg-text :deep(ol) { padding-left: 18px; margin: 6px 0; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(li) { margin: 3px 0; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(p) { margin: 6px 0; }
+.step-chat__msg--assistant .step-chat__msg-text :deep(strong) { font-weight: 600; }
 .step-chat__msg--user .step-chat__msg-text { background: linear-gradient(135deg, #4a6fa5, #6366f1); color: #fff; border-radius: 12px 4px 12px 12px; }
 .step-chat__streaming { animation: pulse 1.2s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
