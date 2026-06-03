@@ -112,8 +112,8 @@
       <main class="step2-mid">
         <div class="step2-layer-header">
           <div class="step2-layer-title">
-            本体视图区
-            <span class="step2-layer-title-sub">点击对象在右侧编辑、挂载规则/动作/派生属性</span>
+            图谱展示
+            <span class="step2-layer-title-sub">点击节点在右侧编辑，拖拽节点调整布局</span>
           </div>
         </div>
         <div class="step2-layers-scroll" style="padding:0">
