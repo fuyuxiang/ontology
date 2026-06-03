@@ -273,6 +273,17 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User |
     v.is_active = True
     v.published_at = datetime.utcnow()
     v.approved_by = user.id if user else None
+
+    # 同步实体状态：将本版本包含的实体标记为 published，其余恢复为 active
+    published_entity_ids = [ve.source_entity_id for ve in v.entities]
+    if published_entity_ids:
+        db.query(OntologyEntity).filter(
+            OntologyEntity.status == "published"
+        ).update({"status": "active"})
+        db.query(OntologyEntity).filter(
+            OntologyEntity.id.in_(published_entity_ids)
+        ).update({"status": "published"})
+
     db.commit()
     return {"message": f"版本 v{v.version_number} 已发布", "status": "published"}
 

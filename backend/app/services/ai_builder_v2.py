@@ -7,6 +7,7 @@ import re
 from typing import Generator
 
 from openai import OpenAI
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.services import dwd_catalog, minio_docs
@@ -29,8 +30,8 @@ def _extract_json(text: str) -> str:
     return text
 
 
-def match_domain(business_desc: str) -> dict:
-    domains = dwd_catalog.get_domains()
+def match_domain(business_desc: str, db: Session | None = None) -> dict:
+    domains = dwd_catalog.get_domains(db)
     domain_list = "\n".join(f"- {d}" for d in domains)
 
     prompt = f"""你是数据中台领域专家。根据用户的业务描述，从以下一级主题域中选择最相关的1-3个：
@@ -60,14 +61,14 @@ def match_domain(business_desc: str) -> dict:
     return result
 
 
-def recommend_tables(business_desc: str, tables: list[dict]) -> list[str]:
+def recommend_tables(business_desc: str, tables: list[dict], db: Session | None = None) -> list[str]:
     """根据业务描述和表的 schema 信息，用 LLM 推荐相关的数据表"""
     if not tables:
         return []
 
     table_summaries = []
     for t in tables[:50]:
-        schema = dwd_catalog.get_table_schema(t["table_name"])
+        schema = dwd_catalog.get_table_schema(t["table_name"], db)
         fields_preview = ", ".join(f["field_name"] + "(" + (f["field_desc"] or "") + ")" for f in schema[:10])
         table_summaries.append(f"- {t['table_name']}: {t['table_desc'] or '无描述'} | 字段: {fields_preview}")
 
@@ -105,10 +106,11 @@ def extract_ontology_stream(
     table_names: list[str],
     document_keys: list[str],
     business_desc: str,
+    db: Session | None = None,
 ) -> Generator[str, None, None]:
     tables_schema = {}
     for tn in table_names:
-        schema = dwd_catalog.get_table_schema(tn)
+        schema = dwd_catalog.get_table_schema(tn, db)
         tables_schema[tn] = {"fields": schema}
 
     yield f"data: {json.dumps({'event': 'progress', 'message': f'已加载 {len(table_names)} 张表的 schema'})}\n\n"
