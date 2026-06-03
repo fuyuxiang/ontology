@@ -56,7 +56,7 @@ const router = createRouter({
     { path: '/agent/manage', name: 'agent-manage', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: '智能体管理' } },
     { path: '/agent/manage/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
     { path: '/agent/toolbox', name: 'agent-toolbox', component: () => import('../views/agents/AgentToolboxView.vue'), meta: { title: '技能管理' } },
-    { path: '/harness', name: 'harness', component: () => import('../views/harness/HarnessView.vue'), meta: { title: '场景模版库' } },
+    { path: '/aip', name: 'aip-platform', component: () => import('../views/aip/AipPlatformView.vue'), meta: { title: '流程编排' } },
 
     // 场景中心
     { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景中心' } },
@@ -79,7 +79,8 @@ const router = createRouter({
     { path: '/data/catalog', redirect: '/data/assets' },
     { path: '/data/hydration', redirect: '/ontology/publish' },
     { path: '/service/agent', redirect: '/agent/manage' },
-    { path: '/service/workflow', redirect: '/harness' },
+    { path: '/service/workflow', redirect: '/aip' },
+    { path: '/harness', redirect: '/aip' },
     { path: '/settings/monitor', redirect: '/ops/monitor' },
     { path: '/settings/general', redirect: '/ops/config' },
     { path: '/governance/permissions', redirect: '/ops/permissions' },

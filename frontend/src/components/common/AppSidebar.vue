@@ -78,7 +78,6 @@ const ico = {
   datasource: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="currentColor" stroke-width="1.5"/><path d="M3 8v4c0 1.1 2.24 2 5 2s5-.9 5-2V8" stroke="currentColor" stroke-width="1.5"/></svg>`,
   mapping: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="11" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 5h2l2 6h-2" stroke="currentColor" stroke-width="1.5"/></svg>`,
   quality: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M4 5l4 3-4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 5l-4 3 4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg>`,
-  harness: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L14 5.5v5L8 14l-6-3.5v-5L8 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6l2.5 1.5v3L8 12l-2.5-1.5v-3L8 6z" fill="currentColor" opacity=".3"/></svg>`,
   model: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.5"/><path d="M8 3v3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   rules: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v2H3V3zM3 7h7v2H3V7zM3 11h10v2H3v-2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/></svg>`,
   workflow: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="7" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="11" y="3" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5h6M8 5.5v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`,
@@ -128,7 +127,7 @@ const navGroups = [
   { label: '智能体应用中心', items: [
     { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
     { path: '/agent/toolbox', label: '技能管理', icon: ico.tool },
-    { path: '/harness', label: '场景模版库', icon: ico.workflow },
+    { path: '/aip', label: '流程编排', icon: ico.workflow },
   ]},
   { label: '场景中心', items: [
     { path: '/scene/broadband', label: '宽带退单稽核', icon: ico.scene },
