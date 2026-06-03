@@ -20,6 +20,7 @@ from app.repositories.execution_log_repo import ExecutionLogRepository
 from app.repositories.lineage_edge_repo import LineageEdgeRepository
 from app.repositories.object_binding_repo import ObjectBindingRepository
 from app.repositories.quality_metric_repo import QualityMetricRepository
+from app.repositories.monitor_repo import MonitorRepository
 
 __all__ = [
     "BaseRepository",
@@ -41,4 +42,5 @@ __all__ = [
     "LineageEdgeRepository",
     "ObjectBindingRepository",
     "QualityMetricRepository",
+    "MonitorRepository",
 ]
