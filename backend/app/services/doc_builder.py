@@ -11,6 +11,7 @@ from typing import Generator
 from openai import OpenAI
 
 from app.config import settings
+from app.services.ontology_constraints import build_constraint_prompt, validate_ontology_output, validate_and_retry
 
 logger = logging.getLogger(__name__)
 
@@ -139,28 +140,16 @@ def get_session(session_id: str) -> dict | None:
     return _sessions.get(session_id)
 
 
-SYSTEM_PROMPT = """你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。你的任务是从用户提供的业务文档中提取本体（实体、属性、关系）。
+_BASE_SYSTEM_PROMPT = """你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。你的任务是从用户提供的业务文档中提取本体（实体、属性、关系）。
 
 规则：
-1. 实体应反映文档中的核心业务概念，给出 PascalCase 英文名和中文名
-2. 每个实体的属性应包含其关键特征，给出英文名、中文名、类型（string/integer/number/date/boolean）
-3. 关系描述实体间的业务关联，给出英文名、中文名、源实体、目标实体、基数（1:1/1:N/N:N）
-4. 每次回复必须包含完整的本体 JSON（即使只做了局部修改），用 ```json 代码块包裹
-5. 在 JSON 之外用自然语言解释你的分析思路和修改内容
+1. 每次回复必须包含完整的本体 JSON
+2. 在 JSON 之外可用自然语言解释你的分析思路
+"""
 
-输出的 JSON 格式：
-```json
-{
-  "entities": [
-    {"name": "PascalCase英文名", "displayName": "中文名", "description": "业务含义", "properties": [
-      {"name": "字段英文名", "displayName": "字段中文名", "type": "string|integer|number|date|boolean", "required": true/false}
-    ]}
-  ],
-  "relations": [
-    {"name": "camelCase英文名", "displayName": "中文名", "source": "源实体name", "target": "目标实体name", "cardinality": "1:1|1:N|N:N", "description": "关系说明"}
-  ]
-}
-```"""
+
+def _build_system_prompt() -> str:
+    return _BASE_SYSTEM_PROMPT + "\n" + build_constraint_prompt()
 
 
 def chat_stream(
@@ -175,7 +164,7 @@ def chat_stream(
 
     yield f"data: {json.dumps({'event': 'thinking', 'message': '正在分析文档内容...'})}\n\n"
 
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": _build_system_prompt()}]
 
     if not session["history"]:
         doc_contents = "\n\n".join(
@@ -252,11 +241,39 @@ def chat_stream(
     session["history"].append({"role": "assistant", "content": full_content})
 
     ontology_json = _extract_json(full_content)
-    try:
-        ontology = json.loads(ontology_json)
-        session["current_ontology"] = ontology
-        yield f"data: {json.dumps({'event': 'ontology', 'data': ontology})}\n\n"
-    except json.JSONDecodeError:
-        pass
+    if ontology_json:
+        result, errors = validate_ontology_output(ontology_json)
+        if result is not None:
+            session["current_ontology"] = result
+            yield f"data: {json.dumps({'event': 'ontology', 'data': result})}\n\n"
+        else:
+            yield f"data: {json.dumps({'event': 'validating', 'message': '正在校验修正输出...'})}\n\n"
+            client = _get_llm_client()
+
+            def retry_caller(retry_prompt: str) -> str:
+                resp = client.chat.completions.create(
+                    model=settings.LLM_MODEL,
+                    messages=[
+                        {"role": "system", "content": retry_prompt},
+                        {"role": "user", "content": "请输出修正后的完整JSON。"},
+                    ],
+                    temperature=0,
+                )
+                return resp.choices[0].message.content or ""
+
+            result, warnings = validate_and_retry(retry_caller, full_content, max_retries=5)
+            if result is not None:
+                session["current_ontology"] = result
+                yield f"data: {json.dumps({'event': 'ontology', 'data': result})}\n\n"
+                if warnings:
+                    yield f"data: {json.dumps({'event': 'validation_warning', 'message': warnings})}\n\n"
+            else:
+                try:
+                    fallback = json.loads(ontology_json)
+                    session["current_ontology"] = fallback
+                    yield f"data: {json.dumps({'event': 'ontology', 'data': fallback})}\n\n"
+                    yield f"data: {json.dumps({'event': 'validation_warning', 'message': '输出未完全通过校验，请人工检查'})}\n\n"
+                except json.JSONDecodeError:
+                    pass
 
     yield "data: [DONE]\n\n"
