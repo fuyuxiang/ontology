@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Text, JSON, DateTime, ForeignKey
+from sqlalchemy import String, Text, JSON, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
@@ -35,6 +35,9 @@ class Agent(Base):
     system_prompt: Mapped[str] = mapped_column(Text, default="")
     kb_ids: Mapped[list | None] = mapped_column(JSON)      # knowledge base ids
     entity_ids: Mapped[list | None] = mapped_column(JSON)  # ontology entity ids
+    ontology_version_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    ontology_stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    ontology_stale_detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     tools_config: Mapped[dict | None] = mapped_column(JSON)
     nodes_json: Mapped[list | None] = mapped_column(JSON)   # workflow canvas nodes
     edges_json: Mapped[list | None] = mapped_column(JSON)   # workflow canvas edges
