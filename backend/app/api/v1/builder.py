@@ -637,6 +637,16 @@ class _DraftProperty(BaseModel):
     source_column: str | None = None
 
 
+class _DraftRelation(BaseModel):
+    name: str
+    displayName: str | None = None
+    source: str
+    target: str
+    cardinality: str = "1:N"
+    relationType: str = "ObjectProperty"
+    description: str | None = None
+
+
 class _DraftObject(BaseModel):
     name: str
     displayName: str | None = None
@@ -650,6 +660,7 @@ class _DraftObject(BaseModel):
 
 class FinalizeRequest(BaseModel):
     objects: list[_DraftObject]
+    relations: list[_DraftRelation] = []
 
 
 @router.post("/finalize")
@@ -734,10 +745,43 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
             except Exception:
                 logger.exception("create binding failed for %s", entity.id)
 
+    # ── 关系持久化 ──
+    from app.models.relation import EntityRelation
+
+    created_relations = 0
+    entity_id_map = {}
+    for obj in body.objects:
+        eid = (f"{obj.namespace}_{obj.name}" if obj.namespace else obj.name)
+        entity_id_map[obj.name] = eid
+
+    for rel in body.relations:
+        from_eid = entity_id_map.get(rel.source)
+        to_eid = entity_id_map.get(rel.target)
+        if not from_eid or not to_eid:
+            continue
+        existing_rel = db.query(EntityRelation).filter(
+            EntityRelation.from_entity_id == from_eid,
+            EntityRelation.to_entity_id == to_eid,
+            EntityRelation.name == rel.name,
+        ).first()
+        if existing_rel:
+            continue
+        new_rel = EntityRelation(
+            from_entity_id=from_eid,
+            to_entity_id=to_eid,
+            name=rel.name,
+            rel_type=rel.relationType or "ObjectProperty",
+            cardinality=rel.cardinality or "1:N",
+            description=rel.description or rel.displayName or rel.name,
+        )
+        db.add(new_rel)
+        created_relations += 1
+
     db.commit()
     return {
         "created_entities": created_entities,
         "created_bindings": created_bindings,
+        "created_relations": created_relations,
         "skipped": skipped,
         "total": len(body.objects),
     }
