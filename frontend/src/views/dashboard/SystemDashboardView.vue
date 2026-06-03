@@ -37,16 +37,25 @@
       </a-col>
     </a-row>
 
-    <!-- Stats Row -->
+    <!-- Stats Row - 6 cards -->
     <a-row :gutter="16" style="margin-top: 16px;">
-      <a-col :xs="24" :sm="8">
+      <a-col :xs="12" :sm="8" :lg="4">
         <OntologyStats :data="ontologyStats" />
       </a-col>
-      <a-col :xs="24" :sm="8">
+      <a-col :xs="12" :sm="8" :lg="4">
         <LLMCallStats :data="llmStats" />
       </a-col>
-      <a-col :xs="24" :sm="8">
+      <a-col :xs="12" :sm="8" :lg="4">
         <AgentActivity :data="agentActivity" />
+      </a-col>
+      <a-col :xs="12" :sm="8" :lg="4">
+        <DataStats :data="platformStats" />
+      </a-col>
+      <a-col :xs="12" :sm="8" :lg="4">
+        <RuleStats :data="platformStats" />
+      </a-col>
+      <a-col :xs="12" :sm="8" :lg="4">
+        <PipelineStats :data="platformStats" />
       </a-col>
     </a-row>
 
@@ -66,7 +75,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { monitorApi } from '../../api/monitor'
-import type { ResourceMetrics, ServiceStatus, AlertItem, LLMStatsResponse, OntologyStatsResponse, AgentActivityResponse } from '../../api/monitor'
+import type { ResourceMetrics, ServiceStatus, AlertItem, LLMStatsResponse, OntologyStatsResponse, AgentActivityResponse, PlatformStatsResponse } from '../../api/monitor'
 import { useMonitorWS } from '../../composables/useMonitorWS'
 
 import ServiceHealthCards from './components/ServiceHealthCards.vue'
@@ -77,6 +86,9 @@ import EventStream from './components/EventStream.vue'
 import OntologyStats from './components/OntologyStats.vue'
 import LLMCallStats from './components/LLMCallStats.vue'
 import AgentActivity from './components/AgentActivity.vue'
+import DataStats from './components/DataStats.vue'
+import RuleStats from './components/RuleStats.vue'
+import PipelineStats from './components/PipelineStats.vue'
 
 const loading = ref(false)
 const resources = ref<ResourceMetrics | null>(null)
@@ -85,6 +97,7 @@ const alerts = ref<AlertItem[]>([])
 const llmStats = ref<LLMStatsResponse | null>(null)
 const ontologyStats = ref<OntologyStatsResponse | null>(null)
 const agentActivity = ref<AgentActivityResponse | null>(null)
+const platformStats = ref<PlatformStatsResponse | null>(null)
 const lastUpdate = ref('--:--:--')
 const autoRefreshSec = ref(30)
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -111,13 +124,14 @@ const autoRefreshLabel = computed(() => {
 async function fetchAll() {
   loading.value = true
   try {
-    const [res, svc, alt, llm, ont, agent] = await Promise.all([
+    const [res, svc, alt, llm, ont, agent, platform] = await Promise.all([
       monitorApi.resources(),
       monitorApi.services(),
       monitorApi.alerts(20),
       monitorApi.llmStats(),
       monitorApi.ontologyStats(),
       monitorApi.agentActivity(),
+      monitorApi.platformStats(),
     ])
     resources.value = res
     services.value = svc
@@ -125,6 +139,7 @@ async function fetchAll() {
     llmStats.value = llm
     ontologyStats.value = ont
     agentActivity.value = agent
+    platformStats.value = platform
     lastUpdate.value = new Date().toLocaleTimeString('zh-CN')
   } catch (e) {
     console.error('Dashboard fetch error:', e)
