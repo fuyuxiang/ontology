@@ -148,6 +148,7 @@ const flowNodes = ref<any[]>([])
 const flowEdges = ref<any[]>([])
 
 let suppressSync = false
+let suppressSyncFromSave = false
 
 function syncFromStore() {
   suppressSync = true
@@ -185,7 +186,19 @@ function syncFromStore() {
 
 watch(() => [store.currentSceneId, store.dataLoaded], syncFromStore)
 watch(() => store.nodeStatuses, syncFromStore, { deep: true })
-watch(() => store.currentScene, () => syncFromStore(), { deep: false })
+watch(() => store.isDirty, (newVal, oldVal) => {
+  if (oldVal && !newVal) {
+    suppressSyncFromSave = true
+  }
+})
+
+watch(() => store.currentScene, () => {
+  if (suppressSyncFromSave) {
+    suppressSyncFromSave = false
+    return
+  }
+  syncFromStore()
+}, { deep: false })
 
 onMounted(async () => {
   await store.loadScenes()
