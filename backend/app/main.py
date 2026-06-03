@@ -222,6 +222,7 @@ from app.api.v1.aip_executions import router as aip_executions_router
 from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
 from app.api.v1.aip_webhooks import router as aip_webhooks_router
 from app.api.v1.doc_builder import router as doc_builder_router
+from app.api.v1.ontology_mapping import router as ontology_mapping_router
 
 # ── Data Plane（M1 新增 7 个 router）──
 from app.api.v1.data_plane.connections import router as dp_connections_router
@@ -438,6 +439,7 @@ app.include_router(dp_quality_router, prefix="/api/v1")
 app.include_router(dp_mapping_router, prefix="/api/v1")
 app.include_router(ai_builder_v2_router, prefix="/api/v1")
 app.include_router(doc_builder_router, prefix="/api/v1")
+app.include_router(ontology_mapping_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
