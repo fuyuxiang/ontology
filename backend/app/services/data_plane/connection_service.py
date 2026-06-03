@@ -188,7 +188,7 @@ class ConnectionService:
         conn = Connection(
             name=name, category=category, type=type,
             host=host or "", port=port or 0, database=database,
-            params=params, credential_ref=ref, credential_type="local-fernet",
+            params=params, credential_ref=ref, credential_type="plain",
             writable=writable, pool_size=pool_size, rate_limit_qps=rate_limit_qps,
             description=description, status="active", enabled=True,
             created_by=user_id,
@@ -233,11 +233,11 @@ class ConnectionService:
             if password is not None:
                 current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
                 new_user = username if username is not None else current.get("username", "")
-                self.vault.rotate(conn.credential_ref, {"username": new_user, "password": password})
+                conn.credential_ref = self.vault.rotate(conn.credential_ref, {"username": new_user, "password": password})
                 password_changed = True
             elif username is not None:
                 current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
-                self.vault.rotate(conn.credential_ref, {"username": username, "password": current.get("password", "")})
+                conn.credential_ref = self.vault.rotate(conn.credential_ref, {"username": username, "password": current.get("password", "")})
         else:
             if credential is not None:
                 cred_payload = dict(credential)
@@ -248,7 +248,7 @@ class ConnectionService:
                 current = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
                 if cred_payload != current:
                     if conn.credential_ref:
-                        self.vault.rotate(conn.credential_ref, cred_payload)
+                        conn.credential_ref = self.vault.rotate(conn.credential_ref, cred_payload)
                     else:
                         conn.credential_ref = self.vault.store(cred_payload)
                     if cred_payload.get("password") != current.get("password"):
@@ -262,7 +262,7 @@ class ConnectionService:
                 old = self.vault.fetch(conn.credential_ref) if conn.credential_ref else {}
                 if current != old:
                     if conn.credential_ref:
-                        self.vault.rotate(conn.credential_ref, current)
+                        conn.credential_ref = self.vault.rotate(conn.credential_ref, current)
                     else:
                         conn.credential_ref = self.vault.store(current)
                     if current.get("password") != old.get("password"):

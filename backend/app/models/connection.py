@@ -56,10 +56,10 @@ class Connection(Base):
         # message_queue:   {brokers: "h1:9092,h2:9092", security_protocol, sasl_mechanism}
         # api:             {base_url, auth_type: bearer|basic|oauth2, headers}
 
-    # ── 凭据：明文不入库，只存引用 ──
-    credential_ref: Mapped[str] = mapped_column(String(300), default="")
-        # local-fernet://<id> | vault://path | kms://key-id
-    credential_type: Mapped[str] = mapped_column(String(30), default="local-fernet")
+    # ── 凭据：base64 编码存入 credential_ref ──
+    credential_ref: Mapped[str] = mapped_column(Text, default="")
+        # plain://<base64_json>
+    credential_type: Mapped[str] = mapped_column(String(30), default="plain")
 
     # ── 连接级安全/限流 ──
     writable: Mapped[bool] = mapped_column(Boolean, default=False)
