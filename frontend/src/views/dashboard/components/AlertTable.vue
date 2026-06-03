@@ -36,7 +36,7 @@
         </div>
         <div class="detail-row">
           <span class="detail-label">时间</span>
-          <span>{{ detailAlert.created_at?.replace('T', ' ').substring(0, 19) }}</span>
+          <span>{{ formatTimeFull(detailAlert.created_at) }}</span>
         </div>
         <div class="detail-row">
           <span class="detail-label">状态</span>
@@ -44,7 +44,7 @@
         </div>
         <div class="detail-row" v-if="detailAlert.resolved_at">
           <span class="detail-label">处理时间</span>
-          <span>{{ detailAlert.resolved_at?.replace('T', ' ').substring(0, 19) }}</span>
+          <span>{{ formatTimeFull(detailAlert.resolved_at) }}</span>
         </div>
         <div class="detail-msg">
           <span class="detail-label">告警内容</span>
@@ -88,7 +88,17 @@ function levelLabel(level: string) {
 }
 function formatTime(iso: string) {
   if (!iso) return ''
-  return iso.substring(11, 19)
+  // UTC 转北京时间 (UTC+8)
+  const d = new Date(iso)
+  d.setHours(d.getHours() + 8)
+  return d.toISOString().substring(11, 19)
+}
+
+function formatTimeFull(iso: string) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  d.setHours(d.getHours() + 8)
+  return d.toISOString().replace('T', ' ').substring(0, 19)
 }
 </script>
 

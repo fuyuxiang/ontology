@@ -3,11 +3,24 @@
     <template #title>
       <div class="chart-header">
         <span>服务响应时间</span>
-        <a-radio-group v-model:value="timeRange" size="small" @change="fetchData">
-          <a-radio-button value="1">近1小时</a-radio-button>
-          <a-radio-button value="6">近6小时</a-radio-button>
-          <a-radio-button value="24">近24小时</a-radio-button>
-        </a-radio-group>
+        <div class="header-controls">
+          <a-radio-group v-model:value="timeRange" size="small" @change="onRangeChange">
+            <a-radio-button value="1">近1小时</a-radio-button>
+            <a-radio-button value="6">近6小时</a-radio-button>
+            <a-radio-button value="24">近24小时</a-radio-button>
+            <a-radio-button value="custom">自定义</a-radio-button>
+          </a-radio-group>
+          <a-range-picker
+            v-if="timeRange === 'custom'"
+            v-model:value="customRange"
+            size="small"
+            show-time
+            format="MM-DD HH:mm"
+            :placeholder="['开始时间', '结束时间']"
+            @change="fetchCustomData"
+            style="margin-left: 8px;"
+          />
+        </div>
       </div>
     </template>
     <div ref="chartEl" style="height: 260px;"></div>
@@ -16,11 +29,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
+import dayjs, { type Dayjs } from 'dayjs'
 import * as echarts from 'echarts'
 import { monitorApi, type ResponseHistoryPoint } from '../../../api/monitor'
 
 const chartEl = ref<HTMLElement>()
 const timeRange = ref('1')
+const customRange = ref<[Dayjs, Dayjs] | null>(null)
 let chart: echarts.ECharts | null = null
 
 const SERVICE_COLORS: Record<string, string> = {
@@ -29,10 +44,30 @@ const SERVICE_COLORS: Record<string, string> = {
   '图数据库': '#e64980', '大模型网关': '#fab005', 'MinIO': '#40c057', 'Redis': '#fd7e14',
 }
 
+function onRangeChange() {
+  if (timeRange.value !== 'custom') {
+    fetchData()
+  }
+}
+
 async function fetchData() {
   const hours = parseInt(timeRange.value)
+  if (isNaN(hours)) return
   const data = await monitorApi.responseHistory(hours)
   renderChart(data)
+}
+
+async function fetchCustomData() {
+  if (!customRange.value) return
+  const [start, end] = customRange.value
+  const hours = Math.ceil((end.valueOf() - start.valueOf()) / (1000 * 60 * 60))
+  if (hours <= 0) return
+  const data = await monitorApi.responseHistory(hours)
+  // Filter data to custom range
+  const startTime = start.toISOString()
+  const endTime = end.toISOString()
+  const filtered = data.filter(d => d.collected_at >= startTime && d.collected_at <= endTime)
+  renderChart(filtered)
 }
 
 function renderChart(data: ResponseHistoryPoint[]) {
@@ -64,7 +99,12 @@ function renderChart(data: ResponseHistoryPoint[]) {
     grid: { top: 40, right: 20, bottom: 30, left: 50 },
     xAxis: {
       type: 'category',
-      data: allTimes.map(t => t.substring(11, 19)),
+      data: allTimes.map(t => {
+        // UTC 转北京时间
+        const d = new Date(t)
+        d.setHours(d.getHours() + 8)
+        return d.toISOString().substring(11, 16)
+      }),
       axisLabel: { fontSize: 11 },
     },
     yAxis: {
@@ -88,5 +128,12 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 </style>
