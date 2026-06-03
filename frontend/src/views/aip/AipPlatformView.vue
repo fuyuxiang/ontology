@@ -79,6 +79,7 @@
           fit-view-on-init
           :default-viewport="{ x: 100, y: 100, zoom: 0.55 }"
           @node-click="onNodeClick"
+          @edge-click="onEdgeClick"
           @pane-click="onPaneClick"
           @nodes-change="onNodesChange"
           @edges-change="onEdgesChange"
@@ -97,6 +98,9 @@
       <transition name="aip-drawer">
         <div v-if="store.selectedNodeId" class="aip-right-drawer">
           <PropertyPanel />
+        </div>
+        <div v-else-if="selectedEdgeId" class="aip-right-drawer">
+          <EdgeMappingPanel :edge-id="selectedEdgeId" @close="selectedEdgeId = null" />
         </div>
       </transition>
 
@@ -125,10 +129,12 @@ import PropertyPanel from './panels/PropertyPanel.vue'
 import BottomDrawer from './panels/BottomDrawer.vue'
 import SceneConfigDrawer from './panels/SceneConfigDrawer.vue'
 import AddNodeDrawer from './panels/AddNodeDrawer.vue'
+import EdgeMappingPanel from './panels/EdgeMappingPanel.vue'
 
 const store = useAipStore()
 const showAddNode = ref(false)
 const canvasWrapEl = ref<HTMLElement | null>(null)
+const selectedEdgeId = ref<string | null>(null)
 
 const nodeTypes = NODE_TYPES.reduce((acc, t) => { acc[t.type] = markRaw(AipNode); return acc }, {} as Record<string, any>)
 
@@ -186,8 +192,9 @@ onMounted(async () => {
   syncFromStore()
 })
 
-function onNodeClick({ node }: any) { store.selectNode(node.id) }
-function onPaneClick() { store.selectNode(null) }
+function onNodeClick({ node }: any) { store.selectNode(node.id); selectedEdgeId.value = null }
+function onPaneClick() { store.selectNode(null); selectedEdgeId.value = null }
+function onEdgeClick({ edge }: any) { selectedEdgeId.value = edge.id; store.selectNode(null) }
 
 function miniMapColor(node: any) {
   return NODE_TYPES.find(t => t.type === node.type)?.color || '#94a3b8'

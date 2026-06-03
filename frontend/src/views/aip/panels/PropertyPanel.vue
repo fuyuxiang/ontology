@@ -84,19 +84,20 @@
             @update:model-value="(v: string) => onPick('agent_id', v)" placeholder="选择已发布 Agent" />
         </div>
         <div class="aip-field">
-          <label>主 Skill</label>
-          <ResourcePicker type="skill" :model-value="node.data.skill_id || ''"
-            @update:model-value="(v: string) => onPick('skill_id', v)" placeholder="选择 Skill（可选）" />
-        </div>
-        <div class="aip-field"><label>角色</label>
-          <select class="aip-input" v-model="node.data.agentRole" @change="touch">
-            <option>reasoning</option><option>generation</option><option>orchestration</option>
-          </select>
-        </div>
-        <div class="aip-field">
-          <label>关联本体（逗号分隔）</label>
+          <label>绑定本体对象（逗号分隔，自动获得对应规则/函数/动作作为 Tool）</label>
           <textarea class="aip-input aip-input--ta" rows="2" :value="(node.data.objectTypes || []).join(',')"
             @input="(e: any) => updateArr('objectTypes', e.target.value)"></textarea>
+        </div>
+        <div class="aip-field"><label>角色描述</label>
+          <input class="aip-input" v-model="node.data.agentRole" @input="touch" placeholder="如: 归因分析专家" />
+        </div>
+        <div class="aip-field">
+          <label>最大推理轮次</label>
+          <input type="number" class="aip-input" v-model.number="node.data.max_rounds" @input="touch" placeholder="5" min="1" max="12" />
+        </div>
+        <div class="aip-field">
+          <label>System Prompt（可选，默认从 Agent 继承）</label>
+          <textarea class="aip-input aip-input--ta" rows="4" v-model="node.data.system_prompt" @input="touch" placeholder="留空则使用 Agent 默认提示词"></textarea>
         </div>
       </template>
 
@@ -115,19 +116,6 @@
             <span v-if="s.isPrimary" class="aip-tag aip-tag--gold">主</span>
             <button class="aip-icon-btn" @click="removeAt('skills', i)">×</button>
           </div>
-        </div>
-      </template>
-
-      <!-- memoryNode -->
-      <template v-else-if="node.type === 'memoryNode'">
-        <div class="aip-field">
-          <label>记忆层 ({{ (node.data.memories || []).length }})</label>
-          <div v-for="(m, i) in (node.data.memories || [])" :key="i" class="aip-list-item">
-            <span class="aip-dot" :style="{ background: layerColor(m.layer) }"></span>
-            <span style="flex:1">{{ m.layer }} · {{ m.impl }}</span>
-            <button class="aip-icon-btn" @click="removeAt('memories', i)">×</button>
-          </div>
-          <button class="aip-add-btn" @click="addMemory">+ 添加记忆层</button>
         </div>
       </template>
 
@@ -221,22 +209,84 @@
 
       <!-- condition -->
       <template v-else-if="node.type === 'condition'">
-        <div class="aip-field"><label>条件字段</label><input class="aip-input" :value="node.data.expression?.field || ''" @input="setExpr('field', $event)" /></div>
-        <div class="aip-field"><label>操作符</label>
-          <select class="aip-input" :value="node.data.expression?.operator || 'switch'" @change="setExpr('operator', $event)">
-            <option v-for="op in OPERATORS" :key="op">{{ op }}</option>
-          </select>
-        </div>
-        <div class="aip-field"><label>比较值</label><input class="aip-input" :value="node.data.expression?.value || ''" @input="setExpr('value', $event)" /></div>
         <div class="aip-field">
           <label>分支 ({{ (node.data.branches || []).length }})</label>
           <div v-for="(b, i) in (node.data.branches || [])" :key="i" class="aip-branch">
             <span class="aip-branch__index">{{ i + 1 }}</span>
             <div style="flex:1">
-              <div class="aip-branch__label">{{ b.label || b.condition }}</div>
-              <div class="aip-branch__action">动作：{{ b.action || '—' }}</div>
+              <input class="aip-input aip-input--sm" v-model="b.label" @input="touch" placeholder="分支名称" />
+              <div class="aip-branch__expr">
+                <input class="aip-input aip-input--sm" v-model="b.field" @input="touch" placeholder="字段" style="flex:2" />
+                <select class="aip-input aip-input--sm" v-model="b.operator" @change="touch" style="flex:1">
+                  <option v-for="op in OPERATORS" :key="op">{{ op }}</option>
+                </select>
+                <input class="aip-input aip-input--sm" v-model="b.value" @input="touch" placeholder="值" style="flex:2" />
+              </div>
+              <div class="aip-branch__handle">出口 Handle: <code>branch-{{ b.when || i }}</code></div>
             </div>
+            <button class="aip-icon-btn" @click="removeBranch(i)">×</button>
           </div>
+          <button class="aip-add-btn" @click="addBranch">+ 添加分支</button>
+        </div>
+        <div class="aip-field">
+          <label>默认分支（无条件命中时走这里）</label>
+          <input class="aip-input" v-model="node.data.default_branch" @input="touch" placeholder="default" />
+        </div>
+      </template>
+
+      <!-- parallel -->
+      <template v-else-if="node.type === 'parallel'">
+        <div class="aip-field">
+          <label>说明</label>
+          <div class="aip-hint">并行网关：所有下游节点并行执行，全部完成后继续后续流程。</div>
+        </div>
+      </template>
+
+      <!-- loop -->
+      <template v-else-if="node.type === 'loop'">
+        <div class="aip-field">
+          <label>迭代数据来源字段</label>
+          <input class="aip-input" v-model="node.data.source_field" @input="touch" placeholder="上游节点的列表字段路径" />
+        </div>
+        <div class="aip-field">
+          <label>每项变量名</label>
+          <input class="aip-input" v-model="node.data.item_var" @input="touch" placeholder="item" />
+        </div>
+      </template>
+
+      <!-- httpCall -->
+      <template v-else-if="node.type === 'httpCall'">
+        <div class="aip-field">
+          <label>请求 URL</label>
+          <input class="aip-input" v-model="node.data.url" @input="touch" placeholder="https://..." />
+        </div>
+        <div class="aip-field"><label>方法</label>
+          <select class="aip-input" v-model="node.data.method" @change="touch">
+            <option v-for="m in HTTP_METHODS" :key="m.value" :value="m.value">{{ m.label }}</option>
+          </select>
+        </div>
+        <div class="aip-field"><label>Headers（JSON）</label>
+          <textarea class="aip-input aip-input--ta" rows="3" :value="JSON.stringify(node.data.headers || {}, null, 2)"
+            @input="(e: any) => onJsonChange('headers', e.target.value)"></textarea>
+        </div>
+        <div class="aip-field"><label>Body（JSON，支持 {nodeId.field} 模板）</label>
+          <textarea class="aip-input aip-input--ta" rows="4" :value="JSON.stringify(node.data.body || {}, null, 2)"
+            @input="(e: any) => onJsonChange('body', e.target.value)"></textarea>
+        </div>
+        <div class="aip-field"><label>超时 (秒)</label>
+          <input type="number" class="aip-input" v-model.number="node.data.timeout" @input="touch" placeholder="30" />
+        </div>
+      </template>
+
+      <!-- datasource -->
+      <template v-else-if="node.type === 'datasource'">
+        <div class="aip-field">
+          <label>数据源名称</label>
+          <ResourcePicker type="datasource" :model-value="node.data.datasource_name || ''"
+            @update:model-value="(v: string) => onPick('datasource_name', v)" placeholder="选择数据源" />
+        </div>
+        <div class="aip-field"><label>SQL 语句（支持 {变量} 模板）</label>
+          <textarea class="aip-input aip-input--ta" rows="5" v-model="node.data.sql" @input="touch" placeholder="SELECT ..."></textarea>
         </div>
       </template>
 
@@ -253,7 +303,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAipStore } from '../../../store/aip'
-import { LLM_MODELS, ML_MODELS, OPERATORS, ACTION_TYPES, MEMORY_LAYERS, NODE_TYPES } from '../aipData'
+import { LLM_MODELS, ML_MODELS, OPERATORS, ACTION_TYPES, HTTP_METHODS, NODE_TYPES } from '../aipData'
 import ResourcePicker from '../../../components/aip/ResourcePicker.vue'
 
 const store = useAipStore()
@@ -286,14 +336,17 @@ function removeAt(field: string, index: number) {
   arr.splice(index, 1)
   touch()
 }
-function addMemory() {
+function addBranch() {
   if (!node.value) return
-  if (!node.value.data.memories) node.value.data.memories = []
-  node.value.data.memories.push({ layer: 'Working', impl: '默认实现' })
+  if (!node.value.data.branches) node.value.data.branches = []
+  const idx = node.value.data.branches.length
+  node.value.data.branches.push({ label: `分支 ${idx + 1}`, when: String(idx), field: '', operator: '==', value: '' })
   touch()
 }
-function layerColor(layer: string) {
-  return MEMORY_LAYERS.find(l => l.value === layer)?.color || '#94a3b8'
+function removeBranch(index: number) {
+  if (!node.value) return
+  node.value.data.branches.splice(index, 1)
+  touch()
 }
 function setExpr(key: string, e: Event) {
   if (!node.value) return
