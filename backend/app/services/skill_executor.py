@@ -26,13 +26,18 @@ def register_skill(code_ref: str):
 
 def execute_skill(code_ref: str, params: dict, db: Session) -> dict:
     fn = SKILL_REGISTRY.get(code_ref)
-    if not fn:
-        return {"success": False, "summary": f"未知 skill: {code_ref}", "data": {}}
-    try:
-        return fn(params, db)
-    except Exception as e:
-        logger.error(f"Skill {code_ref} 执行失败: {e}")
-        return {"success": False, "summary": f"执行失败: {e}", "data": {}}
+    if fn:
+        try:
+            return fn(params, db)
+        except Exception as e:
+            logger.error(f"Skill {code_ref} 执行失败: {e}")
+            return {"success": False, "summary": f"执行失败: {e}", "data": {}}
+    # Fallback: check for generated skill
+    from app.models.skill import Skill
+    skill = db.query(Skill).filter(Skill.code_ref == code_ref, Skill.skill_type == "generated", Skill.status == "active").first()
+    if skill:
+        return execute_generated_skill(skill, params, db)
+    return {"success": False, "summary": f"未知 skill: {code_ref}", "data": {}}
 
 
 SKILL_STREAM_REGISTRY: dict[str, callable] = {}
@@ -545,4 +550,25 @@ def broadband_audit_stream(params: dict, db: Session):
             "audit_status": churn.get("audit_status", ""),
             "root_cause_level_one": root_cause_l1, "root_cause_confidence": confidence,
         },
+    }
+
+
+def execute_generated_skill(skill, params: dict, db) -> dict:
+    """Execute a generated skill by running its tools in sandbox."""
+    from app.models.skill_tool import SkillTool
+    from app.services.skill_sandbox import execute_in_sandbox
+
+    tools = db.query(SkillTool).filter(SkillTool.skill_id == skill.id).all()
+    results = {}
+    for tool in tools:
+        try:
+            output = execute_in_sandbox(tool.code, tool.name, params)
+            results[tool.name] = {"success": True, "output": output}
+        except Exception as e:
+            results[tool.name] = {"success": False, "error": str(e)}
+
+    return {
+        "success": all(r["success"] for r in results.values()),
+        "summary": f"Executed {len(tools)} tools",
+        "data": results,
     }
