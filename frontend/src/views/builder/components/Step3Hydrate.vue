@@ -581,9 +581,22 @@ async function confirmPublish() {
       })),
       backing_asset_ids: o.backing_asset_ids || [],
     }))
+    const relations = (props.session.ontologyRelations || []).map((r: any) => {
+      const srcObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.source)
+      const tgtObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.target)
+      return {
+        name: r.name,
+        displayName: r.displayName,
+        source: srcObj?.name || r.source,
+        target: tgtObj?.name || r.target,
+        cardinality: r.cardinality || '1:N',
+        relationType: r.relationType || 'ObjectProperty',
+        description: r.description || r.displayName || r.name,
+      }
+    })
     if (objects.length > 0) {
       const { post } = await import('../../../api/client')
-      await post('/builder/finalize', { objects })
+      await post('/builder/finalize', { objects, relations })
     }
   } catch (e) {
     console.error('finalize failed', e)
