@@ -43,7 +43,8 @@ function tagColor(type: string) {
 
 <style scoped>
 .event-list {
-  height: 320px;
+  min-height: 320px;
+  max-height: 400px;
   overflow-y: auto;
 }
 .event-item {

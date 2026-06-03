@@ -60,11 +60,11 @@
     </a-row>
 
     <!-- Alerts + Events -->
-    <a-row :gutter="16" style="margin-top: 16px;">
-      <a-col :xs="24" :lg="12">
+    <a-row :gutter="16" style="margin-top: 16px;" class="bottom-row">
+      <a-col :xs="24" :lg="12" class="bottom-col">
         <AlertTable :alerts="mergedAlerts" @resolve="onResolveAlert" />
       </a-col>
-      <a-col :xs="24" :lg="12">
+      <a-col :xs="24" :lg="12" class="bottom-col">
         <EventStream :events="wsEvents" />
       </a-col>
     </a-row>
@@ -203,5 +203,15 @@ onUnmounted(() => {
 .last-update {
   font-size: 13px;
   color: var(--color-text-secondary, #888);
+}
+.bottom-row {
+  display: flex;
+  align-items: stretch;
+}
+.bottom-col {
+  display: flex;
+}
+.bottom-col > * {
+  flex: 1;
 }
 </style>
