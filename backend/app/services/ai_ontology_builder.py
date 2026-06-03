@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from enum import Enum
 from typing import Any, Generator
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.services.copilot import build_ontology_context, get_llm_client
+from app.services.ontology_constraints import build_constraint_prompt, validate_and_retry
 
 logger = logging.getLogger(__name__)
 
@@ -431,12 +433,15 @@ class AIOntologyBuilder:
 
         yield {"type": "build_progress", "step": "识别业务对象", "progress": 30}
 
+        constraint_block = build_constraint_prompt(
+            existing_entities=self._get_existing_entity_names(state.existing_context)
+        )
         prompt = _BUILD_PROMPT.format(
             existing_context=state.existing_context or "（暂无已有本体）",
             scenario=state.scenario,
             materials_content=materials_content[:12000],
             clarify_answers=clarify_answers or "（无补充信息）",
-            domain_knowledge=TELECOM_DOMAIN_KNOWLEDGE,
+            domain_knowledge=constraint_block,
         )
 
         yield {"type": "build_progress", "step": "构建本体模型", "progress": 50}
@@ -449,11 +454,19 @@ class AIOntologyBuilder:
 
         yield {"type": "build_progress", "step": "解析构建结果", "progress": 80}
 
-        try:
-            result = self._parse_json(resp)
-        except ValueError:
-            yield {"type": "error", "content": "AI 构建结果解析失败，请重试"}
+        def retry_caller(retry_prompt: str) -> str:
+            return self._call_llm(
+                system=retry_prompt,
+                user="请输出修正后的完整JSON。",
+                max_tokens=8192,
+            )
+
+        result, warnings = validate_and_retry(retry_caller, resp, max_retries=5)
+        if result is None:
+            yield {"type": "error", "content": "AI 构建结果解析失败，已重试5次仍无法修正"}
             return
+        if warnings:
+            yield {"type": "build_warning", "content": f"输出存在部分校验问题：{warnings}"}
 
         entities = result.get("entities", [])
         relations = result.get("relations", [])
@@ -517,6 +530,12 @@ class AIOntologyBuilder:
             if start >= 0 and end > start:
                 return json.loads(text[start:end])
             raise ValueError(f"Cannot parse JSON from: {text[:200]}")
+
+    def _get_existing_entity_names(self, existing_context: str | None) -> list[str] | None:
+        if not existing_context or existing_context == "（暂无已有本体）":
+            return None
+        names = re.findall(r"[A-Z][a-zA-Z0-9]+", existing_context)
+        return names if names else None
 
     def _summarize_materials(self, materials: list[dict]) -> str:
         parts = []
