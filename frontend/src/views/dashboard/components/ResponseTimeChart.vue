@@ -100,10 +100,9 @@ function renderChart(data: ResponseHistoryPoint[]) {
     xAxis: {
       type: 'category',
       data: allTimes.map(t => {
-        // UTC 转北京时间
-        const d = new Date(t)
-        d.setHours(d.getHours() + 8)
-        return d.toISOString().substring(11, 16)
+        // 后端返回 UTC 时间（无 Z），加 Z 后转北京时间
+        const d = new Date(t + 'Z')
+        return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
       }),
       axisLabel: { fontSize: 11 },
     },
