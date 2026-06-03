@@ -127,7 +127,7 @@ async def collect_service_metrics():
         try:
             cpu = psutil.cpu_percent(interval=0.1)
             mem = psutil.virtual_memory()
-            disk = psutil.disk_usage("/")
+            disk = psutil.disk_usage("C:\\")
 
             db = SessionLocal()
             repo = MonitorRepository(db)
@@ -142,7 +142,7 @@ async def collect_service_metrics():
             finally:
                 db.close()
         except Exception as e:
-            logger.error(f"Metric collection error: {e}")
+            logger.error("Metric collection error: %s", e, exc_info=True)
 
         await asyncio.sleep(30)
 
