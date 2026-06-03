@@ -136,7 +136,8 @@ class TestOntologyOutput:
             OntologyOutput(entities=[], relations=[])
 
 
-from app.services.ontology_constraints import build_constraint_prompt
+from unittest.mock import MagicMock
+from app.services.ontology_constraints import build_constraint_prompt, validate_ontology_output, validate_and_retry, format_validation_errors
 
 
 class TestBuildConstraintPrompt:
@@ -171,3 +172,87 @@ class TestBuildConstraintPrompt:
     def test_without_existing_entities(self):
         prompt = build_constraint_prompt(existing_entities=None)
         assert "已有实体" not in prompt
+
+
+class TestValidateOntologyOutput:
+    def test_valid_json_passes(self):
+        valid_json = json.dumps({
+            "entities": [{"name": "Customer", "name_cn": "客户", "tier": 1, "description": "desc",
+                          "attributes": [{"name": "customer_id", "display_name": "客户编号", "type": "string", "required": True, "description": "d"}]}],
+            "relations": []
+        })
+        result, errors = validate_ontology_output(valid_json)
+        assert result is not None
+        assert errors is None
+
+    def test_invalid_json_returns_errors(self):
+        result, errors = validate_ontology_output("not json at all")
+        assert result is None
+        assert "JSON" in errors
+
+    def test_schema_violation_returns_errors(self):
+        bad_json = json.dumps({
+            "entities": [{"name": "bad_name", "name_cn": "客户", "tier": 1, "description": "d",
+                          "attributes": [{"name": "id", "display_name": "编号", "type": "string", "required": True, "description": "d"}]}],
+            "relations": []
+        })
+        result, errors = validate_ontology_output(bad_json)
+        assert result is None
+        assert "PascalCase" in errors
+
+
+class TestFormatValidationErrors:
+    def test_formats_pydantic_errors(self):
+        from pydantic import ValidationError as PydanticValidationError
+        from app.schemas.ontology_output import OntologyOutput
+        try:
+            OntologyOutput(entities=[], relations=[])
+        except PydanticValidationError as e:
+            formatted = format_validation_errors(e)
+            assert "entities" in formatted
+
+
+class TestValidateAndRetry:
+    def test_passes_on_first_try(self):
+        valid_json = json.dumps({
+            "entities": [{"name": "Customer", "name_cn": "客户", "tier": 1, "description": "desc",
+                          "attributes": [{"name": "customer_id", "display_name": "客户编号", "type": "string", "required": True, "description": "d"}]}],
+            "relations": []
+        })
+        mock_caller = MagicMock()
+        result, warnings = validate_and_retry(mock_caller, valid_json, max_retries=5)
+        assert result is not None
+        assert warnings is None
+        mock_caller.assert_not_called()
+
+    def test_retries_on_failure_then_succeeds(self):
+        valid_json = json.dumps({
+            "entities": [{"name": "Customer", "name_cn": "客户", "tier": 1, "description": "desc",
+                          "attributes": [{"name": "customer_id", "display_name": "客户编号", "type": "string", "required": True, "description": "d"}]}],
+            "relations": []
+        })
+        mock_caller = MagicMock(return_value=valid_json)
+        bad_json = json.dumps({"entities": [], "relations": []})
+        result, warnings = validate_and_retry(mock_caller, bad_json, max_retries=5)
+        assert result is not None
+        assert warnings is None
+        assert mock_caller.call_count == 1
+
+    def test_returns_warnings_after_max_retries(self):
+        bad_json = json.dumps({"entities": [], "relations": []})
+        mock_caller = MagicMock(return_value=bad_json)
+        result, warnings = validate_and_retry(mock_caller, bad_json, max_retries=2)
+        assert warnings is not None
+        assert mock_caller.call_count == 2
+
+    def test_handles_think_tags(self):
+        valid_json = json.dumps({
+            "entities": [{"name": "Customer", "name_cn": "客户", "tier": 1, "description": "desc",
+                          "attributes": [{"name": "customer_id", "display_name": "客户编号", "type": "string", "required": True, "description": "d"}]}],
+            "relations": []
+        })
+        text_with_think = f"<think>some reasoning</think>\n```json\n{valid_json}\n```"
+        mock_caller = MagicMock()
+        result, warnings = validate_and_retry(mock_caller, text_with_think, max_retries=5)
+        assert result is not None
+        assert warnings is None

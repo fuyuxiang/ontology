@@ -49,3 +49,76 @@ def build_constraint_prompt(existing_entities: list[str] | None = None) -> str:
         entity_list = "、".join(existing_entities)
         parts.append(f"\n## 已有实体（避免重复创建，优先建立关联）\n{entity_list}\n")
     return "\n".join(parts)
+
+
+RETRY_PROMPT_TEMPLATE = """你上一次的输出存在以下问题，请修正后重新输出完整JSON：
+
+【你的上次输出】
+{previous_output}
+
+【错误列表】
+{validation_errors}
+
+【要求】
+- 只输出修正后的完整JSON，不要输出其他内容
+- 保留原有正确内容，只修正上述问题
+"""
+
+
+def validate_ontology_output(raw_json: str) -> tuple[dict | None, str | None]:
+    try:
+        data = json.loads(raw_json)
+    except (json.JSONDecodeError, TypeError):
+        return None, "JSON解析失败：输出不是合法的JSON格式"
+
+    try:
+        output = OntologyOutput.model_validate(data)
+        return output.model_dump(), None
+    except ValidationError as e:
+        return None, format_validation_errors(e)
+
+
+def format_validation_errors(e: ValidationError) -> str:
+    lines = []
+    for i, err in enumerate(e.errors(), 1):
+        loc = " → ".join(str(x) for x in err["loc"])
+        lines.append(f"{i}. [{loc}] {err['msg']}")
+    return "\n".join(lines)
+
+
+def validate_and_retry(
+    llm_caller,
+    raw_output: str,
+    max_retries: int = 5,
+) -> tuple[dict | None, str | None]:
+    json_str = _extract_json_from_text(raw_output)
+    result, errors = validate_ontology_output(json_str)
+    if result is not None:
+        return result, None
+
+    for attempt in range(max_retries):
+        retry_prompt = RETRY_PROMPT_TEMPLATE.format(
+            previous_output=json_str[:4000],
+            validation_errors=errors,
+        )
+        raw_output = llm_caller(retry_prompt)
+        json_str = _extract_json_from_text(raw_output)
+        result, errors = validate_ontology_output(json_str)
+        if result is not None:
+            logger.info(f"Validation passed after {attempt + 1} retry(s)")
+            return result, None
+
+    logger.warning(f"Validation failed after {max_retries} retries: {errors}")
+    try:
+        fallback = json.loads(json_str)
+    except (json.JSONDecodeError, TypeError):
+        fallback = None
+    return fallback, errors
+
+
+def _extract_json_from_text(text: str) -> str:
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
+    match = re.search(r"\{[\s\S]*\}", text)
+    return match.group(0) if match else text
