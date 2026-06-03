@@ -24,12 +24,13 @@ router = APIRouter(prefix="/monitor", tags=["monitor"])
 def get_resources():
     mem = psutil.virtual_memory()
     disk = shutil.disk_usage("/")
+    disk_pct = round(disk.used / disk.total * 100, 1) if disk.total else 0
     return ResourceMetrics(
         cpu_percent=psutil.cpu_percent(interval=0.1),
         memory_percent=mem.percent,
         memory_used_gb=round(mem.used / (1024**3), 2),
         memory_total_gb=round(mem.total / (1024**3), 2),
-        disk_percent=disk.percent,
+        disk_percent=disk_pct,
         disk_used_gb=round(disk.used / (1024**3), 2),
         disk_total_gb=round(disk.total / (1024**3), 2),
     )
