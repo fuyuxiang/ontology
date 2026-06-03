@@ -7,6 +7,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models.agent import Agent, ModelRegistry
+from app.models.scene import AipScene
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 open_router = APIRouter(prefix="/open/agents", tags=["open-api"])
@@ -45,12 +46,12 @@ class ChatRequest(BaseModel):
     stream: Optional[bool] = True
 
 
-def _agent_out(a: Agent, db: Session) -> dict:
+def _agent_out(a: Agent, db: Session, referenced_scenes: Optional[list] = None) -> dict:
     model_name = None
     if a.model_id:
         m = db.get(ModelRegistry, a.model_id)
         model_name = m.name if m else None
-    return {
+    result = {
         "id": a.id,
         "name": a.name,
         "description": a.description,
@@ -61,18 +62,34 @@ def _agent_out(a: Agent, db: Session) -> dict:
         "kb_ids": a.kb_ids or [],
         "entity_ids": a.entity_ids or [],
         "tools_config": a.tools_config or {},
-        "nodes_json": a.nodes_json or [],
-        "edges_json": a.edges_json or [],
         "status": a.status,
         "api_key": a.api_key if a.status == "published" else None,
         "created_at": a.created_at.isoformat() if a.created_at else None,
         "updated_at": a.updated_at.isoformat() if a.updated_at else None,
     }
+    if referenced_scenes is not None:
+        result["referenced_scenes"] = referenced_scenes
+    return result
 
 
 @router.get("")
 def list_agents(db: Session = Depends(get_db)):
-    return [_agent_out(a, db) for a in db.query(Agent).all()]
+    # Build agent_id -> referenced scenes mapping
+    scenes = db.query(AipScene).all()
+    agent_scene_map: dict[str, list[dict]] = {}
+    for scene in scenes:
+        seen_agents: set[str] = set()
+        for node in (scene.nodes_json or []):
+            agent_id = (node.get("data") or {}).get("agent_id")
+            if agent_id and agent_id not in seen_agents:
+                seen_agents.add(agent_id)
+                agent_scene_map.setdefault(agent_id, []).append(
+                    {"id": scene.id, "name": scene.name}
+                )
+    return [
+        _agent_out(a, db, referenced_scenes=agent_scene_map.get(a.id, []))
+        for a in db.query(Agent).all()
+    ]
 
 
 @router.post("", status_code=201)
