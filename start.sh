@@ -95,7 +95,7 @@ fi
 
 echo "[2/3] Starting backend (port $BACKEND_PORT)..."
 cd "$BACKEND_DIR"
-backend_args=(app.main:app --host 127.0.0.1 --port "$BACKEND_PORT" --log-level info)
+backend_args=(app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" --log-level info)
 if [ "$BACKEND_RELOAD" = "1" ]; then
     backend_args+=(--reload)
 fi
@@ -121,7 +121,7 @@ echo
 
 echo "[3/3] Starting frontend (port $FRONTEND_PORT)..."
 cd "$FRONTEND_DIR"
-nohup env VITE_PROXY_TARGET="$VITE_PROXY_TARGET" npx vite --host 127.0.0.1 --port "$FRONTEND_PORT" > "$FRONTEND_LOG" 2>&1 &
+nohup env VITE_PROXY_TARGET="$VITE_PROXY_TARGET" npx vite --host 0.0.0.0 --port "$FRONTEND_PORT" > "$FRONTEND_LOG" 2>&1 &
 echo $! > "$FRONTEND_PID_FILE"
 
 frontend_pids=""
@@ -143,9 +143,9 @@ echo
 
 echo "========================================"
 echo "  Ready!"
-echo "  Frontend: http://127.0.0.1:$FRONTEND_PORT"
-echo "  Backend:  http://127.0.0.1:$BACKEND_PORT"
-echo "  API Docs: http://127.0.0.1:$BACKEND_PORT/docs"
+echo "  Frontend: http://0.0.0.0:$FRONTEND_PORT"
+echo "  Backend:  http://0.0.0.0:$BACKEND_PORT"
+echo "  API Docs: http://0.0.0.0:$BACKEND_PORT/docs"
 echo "========================================"
 echo
 echo "Logs: backend.log / frontend.log"
