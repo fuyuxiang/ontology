@@ -201,6 +201,7 @@ from app.api.v1.broadband import router as broadband_router
 from app.api.v1.models import router as models_router
 from app.api.v1.agents import router as agents_router, open_router as agents_open_router
 from app.api.v1.skills import router as skills_router
+from app.api.v1.skill_gen import router as skill_gen_router
 from app.api.v1.resolution import router as resolution_router
 from app.api.v1.governance import router as governance_router
 from app.api.v1.prompt_templates import router as prompt_templates_router
@@ -448,6 +449,7 @@ app.include_router(dp_mapping_router, prefix="/api/v1")
 app.include_router(ai_builder_v2_router, prefix="/api/v1")
 app.include_router(doc_builder_router, prefix="/api/v1")
 app.include_router(ontology_mapping_router, prefix="/api/v1")
+app.include_router(skill_gen_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
