@@ -1,4 +1,4 @@
-import { get } from './client'
+import { get, post } from './client'
 
 export interface ResourceMetrics {
   cpu_percent: number
@@ -14,28 +14,58 @@ export interface ServiceStatus {
   name: string
   status: string
   response_ms: number | null
-  uptime_hours: number | null
 }
 
-export interface SecurityEvent {
-  id: string
-  event_type: string
-  user_name: string | null
-  target: string
-  timestamp: string
-  severity: string
+export interface ResponseHistoryPoint {
+  service_name: string
+  response_ms: number | null
+  status: string
+  collected_at: string
 }
 
-export interface MonitorOverview {
+export interface AlertItem {
+  id: number
+  level: string
+  service_name: string
+  message: string
+  resolved: boolean
+  created_at: string
+  resolved_at: string | null
+}
+
+export interface LLMStatsResponse {
+  total_24h: number
+  by_module: Record<string, {
+    count: number
+    total_prompt_tokens: number
+    total_completion_tokens: number
+    avg_latency_ms: number
+  }>
+}
+
+export interface OntologyStatsResponse {
+  total_entities: number
+  by_type: Record<string, number>
+}
+
+export interface AgentActivityResponse {
+  total_agents: number
+  published_agents: number
+  total_skills: number
+}
+
+export interface DashboardOverview {
   resources: ResourceMetrics
   services: ServiceStatus[]
-  security_events: SecurityEvent[]
-  system_info: Record<string, any>
+  alerts: AlertItem[]
+  llm_stats: LLMStatsResponse
+  ontology_stats: OntologyStatsResponse
+  agent_activity: AgentActivityResponse
 }
 
 export const monitorApi = {
   overview() {
-    return get<MonitorOverview>('/monitor/overview')
+    return get<DashboardOverview>('/monitor/overview')
   },
   resources() {
     return get<ResourceMetrics>('/monitor/resources')
@@ -43,8 +73,28 @@ export const monitorApi = {
   services() {
     return get<ServiceStatus[]>('/monitor/services')
   },
-  securityEvents() {
-    return get<SecurityEvent[]>('/monitor/security-events')
+  responseHistory(hours: number = 1, service?: string) {
+    const params = new URLSearchParams({ hours: String(hours) })
+    if (service) params.set('service', service)
+    return get<ResponseHistoryPoint[]>(`/monitor/response-history?${params}`)
+  },
+  alerts(limit = 20, resolved?: boolean, level?: string) {
+    const params = new URLSearchParams({ limit: String(limit) })
+    if (resolved !== undefined) params.set('resolved', String(resolved))
+    if (level) params.set('level', level)
+    return get<AlertItem[]>(`/monitor/alerts?${params}`)
+  },
+  resolveAlert(id: number) {
+    return post<AlertItem>(`/monitor/alerts/${id}/resolve`)
+  },
+  llmStats() {
+    return get<LLMStatsResponse>('/monitor/llm-stats')
+  },
+  ontologyStats() {
+    return get<OntologyStatsResponse>('/monitor/ontology-stats')
+  },
+  agentActivity() {
+    return get<AgentActivityResponse>('/monitor/agent-activity')
   },
   systemInfo() {
     return get<Record<string, any>>('/monitor/system-info')
