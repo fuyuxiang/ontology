@@ -59,4 +59,6 @@ export const agentsApi = {
   publish: (id: string) => client.post<AgentItem>(`/agents/${id}/publish`).then(r => r.data),
   apiInfo: (id: string) => client.get<ApiInfo>(`/agents/${id}/api-info`).then(r => r.data),
   chatUrl: (id: string) => `/api/v1/agents/${id}/chat`,
+  acknowledgeStale: (id: string) =>
+    client.post(`/agents/${id}/acknowledge-stale`).then(r => r.data),
 }
