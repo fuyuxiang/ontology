@@ -31,6 +31,42 @@ def _extract_json(text: str) -> str:
     return text
 
 
+def _sanitize_docx(data: bytes) -> bytes:
+    """Remove broken relationship entries (e.g. Target='../NULL') from docx archive."""
+    import zipfile
+    from xml.etree import ElementTree as ET
+
+    NS = "http://schemas.openxmlformats.org/package/2006/relationships"
+    src = zipfile.ZipFile(io.BytesIO(data))
+    names = set(src.namelist())
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist():
+            raw = src.read(item.filename)
+            if item.filename.endswith(".rels"):
+                tree = ET.fromstring(raw)
+                dirty = False
+                for rel in list(tree):
+                    target = rel.get("Target", "")
+                    if target.startswith("http"):
+                        continue
+                    # resolve relative path against rels parent dir
+                    import posixpath
+                    rels_dir = posixpath.dirname(item.filename)
+                    parent_dir = posixpath.dirname(rels_dir)
+                    resolved = posixpath.normpath(posixpath.join(parent_dir, target))
+                    if resolved not in names and target not in names:
+                        tree.remove(rel)
+                        dirty = True
+                if dirty:
+                    ET.register_namespace("", NS)
+                    raw = ET.tostring(tree, encoding="unicode", xml_declaration=True).encode("utf-8")
+            dst.writestr(item, raw)
+    src.close()
+    return buf.getvalue()
+
+
 def parse_file_content(filename: str, content: bytes) -> str:
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
 
@@ -49,7 +85,7 @@ def parse_file_content(filename: str, content: bytes) -> str:
     if ext in ("docx", "doc"):
         try:
             import docx
-            doc = docx.Document(io.BytesIO(content))
+            doc = docx.Document(io.BytesIO(_sanitize_docx(content)))
             texts = [p.text for p in doc.paragraphs if p.text.strip()]
             return "\n".join(texts)[:8000]
         except Exception as e:
@@ -175,6 +211,7 @@ def chat_stream(
     full_content = ""
     in_think = False
     buffer = ""
+    think_notified = False
 
     for chunk in resp:
         delta = chunk.choices[0].delta
@@ -208,6 +245,9 @@ def chat_stream(
                             yield f"data: {json.dumps({'event': 'token', 'content': buffer[:start_idx]})}\n\n"
                         buffer = buffer[start_idx + 7:]
                         in_think = True
+                        if not think_notified:
+                            think_notified = True
+                            yield f"data: {json.dumps({'event': 'thinking', 'message': 'AI 正在深度思考...'})}\n\n"
 
     session["history"].append({"role": "assistant", "content": full_content})
 
