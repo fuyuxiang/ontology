@@ -34,6 +34,23 @@
       </div>
     </div>
 
+    <!-- Ontology stale banner -->
+    <div v-if="current?.ontology_stale" class="agent-detail__stale-banner">
+      <span class="agent-detail__stale-icon">⚠</span>
+      <span class="agent-detail__stale-text">该 Agent 依赖的本体实体已发生变更</span>
+      <button class="agent-detail__stale-btn" @click="showStaleDetail = !showStaleDetail">查看变更</button>
+      <button class="agent-detail__stale-btn agent-detail__stale-btn--ack" @click="ackStale">确认已知</button>
+    </div>
+    <div v-if="showStaleDetail && current?.ontology_stale_detail" class="agent-detail__stale-detail">
+      <ul>
+        <li v-for="c in current.ontology_stale_detail.breaking_changes" :key="c.entity_name">
+          <strong>{{ c.entity_name }}</strong> —
+          <span v-if="c.change_type === 'deleted'">已删除</span>
+          <span v-else>改名为 {{ c.new_name }}</span>
+        </li>
+      </ul>
+    </div>
+
     <!-- Body: left form + right chat -->
     <div class="agent-detail__body">
       <!-- Left: Config form -->
@@ -107,6 +124,7 @@ const entities = ref<{ id: string; name: string; name_cn?: string }[]>([])
 const current = ref<AgentItem | null>(null)
 const saving = ref(false)
 const streaming = ref(false)
+const showStaleDetail = ref(false)
 
 const form = reactive({
   name: '',
@@ -178,6 +196,14 @@ async function unpublishAgent() {
   if (!current.value) return
   const result = await agentsApi.update(current.value.id, { status: 'draft' } as any)
   loadFormFromAgent(result)
+}
+
+async function ackStale() {
+  if (!current.value) return
+  await agentsApi.acknowledgeStale(current.value.id)
+  current.value.ontology_stale = false
+  current.value.ontology_stale_detail = null
+  showStaleDetail.value = false
 }
 
 function resetChat() {
@@ -471,4 +497,36 @@ onMounted(async () => {
   flex: 1;
   resize: none;
 }
+.agent-detail__stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fef3c7;
+  border-bottom: 1px solid #fde68a;
+  font-size: 13px;
+}
+.agent-detail__stale-icon { color: #d97706; }
+.agent-detail__stale-text { flex: 1; color: #92400e; }
+.agent-detail__stale-btn {
+  padding: 4px 10px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: transparent;
+  color: #d97706;
+  cursor: pointer;
+  font-size: 12px;
+}
+.agent-detail__stale-btn--ack {
+  background: #d97706;
+  color: #fff;
+}
+.agent-detail__stale-detail {
+  padding: 8px 16px;
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  font-size: 12px;
+}
+.agent-detail__stale-detail ul { margin: 0; padding-left: 16px; }
+.agent-detail__stale-detail li { margin: 2px 0; }
 </style>
