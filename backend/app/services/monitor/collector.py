@@ -129,6 +129,7 @@ async def collect_service_metrics():
             cpu = psutil.cpu_percent(interval=0.1)
             mem = psutil.virtual_memory()
             disk = shutil.disk_usage("/")
+            disk_pct = round(disk.used / disk.total * 100, 1) if disk.total else 0
 
             db = SessionLocal()
             repo = MonitorRepository(db)
@@ -137,7 +138,7 @@ async def collect_service_metrics():
                     name, status, ms = await _check_service(svc)
                     repo.save_metric(
                         service_name=name, status=status, response_ms=ms,
-                        cpu_percent=cpu, memory_percent=mem.percent, disk_percent=disk.percent,
+                        cpu_percent=cpu, memory_percent=mem.percent, disk_percent=disk_pct,
                     )
                 logger.debug("Service metrics collected")
             finally:
