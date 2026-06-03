@@ -1,156 +1,115 @@
 <template>
-  <div class="agent-service">
-    <div class="agent-service__header">
-      <h1 class="page-title">Agent 交互</h1>
-      <p class="page-desc">本体感知的智能体，通过自然语言查询实体、遍历关系、执行规则</p>
+  <div class="agent-manage">
+    <div class="agent-manage__header">
+      <div class="header-text">
+        <h1 class="page-title">智能体管理</h1>
+        <p class="page-desc">管理和配置智能体，作为原子能力单元供流程编排调用</p>
+      </div>
+      <button class="btn-primary" @click="$router.push('/agent/manage/new')">+ 新建智能体</button>
     </div>
 
-    <div class="agent-service__body">
-      <!-- 左侧：Agent 列表 -->
-      <div class="agent-sidebar">
-        <div class="agent-sidebar__head">
-          <input v-model="searchText" class="search-input" placeholder="搜索智能体..." />
-          <button class="btn-sm" @click="$router.push('/service/agent/new')">+ 新建</button>
-        </div>
-        <div class="agent-list">
-          <div
-            v-for="agent in filteredAgents"
-            :key="agent.id"
-            class="agent-card"
-            :class="{ 'agent-card--active': selectedAgent?.id === agent.id }"
-            @click="selectAgent(agent)"
-          >
-            <div class="agent-card__name">{{ agent.name }}</div>
-            <div class="agent-card__desc">{{ agent.description || '暂无描述' }}</div>
-            <div class="agent-card__meta">
-              <span class="agent-card__status" :class="`agent-card__status--${agent.status}`">{{ agent.status === 'published' ? '已发布' : '草稿' }}</span>
-              <span class="agent-card__tags" v-if="agent.tags">{{ agent.tags }}</span>
-            </div>
-          </div>
-          <div v-if="filteredAgents.length === 0" class="agent-list__empty">暂无智能体</div>
-        </div>
+    <div class="agent-manage__toolbar">
+      <input
+        v-model="searchText"
+        class="search-input"
+        placeholder="搜索名称或描述..."
+      />
+      <div class="status-filters">
+        <button
+          v-for="opt in statusOptions"
+          :key="opt.value"
+          class="filter-btn"
+          :class="{ 'filter-btn--active': statusFilter === opt.value }"
+          @click="statusFilter = opt.value"
+        >{{ opt.label }}</button>
       </div>
+    </div>
 
-      <!-- 右侧：对话区 -->
-      <div class="chat-area">
-        <template v-if="selectedAgent">
-          <div class="chat-header">
-            <span class="chat-header__name">{{ selectedAgent.name }}</span>
-            <button class="btn-sm" @click="$router.push(`/service/agent/${selectedAgent.id}`)">编辑</button>
-          </div>
-          <div class="chat-messages" ref="messagesRef">
-            <div v-for="(msg, i) in messages" :key="i" class="chat-msg" :class="`chat-msg--${msg.role}`">
-              <div class="chat-msg__bubble">{{ msg.content }}</div>
-            </div>
-            <div v-if="streaming" class="chat-msg chat-msg--assistant">
-              <div class="chat-msg__bubble chat-msg__typing">
-                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-              </div>
-            </div>
-          </div>
-          <div class="chat-input">
-            <textarea v-model="userInput" class="chat-textarea" placeholder="输入消息..." rows="2" @keydown.enter.exact.prevent="sendMessage" :disabled="streaming"></textarea>
-            <button class="btn-send" @click="sendMessage" :disabled="streaming || !userInput.trim()">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8l12-5-4 5 4 5-12-5z" fill="currentColor"/></svg>
-            </button>
-          </div>
-        </template>
-        <div v-else class="chat-empty">
-          <p>选择左侧智能体开始对话</p>
+    <div v-if="filteredAgents.length" class="agent-manage__grid">
+      <div
+        v-for="agent in filteredAgents"
+        :key="agent.id"
+        class="agent-card"
+        @click="$router.push(`/agent/manage/${agent.id}`)"
+      >
+        <div class="agent-card__top">
+          <span class="agent-card__name">{{ agent.name }}</span>
+          <span
+            class="agent-card__badge"
+            :class="agent.status === 'published' ? 'badge--published' : 'badge--draft'"
+          >{{ agent.status === 'published' ? '已发布' : '草稿' }}</span>
+        </div>
+        <p class="agent-card__desc">{{ agent.description || '暂无描述' }}</p>
+        <div v-if="agent.tags && agent.tags.length" class="agent-card__tags">
+          <span v-for="tag in agent.tags" :key="tag" class="tag">{{ tag }}</span>
+        </div>
+        <div class="agent-card__footer">
+          <span
+            class="ref-count"
+            :title="refsTooltip(agent)"
+          >被 {{ agent.referenced_scenes?.length || 0 }} 个场景引用</span>
+          <button class="btn-delete" @click.stop="confirmDelete(agent)">删除</button>
         </div>
       </div>
+    </div>
+
+    <div v-else class="agent-manage__empty">
+      <p>{{ agents.length === 0 ? '暂无智能体，点击右上角新建' : '没有匹配的智能体' }}</p>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
-import { get } from '../../api/client'
-
-interface Agent { id: string; name: string; description: string; status: string; tags: string }
-interface ChatMsg { role: 'user' | 'assistant'; content: string }
+import { ref, computed, onMounted } from 'vue'
+import { agentsApi, type AgentItem } from '../../api/agents'
 
 const searchText = ref('')
-const agents = ref<Agent[]>([])
-const selectedAgent = ref<Agent | null>(null)
-const messages = ref<ChatMsg[]>([])
-const userInput = ref('')
-const streaming = ref(false)
-const messagesRef = ref<HTMLElement | null>(null)
+const statusFilter = ref('all')
+const agents = ref<AgentItem[]>([])
+
+const statusOptions = [
+  { label: '全部', value: 'all' },
+  { label: '草稿', value: 'draft' },
+  { label: '已发布', value: 'published' },
+]
 
 const filteredAgents = computed(() => {
-  if (!searchText.value) return agents.value
-  const q = searchText.value.toLowerCase()
-  return agents.value.filter(a => a.name.toLowerCase().includes(q) || a.description?.toLowerCase().includes(q))
+  let list = agents.value
+  if (statusFilter.value !== 'all') {
+    list = list.filter(a => a.status === statusFilter.value)
+  }
+  if (searchText.value) {
+    const q = searchText.value.toLowerCase()
+    list = list.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      (a.description && a.description.toLowerCase().includes(q))
+    )
+  }
+  return list
 })
 
-function selectAgent(agent: Agent) {
-  selectedAgent.value = agent
-  messages.value = [{ role: 'assistant', content: `你好！我是「${agent.name}」，有什么可以帮你的？` }]
+function refsTooltip(agent: AgentItem): string {
+  if (!agent.referenced_scenes || agent.referenced_scenes.length === 0) return '未被引用'
+  return agent.referenced_scenes.map(s => s.name).join('、')
 }
 
-function scrollToBottom() {
-  nextTick(() => { if (messagesRef.value) messagesRef.value.scrollTop = messagesRef.value.scrollHeight })
-}
-
-async function sendMessage() {
-  const text = userInput.value.trim()
-  if (!text || !selectedAgent.value) return
-  messages.value.push({ role: 'user', content: text })
-  userInput.value = ''
-  streaming.value = true
-  scrollToBottom()
-
+async function confirmDelete(agent: AgentItem) {
+  const refCount = agent.referenced_scenes?.length || 0
+  const warning = refCount > 0
+    ? `该智能体被 ${refCount} 个场景引用，删除后相关场景将受到影响。确定删除「${agent.name}」吗？`
+    : `确定删除智能体「${agent.name}」吗？`
+  if (!confirm(warning)) return
   try {
-    const token = localStorage.getItem('token')
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (token) headers['Authorization'] = `Bearer ${token}`
-
-    const res = await fetch(`/api/v1/agents/${selectedAgent.value.id}/chat`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ message: text }),
-    })
-
-    const reader = res.body!.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    let assistantMsg = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const parts = buffer.split('\n')
-      buffer = parts.pop() ?? ''
-      for (const line of parts) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6)
-          if (data === '[DONE]') continue
-          try {
-            const event = JSON.parse(data)
-            if (event.type === 'token' && event.content) {
-              assistantMsg += event.content
-            } else if (event.type === 'message' && event.content) {
-              assistantMsg = event.content
-            }
-          } catch { /* skip */ }
-        }
-      }
-    }
-    if (assistantMsg) messages.value.push({ role: 'assistant', content: assistantMsg })
+    await agentsApi.delete(agent.id)
+    agents.value = agents.value.filter(a => a.id !== agent.id)
   } catch (e: any) {
-    messages.value.push({ role: 'assistant', content: `错误: ${e.message}` })
-  } finally {
-    streaming.value = false
-    scrollToBottom()
+    alert('删除失败: ' + (e.message || '未知错误'))
   }
 }
 
 async function loadAgents() {
   try {
-    const data = await get<Agent[]>('/agents')
-    agents.value = data
+    agents.value = await agentsApi.list()
   } catch { /* empty */ }
 }
 
@@ -158,55 +117,209 @@ onMounted(loadAgents)
 </script>
 
 <style scoped>
-.agent-service { display: flex; flex-direction: column; height: 100%; }
-.agent-service__header { padding: 20px 24px 12px; flex-shrink: 0; }
-.page-title { font-size: 18px; font-weight: 700; color: var(--neutral-900); margin: 0 0 4px; }
-.page-desc { font-size: 13px; color: var(--neutral-500); margin: 0; }
-.agent-service__body { display: flex; flex: 1; overflow: hidden; border-top: 1px solid var(--neutral-200); }
+.agent-manage {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  overflow-y: auto;
+}
 
-.agent-sidebar { width: 280px; flex-shrink: 0; border-right: 1px solid var(--neutral-200); display: flex; flex-direction: column; }
-.agent-sidebar__head { display: flex; gap: 8px; padding: 12px; border-bottom: 1px solid var(--neutral-100); }
-.search-input { flex: 1; padding: 6px 10px; border: 1px solid var(--neutral-200); border-radius: 6px; font-size: 12px; outline: none; }
-.search-input:focus { border-color: var(--semantic-500); }
-.btn-sm { padding: 4px 10px; border: 1px solid var(--neutral-200); border-radius: 5px; background: var(--neutral-0); font-size: 11px; cursor: pointer; color: var(--neutral-600); white-space: nowrap; }
-.btn-sm:hover { background: var(--neutral-50); }
+.agent-manage__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
 
-.agent-list { flex: 1; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 4px; }
-.agent-card { padding: 10px 12px; border-radius: 8px; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
-.agent-card:hover { background: var(--neutral-50); }
-.agent-card--active { background: var(--semantic-50); border-color: var(--semantic-200); }
-.agent-card__name { font-size: 13px; font-weight: 600; color: var(--neutral-800); }
-.agent-card__desc { font-size: 11px; color: var(--neutral-500); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.agent-card__meta { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
-.agent-card__status { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 500; }
-.agent-card__status--published { background: #d1fae5; color: #059669; }
-.agent-card__status--draft { background: var(--neutral-100); color: var(--neutral-500); }
-.agent-card__tags { font-size: 10px; color: var(--neutral-400); }
-.agent-list__empty { padding: 20px; text-align: center; color: var(--neutral-400); font-size: 12px; }
+.page-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--neutral-900);
+  margin: 0 0 4px;
+}
 
-.chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-.chat-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--neutral-100); }
-.chat-header__name { font-size: 14px; font-weight: 600; color: var(--neutral-800); }
-.chat-empty { flex: 1; display: flex; align-items: center; justify-content: center; color: var(--neutral-400); font-size: 13px; }
+.page-desc {
+  font-size: 13px;
+  color: var(--neutral-500);
+  margin: 0;
+}
 
-.chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
-.chat-msg { display: flex; }
-.chat-msg--user { justify-content: flex-end; }
-.chat-msg--assistant { justify-content: flex-start; }
-.chat-msg__bubble { max-width: 70%; padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
-.chat-msg--user .chat-msg__bubble { background: var(--semantic-600); color: #fff; border-bottom-right-radius: 3px; }
-.chat-msg--assistant .chat-msg__bubble { background: var(--neutral-100); color: var(--neutral-800); border-bottom-left-radius: 3px; }
+.btn-primary {
+  padding: 8px 16px;
+  background: var(--semantic-600);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
 
-.chat-msg__typing { display: flex; gap: 4px; padding: 10px 14px; }
-.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--neutral-400); animation: bounce 1.2s infinite; }
-.dot:nth-child(2) { animation-delay: 0.2s; }
-.dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes bounce { 0%,80%,100% { transform: translateY(0); } 40% { transform: translateY(-4px); } }
+.btn-primary:hover {
+  background: var(--semantic-700);
+}
 
-.chat-input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--neutral-100); }
-.chat-textarea { flex: 1; padding: 8px 12px; border: 1px solid var(--neutral-200); border-radius: 8px; font-size: 13px; resize: none; outline: none; font-family: inherit; }
-.chat-textarea:focus { border-color: var(--semantic-500); }
-.btn-send { width: 36px; height: 36px; border-radius: 8px; border: none; background: var(--semantic-600); color: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; align-self: flex-end; }
-.btn-send:hover:not(:disabled) { background: var(--semantic-700); }
-.btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.agent-manage__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.search-input {
+  flex: 1;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--semantic-500);
+}
+
+.status-filters {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-btn {
+  padding: 6px 12px;
+  border: 1px solid var(--neutral-200);
+  border-radius: 6px;
+  background: var(--neutral-0);
+  font-size: 12px;
+  color: var(--neutral-600);
+  cursor: pointer;
+}
+
+.filter-btn:hover {
+  background: var(--neutral-50);
+}
+
+.filter-btn--active {
+  background: var(--semantic-50);
+  border-color: var(--semantic-300);
+  color: var(--semantic-700);
+  font-weight: 500;
+}
+
+.agent-manage__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.agent-card {
+  border: 1px solid var(--neutral-200);
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.agent-card:hover {
+  border-color: var(--semantic-300);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.agent-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.agent-card__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--neutral-800);
+}
+
+.agent-card__badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.badge--published {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.badge--draft {
+  background: var(--neutral-100);
+  color: var(--neutral-500);
+}
+
+.agent-card__desc {
+  font-size: 12px;
+  color: var(--neutral-600);
+  margin: 0;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.agent-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tag {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--neutral-100);
+  color: var(--neutral-600);
+  border-radius: 4px;
+}
+
+.agent-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--neutral-100);
+}
+
+.ref-count {
+  font-size: 11px;
+  color: var(--neutral-400);
+}
+
+.btn-delete {
+  padding: 4px 10px;
+  border: 1px solid var(--neutral-200);
+  border-radius: 5px;
+  background: var(--neutral-0);
+  font-size: 11px;
+  color: var(--neutral-500);
+  cursor: pointer;
+}
+
+.btn-delete:hover {
+  border-color: #fca5a5;
+  color: #dc2626;
+  background: #fef2f2;
+}
+
+.agent-manage__empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--neutral-400);
+  font-size: 13px;
+}
 </style>
