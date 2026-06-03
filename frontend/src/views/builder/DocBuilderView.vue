@@ -10,7 +10,8 @@
     <div class="ai-builder__content">
       <StepDocUpload v-if="step === 0" @next="onUploadDone" />
       <StepDocChat v-else-if="step === 1" :session-id="sessionId" :business-desc="businessDesc" @next="onChatDone" />
-      <StepDocReview v-else-if="step === 2" :result="extractionResult!" @prev="step = 1" @confirm="onConfirm" />
+      <StepDocMapping v-else-if="step === 2" :session-id="sessionId" :ontology="extractionResult!" @next="onMappingDone" />
+      <StepDocReview v-else-if="step === 3" :result="mappedResult!" @prev="step = 2" @confirm="onConfirm" />
     </div>
   </div>
 </template>
@@ -21,16 +22,18 @@ import { useRouter } from 'vue-router'
 import { useBuilderStore } from '../../store/builder'
 import StepDocUpload from './components/doc/StepDocUpload.vue'
 import StepDocChat from './components/doc/StepDocChat.vue'
+import StepDocMapping from './components/doc/StepDocMapping.vue'
 import StepDocReview from './components/doc/StepDocReview.vue'
 
 const router = useRouter()
 const store = useBuilderStore()
 
-const steps = ['需求与文档', 'AI对话抽取', '确认入库']
+const steps = ['需求与文档', 'AI对话抽取', '资产映射', '确认入库']
 const step = ref(0)
 const sessionId = ref('')
 const businessDesc = ref('')
 const extractionResult = ref<any>(null)
+const mappedResult = ref<any>(null)
 
 function onUploadDone(payload: { sessionId: string; businessDesc: string }) {
   sessionId.value = payload.sessionId
@@ -41,6 +44,11 @@ function onUploadDone(payload: { sessionId: string; businessDesc: string }) {
 function onChatDone(ontology: any) {
   extractionResult.value = ontology
   step.value = 2
+}
+
+function onMappingDone(ontology: any) {
+  mappedResult.value = ontology
+  step.value = 3
 }
 
 function onConfirm(ontology: any) {
@@ -55,12 +63,17 @@ function onConfirm(ontology: any) {
     primaryKey: 'id',
     icon: '🔷',
     instanceCount: 0,
+    table: e.table || undefined,
+    tableConfidence: e.confidence || undefined,
     properties: (e.properties || []).map((p: any, j: number) => ({
       id: `prop-${Date.now().toString(36)}-${i}-${j}`,
       name: p.name,
       displayName: p.displayName || p.name,
       type: p.type || 'string',
       required: p.required ?? false,
+      field: p.field || undefined,
+      fieldType: p.fieldType || undefined,
+      fieldConfidence: p.confidence || undefined,
     })),
     derivedProperties: [],
     rules: [],
@@ -77,6 +90,11 @@ function onConfirm(ontology: any) {
     description: r.description || r.displayName,
     relationType: 'ObjectProperty' as const,
     semanticType: 'association' as const,
+    sourceField: r.sourceField || undefined,
+    sourceTable: r.sourceTable || undefined,
+    targetField: r.targetField || undefined,
+    targetTable: r.targetTable || undefined,
+    mappingConfidence: r.confidence || undefined,
   }))
   store.patchActive({ ontologyObjects: objects, ontologyRelations: relations })
   router.push('/studio')
