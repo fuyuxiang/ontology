@@ -264,6 +264,30 @@ async def lifespan(app: FastAPI):
                     conn.execute(text("UPDATE datasources SET table_count = 0 WHERE table_count IS NULL"))
                 except Exception:
                     pass
+            if "enabled" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN enabled TINYINT(1) DEFAULT 0"))
+            if "source_category" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN source_category VARCHAR(20) DEFAULT 'database'"))
+            if "file_path" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN file_path VARCHAR(500)"))
+            if "file_type" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN file_type VARCHAR(20)"))
+            if "api_url" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_url VARCHAR(500)"))
+            if "api_method" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_method VARCHAR(10) DEFAULT 'GET'"))
+            if "api_headers" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_headers JSON"))
+            if "api_body" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_body TEXT"))
+            if "mq_topic" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN mq_topic VARCHAR(200)"))
+            if "mq_group" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN mq_group VARCHAR(200)"))
+            if "poll_interval" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN poll_interval INTEGER DEFAULT 60"))
+            if "parsed_content" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN parsed_content TEXT"))
             conn.commit()
 
         # business_rules 表增加结构化列
@@ -301,6 +325,23 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE agents ADD COLUMN nodes_json JSON"))
             if "edges_json" not in cols:
                 conn.execute(text("ALTER TABLE agents ADD COLUMN edges_json JSON"))
+            if "ontology_version_id" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN ontology_version_id VARCHAR(36)"))
+            if "ontology_stale" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN ontology_stale TINYINT(1) NOT NULL DEFAULT 0"))
+            if "ontology_stale_detail" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN ontology_stale_detail JSON"))
+            conn.commit()
+
+        # aip_scenes 表增加 ontology_stale 相关列
+        if "aip_scenes" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("aip_scenes")}
+            if "ontology_version_id" not in cols:
+                conn.execute(text("ALTER TABLE aip_scenes ADD COLUMN ontology_version_id VARCHAR(36)"))
+            if "ontology_stale" not in cols:
+                conn.execute(text("ALTER TABLE aip_scenes ADD COLUMN ontology_stale TINYINT(1) NOT NULL DEFAULT 0"))
+            if "ontology_stale_detail" not in cols:
+                conn.execute(text("ALTER TABLE aip_scenes ADD COLUMN ontology_stale_detail JSON"))
             conn.commit()
 
         # audit_log 表补充 details / status 列
@@ -310,6 +351,36 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE audit_log ADD COLUMN details TEXT"))
             if "status" not in cols:
                 conn.execute(text("ALTER TABLE audit_log ADD COLUMN status VARCHAR(16) DEFAULT 'success'"))
+            conn.commit()
+
+        # skills 表增加技能平台扩展列
+        if "skills" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("skills")}
+            if "current_version" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN current_version INTEGER DEFAULT 0"))
+            if "input_schema" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN input_schema JSON"))
+            if "output_schema" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN output_schema JSON"))
+            if "prompt_template" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN prompt_template TEXT"))
+            if "tools" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN tools JSON"))
+            if "test_cases" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN test_cases JSON"))
+            if "asset_refs" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN asset_refs JSON"))
+            if "created_by" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN created_by VARCHAR(100) DEFAULT ''"))
+            if "reviewed_by" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN reviewed_by VARCHAR(100) DEFAULT ''"))
+            conn.commit()
+
+        # ontology_entities 表增加 publish_config 列
+        if "ontology_entities" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("ontology_entities")}
+            if "publish_config" not in cols:
+                conn.execute(text("ALTER TABLE ontology_entities ADD COLUMN publish_config JSON"))
             conn.commit()
 
     db = SessionLocal()
