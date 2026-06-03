@@ -28,11 +28,11 @@
     <ServiceHealthCards :services="services" />
 
     <!-- Resource + Response Time -->
-    <a-row :gutter="16" style="margin-top: 16px;">
-      <a-col :xs="24" :lg="10">
+    <a-row :gutter="16" style="margin-top: 16px;" class="middle-row">
+      <a-col :xs="24" :lg="10" class="middle-col">
         <ResourceGauges :data="resources" />
       </a-col>
-      <a-col :xs="24" :lg="14">
+      <a-col :xs="24" :lg="14" class="middle-col">
         <ResponseTimeChart />
       </a-col>
     </a-row>
@@ -204,13 +204,16 @@ onUnmounted(() => {
   font-size: 13px;
   color: var(--color-text-secondary, #888);
 }
+.middle-row,
 .bottom-row {
   display: flex;
   align-items: stretch;
 }
+.middle-col,
 .bottom-col {
   display: flex;
 }
+.middle-col > *,
 .bottom-col > * {
   flex: 1;
 }
