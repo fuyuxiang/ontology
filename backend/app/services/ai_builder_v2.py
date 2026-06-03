@@ -35,7 +35,7 @@ def match_domain(business_desc: str, db: Session | None = None) -> dict:
     domains = dwd_catalog.get_domains(db)
     domain_list = "\n".join(f"- {d}" for d in domains)
 
-    prompt = f"""你是数据中台领域专家。根据用户的业务描述，从以下一级主题域中选择最相关的1-3个：
+    prompt = f"""你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。根据用户的业务描述，从以下一级主题域中选择最相关的1-3个：
 
 可选主题域：
 {domain_list}
@@ -76,7 +76,7 @@ def recommend_tables(business_desc: str, tables: list[dict], db: Session | None 
     tables_text = "\n".join(table_summaries)
     table_names = [t["table_name"] for t in tables[:50]]
 
-    prompt = f"""你是数据中台领域专家。根据用户的业务描述，从以下候选数据表中选出与该业务最相关的表。
+    prompt = f"""你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。根据用户的业务描述，从以下候选数据表中选出与该业务最相关的表。
 
 业务描述：{business_desc}
 
@@ -129,7 +129,7 @@ def extract_ontology_stream(
     schema_json = json.dumps(tables_schema, ensure_ascii=False, indent=2)
     doc_summary = "\n\n".join(f"### {k}\n{v[:2000]}" for k, v in doc_texts.items())
 
-    prompt = f"""你是本体工程师。根据以下结构化数据表 schema 和业务文档，提取本体的实体、属性和关系。
+    prompt = f"""你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。根据以下结构化数据表 schema 和业务文档，提取本体的实体、属性和关系。
 
 规则：
 - 实体必须和结构化数据中的表对应（一张表对应一个实体）
