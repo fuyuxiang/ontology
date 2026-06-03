@@ -22,7 +22,7 @@ router = APIRouter(prefix="/monitor", tags=["monitor"])
 @router.get("/resources", response_model=ResourceMetrics)
 def get_resources():
     mem = psutil.virtual_memory()
-    disk = psutil.disk_usage("/")
+    disk = psutil.disk_usage("C:\\")
     return ResourceMetrics(
         cpu_percent=psutil.cpu_percent(interval=0.1),
         memory_percent=mem.percent,
