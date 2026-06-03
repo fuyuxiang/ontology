@@ -54,6 +54,12 @@ export interface AgentActivityResponse {
   total_skills: number
 }
 
+export interface PlatformStatsResponse {
+  total_datasources: number
+  total_rules: number
+  total_pipelines: number
+}
+
 export interface DashboardOverview {
   resources: ResourceMetrics
   services: ServiceStatus[]
@@ -95,6 +101,9 @@ export const monitorApi = {
   },
   agentActivity() {
     return get<AgentActivityResponse>('/monitor/agent-activity')
+  },
+  platformStats() {
+    return get<PlatformStatsResponse>('/monitor/platform-stats')
   },
   systemInfo() {
     return get<Record<string, any>>('/monitor/system-info')
