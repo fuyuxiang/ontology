@@ -321,3 +321,20 @@ def open_agent_info(
         "description": a.description,
         "tags": a.tags or [],
     }
+
+
+@router.post("/{agent_id}/acknowledge-stale")
+def acknowledge_stale(agent_id: str, db: Session = Depends(get_db)):
+    agent = db.query(Agent).filter(Agent.id == agent_id).first()
+    if not agent:
+        raise HTTPException(404, "Agent 不存在")
+    if not agent.ontology_stale:
+        return {"message": "该 Agent 没有过期标记"}
+
+    from app.models.version import OntologyVersion
+    active_version = db.query(OntologyVersion).filter(OntologyVersion.is_active == True).first()
+    agent.ontology_stale = False
+    agent.ontology_stale_detail = None
+    agent.ontology_version_id = active_version.id if active_version else None
+    db.commit()
+    return {"message": "已确认，过期标记已清除"}
