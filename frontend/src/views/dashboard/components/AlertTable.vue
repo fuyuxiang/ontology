@@ -88,17 +88,15 @@ function levelLabel(level: string) {
 }
 function formatTime(iso: string) {
   if (!iso) return ''
-  // UTC 转北京时间 (UTC+8)
-  const d = new Date(iso)
-  d.setHours(d.getHours() + 8)
-  return d.toISOString().substring(11, 19)
+  // 后端返回的是 UTC 时间（无 Z 后缀），需要加 Z 表示 UTC
+  const d = new Date(iso + 'Z')
+  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
 }
 
 function formatTimeFull(iso: string) {
   if (!iso) return ''
-  const d = new Date(iso)
-  d.setHours(d.getHours() + 8)
-  return d.toISOString().replace('T', ' ').substring(0, 19)
+  const d = new Date(iso + 'Z')
+  return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
 }
 </script>
 
