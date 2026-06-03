@@ -173,11 +173,41 @@ def chat_stream(
         return
 
     full_content = ""
+    in_think = False
+    buffer = ""
+
     for chunk in resp:
         delta = chunk.choices[0].delta
         if delta.content:
             full_content += delta.content
-            yield f"data: {json.dumps({'event': 'token', 'content': delta.content})}\n\n"
+            buffer += delta.content
+
+            while buffer:
+                if in_think:
+                    end_idx = buffer.find("</think>")
+                    if end_idx == -1:
+                        buffer = ""
+                        break
+                    else:
+                        buffer = buffer[end_idx + 8:]
+                        in_think = False
+                else:
+                    start_idx = buffer.find("<think>")
+                    if start_idx == -1:
+                        if "<" in buffer and not buffer.endswith(">"):
+                            safe = buffer[:buffer.rfind("<")]
+                            if safe:
+                                yield f"data: {json.dumps({'event': 'token', 'content': safe})}\n\n"
+                            buffer = buffer[len(safe):]
+                        else:
+                            yield f"data: {json.dumps({'event': 'token', 'content': buffer})}\n\n"
+                            buffer = ""
+                        break
+                    else:
+                        if start_idx > 0:
+                            yield f"data: {json.dumps({'event': 'token', 'content': buffer[:start_idx]})}\n\n"
+                        buffer = buffer[start_idx + 7:]
+                        in_think = True
 
     session["history"].append({"role": "assistant", "content": full_content})
 
