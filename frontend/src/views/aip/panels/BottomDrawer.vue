@@ -57,6 +57,20 @@
                 <span class="aip-bd__reason-label">写回</span>
                 <span v-for="w in r.writeback" :key="w" class="aip-tag aip-tag--green">{{ w }}</span>
               </div>
+              <!-- Agent ReAct Loop 轮次详情 -->
+              <div v-if="r.raw && r.raw.rounds" class="aip-bd__agent-loop">
+                <div class="aip-bd__agent-loop-title">Agent 推理轮次 ({{ r.raw.rounds }} 轮)</div>
+                <div v-for="(round, ri) in (r.raw.agent_rounds || [])" :key="ri" class="aip-bd__agent-round">
+                  <div class="aip-bd__agent-round-head">
+                    <span class="aip-bd__agent-round-num">R{{ ri + 1 }}</span>
+                    <span v-if="round.thought" class="aip-bd__agent-thought">{{ round.thought.slice(0, 100) }}</span>
+                  </div>
+                  <div v-if="round.tool_call" class="aip-bd__agent-tool">
+                    <span class="aip-tag aip-tag--blue">{{ round.tool_call.name }}</span>
+                    <span class="aip-bd__agent-obs">→ {{ shorten(round.observation) }}</span>
+                  </div>
+                </div>
+              </div>
               <div class="aip-bd__reason-output">{{ r.output }}</div>
             </div>
           </div>
@@ -288,4 +302,14 @@ onBeforeUnmount(() => { document.removeEventListener('mousemove', onMove); docum
 .aip-bd__reason-status { margin-left: auto; font-size: 10px; padding: 1px 8px; border-radius: 999px; }
 .aip-bd__reason-status--success { background: #ecfdf5; color: #059669; }
 .aip-bd__reason-status--failed { background: #fef2f2; color: #dc2626; }
+
+/* Agent ReAct Loop 追溯 */
+.aip-bd__agent-loop { margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0; }
+.aip-bd__agent-loop-title { font-size: 10px; color: #64748b; font-weight: 600; margin-bottom: 6px; }
+.aip-bd__agent-round { padding: 4px 8px; background: #f8fafc; border-radius: 4px; margin-bottom: 4px; border-left: 2px solid #2E5BFF; }
+.aip-bd__agent-round-head { display: flex; align-items: center; gap: 6px; }
+.aip-bd__agent-round-num { font-size: 10px; font-weight: 700; color: #2E5BFF; min-width: 20px; }
+.aip-bd__agent-thought { font-size: 11px; color: #475569; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.aip-bd__agent-tool { display: flex; align-items: center; gap: 6px; margin-top: 2px; padding-left: 26px; }
+.aip-bd__agent-obs { font-size: 10px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
 </style>

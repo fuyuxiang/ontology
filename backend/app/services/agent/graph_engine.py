@@ -216,33 +216,63 @@ class GraphEngine:
         yield {"type": "done", "suggestions": self._generate_suggestions(context, question), "actions": []}
 
     def run_for_scene(self, input_params: dict | None = None) -> Generator[dict, None, None]:
-        """AIP 场景模式入口：无对话语义，仅按 DAG 跑、不做最终 LLM 总结。"""
+        """AIP 场景模式入口：就绪队列执行，支持条件分支路由、并行、数据映射。"""
+        from app.services.aip.data_mapper import resolve_node_input, get_incoming_edges
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
         self.emit_node_io = True
-        topo_order = self._topological_sort()
-        if not topo_order:
-            yield {"type": "scene_failed", "error": "画布为空或存在循环依赖"}
+        if not self.nodes:
+            yield {"type": "scene_failed", "error": "画布为空"}
             return
 
         context: dict[str, Any] = {
             "system_prompt": self.system_prompt,
             "input_params": input_params or {},
         }
-        # 把 input_params 顶层平铺，方便节点用 {var} 引用
         for k, v in (input_params or {}).items():
             context[k] = v
 
+        # 构建 DAG 依赖关系
+        in_degree: dict[str, int] = {nid: 0 for nid in self.nodes}
+        children: dict[str, list[str]] = {nid: [] for nid in self.nodes}
+        parent_edges: dict[str, list[dict]] = {nid: [] for nid in self.nodes}
+        for e in self.edges:
+            src, tgt = e.get("source"), e.get("target")
+            if src in children and tgt in in_degree:
+                children[src].append(tgt)
+                in_degree[tgt] += 1
+                parent_edges[tgt].append(e)
+
+        # 状态追踪
+        executed: set[str] = set()
+        skipped: set[str] = set()
+        ready = deque(nid for nid, deg in in_degree.items() if deg == 0)
+
+        active_nodes = [nid for nid in self.nodes if self.nodes[nid].get("type") not in ("skillNode", "memoryNode", "toolNode")]
         yield {
             "type": "scene_started",
-            "total_nodes": len(topo_order),
+            "total_nodes": len(active_nodes),
             "input_params": input_params or {},
         }
 
-        for node_id in topo_order:
+        while ready:
+            node_id = ready.popleft()
+            if node_id in skipped or node_id in executed:
+                self._propagate_ready(node_id, children, in_degree, executed, skipped, ready)
+                continue
+
             node = self.nodes[node_id]
             ntype = node.get("type", "")
             data = node.get("data", {})
             label = data.get("label", ntype)
             node_started_at = time.time()
+
+            # 跳过元数据子节点
+            if ntype in ("memoryNode", "toolNode", "skillNode"):
+                context[node_id] = {"meta": data, "passthrough": True}
+                executed.add(node_id)
+                self._propagate_ready(node_id, children, in_degree, executed, skipped, ready)
+                continue
 
             yield {
                 "type": "node_started",
@@ -252,25 +282,146 @@ class GraphEngine:
                 "started_at": node_started_at,
             }
 
+            # 数据映射：从入边的 mapping 配置组装输入
+            incoming = get_incoming_edges(node_id, self.edges)
+            mapped_input = resolve_node_input(node_id, incoming, context)
+            if mapped_input:
+                data = {**data, "_mapped_input": mapped_input}
+
             try:
-                result, summary = self._execute_node(ntype, data, context, "")
+                # Agent 节点特殊处理：使用 ReAct Loop
+                if ntype in ("agentNode",) and self._should_use_agent_loop(data):
+                    result, summary = yield from self._exec_agent_loop(node_id, data, context, node_started_at)
+                else:
+                    result, summary = self._execute_node(ntype, data, context, "")
+
                 context[node_id] = result
                 self._record_node_io(node_id, ntype, label, data, result, summary, node_started_at, status="success")
                 yield self._make_node_finished_event(node_id, ntype, label, result, summary, node_started_at)
+                executed.add(node_id)
+
+                # 条件分支路由：标记未命中分支的下游为 skipped
+                if ntype == "condition":
+                    self._route_condition_branches(node_id, result, children, skipped, context)
+
             except Exception as e:
                 logger.error(f"[scene] 节点 {node_id} ({ntype}) 执行失败: {e}")
                 err = {"error": str(e)}
                 context[node_id] = err
                 self._record_node_io(node_id, ntype, label, data, err, str(e), node_started_at, status="failed")
                 yield self._make_node_failed_event(node_id, ntype, label, str(e), node_started_at)
-                # 节点失败默认继续往下，节点的 on_error 配置可改为 stop
+                executed.add(node_id)
                 if data.get("on_error", "continue") == "stop":
                     yield {"type": "scene_failed", "failed_node": node_id, "error": str(e)}
                     return
 
-        # 收集"输出节点"的最终产出
+            # 推进后续就绪节点
+            self._propagate_ready(node_id, children, in_degree, executed, skipped, ready)
+
         final_output = self._collect_final_output(context)
         yield {"type": "scene_finished", "final_output": final_output, "node_io": self.node_io}
+
+    def _propagate_ready(self, node_id: str, children: dict, in_degree: dict,
+                         executed: set, skipped: set, ready: deque):
+        """节点完成/跳过后，更新下游入度，就绪的加入队列。"""
+        for child in children.get(node_id, []):
+            in_degree[child] -= 1
+            if in_degree[child] <= 0 and child not in executed and child not in skipped:
+                ready.append(child)
+
+    def _route_condition_branches(self, node_id: str, result: dict,
+                                  children: dict, skipped: set, context: dict):
+        """条件节点执行后，根据结果标记未命中的分支为 skipped。"""
+        branch_label = result.get("branch", "true")
+        outgoing = [e for e in self.edges if e.get("source") == node_id]
+
+        for edge in outgoing:
+            target = edge.get("target", "")
+            handle = edge.get("sourceHandle", "")
+            # sourceHandle 格式: "branch-true" / "branch-false" / "branch-0" / "branch-1" 等
+            if handle and handle.startswith("branch-"):
+                edge_branch = handle.replace("branch-", "")
+                if edge_branch != branch_label and edge_branch != str(branch_label):
+                    self._skip_subtree(target, children, skipped)
+
+    def _skip_subtree(self, node_id: str, children: dict, skipped: set):
+        """递归跳过某节点及其所有后续节点（条件分支未命中路径）。"""
+        if node_id in skipped:
+            return
+        skipped.add(node_id)
+        self.node_io[node_id] = {
+            "node_id": node_id,
+            "node_type": self.nodes.get(node_id, {}).get("type", ""),
+            "label": self.nodes.get(node_id, {}).get("data", {}).get("label", ""),
+            "status": "skipped",
+            "input": {},
+            "output": {"skipped": True},
+            "summary": "条件分支未命中，已跳过",
+            "started_at": time.time(),
+            "finished_at": time.time(),
+            "duration_ms": 0,
+        }
+        for child in children.get(node_id, []):
+            # 只跳过该分支独有的下游（如果有其他入边不来自被跳过的节点，则不跳过）
+            other_parents = [e for e in self.edges if e.get("target") == child and e.get("source") != node_id and e.get("source") not in skipped]
+            if not other_parents:
+                self._skip_subtree(child, children, skipped)
+
+    def _should_use_agent_loop(self, data: dict) -> bool:
+        """判断 Agent 节点是否应使用 ReAct loop（有绑定本体类型或 skill）。"""
+        return bool(data.get("objectTypes")) or bool(data.get("skill_ids"))
+
+    def _exec_agent_loop(self, node_id: str, data: dict, context: dict, started_at: float):
+        """执行 Agent ReAct loop，yield 事件，返回 (result, summary)。"""
+        from app.services.aip.agent_loop import AgentNodeRunner
+
+        # 收集挂载的 skill/tool ID（从子节点边获取）
+        skill_ids = list(data.get("skill_ids", []))
+        tool_ids = list(data.get("tool_ids", []))
+        for e in self.edges:
+            if e.get("target") == node_id or e.get("source") != node_id:
+                continue
+            child_id = e.get("target", "")
+            child_node = self.nodes.get(child_id, {})
+            child_type = child_node.get("type", "")
+            child_data = child_node.get("data", {})
+            if child_type == "skillNode" and child_data.get("skill_id"):
+                skill_ids.append(child_data["skill_id"])
+            elif child_type == "toolNode" and child_data.get("tool_id"):
+                tool_ids.append(child_data["tool_id"])
+
+        node_data = {**data, "skill_ids": skill_ids, "tool_ids": tool_ids}
+        runner = AgentNodeRunner(
+            db=self.db,
+            node_data=node_data,
+            upstream_context=context,
+            model_name=self.model_name,
+            model_config=self.model_config,
+        )
+
+        # 构建输入：优先用映射数据，否则用上游 context
+        input_data = data.get("_mapped_input") or {}
+        if not input_data:
+            for k, v in context.items():
+                if k in ("system_prompt", "input_params"):
+                    continue
+                if isinstance(v, dict) and not v.get("passthrough"):
+                    input_data = v
+                    break
+
+        final_answer = ""
+        rounds_info = []
+        for ev in runner.run(input_data):
+            ev["node_id"] = node_id
+            yield ev
+            if ev.get("type") == "agent_finished":
+                final_answer = ev.get("answer", "")
+            elif ev.get("type") == "agent_round_end":
+                rounds_info.append(ev)
+
+        result = {"answer": final_answer, "rounds": len(rounds_info)}
+        summary = f"Agent 推理完成 ({len(rounds_info)} 轮)"
+        return result, summary
 
     def _record_node_io(
         self, node_id: str, ntype: str, label: str,
@@ -393,6 +544,9 @@ class GraphEngine:
             "subscene": self._exec_subscene,
             "memoryNode": self._exec_passthrough,        # 子节点：仅作为元数据挂在 agent 上
             "toolNode": self._exec_passthrough,
+            "skillNode": self._exec_passthrough,
+            "httpCall": self._exec_http_call,
+            "loop": self._exec_loop,
         }
         handler = handlers.get(ntype, self._exec_default)
         return handler(data, context, question)
@@ -693,8 +847,20 @@ class GraphEngine:
         return None
 
     def _exec_loop(self, data: dict, context: dict, question: str):
-        upstream = self._collect_upstream_data(context)
-        return {"looped": True, "data_preview": upstream[:500]}, "遍历完成"
+        """循环节点：对上游列表数据逐项处理。
+        data: { source_field: 要迭代的字段路径, item_var: 每项的变量名 }
+        """
+        source_field = data.get("source_field", "")
+        items = self._lookup_in_context(source_field, context) if source_field else None
+        if not items:
+            upstream = self._collect_upstream_data(context)
+            try:
+                items = json.loads(upstream) if upstream.startswith("[") else []
+            except Exception:
+                items = []
+        if not isinstance(items, list):
+            items = [items] if items else []
+        return {"looped": True, "item_count": len(items), "items": items[:100]}, f"循环 {len(items)} 项"
 
     def _exec_merge(self, data: dict, context: dict, question: str):
         return {"merged": True}, "分支合并完成"
@@ -891,7 +1057,48 @@ class GraphEngine:
         return {"assigned": True}, "变量赋值完成"
 
     def _exec_parallel(self, data: dict, context: dict, question: str):
-        return {"parallel": True}, "并行分支已启动"
+        """并行网关节点：标记为已执行，实际并行由 DAG 引擎的就绪队列自然实现。"""
+        return {"parallel": True, "gateway": "fork"}, "并行网关已通过"
+
+    def _exec_http_call(self, data: dict, context: dict, question: str):
+        """HTTP 调用节点：调用外部 API。
+        data: { url, method, headers, body, timeout }
+        """
+        import requests
+        url = data.get("url", "")
+        if not url:
+            return {"error": "未配置 URL"}, "未配置 URL"
+        url = self._resolve_template(url, context)
+        method = (data.get("method", "GET")).upper()
+        headers = data.get("headers") or {}
+        body = data.get("body") or {}
+        timeout = data.get("timeout", 30)
+
+        if isinstance(body, str):
+            body = self._resolve_template(body, context)
+            try:
+                body = json.loads(body)
+            except Exception:
+                pass
+        elif isinstance(body, dict):
+            for k, v in list(body.items()):
+                if isinstance(v, str):
+                    body[k] = self._resolve_template(v, context)
+
+        try:
+            resp = requests.request(
+                method=method, url=url, headers=headers,
+                json=body if method in ("POST", "PUT", "PATCH") else None,
+                params=body if method == "GET" else None,
+                timeout=timeout,
+            )
+            result = {
+                "status_code": resp.status_code,
+                "body": resp.json() if resp.headers.get("content-type", "").startswith("application/json") else resp.text[:2000],
+            }
+            return result, f"HTTP {method} {resp.status_code}"
+        except Exception as e:
+            return {"error": str(e)}, f"HTTP 调用失败: {e}"
 
     def _exec_ml_model(self, data: dict, context: dict, question: str):
         model_name = data.get("model_name", "默认模型")
