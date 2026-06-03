@@ -37,6 +37,7 @@
               <div class="aip-sb__card-trigger">{{ triggerText(s) }}</div>
             </div>
             <span class="aip-sb__card-status" :class="`aip-sb__card-status--${s.status}`">{{ s.status === 'published' ? '已发布' : '草稿' }}</span>
+            <span v-if="s.ontology_stale" class="aip-sb__card-stale" title="本体依赖已更新">⚠</span>
           </div>
         </div>
       </div>
@@ -190,6 +191,11 @@ function onDelete() { store.deleteCurrentScene() }
 }
 .aip-sb__card-status--published { background: #ecfdf5; color: #10b981; }
 .aip-sb__card-status--draft { background: #fffbeb; color: #f59e0b; }
+.aip-sb__card-stale {
+  color: #d97706;
+  font-size: 12px;
+  margin-left: 4px;
+}
 
 .aip-sb__current {
   border-top: 1px solid #f0f0f0;
