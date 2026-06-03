@@ -1,4 +1,5 @@
 import platform
+import shutil
 from datetime import datetime
 
 import psutil
@@ -22,7 +23,7 @@ router = APIRouter(prefix="/monitor", tags=["monitor"])
 @router.get("/resources", response_model=ResourceMetrics)
 def get_resources():
     mem = psutil.virtual_memory()
-    disk = psutil.disk_usage("C:\\")
+    disk = shutil.disk_usage("/")
     return ResourceMetrics(
         cpu_percent=psutil.cpu_percent(interval=0.1),
         memory_percent=mem.percent,
