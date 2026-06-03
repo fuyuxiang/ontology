@@ -50,6 +50,12 @@ class AgentActivityResponse(BaseModel):
     total_skills: int
 
 
+class PlatformStatsResponse(BaseModel):
+    total_datasources: int
+    total_rules: int
+    total_pipelines: int
+
+
 class DashboardOverview(BaseModel):
     resources: ResourceMetrics
     services: list[ServiceStatus]
