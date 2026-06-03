@@ -38,10 +38,18 @@ def get_llm_client(api_key: str | None = None, api_base: str | None = None) -> O
 
 
 def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
-    """构建本体感知的上下文"""
-    entities = db.query(OntologyEntity).all()
-    relations = db.query(EntityRelation).all()
-    rules = db.query(BusinessRule).filter(BusinessRule.status == "active").all()
+    """构建本体感知的上下文（仅使用已发布实体，若无已发布实体则回退到全量）"""
+    published = db.query(OntologyEntity).filter(OntologyEntity.status == "published").all()
+    entities = published if published else db.query(OntologyEntity).all()
+    published_ids = {e.id for e in entities}
+    relations = [
+        r for r in db.query(EntityRelation).all()
+        if r.from_entity_id in published_ids and r.to_entity_id in published_ids
+    ]
+    rules = db.query(BusinessRule).filter(
+        BusinessRule.status == "active",
+        BusinessRule.entity_id.in_(published_ids),
+    ).all() if published_ids else []
 
     ctx_parts = ["## 本体模型概览\n"]
 
@@ -86,7 +94,10 @@ def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
             ctx_parts.append(f"- {e.name} ({e.name_cn}) → 数据源: {ds_ref}, 主键: {pk}")
 
     # 动作类型
-    actions = db.query(EntityAction).filter(EntityAction.status == "active").all()
+    actions = db.query(EntityAction).filter(
+        EntityAction.status == "active",
+        EntityAction.entity_id.in_(published_ids),
+    ).all() if published_ids else []
     if actions:
         ctx_parts.append(f"\n### 可执行动作 ({len(actions)} 个)")
         for a in actions:
