@@ -13,6 +13,11 @@ export interface ModelRegistry {
   created_at: string
 }
 
+export interface ReferencedScene {
+  id: string
+  name: string
+}
+
 export interface AgentItem {
   id: string
   name: string
@@ -28,6 +33,7 @@ export interface AgentItem {
   api_key: string | null
   created_at: string
   updated_at: string
+  referenced_scenes?: ReferencedScene[]
 }
 
 export interface ApiInfo {
