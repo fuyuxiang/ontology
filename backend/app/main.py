@@ -372,6 +372,14 @@ async def lifespan(app: FastAPI):
 
     start_pipeline_worker()
 
+    # 启动监控采集器
+    try:
+        from app.services.monitor.collector import start_collector
+        await start_collector()
+        logger.info("监控采集器已启动")
+    except Exception as e:
+        logger.warning(f"监控采集器启动失败: {e}")
+
     yield
 
 
