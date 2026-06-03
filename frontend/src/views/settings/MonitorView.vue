@@ -68,23 +68,23 @@
       </div>
     </div>
 
-    <!-- 安全事件 -->
+    <!-- 告警事件 -->
     <div v-if="activeTab === 'security'" class="monitor-section">
       <table class="data-table" v-if="securityEvents.length">
         <thead>
-          <tr><th>时间</th><th>事件类型</th><th>用户</th><th>目标</th><th>严重度</th></tr>
+          <tr><th>时间</th><th>级别</th><th>服务</th><th>告警内容</th><th>状态</th></tr>
         </thead>
         <tbody>
           <tr v-for="evt in securityEvents" :key="evt.id">
-            <td class="text-caption">{{ evt.timestamp?.slice(0, 19).replace('T', ' ') }}</td>
-            <td><code class="text-code">{{ evt.event_type }}</code></td>
-            <td>{{ evt.user_name || '—' }}</td>
-            <td class="text-caption">{{ evt.target }}</td>
-            <td><span class="severity-tag" :class="`severity--${evt.severity}`">{{ evt.severity }}</span></td>
+            <td class="text-caption">{{ evt.created_at?.slice(0, 19).replace('T', ' ') }}</td>
+            <td><span class="severity-tag" :class="`severity--${evt.level}`">{{ evt.level }}</span></td>
+            <td>{{ evt.service_name }}</td>
+            <td class="text-caption">{{ evt.message }}</td>
+            <td>{{ evt.resolved ? '已处理' : '未处理' }}</td>
           </tr>
         </tbody>
       </table>
-      <div v-else class="monitor-empty">暂无安全事件</div>
+      <div v-else class="monitor-empty">暂无告警</div>
     </div>
 
     <!-- 链路追踪 -->
@@ -107,7 +107,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { monitorApi, type ResourceMetrics, type ServiceStatus, type SecurityEvent } from '../../api/monitor'
+import { monitorApi, type ResourceMetrics, type ServiceStatus, type AlertItem } from '../../api/monitor'
 
 const activeTab = ref('resources')
 const tabs = [
@@ -120,7 +120,7 @@ const tabs = [
 
 const resources = ref<ResourceMetrics>({ cpu_percent: 0, memory_percent: 0, memory_used_gb: 0, memory_total_gb: 0, disk_percent: 0, disk_used_gb: 0, disk_total_gb: 0 })
 const services = ref<ServiceStatus[]>([])
-const securityEvents = ref<SecurityEvent[]>([])
+const securityEvents = ref<AlertItem[]>([])
 const systemInfo = ref<Record<string, any> | null>(null)
 
 let timer: ReturnType<typeof setInterval> | null = null
@@ -133,11 +133,16 @@ function gaugeColor(pct: number) {
 
 async function fetchData() {
   try {
-    const overview = await monitorApi.overview()
-    resources.value = overview.resources
-    services.value = overview.services
-    securityEvents.value = overview.security_events
-    systemInfo.value = overview.system_info
+    const [res, svc, alt, info] = await Promise.all([
+      monitorApi.resources(),
+      monitorApi.services(),
+      monitorApi.alerts(20),
+      monitorApi.systemInfo(),
+    ])
+    resources.value = res
+    services.value = svc
+    securityEvents.value = alt
+    systemInfo.value = info
   } catch { /* ignore */ }
 }
 
