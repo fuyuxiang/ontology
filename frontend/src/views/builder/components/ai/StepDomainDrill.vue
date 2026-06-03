@@ -31,16 +31,20 @@
     <div class="step-drill__section" v-if="tables.length">
       <div class="step-drill__label">
         可用数据表（AI已自动推荐，可调整勾选）
-        <span class="step-drill__hint">共 {{ tables.length }} 张，已选 {{ selectedTables.length }} 张</span>
+        <span class="step-drill__hint">共 {{ filteredTables.length }} 张，已选 {{ selectedTables.length }} 张</span>
+      </div>
+      <div class="step-drill__search">
+        <input class="step-drill__search-input" v-model="tableFilter" placeholder="搜索表名或描述..." />
       </div>
       <div class="step-drill__table-list">
-        <label v-for="t in tables" :key="t.table_name" class="step-drill__table-item" :class="{ 'step-drill__table-item--recommended': recommendedSet.has(t.table_name) }">
+        <label v-for="t in filteredTables" :key="t.table_name" class="step-drill__table-item" :class="{ 'step-drill__table-item--recommended': recommendedSet.has(t.table_name) }">
           <input type="checkbox" :value="t.table_name" v-model="selectedTables" />
           <span class="step-drill__table-name">{{ t.table_name }}</span>
           <span class="step-drill__table-desc">{{ t.table_desc }}</span>
           <span class="step-drill__table-tag">{{ t.layering }}</span>
           <span v-if="recommendedSet.has(t.table_name)" class="step-drill__rec-badge">AI推荐</span>
         </label>
+        <div v-if="!filteredTables.length" class="step-drill__table-empty">无匹配数据表</div>
       </div>
     </div>
 
@@ -67,8 +71,16 @@ const selectedTables = ref<string[]>([])
 const recommendedTables = ref<string[]>([])
 const loadingTables = ref(false)
 const errorMsg = ref('')
+const tableFilter = ref('')
 
 const recommendedSet = computed(() => new Set(recommendedTables.value))
+const filteredTables = computed(() => {
+  if (!tableFilter.value) return tables.value
+  const q = tableFilter.value.toLowerCase()
+  return tables.value.filter(t =>
+    t.table_name.toLowerCase().includes(q) || t.table_desc.toLowerCase().includes(q)
+  )
+})
 
 onMounted(async () => {
   const allSubs: string[] = []
@@ -144,7 +156,11 @@ async function loadAndRecommend() {
 .step-drill__card:hover { border-color: #4a6fa5; background: #f0f6ff; }
 .step-drill__card--active { border-color: #4a6fa5; background: #e8f0fc; color: #4a6fa5; font-weight: 500; }
 .step-drill__table-list { max-height: 360px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px; }
+.step-drill__search { margin-bottom: 8px; }
+.step-drill__search-input { width: 100%; padding: 8px 12px; border: 1px solid #d0d0d0; border-radius: 6px; font-size: 13px; }
+.step-drill__search-input:focus { outline: none; border-color: #4a6fa5; }
 .step-drill__table-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid #f0f0f0; cursor: pointer; font-size: 13px; }
+.step-drill__table-empty { padding: 20px; text-align: center; color: #999; font-size: 13px; }
 .step-drill__table-item:hover { background: #f8f9fa; }
 .step-drill__table-item:last-child { border-bottom: none; }
 .step-drill__table-item--recommended { background: #f0fff0; }
