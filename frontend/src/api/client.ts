@@ -1,5 +1,5 @@
 import axios from 'axios'
-import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse, InternalAxiosRequestConfig } from 'axios'
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
@@ -21,15 +21,65 @@ client.interceptors.request.use((config) => {
   return config
 })
 
-// 响应拦截：统一错误处理
+// token 续期状态管理
+let isRefreshing = false
+let pendingRequests: Array<(token: string) => void> = []
+
+function onRefreshed(newToken: string) {
+  pendingRequests.forEach(cb => cb(newToken))
+  pendingRequests = []
+}
+
+// 响应拦截：401 时自动续期，续期失败才跳登录
 client.interceptors.response.use(
   (res) => res,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     const status = error.response?.status
-    if (status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+
+    if (status === 401 && !originalRequest._retry) {
+      const refreshToken = localStorage.getItem('refresh_token')
+
+      if (!refreshToken) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
+
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          pendingRequests.push((newToken: string) => {
+            originalRequest.headers.Authorization = `Bearer ${newToken}`
+            resolve(client(originalRequest))
+          })
+        })
+      }
+
+      originalRequest._retry = true
+      isRefreshing = true
+
+      try {
+        const resp = await axios.post(`${baseURL}/auth/refresh`, { refresh_token: refreshToken })
+        const { token: newToken, refresh_token: newRefresh } = resp.data
+
+        localStorage.setItem('token', newToken)
+        localStorage.setItem('refresh_token', newRefresh)
+        isRefreshing = false
+        onRefreshed(newToken)
+
+        originalRequest.headers.Authorization = `Bearer ${newToken}`
+        return client(originalRequest)
+      } catch {
+        isRefreshing = false
+        pendingRequests = []
+        localStorage.removeItem('token')
+        localStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
     }
+
     return Promise.reject(error)
   }
 )
