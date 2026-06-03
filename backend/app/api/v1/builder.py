@@ -135,7 +135,8 @@ def _call_llm_for_extract(content: str, filename: str) -> list[dict]:
         logger.error("LLM 调用失败: %s", e)
         raise
     text = (resp.choices[0].message.content or "").strip()
-    # 清理 markdown 代码块
+    # 清理 think 标签和 markdown 代码块
+    text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
     if text.startswith("```"):
         text = re.sub(r"^```\w*\n", "", text)
         text = re.sub(r"\n```\s*$", "", text)
