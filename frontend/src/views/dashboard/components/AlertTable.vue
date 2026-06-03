@@ -15,16 +15,48 @@
           {{ formatTime(record.created_at) }}
         </template>
         <template v-if="column.key === 'action'">
-          <a v-if="!record.resolved" @click="$emit('resolve', record.id)" style="color: #5c7cfa;">处理</a>
-          <span v-else style="color: #aaa;">已处理</span>
+          <a-space>
+            <a v-if="!record.resolved" @click="$emit('resolve', record.id)" style="color: #5c7cfa;">处理</a>
+            <a @click="showDetail(record)" style="color: #888;">详情</a>
+          </a-space>
         </template>
       </template>
     </a-table>
+
+    <!-- 详情弹窗 -->
+    <a-modal v-model:open="detailVisible" title="告警详情" :footer="null" width="480px">
+      <div v-if="detailAlert" class="alert-detail">
+        <div class="detail-row">
+          <span class="detail-label">级别</span>
+          <a-tag :color="levelColor(detailAlert.level)">{{ levelLabel(detailAlert.level) }}</a-tag>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">服务</span>
+          <span>{{ detailAlert.service_name }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">时间</span>
+          <span>{{ detailAlert.created_at?.replace('T', ' ').substring(0, 19) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-label">状态</span>
+          <a-tag :color="detailAlert.resolved ? 'green' : 'red'">{{ detailAlert.resolved ? '已处理' : '未处理' }}</a-tag>
+        </div>
+        <div class="detail-row" v-if="detailAlert.resolved_at">
+          <span class="detail-label">处理时间</span>
+          <span>{{ detailAlert.resolved_at?.replace('T', ' ').substring(0, 19) }}</span>
+        </div>
+        <div class="detail-msg">
+          <span class="detail-label">告警内容</span>
+          <p>{{ detailAlert.message }}</p>
+        </div>
+      </div>
+    </a-modal>
   </a-card>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed } from 'vue'
 import type { AlertItem } from '../../../api/monitor'
 
 const props = defineProps<{ alerts: AlertItem[] }>()
@@ -32,12 +64,20 @@ defineEmits<{ resolve: [id: number] }>()
 
 const unresolvedCount = computed(() => props.alerts.filter(a => !a.resolved).length)
 
+const detailVisible = ref(false)
+const detailAlert = ref<AlertItem | null>(null)
+
+function showDetail(alert: AlertItem) {
+  detailAlert.value = alert
+  detailVisible.value = true
+}
+
 const columns = [
-  { key: 'level', title: '级别', width: 70 },
-  { key: 'message', title: '告警内容', ellipsis: true },
-  { key: 'service_name', title: '服务', width: 100 },
-  { key: 'time', title: '时间', width: 120 },
-  { key: 'action', title: '操作', width: 70 },
+  { key: 'level', dataIndex: 'level', title: '级别', width: 70 },
+  { key: 'message', dataIndex: 'message', title: '告警内容', ellipsis: true },
+  { key: 'service_name', dataIndex: 'service_name', title: '服务', width: 100 },
+  { key: 'time', dataIndex: 'created_at', title: '时间', width: 120 },
+  { key: 'action', title: '操作', width: 100 },
 ]
 
 function levelColor(level: string) {
@@ -51,3 +91,31 @@ function formatTime(iso: string) {
   return iso.substring(11, 19)
 }
 </script>
+
+<style scoped>
+.alert-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.detail-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detail-label {
+  font-size: 13px;
+  color: var(--color-text-secondary, #888);
+  min-width: 70px;
+  flex-shrink: 0;
+}
+.detail-msg {
+  margin-top: 8px;
+}
+.detail-msg p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-primary, #333);
+}
+</style>
