@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, TokenResponse, UserOut, ROLE_PERMISSIONS
-from app.core.security import verify_password, create_access_token, hash_password
+from app.core.security import verify_password, create_access_token, create_refresh_token, decode_refresh_token, hash_password
 from app.core.deps import require_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -16,13 +17,37 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户名或密码错误")
     token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
     return TokenResponse(
         token=token,
+        refresh_token=refresh_token,
         user=UserOut(
             id=user.id, username=user.username, name=user.name,
             role=user.role, permissions=ROLE_PERMISSIONS.get(user.role, []),
         ),
     )
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshResponse(BaseModel):
+    token: str
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=RefreshResponse)
+def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
+    user_id = decode_refresh_token(data.refresh_token)
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token 无效或已过期")
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在")
+    new_token = create_access_token(user.id)
+    new_refresh = create_refresh_token(user.id)
+    return RefreshResponse(token=new_token, refresh_token=new_refresh)
 
 
 @router.get("/me", response_model=UserOut)
