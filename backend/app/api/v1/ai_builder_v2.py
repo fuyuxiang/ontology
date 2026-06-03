@@ -1,38 +1,40 @@
 """AI Builder V2 API — 主题域下钻式本体构建"""
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
+from app.database import get_db
 from app.services import dwd_catalog, minio_docs, ai_builder_v2
 
 router = APIRouter(prefix="/ai-builder", tags=["AI Builder V2"])
 
 
 @router.get("/domains")
-def list_domains():
-    return {"domains": dwd_catalog.get_domains()}
+def list_domains(db: Session = Depends(get_db)):
+    return {"domains": dwd_catalog.get_domains(db)}
 
 
 @router.get("/domains/{domain1}/sub-domains")
-def list_sub_domains(domain1: str):
-    return {"sub_domains": dwd_catalog.get_sub_domains(domain1)}
+def list_sub_domains(domain1: str, db: Session = Depends(get_db)):
+    return {"sub_domains": dwd_catalog.get_sub_domains(domain1, db)}
 
 
 @router.get("/domains/{domain1}/{domain2}/themes")
-def list_themes(domain1: str, domain2: str):
-    return {"themes": dwd_catalog.get_themes(domain1, domain2)}
+def list_themes(domain1: str, domain2: str, db: Session = Depends(get_db)):
+    return {"themes": dwd_catalog.get_themes(domain1, domain2, db)}
 
 
 @router.get("/tables")
-def list_tables(domain1: str = Query(...), domain2: str = Query(...), domain3: str = Query(None)):
-    return {"tables": dwd_catalog.get_tables(domain1, domain2, domain3)}
+def list_tables(domain1: str = Query(...), domain2: str = Query(...), domain3: str = Query(None), db: Session = Depends(get_db)):
+    return {"tables": dwd_catalog.get_tables(domain1, domain2, domain3, db)}
 
 
 @router.get("/tables/{table_name}/schema")
-def get_table_schema(table_name: str):
-    return {"table_name": table_name, "fields": dwd_catalog.get_table_schema(table_name)}
+def get_table_schema(table_name: str, db: Session = Depends(get_db)):
+    return {"table_name": table_name, "fields": dwd_catalog.get_table_schema(table_name, db)}
 
 
 class MatchDomainRequest(BaseModel):
@@ -40,8 +42,8 @@ class MatchDomainRequest(BaseModel):
 
 
 @router.post("/match-domain")
-def match_domain(req: MatchDomainRequest):
-    return ai_builder_v2.match_domain(req.business_desc)
+def match_domain(req: MatchDomainRequest, db: Session = Depends(get_db)):
+    return ai_builder_v2.match_domain(req.business_desc, db)
 
 
 class RecommendTablesRequest(BaseModel):
@@ -52,13 +54,14 @@ class RecommendTablesRequest(BaseModel):
 
 
 @router.post("/recommend-tables")
-def recommend_tables(req: RecommendTablesRequest):
+def recommend_tables(req: RecommendTablesRequest, db: Session = Depends(get_db)):
     tables = dwd_catalog.get_tables_by_domains(
         req.domains,
         req.sub_domains if req.sub_domains else None,
         req.themes if req.themes else None,
+        db,
     )
-    recommended = ai_builder_v2.recommend_tables(req.business_desc, tables)
+    recommended = ai_builder_v2.recommend_tables(req.business_desc, tables, db)
     return {"tables": tables, "recommended": recommended}
 
 
@@ -80,9 +83,9 @@ class ExtractRequest(BaseModel):
 
 
 @router.post("/extract-ontology")
-def extract_ontology(req: ExtractRequest):
+def extract_ontology(req: ExtractRequest, db: Session = Depends(get_db)):
     return StreamingResponse(
-        ai_builder_v2.extract_ontology_stream(req.table_names, req.document_keys, req.business_desc),
+        ai_builder_v2.extract_ontology_stream(req.table_names, req.document_keys, req.business_desc, db),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )

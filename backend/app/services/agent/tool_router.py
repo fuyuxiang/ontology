@@ -48,9 +48,17 @@ class ToolRouter:
             return {"error": str(e)}, f"执行失败: {e}", 0
 
     def _tool_describe_ontology_model(self, args: dict) -> tuple[Any, str, int]:
-        entities = self.db.query(OntologyEntity).all()
-        relations = self.db.query(EntityRelation).all()
-        rules = self.db.query(BusinessRule).filter(BusinessRule.status == "active").all()
+        published = self.db.query(OntologyEntity).filter(OntologyEntity.status == "published").all()
+        entities = published if published else self.db.query(OntologyEntity).all()
+        entity_ids = {e.id for e in entities}
+        relations = [
+            r for r in self.db.query(EntityRelation).all()
+            if r.from_entity_id in entity_ids and r.to_entity_id in entity_ids
+        ]
+        rules = self.db.query(BusinessRule).filter(
+            BusinessRule.status == "active",
+            BusinessRule.entity_id.in_(entity_ids),
+        ).all() if entity_ids else []
 
         tier_names = {1: "核心", 2: "领域", 3: "场景"}
         entity_list = []
