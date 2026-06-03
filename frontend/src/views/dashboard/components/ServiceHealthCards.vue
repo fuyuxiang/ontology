@@ -6,7 +6,7 @@
         <span class="status-dot" :class="svc.status"></span>
         <div class="info">
           <span class="name">{{ svc.name }}</span>
-          <span class="latency">{{ svc.response_ms != null ? svc.response_ms.toFixed(0) + 'ms' : '不可达' }}</span>
+          <span class="latency">{{ svc.response_ms != null ? svc.response_ms.toFixed(0) + 'ms' : (svc.status === 'healthy' ? '正常' : '不可达') }}</span>
         </div>
       </div>
     </div>
