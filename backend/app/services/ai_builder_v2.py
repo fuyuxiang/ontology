@@ -10,6 +10,7 @@ from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models.asset import Asset
 from app.services import dwd_catalog, minio_docs
 
 logger = logging.getLogger(__name__)
@@ -184,8 +185,53 @@ def extract_ontology_stream(
 
     try:
         result = json.loads(full_content)
-        yield f"data: {json.dumps({'event': 'result', 'data': result})}\n\n"
     except json.JSONDecodeError:
-        yield f"data: {json.dumps({'event': 'result', 'data': {'entities': [], 'relations': []}, 'raw': full_content})}\n\n"
+        yield f"data: {json.dumps({'event': 'result', 'data': {'entities': [], 'relations': [], 'asset_ids': []}, 'raw': full_content})}\n\n"
+        yield "data: [DONE]\n\n"
+        return
 
+    # Resolve table_names to Asset IDs and attach backing info
+    table_asset_map: dict[str, str] = {}
+    all_asset_ids: list[str] = []
+    if db:
+        for tn in table_names:
+            asset = (
+                db.query(Asset)
+                .filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"]))
+                .filter(Asset.locator["table"].as_string() == tn)
+                .first()
+            )
+            if not asset:
+                asset = (
+                    db.query(Asset)
+                    .filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"]),
+                            Asset.name == tn)
+                    .first()
+                )
+            if asset:
+                table_asset_map[tn] = asset.id
+                all_asset_ids.append(asset.id)
+
+    for ent in result.get("entities", []):
+        table_for_ent = ent.get("table", "")
+        asset_id = table_asset_map.get(table_for_ent)
+        if asset_id:
+            ent["backing_asset_ids"] = [asset_id]
+        elif all_asset_ids:
+            ent["backing_asset_ids"] = list(all_asset_ids)
+        else:
+            ent["backing_asset_ids"] = []
+
+        if asset_id and db:
+            asset_obj = db.get(Asset, asset_id)
+            schema_cols = asset_obj.schema_snapshot or [] if asset_obj else []
+            col_names = {c.get("name", "").lower() for c in schema_cols}
+            for prop in ent.get("properties", []):
+                prop_name = (prop.get("name") or "").lower()
+                if prop_name in col_names:
+                    prop["source_asset_id"] = asset_id
+                    prop["source_column"] = prop.get("name")
+
+    result["asset_ids"] = all_asset_ids
+    yield f"data: {json.dumps({'event': 'result', 'data': result})}\n\n"
     yield "data: [DONE]\n\n"

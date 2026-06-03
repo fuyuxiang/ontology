@@ -336,6 +336,20 @@ async function loadAssetDetails() {
       allIds.add(aid)
     }
   }
+
+  // Fallback: query active table/sql_view assets from backend
+  if (allIds.size === 0) {
+    try {
+      const { get } = await import('../../../api/client')
+      const assets = await get('/assets?kinds=table&kinds=sql_view&status=active') as any[]
+      if (assets && assets.length) {
+        for (const a of assets) {
+          allIds.add(a.id)
+        }
+      }
+    } catch { /* ignore */ }
+  }
+
   if (allIds.size === 0) {
     assetList.value = []
     return

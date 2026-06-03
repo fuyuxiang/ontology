@@ -72,6 +72,7 @@ function onExtractionDone(result: any) {
   if (!session.value) {
     store.createSession({ ontologyName: `AI构建-${Date.now().toString(36).slice(-4)}`, buildMethod: 'chat' })
   }
+  const assetIds: string[] = result.asset_ids || []
   const objects = result.entities.map((e: any, i: number) => ({
     id: `obj-${Date.now().toString(36)}-${i}`,
     name: e.name,
@@ -82,12 +83,17 @@ function onExtractionDone(result: any) {
     primaryKey: 'id',
     icon: '🔷',
     instanceCount: 0,
+    backing_asset_ids: Array.isArray(e.backing_asset_ids) && e.backing_asset_ids.length
+      ? e.backing_asset_ids
+      : (assetIds.length ? [...assetIds] : []),
     properties: (e.properties || []).map((p: any, j: number) => ({
       id: `prop-${Date.now().toString(36)}-${i}-${j}`,
       name: p.name,
       displayName: p.displayName || p.name,
       type: p.type || 'string',
       required: p.required ?? false,
+      source_asset_id: p.source_asset_id ?? null,
+      source_column: p.source_column ?? null,
     })),
     derivedProperties: [],
     rules: [],
@@ -105,7 +111,7 @@ function onExtractionDone(result: any) {
     relationType: 'ObjectProperty' as const,
     semanticType: 'association' as const,
   }))
-  store.patchActive({ ontologyObjects: objects, ontologyRelations: relations })
+  store.patchActive({ ontologyObjects: objects, ontologyRelations: relations, selectedAssetIds: assetIds })
   step.value = 4
 }
 
