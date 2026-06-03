@@ -11,7 +11,8 @@
       <StepDocUpload v-if="step === 0" @next="onUploadDone" />
       <StepDocChat v-else-if="step === 1" :session-id="sessionId" :business-desc="businessDesc" @next="onChatDone" />
       <StepDocMapping v-else-if="step === 2" :session-id="sessionId" :ontology="extractionResult!" @next="onMappingDone" />
-      <StepDocReview v-else-if="step === 3" :result="mappedResult!" @prev="step = 2" @confirm="onConfirm" />
+      <StepDocMappingPersist v-else-if="step === 3" :session-id="sessionId" :mapping-result="mappedResult!" @prev="step = 2" @next="onPersistDone" />
+      <StepDocReview v-else-if="step === 4" :result="mappedResult!" @prev="step = 3" @confirm="onConfirm" />
     </div>
   </div>
 </template>
@@ -23,12 +24,13 @@ import { useBuilderStore } from '../../store/builder'
 import StepDocUpload from './components/doc/StepDocUpload.vue'
 import StepDocChat from './components/doc/StepDocChat.vue'
 import StepDocMapping from './components/doc/StepDocMapping.vue'
+import StepDocMappingPersist from './components/doc/StepDocMappingPersist.vue'
 import StepDocReview from './components/doc/StepDocReview.vue'
 
 const router = useRouter()
 const store = useBuilderStore()
 
-const steps = ['需求与文档', 'AI对话抽取', '资产映射', '确认入库']
+const steps = ['需求与文档', 'AI对话抽取', '资产映射', '映射确认', '确认入库']
 const step = ref(0)
 const sessionId = ref('')
 const businessDesc = ref('')
@@ -49,6 +51,10 @@ function onChatDone(ontology: any) {
 function onMappingDone(ontology: any) {
   mappedResult.value = ontology
   step.value = 3
+}
+
+function onPersistDone() {
+  step.value = 4
 }
 
 function onConfirm(ontology: any) {
