@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import shutil
 import time
 
 import psutil
@@ -127,7 +128,7 @@ async def collect_service_metrics():
         try:
             cpu = psutil.cpu_percent(interval=0.1)
             mem = psutil.virtual_memory()
-            disk = psutil.disk_usage("C:\\")
+            disk = shutil.disk_usage("/")
 
             db = SessionLocal()
             repo = MonitorRepository(db)
