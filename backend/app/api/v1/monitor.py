@@ -1,51 +1,22 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import func, text
-from pydantic import BaseModel
-from datetime import datetime, timedelta
 import platform
+from datetime import datetime
+
 import psutil
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OntologyEntity, EntityAction, BusinessRule, AuditLog
-from app.models.function import OntologyFunction
-from app.models.agent import Agent
-from app.models.datasource import DataSource
+from app.models import OntologyEntity, Agent
+from app.models.skill import Skill
+from app.repositories.monitor_repo import MonitorRepository
+from app.schemas.monitor import (
+    ResourceMetrics, ServiceStatus, ResponseHistoryPoint,
+    AlertItem, LLMStatsResponse, OntologyStatsResponse,
+    AgentActivityResponse, DashboardOverview,
+)
+from app.services.monitor.ws_manager import ws_manager
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
-
-
-class ResourceMetrics(BaseModel):
-    cpu_percent: float
-    memory_percent: float
-    memory_used_gb: float
-    memory_total_gb: float
-    disk_percent: float
-    disk_used_gb: float
-    disk_total_gb: float
-
-
-class ServiceStatus(BaseModel):
-    name: str
-    status: str
-    response_ms: float | None = None
-    uptime_hours: float | None = None
-
-
-class SecurityEvent(BaseModel):
-    id: str
-    event_type: str
-    user_name: str | None = None
-    target: str
-    timestamp: str
-    severity: str
-
-
-class MonitorOverview(BaseModel):
-    resources: ResourceMetrics
-    services: list[ServiceStatus]
-    security_events: list[SecurityEvent]
-    system_info: dict
 
 
 @router.get("/resources", response_model=ResourceMetrics)
@@ -65,47 +36,118 @@ def get_resources():
 
 @router.get("/services", response_model=list[ServiceStatus])
 def get_services(db: Session = Depends(get_db)):
-    services = []
-    try:
-        db.execute(text("SELECT 1"))
-        services.append(ServiceStatus(name="数据库", status="healthy", response_ms=1.0))
-    except Exception:
-        services.append(ServiceStatus(name="数据库", status="unhealthy"))
-
-    services.append(ServiceStatus(name="API 服务", status="healthy"))
-    services.append(ServiceStatus(name="规则引擎", status="healthy"))
-    services.append(ServiceStatus(name="函数运行时", status="healthy"))
-    services.append(ServiceStatus(name="Agent 服务", status="healthy"))
-    return services
+    repo = MonitorRepository(db)
+    metrics = repo.get_latest_metrics()
+    return [
+        ServiceStatus(name=m.service_name, status=m.status, response_ms=m.response_ms)
+        for m in metrics
+    ]
 
 
-@router.get("/security-events", response_model=list[SecurityEvent])
-def get_security_events(db: Session = Depends(get_db)):
-    since = datetime.utcnow() - timedelta(days=7)
-    logs = (
-        db.query(AuditLog)
-        .filter(AuditLog.timestamp >= since)
-        .filter(AuditLog.action.in_(["login", "login_failed", "delete", "update"]))
-        .order_by(AuditLog.timestamp.desc())
-        .limit(50)
-        .all()
+@router.get("/response-history", response_model=list[ResponseHistoryPoint])
+def get_response_history(hours: int = 1, service: str | None = None, db: Session = Depends(get_db)):
+    repo = MonitorRepository(db)
+    metrics = repo.get_metric_history(hours=hours, service_name=service)
+    return [
+        ResponseHistoryPoint(
+            service_name=m.service_name,
+            response_ms=m.response_ms,
+            status=m.status,
+            collected_at=m.collected_at.isoformat(),
+        )
+        for m in metrics
+    ]
+
+
+@router.get("/alerts", response_model=list[AlertItem])
+def get_alerts(limit: int = 20, resolved: bool | None = None, level: str | None = None,
+               db: Session = Depends(get_db)):
+    repo = MonitorRepository(db)
+    alerts = repo.get_alerts(limit=limit, resolved=resolved, level=level)
+    return [
+        AlertItem(
+            id=a.id, level=a.level, service_name=a.service_name, message=a.message,
+            resolved=a.resolved, created_at=a.created_at.isoformat(),
+            resolved_at=a.resolved_at.isoformat() if a.resolved_at else None,
+        )
+        for a in alerts
+    ]
+
+
+@router.post("/alerts/{alert_id}/resolve", response_model=AlertItem)
+def resolve_alert(alert_id: int, db: Session = Depends(get_db)):
+    repo = MonitorRepository(db)
+    a = repo.resolve_alert(alert_id)
+    if not a:
+        from fastapi import HTTPException
+        raise HTTPException(404, "Alert not found")
+    return AlertItem(
+        id=a.id, level=a.level, service_name=a.service_name, message=a.message,
+        resolved=a.resolved, created_at=a.created_at.isoformat(),
+        resolved_at=a.resolved_at.isoformat() if a.resolved_at else None,
     )
-    events = []
-    for log in logs:
-        severity = "low"
-        if log.action == "login_failed":
-            severity = "high"
-        elif log.action == "delete":
-            severity = "medium"
-        events.append(SecurityEvent(
-            id=log.id,
-            event_type=log.action,
-            user_name=log.user_name,
-            target=f"{log.target_type}:{log.target_name}",
-            timestamp=log.timestamp.isoformat() if log.timestamp else "",
-            severity=severity,
-        ))
-    return events
+
+
+@router.get("/llm-stats", response_model=LLMStatsResponse)
+def get_llm_stats(db: Session = Depends(get_db)):
+    repo = MonitorRepository(db)
+    return LLMStatsResponse(**repo.get_llm_stats_24h())
+
+
+@router.get("/ontology-stats", response_model=OntologyStatsResponse)
+def get_ontology_stats(db: Session = Depends(get_db)):
+    total = db.query(OntologyEntity).count()
+    by_type = {}
+    try:
+        from sqlalchemy import func
+        rows = (
+            db.query(OntologyEntity.entity_type, func.count(OntologyEntity.id))
+            .group_by(OntologyEntity.entity_type)
+            .all()
+        )
+        by_type = {r[0] or "unknown": r[1] for r in rows}
+    except Exception:
+        pass
+    return OntologyStatsResponse(total_entities=total, by_type=by_type)
+
+
+@router.get("/agent-activity", response_model=AgentActivityResponse)
+def get_agent_activity(db: Session = Depends(get_db)):
+    total_agents = db.query(Agent).count()
+    published = db.query(Agent).filter(Agent.status == "published").count()
+    total_skills = db.query(Skill).count()
+    return AgentActivityResponse(
+        total_agents=total_agents, published_agents=published, total_skills=total_skills,
+    )
+
+
+@router.get("/overview", response_model=DashboardOverview)
+def get_overview(db: Session = Depends(get_db)):
+    repo = MonitorRepository(db)
+    return DashboardOverview(
+        resources=get_resources(),
+        services=[
+            ServiceStatus(name=m.service_name, status=m.status, response_ms=m.response_ms)
+            for m in repo.get_latest_metrics()
+        ],
+        alerts=[
+            AlertItem(
+                id=a.id, level=a.level, service_name=a.service_name, message=a.message,
+                resolved=a.resolved, created_at=a.created_at.isoformat(),
+                resolved_at=a.resolved_at.isoformat() if a.resolved_at else None,
+            )
+            for a in repo.get_alerts(limit=10)
+        ],
+        llm_stats=LLMStatsResponse(**repo.get_llm_stats_24h()),
+        ontology_stats=OntologyStatsResponse(
+            total_entities=db.query(OntologyEntity).count(), by_type={},
+        ),
+        agent_activity=AgentActivityResponse(
+            total_agents=db.query(Agent).count(),
+            published_agents=db.query(Agent).filter(Agent.status == "published").count(),
+            total_skills=db.query(Skill).count(),
+        ),
+    )
 
 
 @router.get("/system-info")
@@ -120,11 +162,15 @@ def get_system_info():
     }
 
 
-@router.get("/overview", response_model=MonitorOverview)
-def get_overview(db: Session = Depends(get_db)):
-    return MonitorOverview(
-        resources=get_resources(),
-        services=get_services(db),
-        security_events=get_security_events(db)[:10],
-        system_info=get_system_info(),
-    )
+# -- WebSocket endpoint --
+
+@router.websocket("/ws")
+async def monitor_ws(ws: WebSocket):
+    await ws_manager.connect(ws)
+    try:
+        while True:
+            data = await ws.receive_text()
+            if data == "pong":
+                continue
+    except WebSocketDisconnect:
+        ws_manager.disconnect(ws)
