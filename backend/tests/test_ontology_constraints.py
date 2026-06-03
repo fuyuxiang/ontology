@@ -134,3 +134,40 @@ class TestOntologyOutput:
     def test_empty_entities(self):
         with pytest.raises(ValidationError):
             OntologyOutput(entities=[], relations=[])
+
+
+from app.services.ontology_constraints import build_constraint_prompt
+
+
+class TestBuildConstraintPrompt:
+    def test_returns_string(self):
+        prompt = build_constraint_prompt()
+        assert isinstance(prompt, str)
+        assert len(prompt) > 100
+
+    def test_contains_naming_rules(self):
+        prompt = build_constraint_prompt()
+        assert "PascalCase" in prompt
+        assert "snake_case" in prompt
+        assert "camelCase" in prompt
+
+    def test_contains_tier_rules(self):
+        prompt = build_constraint_prompt()
+        assert "T1" in prompt
+        assert "T2" in prompt
+        assert "T3" in prompt
+
+    def test_contains_telecom_knowledge(self):
+        prompt = build_constraint_prompt()
+        assert "客户" in prompt
+        assert "用户" in prompt
+
+    def test_with_existing_entities(self):
+        existing = ["Customer", "Product"]
+        prompt = build_constraint_prompt(existing_entities=existing)
+        assert "Customer" in prompt
+        assert "Product" in prompt
+
+    def test_without_existing_entities(self):
+        prompt = build_constraint_prompt(existing_entities=None)
+        assert "已有实体" not in prompt
