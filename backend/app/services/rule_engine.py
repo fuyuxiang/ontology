@@ -139,7 +139,7 @@ class FieldResolver:
         return self._asset_cache.get(entity.id)
 
     def _get_join_field(self, entity: OntologyEntity) -> str:
-        pk = (entity.schema_json or {}).get("primary_key", "")
+        pk = (entity.config_json or {}).get("primary_key", "")
         return pk if pk else "user_id"
 
     def _find_column(self, entity: OntologyEntity, prop_name: str) -> str | None:
@@ -559,7 +559,7 @@ class RuleScreener:
         return None, None
 
     def _resolver_pk(self, entity: OntologyEntity) -> str:
-        return (entity.schema_json or {}).get("primary_key", "user_id")
+        return (entity.config_json or {}).get("primary_key", "user_id")
 
     def _condition_to_subquery(self, cond: dict) -> str | None:
         """将单个条件转为 SQL 表达式（以 u.user_id 为关联键）"""

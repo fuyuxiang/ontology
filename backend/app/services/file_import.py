@@ -64,13 +64,13 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
         if existing:
             entity_map[obj["name"]] = eid
             # 更新已有实体的 datasource_ref（可能之前是逻辑名）
-            schema = existing.schema_json or {}
+            schema = existing.config_json or {}
             old_ref = schema.get("datasource_ref", "")
             if raw_ds_ref and old_ref != resolved_ds_ref:
                 schema["datasource_ref"] = resolved_ds_ref
-                existing.schema_json = schema
+                existing.config_json = schema
                 from sqlalchemy.orm.attributes import flag_modified
-                flag_modified(existing, "schema_json")
+                flag_modified(existing, "config_json")
             result.entities_skipped += 1
             continue
 
@@ -81,7 +81,7 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
             tier=obj.get("tier", 3),
             status="active",
             description=obj.get("description", ""),
-            schema_json={
+            config_json={
                 "namespace": namespace,
                 "primary_key": obj.get("primary_key"),
                 "datasource_ref": resolved_ds_ref,

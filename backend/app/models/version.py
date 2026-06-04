@@ -44,7 +44,7 @@ class OntologyVersionEntity(Base):
     name_cn: Mapped[str] = mapped_column(String(100), nullable=False)
     tier: Mapped[int] = mapped_column(Integer, nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
-    schema_json: Mapped[dict | None] = mapped_column(JSON)
+    config_json: Mapped[dict | None] = mapped_column(JSON)
     publish_config: Mapped[dict | None] = mapped_column(JSON)
 
     version: Mapped["OntologyVersion"] = relationship(back_populates="entities")

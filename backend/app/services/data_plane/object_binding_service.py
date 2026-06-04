@@ -149,7 +149,7 @@ def _auto_mount_quality_rules(db: Session, asset_id: str, object_type_id: str) -
     existing = svc.list_rules(asset_id)
     existing_keys = {(r.kind, r.column_name) for r in existing}
 
-    pk = (entity.schema_json or {}).get("primary_key", "")
+    pk = (entity.config_json or {}).get("primary_key", "")
 
     rules_to_create = []
 

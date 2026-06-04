@@ -108,7 +108,7 @@ def _get_entity_and_ds(db: Session, entity_name: str) -> tuple[OntologyEntity | 
     if not entity:
         return None, None
 
-    ds_ref = (entity.schema_json or {}).get("datasource_ref", "")
+    ds_ref = (entity.config_json or {}).get("datasource_ref", "")
     if not ds_ref:
         return entity, None
 
@@ -126,7 +126,7 @@ def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: 
     if not entity or not ds or not table_name:
         return {}
 
-    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
+    pk_field = (entity.config_json or {}).get("primary_key", "user_id")
 
     # 选择参数化 WHERE
     if pk_field in ("sheet_id",) and device_number:
@@ -167,7 +167,7 @@ def list_mnp_users(
     if not entity or not ds or not table_name:
         raise HTTPException(status_code=404, detail="CbssSubscriber 实体未关联可用数据源")
 
-    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
+    pk_field = (entity.config_json or {}).get("primary_key", "user_id")
     sql = f"SELECT * FROM {table_name} LIMIT {limit}"
     result = _execute_asset_sql(db, ds, sql, limit=limit)
     if result.get("error"):
@@ -222,7 +222,7 @@ def list_mnp_case_users(db: Session = Depends(get_db)):
     if not entity or not ds or not table_name:
         raise HTTPException(status_code=404, detail="CbssSubscriber 实体未关联可用数据源")
 
-    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
+    pk_field = (entity.config_json or {}).get("primary_key", "user_id")
     sql = f"SELECT * FROM {table_name} LIMIT 50"
     result = _execute_asset_sql(db, ds, sql, limit=50)
     if result.get("error"):

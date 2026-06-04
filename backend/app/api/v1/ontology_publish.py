@@ -142,7 +142,7 @@ def add_entities(version_id: str, req: AddEntitiesRequest, db: Session = Depends
             name_cn=entity.name_cn,
             tier=entity.tier,
             description=entity.description,
-            schema_json=entity.schema_json,
+            config_json=entity.config_json,
             publish_config=entity.publish_config,
         )
         db.add(ve)
@@ -393,7 +393,7 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
             name_cn=ve.name_cn,
             tier=ve.tier,
             description=ve.description,
-            schema_json=ve.schema_json,
+            config_json=ve.config_json,
             publish_config=ve.publish_config,
         )
         db.add(new_ve)
