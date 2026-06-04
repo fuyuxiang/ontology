@@ -311,6 +311,17 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE business_rules ADD COLUMN conditions_json JSON"))
             if "rule_meta_json" not in cols:
                 conn.execute(text("ALTER TABLE business_rules ADD COLUMN rule_meta_json JSON"))
+            # 规则元数据扩展列（与 models/rule.py BusinessRule 对齐）
+            if "description" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN description TEXT"))
+            if "tags" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN tags JSON"))
+            if "input_params" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN input_params JSON"))
+            if "output_schema" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN output_schema JSON"))
+            if "action_id" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN action_id VARCHAR(36)"))
             conn.commit()
 
         # entity_actions 表增加结构化列（旧字段兼容 + 新字段迁移）
@@ -319,6 +330,9 @@ async def lifespan(app: FastAPI):
             for col in ("parameters_json", "preconditions_json", "effects_json", "action_meta_json"):
                 if col not in cols:
                     conn.execute(text(f"ALTER TABLE entity_actions ADD COLUMN {col} JSON"))
+            # description 列（与 models/rule.py EntityAction 对齐）
+            if "description" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN description TEXT"))
             # 新 schema 列（Task-11 重构）
             if "category" not in cols:
                 conn.execute(text("ALTER TABLE entity_actions ADD COLUMN category VARCHAR(20) DEFAULT 'domain'"))
@@ -421,6 +435,15 @@ async def lifespan(app: FastAPI):
             cols = {c["name"] for c in inspector.get_columns("ontology_entities")}
             if "publish_config" not in cols:
                 conn.execute(text("ALTER TABLE ontology_entities ADD COLUMN publish_config JSON"))
+            conn.commit()
+
+        # ontology_functions 表增加扩展列（与 models/function.py 对齐）
+        if "ontology_functions" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("ontology_functions")}
+            if "callable_name" not in cols:
+                conn.execute(text("ALTER TABLE ontology_functions ADD COLUMN callable_name VARCHAR(100)"))
+            if "tags" not in cols:
+                conn.execute(text("ALTER TABLE ontology_functions ADD COLUMN tags JSON"))
             conn.commit()
 
     db = SessionLocal()
