@@ -6,6 +6,7 @@ export interface RuleQuery {
   status?: RuleStatus
   priority?: Priority
   search?: string
+  tags?: string[]
 }
 
 export interface RuleExecuteResult {

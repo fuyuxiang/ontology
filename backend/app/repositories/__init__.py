@@ -4,7 +4,6 @@ from app.repositories.relation_repo import RelationRepository
 from app.repositories.rule_repo import RuleRepository
 from app.repositories.action_repo import ActionRepository
 from app.repositories.function_repo import FunctionRepository
-from app.repositories.datasource_repo import DataSourceRepository
 from app.repositories.scene_repo import (
     AipSceneRepository,
     AipSceneVersionRepository,

@@ -1,32 +1,29 @@
-from __future__ import annotations
-
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 from app.models.rule import EntityAction
-from app.models import OntologyEntity
 from app.repositories.base import BaseRepository
 
 
 class ActionRepository(BaseRepository[EntityAction]):
-    model = EntityAction
+    def __init__(self, db: Session):
+        super().__init__(EntityAction, db)
 
-    def list_with_filters(
-        self,
-        entity_id: str | None = None,
-        status: str | None = None,
-        type: str | None = None,
-        search: str | None = None,
-    ) -> list[EntityAction]:
-        q = self.db.query(EntityAction)
+    def list_with_filters(self, entity_id=None, status=None, action_type=None, category=None, search=None):
+        query = select(EntityAction)
         if entity_id:
-            q = q.filter(EntityAction.entity_id == entity_id)
+            query = query.where(EntityAction.entity_id == entity_id)
         if status:
-            q = q.filter(EntityAction.status == status)
-        if type:
-            q = q.filter(EntityAction.type == type)
+            query = query.where(EntityAction.status == status)
+        if action_type:
+            query = query.where(EntityAction.action_type == action_type)
+        if category:
+            query = query.where(EntityAction.category == category)
         if search:
-            pattern = f"%{search}%"
-            q = q.filter(EntityAction.name.ilike(pattern))
-        return q.order_by(EntityAction.created_at.desc()).all()
+            query = query.where(EntityAction.name.ilike(f"%{search}%"))
+        query = query.order_by(EntityAction.created_at.desc())
+        return self.db.execute(query).scalars().all()
 
-    def get_entity_name(self, entity_id: str) -> str:
+    def get_entity_name(self, entity_id: str) -> str | None:
+        from app.models.entity import OntologyEntity
         entity = self.db.get(OntologyEntity, entity_id)
-        return entity.name if entity else ""
+        return entity.name if entity else None

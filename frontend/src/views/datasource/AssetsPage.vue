@@ -243,7 +243,7 @@ async function reload() {
 function buildFilters() {
   const f: any = {}
   if (activeCategory.value === 'structured') {
-    f.kinds = ['table', 'sql_view']
+    f.kinds = 'table,sql_view'
   } else if (activeCategory.value === 'unstructured') {
     f.kind = 'document'
     if (docSubFilter.value !== 'all') f.document_source_type = docSubFilter.value

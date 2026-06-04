@@ -3,6 +3,11 @@
     <h2 class="step-upload__title">描述业务需求并上传文档</h2>
     <p class="step-upload__sub">上传业务相关文档（Excel/PDF/Word/PPT），AI 将从中提取本体实体、属性和关系</p>
 
+    <div class="step-upload__tip">
+      <span class="step-upload__tip-icon">💡</span>
+      <span>首次使用？建议先 <a class="step-upload__tip-link" @click="handleDownloadTemplate">下载文档模板</a>，按模板结构整理业务资料后上传，抽取效果更佳</span>
+    </div>
+
     <div class="step-upload__field">
       <label class="step-upload__label">业务需求描述</label>
       <textarea class="step-upload__textarea" v-model="desc" placeholder="例如：我需要构建宽带退单稽核的本体，包含客户、工单、退单原因等实体..." rows="4"></textarea>
@@ -41,7 +46,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { uploadDocuments } from '../../../../api/docBuilder'
+import { uploadDocuments, downloadTemplate } from '../../../../api/docBuilder'
 
 const emit = defineEmits<{ (e: 'next', payload: { sessionId: string; businessDesc: string }): void }>()
 
@@ -83,6 +88,10 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+function handleDownloadTemplate() {
+  downloadTemplate()
+}
+
 async function handleStart() {
   if (!canProceed.value) return
   uploading.value = true
@@ -100,7 +109,11 @@ async function handleStart() {
 <style scoped>
 .step-upload { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
 .step-upload__title { font-size: 20px; font-weight: 600; margin-bottom: 8px; color: #1a1a2e; }
-.step-upload__sub { font-size: 13px; color: #666; margin-bottom: 24px; }
+.step-upload__sub { font-size: 13px; color: #666; margin-bottom: 16px; }
+.step-upload__tip { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: #f0f6ff; border: 1px solid #d0e2ff; border-radius: 8px; margin-bottom: 20px; font-size: 13px; color: #333; }
+.step-upload__tip-icon { font-size: 16px; }
+.step-upload__tip-link { color: #4a6fa5; cursor: pointer; text-decoration: underline; font-weight: 500; }
+.step-upload__tip-link:hover { color: #3d5f8c; }
 .step-upload__field { margin-bottom: 20px; }
 .step-upload__label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; color: #333; }
 .step-upload__textarea { width: 100%; padding: 12px; border: 1px solid #d0d0d0; border-radius: 8px; font-size: 14px; resize: vertical; font-family: inherit; }

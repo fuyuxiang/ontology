@@ -32,7 +32,7 @@ class EntityBase(BaseModel):
     tier: int
     status: str = "active"
     description: str | None = None
-    schema_json: dict | None = None
+    config_json: dict | None = None
 
 
 class EntityCreate(EntityBase):
@@ -45,7 +45,7 @@ class EntityUpdate(BaseModel):
     tier: int | None = None
     status: str | None = None
     description: str | None = None
-    schema_json: dict | None = None
+    config_json: dict | None = None
 
 
 class FromDatasourceRequest(BaseModel):
@@ -147,6 +147,66 @@ class FileImportResult(BaseModel):
     rules_created: int = 0
     actions_created: int = 0
     errors: list[str] = []
+
+
+# ── 本体文件预览（只解析不落库）──
+class PreviewProperty(BaseModel):
+    name: str
+    display_name: str
+    type: str
+    raw_type: str
+    required: bool = False
+    description: str = ""
+    source_table: str | None = None
+    source_field: str | None = None
+
+
+class PreviewObject(BaseModel):
+    name: str
+    display_name: str
+    tier: int = 3
+    namespace: str | None = None
+    primary_key: str | None = None
+    description: str = ""
+    properties: list[PreviewProperty] = []
+
+
+class PreviewRelation(BaseModel):
+    name: str
+    display_name: str
+    source: str
+    target: str
+    cardinality: str
+    description: str = ""
+
+
+class PreviewAction(BaseModel):
+    name: str
+    display_name: str
+    trigger: str = "automatic"
+    target_object: str | None = None
+    description: str = ""
+
+
+class PreviewDataSource(BaseModel):
+    source_id: str
+    physical_table: str = ""
+    display_name: str = ""
+
+
+class PreviewSummary(BaseModel):
+    object_count: int = 0
+    relation_count: int = 0
+    property_count: int = 0
+    action_count: int = 0
+
+
+class OntologyPreviewResult(BaseModel):
+    objects: list[PreviewObject] = []
+    relations: list[PreviewRelation] = []
+    actions: list[PreviewAction] = []
+    data_sources: list[PreviewDataSource] = []
+    summary: PreviewSummary = PreviewSummary()
 
 
 class GraphNode(BaseModel):

@@ -1,4 +1,7 @@
 import client from './client'
+import { post } from './client'
+
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
 
 export interface DocFileInfo {
   name: string
@@ -10,6 +13,10 @@ export interface DocFileInfo {
 export interface UploadResult {
   session_id: string
   files: DocFileInfo[]
+}
+
+export function downloadTemplate(): void {
+  window.open(`${baseURL}/doc-builder/template`, '_blank')
 }
 
 export function uploadDocuments(files: File[]): Promise<{ data: UploadResult }> {
@@ -70,4 +77,50 @@ export function docBuilderChat(
   }).catch(() => onError())
 
   return { abort: () => ctrl.abort() }
+}
+
+// ─── 映射持久化 ───────────────────────────────────────
+
+export interface MappingPreviewItem {
+  entity_name: string
+  entity_id: string | null
+  table_name: string | null
+  asset_id: string | null
+  asset_registered: boolean
+  confidence: number
+  conflict: { existing_binding_id: string; existing_asset_name: string } | null
+  field_mappings: Array<{
+    attribute_name: string
+    attribute_id: string | null
+    source_column: string | null
+    confidence: number
+  }>
+}
+
+export interface MappingPreviewResponse {
+  items: MappingPreviewItem[]
+}
+
+export interface MappingApplyItem {
+  entity_id: string | null
+  asset_id: string | null
+  conflict_action: 'overwrite' | 'keep' | null
+  register_asset: boolean
+  table_name: string | null
+  field_mappings: Array<{ attribute_id: string; source_column: string | null }>
+}
+
+export interface MappingApplyResponse {
+  created: number
+  updated: number
+  skipped: number
+  binding_ids: string[]
+}
+
+export function previewMappingPersist(sessionId: string, mappingResult: any): Promise<MappingPreviewResponse> {
+  return post<MappingPreviewResponse>('/doc-builder/mapping/preview', { session_id: sessionId, mapping_result: mappingResult })
+}
+
+export function applyMappingPersist(sessionId: string, items: MappingApplyItem[]): Promise<MappingApplyResponse> {
+  return post<MappingApplyResponse>('/doc-builder/mapping/apply', { session_id: sessionId, items })
 }

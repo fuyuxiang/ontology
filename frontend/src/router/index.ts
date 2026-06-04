@@ -54,8 +54,11 @@ const router = createRouter({
 
     // 智能体应用中心
     { path: '/agent/manage', name: 'agent-manage', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: '智能体管理' } },
+    { path: '/agent/manage/new', name: 'agent-new', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '新建智能体' } },
     { path: '/agent/manage/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
-    { path: '/agent/toolbox', name: 'agent-toolbox', component: () => import('../views/agents/AgentToolboxView.vue'), meta: { title: '技能管理' } },
+    { path: '/agent/toolbox', name: 'agent-toolbox', component: () => import('../views/agents/skills/SkillListView.vue'), meta: { title: '技能管理' } },
+    { path: '/agent/toolbox/create', name: 'skill-create', component: () => import('../views/agents/skills/SkillWizard.vue'), meta: { title: '创建技能' } },
+    { path: '/agent/toolbox/:id', name: 'skill-detail', component: () => import('../views/agents/skills/SkillDetailView.vue'), meta: { title: '技能详情' } },
     { path: '/aip', name: 'aip-platform', component: () => import('../views/aip/AipPlatformView.vue'), meta: { title: '流程编排' } },
 
     // 场景中心

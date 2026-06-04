@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -6,40 +6,43 @@ from app.models import OntologyEntity
 from app.models.rule import EntityAction
 from app.schemas.action import (
     ActionCreate, ActionUpdate, ActionOut,
-    ActionExecuteRequest, ActionExecuteResult,
+    ActionExecuteRequest, ActionExecuteResult, ActionTypeInfo,
 )
 from app.repositories.action_repo import ActionRepository
 from app.core.deps import get_current_user
 from app.models.user import User
 from app.services.audit import write_audit
+from app.services.action_executors import get_executor, get_all_type_info
 
 router = APIRouter(prefix="/actions", tags=["actions"])
 
 
-def _action_to_out(a: EntityAction, entity_name: str) -> ActionOut:
-    return ActionOut(
-        id=a.id, entity_id=a.entity_id, entity_name=entity_name,
-        name=a.name, type=a.type, status=a.status,
-        impact_count=a.impact_count,
-        parameters_json=a.parameters_json,
-        preconditions_json=a.preconditions_json,
-        effects_json=a.effects_json,
-        action_meta_json=a.action_meta_json,
-        created_at=a.created_at,
-    )
+@router.get("/types", response_model=list[ActionTypeInfo])
+def list_action_types():
+    return get_all_type_info()
 
 
 @router.get("", response_model=list[ActionOut])
 def list_actions(
-    entity_id: str | None = None,
-    status: str | None = None,
-    type: str | None = None,
-    search: str | None = None,
+    entity_id: str | None = Query(None),
+    status: str | None = Query(None),
+    action_type: str | None = Query(None),
+    category: str | None = Query(None),
+    search: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     repo = ActionRepository(db)
-    actions = repo.list_with_filters(entity_id=entity_id, status=status, type=type, search=search)
-    return [_action_to_out(a, repo.get_entity_name(a.entity_id)) for a in actions]
+    actions = repo.list_with_filters(
+        entity_id=entity_id, status=status,
+        action_type=action_type, category=category, search=search,
+    )
+    results = []
+    for a in actions:
+        out = ActionOut.model_validate(a)
+        if a.entity_id:
+            out.entity_name = repo.get_entity_name(a.entity_id)
+        results.append(out)
+    return results
 
 
 @router.get("/{action_id}", response_model=ActionOut)
@@ -48,7 +51,10 @@ def get_action(action_id: str, db: Session = Depends(get_db)):
     a = repo.get_by_id(action_id)
     if not a:
         raise HTTPException(status_code=404, detail="动作不存在")
-    return _action_to_out(a, repo.get_entity_name(a.entity_id))
+    out = ActionOut.model_validate(a)
+    if a.entity_id:
+        out.entity_name = repo.get_entity_name(a.entity_id)
+    return out
 
 
 @router.post("", response_model=ActionOut, status_code=201)
@@ -57,17 +63,18 @@ def create_action(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    repo = ActionRepository(db)
-    entity = db.get(OntologyEntity, data.entity_id)
-    if not entity:
-        raise HTTPException(status_code=400, detail="关联实体不存在")
+    if data.category == "domain" and not data.entity_id:
+        raise HTTPException(status_code=400, detail="领域行动必须绑定实体")
+    if data.category == "system" and data.entity_id:
+        raise HTTPException(status_code=400, detail="系统行动不应绑定实体")
 
-    action = EntityAction(
-        entity_id=data.entity_id, name=data.name, type=data.type,
-        status=data.status, parameters_json=data.parameters_json,
-        preconditions_json=data.preconditions_json,
-        effects_json=data.effects_json, action_meta_json=data.action_meta_json,
-    )
+    if data.entity_id:
+        entity = db.get(OntologyEntity, data.entity_id)
+        if not entity:
+            raise HTTPException(status_code=400, detail="关联实体不存在")
+
+    repo = ActionRepository(db)
+    action = EntityAction(**data.model_dump())
     repo.create(action)
 
     write_audit(
@@ -77,7 +84,11 @@ def create_action(
         target_id=action.id, target_name=action.name,
     )
     repo.commit()
-    return _action_to_out(action, entity.name)
+
+    out = ActionOut.model_validate(action)
+    if action.entity_id:
+        out.entity_name = repo.get_entity_name(action.entity_id)
+    return out
 
 
 @router.put("/{action_id}", response_model=ActionOut)
@@ -106,7 +117,11 @@ def update_action(
             target_id=action.id, target_name=action.name, changes=changes,
         )
     repo.commit()
-    return _action_to_out(action, repo.get_entity_name(action.entity_id))
+
+    out = ActionOut.model_validate(action)
+    if action.entity_id:
+        out.entity_name = repo.get_entity_name(action.entity_id)
+    return out
 
 
 @router.delete("/{action_id}", status_code=204)
@@ -131,7 +146,7 @@ def delete_action(
 
 
 @router.post("/{action_id}/execute", response_model=ActionExecuteResult)
-def execute_action(
+async def execute_action(
     action_id: str,
     data: ActionExecuteRequest | None = None,
     db: Session = Depends(get_db),
@@ -144,11 +159,11 @@ def execute_action(
     if action.status != "active":
         raise HTTPException(status_code=400, detail="动作未激活")
 
-    from app.services.rule_engine import ActionExecutor
-    executor = ActionExecutor(db)
     params = data.params if data else {}
     dry_run = data.dry_run if data else False
-    result = executor.execute(action, params, dry_run=dry_run)
+
+    executor = get_executor(action.action_type)
+    result = await executor.execute(action.type_config or {}, params, dry_run)
 
     if not dry_run:
         action.impact_count = (action.impact_count or 0) + 1
@@ -160,8 +175,4 @@ def execute_action(
         )
         repo.commit()
 
-    return ActionExecuteResult(
-        success=result.success,
-        message=result.message,
-        effects=result.effects,
-    )
+    return ActionExecuteResult(success=result.success, message=result.message, output=result.output)
