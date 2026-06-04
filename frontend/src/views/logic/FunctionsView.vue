@@ -84,42 +84,12 @@
       </div>
     </div>
 
-    <ModalDialog :visible="showAdd" title="新建函数" width="560px" @close="showAdd = false">
-      <form class="rule-form" @submit.prevent="handleCreate">
-        <div class="form-row"><label class="form-label">函数名称</label><input v-model="form.name" class="form-input" required /></div>
-        <div class="form-row"><label class="form-label">描述</label><input v-model="form.description" class="form-input" /></div>
-        <div class="form-row"><label class="form-label">关联实体（可选）</label>
-          <select v-model="form.entity_id" class="form-input">
-            <option value="">独立函数</option>
-            <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name_cn }} ({{ e.name }})</option>
-          </select>
-        </div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1"><label class="form-label">返回类型</label>
-            <select v-model="form.return_type" class="form-input">
-              <option value="string">string</option>
-              <option value="number">number</option>
-              <option value="boolean">boolean</option>
-              <option value="object">object</option>
-            </select>
-          </div>
-          <div class="form-row" style="flex:1"><label class="form-label">逻辑类型</label>
-            <select v-model="form.logic_type" class="form-input">
-              <option value="expression">表达式</option>
-              <option value="sql">SQL</option>
-              <option value="script">脚本</option>
-            </select>
-          </div>
-        </div>
-        <div class="form-row"><label class="form-label">逻辑体</label><textarea v-model="form.logic_body" class="form-input form-input--code" rows="3"></textarea></div>
-        <div class="form-row">
-          <label class="form-label" style="flex-direction:row;align-items:center;gap:8px;display:flex;">
-            <input type="checkbox" v-model="form.is_derived_property" /> 作为派生属性暴露
-          </label>
-        </div>
-        <button type="submit" class="btn-primary" style="align-self: flex-end;">创建</button>
-      </form>
-    </ModalDialog>
+    <FunctionBuilderDrawer
+      :visible="showAdd"
+      :edit-id="editingFuncId"
+      @close="showAdd = false; editingFuncId = undefined"
+      @saved="onFuncSaved"
+    />
   </div>
 </template>
 
@@ -127,20 +97,18 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi, type FunctionItem } from '../../api/functions'
-import { get } from '../../api/client'
-import ModalDialog from '../../components/common/ModalDialog.vue'
+import FunctionBuilderDrawer from '../../components/logic/FunctionBuilderDrawer.vue'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const functions = ref<FunctionItem[]>([])
-const entities = ref<any[]>([])
 const search = ref('')
 const activeFilter = ref('all')
 const expandedId = ref<string | null>(null)
 const showAdd = ref(false)
-const form = ref({ name: '', description: '', entity_id: '', return_type: 'string', logic_type: 'expression', logic_body: '', is_derived_property: false })
+const editingFuncId = ref<string | undefined>()
 
 const filters = [
   { label: '全部', value: 'all' },
@@ -175,20 +143,15 @@ async function fetchFunctions() {
   functions.value = await functionApi.list()
 }
 
-async function fetchEntities() {
-  entities.value = await get<any[]>('/entities')
-}
-
-async function handleCreate() {
-  const created = await functionApi.create(form.value as any)
+function onFuncSaved(fn: { id: string; name: string }) {
   showAdd.value = false
-  form.value = { name: '', description: '', entity_id: '', return_type: 'string', logic_type: 'expression', logic_body: '', is_derived_property: false }
-  await fetchFunctions()
+  editingFuncId.value = undefined
+  fetchFunctions()
   if (route.query.from === 'builder') {
     const sid = route.query.session_id as string
     const oid = route.query.object_id as string
-    if (sid && oid && (created as any)?.id) {
-      router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: (created as any).id, kind: 'function' } })
+    if (sid && oid) {
+      router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: fn.id, kind: 'function' } })
     }
   }
 }
@@ -206,15 +169,8 @@ async function handleDelete(fn: FunctionItem) {
 }
 
 onMounted(() => {
-  fetchFunctions(); fetchEntities()
+  fetchFunctions()
   if (route.query.from === 'builder') {
-    form.value = {
-      name: (route.query.prefill_name || '') as string,
-      description: (route.query.prefill_desc || '') as string,
-      entity_id: (route.query.object_id || '') as string,
-      return_type: 'string', logic_type: 'expression', logic_body: '',
-      is_derived_property: true,
-    }
     showAdd.value = true
   }
 })

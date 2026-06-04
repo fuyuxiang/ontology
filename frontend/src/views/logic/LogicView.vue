@@ -104,36 +104,13 @@
       </div>
     </div>
 
-    <RuleCreateForm
-      :visible="showAdd"
-      :prefill-name="prefill.name"
-      :prefill-condition="prefill.condition"
-      :prefill-action="prefill.action"
-      :prefill-entity-id="prefill.entityId"
-      @close="onCreateClose"
-      @created="onCreated"
+    <RuleBuilderDrawer
+      :visible="showAdd || showEdit"
+      :edit-id="editingRuleId"
+      :locked-entity-id="prefill.entityId || undefined"
+      @close="showAdd = false; showEdit = false; editingRuleId = undefined"
+      @saved="onRuleSaved"
     />
-
-    <!-- 编辑规则弹窗 -->
-    <ModalDialog :visible="showEdit" title="编辑规则" width="560px" @close="showEdit = false">
-      <form v-if="editForm" class="rule-form" @submit.prevent="handleSaveEdit">
-        <div class="form-row"><label class="form-label">规则名称</label><input v-model="editForm.name" class="form-input" /></div>
-        <div class="form-row"><label class="form-label">触发条件</label><input v-model="editForm.condition_expr" class="form-input form-input--code" /></div>
-        <div class="form-row"><label class="form-label">执行动作</label><input v-model="editForm.action_desc" class="form-input" /></div>
-        <div class="form-row-inline">
-          <div class="form-row" style="flex:1"><label class="form-label">优先级</label>
-            <select v-model="editForm.priority" class="form-input"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select>
-          </div>
-          <div class="form-row" style="flex:1"><label class="form-label">状态</label>
-            <select v-model="editForm.status" class="form-input"><option value="active">活跃</option><option value="warning">警告</option><option value="disabled">禁用</option></select>
-          </div>
-        </div>
-      </form>
-      <template #footer>
-        <button class="btn-secondary" @click="showEdit = false">取消</button>
-        <button class="btn-primary" @click="handleSaveEdit">保存</button>
-      </template>
-    </ModalDialog>
   </div>
 </template>
 
@@ -141,8 +118,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useRulesStore } from '../../store/rules'
-import RuleCreateForm from '../../components/common/RuleCreateForm.vue'
-import ModalDialog from '../../components/common/ModalDialog.vue'
+import RuleBuilderDrawer from '../../components/logic/RuleBuilderDrawer.vue'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 import { ruleApi } from '../../api/rules'
 import { useToast } from '../../composables/useToast'
@@ -154,20 +130,14 @@ const router = useRouter()
 const expandedId = ref<string | null>(null)
 const showAdd = ref(false)
 const showEdit = ref(false)
-const editForm = reactive({ id: '', name: '', condition_expr: '', action_desc: '', priority: 'medium', status: 'active' })
+const editingRuleId = ref<string | undefined>()
 
 const prefill = reactive({ name: '', condition: '', action: '', entityId: '' })
 
-function onCreateClose() {
+function onRuleSaved(rule: { id: string; name: string }) {
   showAdd.value = false
-  // 取消时如果是从 builder 来的，跳回构建器
-  if (route.query.from === 'builder') {
-    const sid = (route.query.session_id || '') as string
-    if (sid) router.push({ path: '/builder' })
-  }
-}
-
-function onCreated(rule: { id: string; name: string }) {
+  showEdit.value = false
+  editingRuleId.value = undefined
   store.fetchRules()
   if (route.query.from === 'builder') {
     const sid = route.query.session_id as string
@@ -178,26 +148,9 @@ function onCreated(rule: { id: string; name: string }) {
   }
 }
 
-function openEdit(rule: { id: string; name: string; condition: string; action: string; priority: string; status: string }) {
-  editForm.id = rule.id
-  editForm.name = rule.name
-  editForm.condition_expr = rule.condition
-  editForm.action_desc = rule.action
-  editForm.priority = rule.priority
-  editForm.status = rule.status
+function openEdit(rule: { id: string }) {
+  editingRuleId.value = rule.id
   showEdit.value = true
-}
-
-async function handleSaveEdit() {
-  try {
-    await ruleApi.update(editForm.id, {
-      name: editForm.name, condition_expr: editForm.condition_expr,
-      action_desc: editForm.action_desc, priority: editForm.priority, status: editForm.status,
-    } as never)
-    showEdit.value = false
-    toast.success('规则保存成功')
-    store.fetchRules()
-  } catch (e) { toast.error(`保存失败: ${(e as Error).message}`) }
 }
 
 async function handleDelete(id: string, name: string) {
