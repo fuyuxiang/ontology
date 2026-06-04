@@ -134,3 +134,49 @@ class ObjectBindingService:
         if not b:
             raise LookupError(f"binding 不存在: {binding_id}")
         return b
+
+
+def _auto_mount_quality_rules(db: Session, asset_id: str, object_type_id: str) -> None:
+    """Auto-mount quality rules based on entity attributes when a binding is created."""
+    from app.models.entity import OntologyEntity
+    from app.services.data_plane.quality_rule_service import QualityRuleService
+
+    entity = db.get(OntologyEntity, object_type_id)
+    if not entity:
+        return
+
+    svc = QualityRuleService(db)
+    existing = svc.list_rules(asset_id)
+    existing_keys = {(r.kind, r.column_name) for r in existing}
+
+    pk = (entity.schema_json or {}).get("primary_key", "")
+
+    rules_to_create = []
+
+    # Universal: row_count_min
+    if ("row_count_min", None) not in existing_keys:
+        rules_to_create.append({"name": "行数非空", "kind": "row_count_min", "column_name": None, "severity": "failure"})
+
+    # Universal: freshness (use pk column as proxy)
+    if ("freshness", pk) not in existing_keys and pk:
+        rules_to_create.append({"name": f"{pk} 新鲜度", "kind": "freshness", "column_name": pk, "severity": "warning"})
+
+    # PK uniqueness
+    if pk and ("pk_uniqueness", pk) not in existing_keys:
+        rules_to_create.append({"name": f"{pk} 唯一性", "kind": "pk_uniqueness", "column_name": pk, "severity": "failure"})
+
+    # Required attributes → null_ratio_max
+    for attr in entity.attributes:
+        if attr.required and ("null_ratio_max", attr.name) not in existing_keys:
+            rules_to_create.append({
+                "name": f"{attr.name} 非空",
+                "kind": "null_ratio_max",
+                "column_name": attr.name,
+                "severity": "warning",
+            })
+
+    for r in rules_to_create:
+        try:
+            svc.create_rule(asset_id=asset_id, **r)
+        except Exception as e:
+            logger.warning("Auto-mount rule failed: %s — %s", r, e)
