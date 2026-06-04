@@ -21,6 +21,11 @@ class BusinessRule(Base):
     last_triggered: Mapped[datetime | None] = mapped_column(DateTime)
     conditions_json: Mapped[list | None] = mapped_column(JSON)
     rule_meta_json: Mapped[dict | None] = mapped_column(JSON)
+    description: Mapped[str] = mapped_column(Text, default="")
+    tags: Mapped[list | None] = mapped_column(JSON)
+    input_params: Mapped[list | None] = mapped_column(JSON)
+    output_schema: Mapped[dict | None] = mapped_column(JSON)
+    action_id: Mapped[str | None] = mapped_column(ForeignKey("entity_actions.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
