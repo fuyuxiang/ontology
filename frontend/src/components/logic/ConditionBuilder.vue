@@ -177,3 +177,13 @@ watch(() => props.modelValue, (val) => {
     <button class="btn-sm-exec" style="margin-top:4px;" @click="addRow">+ 添加条件</button>
   </div>
 </template>
+
+<style scoped>
+@import '../../views/logic/logic-shared.css';
+
+.condition-builder__mode {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+</style>
