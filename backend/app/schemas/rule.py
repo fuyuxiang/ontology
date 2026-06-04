@@ -5,22 +5,54 @@ from datetime import datetime
 class RuleCreate(BaseModel):
     entity_id: str
     name: str
-    condition_expr: str
-    action_desc: str
+    description: str = ""
+    condition_expr: str = ""
+    action_desc: str = ""
     status: str = "active"
     priority: str = "medium"
     conditions_json: list | None = None
     rule_meta_json: dict | None = None
+    tags: list[str] | None = None
+    input_params: list[dict] | None = None
+    output_schema: dict | None = None
+    action_id: str | None = None
 
 
 class RuleUpdate(BaseModel):
     name: str | None = None
+    description: str | None = None
     condition_expr: str | None = None
     action_desc: str | None = None
     status: str | None = None
     priority: str | None = None
     conditions_json: list | None = None
     rule_meta_json: dict | None = None
+    tags: list[str] | None = None
+    input_params: list[dict] | None = None
+    output_schema: dict | None = None
+    action_id: str | None = None
+
+
+class RuleOut(BaseModel):
+    id: str
+    name: str
+    description: str = ""
+    entity_id: str
+    entity_name: str = ""
+    condition_expr: str = ""
+    action_desc: str = ""
+    status: str
+    priority: str
+    trigger_count: int = 0
+    last_triggered: datetime | None = None
+    conditions_json: list | None = None
+    rule_meta_json: dict | None = None
+    tags: list[str] | None = None
+    input_params: list[dict] | None = None
+    output_schema: dict | None = None
+    action_id: str | None = None
+    ref_count: int = 0
+    model_config = {"from_attributes": True}
 
 
 class RuleExecuteResult(BaseModel):
