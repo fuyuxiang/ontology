@@ -29,9 +29,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted, nextTick } from 'vue'
-import dayjs, { type Dayjs } from 'dayjs'
+import type { Dayjs } from 'dayjs'
 import * as echarts from 'echarts'
 import { monitorApi, type ResponseHistoryPoint } from '../../../api/monitor'
+import { buildResponseTimeChartData } from './responseTimeChartData'
 
 const chartEl = ref<HTMLElement>()
 const timeRange = ref('1')
@@ -74,37 +75,38 @@ function renderChart(data: ResponseHistoryPoint[]) {
   if (!chartEl.value) return
   if (!chart) chart = echarts.init(chartEl.value)
 
-  const byService: Record<string, { times: string[]; values: (number | null)[] }> = {}
-  for (const p of data) {
-    if (!byService[p.service_name]) byService[p.service_name] = { times: [], values: [] }
-    byService[p.service_name].times.push(p.collected_at)
-    byService[p.service_name].values.push(p.response_ms)
-  }
+  const chartData = buildResponseTimeChartData(data)
 
-  const series = Object.entries(byService).map(([name, d]) => ({
+  const series = chartData.series.map(({ name, points }) => ({
     name,
     type: 'line' as const,
     smooth: true,
-    data: d.values,
+    data: points.map(([time, value]) => [toChartTime(time), value]),
+    showSymbol: false,
+    symbol: 'circle',
+    symbolSize: 5,
     lineStyle: { width: 2 },
     itemStyle: { color: SERVICE_COLORS[name] || '#999' },
     connectNulls: false,
   }))
 
-  const allTimes = [...new Set(data.map(d => d.collected_at))].sort()
-
   chart.setOption({
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        label: {
+          formatter: (params: { value: string | number }) => formatCollectedAt(String(params.value)),
+        },
+      },
+    },
     legend: { top: 0, right: 0, type: 'scroll' },
     grid: { top: 40, right: 20, bottom: 30, left: 50 },
     xAxis: {
-      type: 'category',
-      data: allTimes.map(t => {
-        // 后端返回 UTC 时间（无 Z），加 Z 后转北京时间
-        const d = new Date(t + 'Z')
-        return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
-      }),
-      axisLabel: { fontSize: 11 },
+      type: 'time',
+      axisLabel: {
+        fontSize: 11,
+        formatter: (value: string | number) => formatCollectedAt(String(value)),
+      },
     },
     yAxis: {
       type: 'value',
@@ -114,6 +116,20 @@ function renderChart(data: ResponseHistoryPoint[]) {
     },
     series,
   }, true)
+}
+
+function toChartTime(value: string) {
+  return value.endsWith('Z') ? value : `${value}Z`
+}
+
+function formatCollectedAt(value: string) {
+  const date = new Date(/^\d+$/.test(value) ? Number(value) : toChartTime(value))
+  return date.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Asia/Shanghai',
+  })
 }
 
 onMounted(() => {
