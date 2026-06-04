@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db, SessionLocal
-from app.models.datasource import DataSource
+from app.models.asset import Asset
 from app.models.pipeline import Pipeline, PipelineRun
 
 logger = logging.getLogger(__name__)
@@ -217,9 +217,11 @@ _worker_task: asyncio.Task | None = None
 
 def _mock_records(p: Pipeline, db: Session) -> int:
     if p.datasource_id:
-        ds = db.query(DataSource).filter(DataSource.id == p.datasource_id).first()
-        if ds and ds.record_count:
-            return int(ds.record_count)
+        asset = db.query(Asset).filter(Asset.id == p.datasource_id).first()
+        if asset and asset.profile:
+            row_count = asset.profile.get("row_count")
+            if row_count:
+                return int(row_count)
     if p.last_records:
         jitter = int((random.random() - 0.5) * max(100, p.last_records * 0.05))
         return max(0, p.last_records + jitter)

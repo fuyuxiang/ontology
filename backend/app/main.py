@@ -194,7 +194,7 @@ from app.api.v1.rules import router as rules_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.copilot import router as copilot_router
 from app.api.v1.relations import router as relations_router
-from app.api.v1.datasources import router as datasources_router
+# datasources_router 已废弃，数据接入统一走 data_plane/connections + assets
 from app.api.v1.mnp import router as mnp_router
 from app.api.v1.scenes import router as scenes_router
 from app.api.v1.broadband import router as broadband_router
@@ -478,7 +478,7 @@ app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(copilot_router, prefix="/api/v1")
 app.include_router(relations_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(datasources_router, prefix="/api/v1")
+# app.include_router(datasources_router, prefix="/api/v1")  # 已废弃
 app.include_router(mnp_router, prefix="/api/v1")
 app.include_router(scenes_router, prefix="/api/v1")
 app.include_router(broadband_router, prefix="/api/v1")

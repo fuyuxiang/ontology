@@ -14,6 +14,7 @@ from app.services.agent_tools import agent_tool_definitions, AGENT_TOOL_SPECS
 from app.services.copilot import get_llm_client
 from app.services.agent.prompt_builder import build_system_prompt
 from app.services.agent.tool_router import ToolRouter
+from app.services.data_plane.entity_data_service import EntityDataService
 
 logger = logging.getLogger(__name__)
 
@@ -202,11 +203,12 @@ class AgentService:
                                     seen.add(ename)
                                     entity = self.db.query(OntologyEntity).filter(OntologyEntity.name == ename).first()
                                     if entity:
-                                        ds_ref = (entity.schema_json or {}).get("datasource_ref", "")
+                                        asset_result = EntityDataService(self.db).resolve_entity_asset(entity.id)
+                                        ds_name = asset_result[0].name if asset_result else ""
                                         entities_involved.append({
                                             "entity": ename,
                                             "entity_cn": entity.name_cn,
-                                            "datasource": ds_ref,
+                                            "datasource": ds_name,
                                         })
                     return {
                         "type": "screen",

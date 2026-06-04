@@ -8,8 +8,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, DataSource, BusinessRule
-from app.services.datasource_utils import execute_readonly_sql
+from app.models import OntologyEntity, BusinessRule
+from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.rule_engine import RuleEvaluator
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ _ENTITY_ALIAS = {
 _MNP_ENTITIES = list(_ENTITY_ALIAS.keys())
 
 
-def _get_entity_and_ds(db: Session, entity_name: str):
+def _get_entity_and_asset(db: Session, entity_name: str):
     db_name = _ENTITY_ALIAS.get(entity_name, entity_name)
     entity = db.query(OntologyEntity).filter(OntologyEntity.id == f"{_NS}_{db_name}").first()
     if not entity:
@@ -92,28 +92,35 @@ def _get_entity_and_ds(db: Session, entity_name: str):
         entity = db.query(OntologyEntity).filter(OntologyEntity.id == f"{_NS}_{entity_name}").first()
     if not entity:
         return None, None
-    ds_ref = (entity.schema_json or {}).get("datasource_ref", "")
-    if not ds_ref:
+    svc = EntityDataService(db)
+    resolved = svc.resolve_entity_asset(entity.id)
+    if not resolved:
         return entity, None
-    ds = db.query(DataSource).filter(DataSource.name == ds_ref, DataSource.enabled == True).first()
-    return entity, ds
+    asset, _ = resolved
+    return entity, asset
 
 
 def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: str = "") -> dict:
-    entity, ds = _get_entity_and_ds(db, entity_name)
-    if not entity or not ds or not ds.table_name:
+    entity, asset = _get_entity_and_asset(db, entity_name)
+    if not entity or not asset:
+        return {}
+    svc = EntityDataService(db)
+    table_name = svc.get_table_name(asset)
+    if not table_name:
         return {}
     pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
     if pk_field in ("sheet_id",) and device_number:
-        where = f"device_number = '{device_number}'"
+        where_col, where_val = "device_number", device_number
     elif pk_field == "device_number" and device_number:
-        where = f"device_number = '{device_number}'"
+        where_col, where_val = "device_number", device_number
     elif pk_field == "subs_id":
-        where = f"subs_id = '{user_id}'"
+        where_col, where_val = "subs_id", user_id
     else:
-        where = f"{pk_field} = '{user_id}'"
-    sql = f"SELECT * FROM {ds.table_name} WHERE {where} LIMIT 1"
-    result = execute_readonly_sql(ds, sql, limit=1)
+        where_col, where_val = pk_field, user_id
+    sql = f"SELECT * FROM {table_name} WHERE {where_col} = :pk_val LIMIT 1"
+    result = svc.execute_sql_on_entity(
+        entity.id, sql, params={"pk_val": where_val}, purpose="skill.query_user_row",
+    )
     if result.get("error") or not result.get("rows"):
         return {}
     columns = result["columns"]
@@ -185,7 +192,7 @@ def _analyze_churn_reasons(entities: dict) -> list[str]:
 def _recommend_actions(db: Session, risk_level: str, reasons: list[str]) -> list[str]:
     from app.models.rule import EntityAction
     actions = []
-    entity, _ = _get_entity_and_ds(db, "MnpRiskUser")
+    entity, _ = _get_entity_and_asset(db, "MnpRiskUser")
     if entity:
         db_actions = db.query(EntityAction).filter(
             EntityAction.entity_id == entity.id, EntityAction.status == "active"

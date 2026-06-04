@@ -7,23 +7,32 @@ from sqlalchemy import create_engine, text, bindparam
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import DataSource
+from app.models.asset import Asset
 
 _engine_cache: dict[str, object] = {}
 
 
 def _get_engine(db: Session | None = None):
     if db:
-        ds = db.query(DataSource).filter(
-            DataSource.enabled == True,
-            DataSource.database == "dwd",
+        asset = db.query(Asset).filter(
+            Asset.kind == "table",
+            Asset.domain == "dwd",
+            Asset.status == "active",
         ).first()
-        if ds:
-            pwd = quote_plus(ds.password) if ds.password else ""
-            url = f"mysql+pymysql://{ds.username}:{pwd}@{ds.host}:{ds.port}/{ds.database}?charset=utf8mb4"
-            if url not in _engine_cache:
-                _engine_cache[url] = create_engine(url, pool_pre_ping=True, pool_size=5)
-            return _engine_cache[url]
+        if asset and asset.connection_id:
+            from app.models.connection import Connection
+            conn_obj = db.query(Connection).filter(Connection.id == asset.connection_id).first()
+            if conn_obj:
+                params = conn_obj.params or {}
+                host = params.get("host", "127.0.0.1")
+                port = params.get("port", 3306)
+                user = params.get("username", "root")
+                pwd = quote_plus(params.get("password", "")) if params.get("password") else ""
+                database = params.get("database", "dwd")
+                url = f"mysql+pymysql://{user}:{pwd}@{host}:{port}/{database}?charset=utf8mb4"
+                if url not in _engine_cache:
+                    _engine_cache[url] = create_engine(url, pool_pre_ping=True, pool_size=5)
+                return _engine_cache[url]
 
     fallback_url = settings.DWD_DATABASE_URL
     if fallback_url not in _engine_cache:
