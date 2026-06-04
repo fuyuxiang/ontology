@@ -4,7 +4,6 @@ from app.models.rule import BusinessRule, EntityAction
 from app.models.function import OntologyFunction
 from app.models.audit import AuditLog
 from app.models.user import User
-from app.models.datasource import DataSource
 from app.models.dashboard_config import DashboardConfig
 from app.models.agent import ModelRegistry, Agent
 from app.models.prompt_template import PromptTemplate
@@ -38,7 +37,7 @@ __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
     "BusinessRule", "EntityAction", "OntologyFunction",
     "AuditLog", "User",
-    "DataSource", "DashboardConfig",
+    "DashboardConfig",
     "ModelRegistry", "Agent", "PromptTemplate",
     "AgentTrace", "EvalSuite", "EvalCase", "EvalRun", "EvalResult",
     "OntologyVersion", "OntologyVersionEntity",

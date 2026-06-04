@@ -15,9 +15,9 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, DataSource
+from app.models import OntologyEntity
 from app.models.rule import BusinessRule, EntityAction
-from app.services.datasource_utils import execute_readonly_sql
+from app.services.data_plane.entity_data_service import EntityDataService
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +64,8 @@ class FieldResolver:
     def __init__(self, db: Session):
         self.db = db
         self._entity_cache: dict[str, OntologyEntity] = {}
-        self._ds_cache: dict[str, DataSource] = {}
+        self._asset_cache: dict[str, Any] = {}
+        self._data_svc = EntityDataService(db)
 
     def resolve(self, field_ref: str, user_id: str) -> Any:
         """
@@ -80,29 +81,29 @@ class FieldResolver:
         if not entity:
             return None
 
-        ds = self._get_datasource(entity)
-        if not ds:
+        resolved = self._get_entity_asset(entity)
+        if not resolved:
             return None
+        asset, _ = resolved
 
-        # 检查是否为 computed_property
         attr = next((a for a in entity.attributes if a.name == prop_name), None)
         if attr and attr.type == "computed" and attr.constraints_json:
             expr = attr.constraints_json.get("expression", "")
-            return self._resolve_computed(ds, entity, expr, user_id)
+            return self._resolve_computed(asset, entity, expr, user_id)
 
-        # 普通属性：直接查询
-        table_name = ds.table_name
+        table_name = self._data_svc.get_table_name(asset)
         if not table_name:
             return None
 
-        # 从 entity schema_json 中找 primary_key 用于关联
         pk_field = self._get_join_field(entity)
         column = self._find_column(entity, prop_name)
         if not column:
             column = prop_name
 
-        sql = f"SELECT {column} FROM {table_name} WHERE {pk_field} = '{user_id}' LIMIT 1"
-        result = execute_readonly_sql(ds, sql, limit=1)
+        sql = f"SELECT {column} FROM {table_name} WHERE {pk_field} = :uid LIMIT 1"
+        result = self._data_svc.execute_sql_on_entity(
+            entity.id, sql, params={"uid": user_id}, purpose="rule_engine.resolve",
+        )
         if result.get("error") or not result.get("rows"):
             return None
         return result["rows"][0][0]
@@ -114,16 +115,22 @@ class FieldResolver:
         if not entity:
             return 0
 
-        ds = self._get_datasource(entity)
-        if not ds or not ds.table_name:
+        resolved = self._get_entity_asset(entity)
+        if not resolved:
+            return 0
+        asset, _ = resolved
+        table_name = self._data_svc.get_table_name(asset)
+        if not table_name:
             return 0
 
         pk_field = self._get_join_field(entity)
-        sql = f"SELECT COUNT(*) FROM {ds.table_name} WHERE {pk_field} = '{user_id}'"
+        sql = f"SELECT COUNT(*) FROM {table_name} WHERE {pk_field} = :uid"
         if since_days:
             sql += f" AND created_at >= NOW() - INTERVAL {since_days} DAY"
 
-        result = execute_readonly_sql(ds, sql, limit=1)
+        result = self._data_svc.execute_sql_on_entity(
+            entity.id, sql, params={"uid": user_id}, purpose="rule_engine.resolve_count",
+        )
         if result.get("error") or not result.get("rows"):
             return 0
         return int(result["rows"][0][0] or 0)
@@ -135,17 +142,12 @@ class FieldResolver:
                 self._entity_cache[name] = entity
         return self._entity_cache.get(name)
 
-    def _get_datasource(self, entity: OntologyEntity) -> DataSource | None:
-        ds_ref = (entity.schema_json or {}).get("datasource_ref", "")
-        if not ds_ref:
-            return None
-        if ds_ref not in self._ds_cache:
-            ds = self.db.query(DataSource).filter(
-                DataSource.name == ds_ref, DataSource.enabled == True
-            ).first()
-            if ds:
-                self._ds_cache[ds_ref] = ds
-        return self._ds_cache.get(ds_ref)
+    def _get_entity_asset(self, entity: OntologyEntity):
+        if entity.id not in self._asset_cache:
+            resolved = self._data_svc.resolve_entity_asset(entity.id)
+            if resolved:
+                self._asset_cache[entity.id] = resolved
+        return self._asset_cache.get(entity.id)
 
     def _get_join_field(self, entity: OntologyEntity) -> str:
         pk = (entity.schema_json or {}).get("primary_key", "")
@@ -156,12 +158,15 @@ class FieldResolver:
         attr = next((a for a in entity.attributes if a.name == prop_name), None)
         return attr.name if attr else None
 
-    def _resolve_computed(self, ds: DataSource, entity: OntologyEntity,
+    def _resolve_computed(self, asset, entity: OntologyEntity,
                           expression: str, user_id: str) -> Any:
         """解析计算属性表达式"""
+        table_name = self._data_svc.get_table_name(asset)
         pk_field = self._get_join_field(entity)
-        sql = f"SELECT CASE WHEN {expression} THEN 1 ELSE 0 END FROM {ds.table_name} WHERE {pk_field} = '{user_id}' LIMIT 1"
-        result = execute_readonly_sql(ds, sql, limit=1)
+        sql = f"SELECT CASE WHEN {expression} THEN 1 ELSE 0 END FROM {table_name} WHERE {pk_field} = :uid LIMIT 1"
+        result = self._data_svc.execute_sql_on_entity(
+            entity.id, sql, params={"uid": user_id}, purpose="rule_engine.computed",
+        )
         if result.get("error") or not result.get("rows"):
             return None
         return bool(result["rows"][0][0])
@@ -413,6 +418,7 @@ class RuleScreener:
     def __init__(self, db: Session):
         self.db = db
         self.resolver = FieldResolver(db)
+        self._data_svc = EntityDataService(db)
 
     def screen(self, rule: BusinessRule, limit: int = 50) -> dict:
         """根据规则筛选命中的用户列表"""
@@ -435,11 +441,11 @@ class RuleScreener:
             return {"error": "无法将规则条件转为查询", "users": []}
 
         # 2. 找到主实体（用户表）作为驱动表
-        main_entity, main_ds = self._find_main_entity()
-        if not main_entity or not main_ds:
+        main_entity, main_asset = self._find_main_entity()
+        if not main_entity or not main_asset:
             return {"error": "未找到主用户实体或数据源", "users": []}
 
-        main_table = main_ds.table_name
+        main_table = self._data_svc.get_table_name(main_asset)
         main_pk = self._resolver_pk(main_entity)
 
         # 3. 根据 match_mode 构建最终 SQL
@@ -463,7 +469,9 @@ class RuleScreener:
             f"LIMIT {min(limit, 200)}"
         )
 
-        result = execute_readonly_sql(main_ds, sql, limit=limit)
+        result = self._data_svc.execute_sql_on_entity(
+            main_entity.id, sql, params={}, purpose="rule_engine.screen",
+        )
         if result.get("error"):
             return {
                 "error": result["error"],
@@ -501,23 +509,25 @@ class RuleScreener:
             return {"error": f"规则 '{rule_name}' 没有结构化条件", "users": []}
         return self.screen(rule, limit)
 
-    def _find_main_entity(self) -> tuple[OntologyEntity | None, DataSource | None]:
+    def _find_main_entity(self):
         """找到主用户实体（CbssSubscriber 或类似的核心用户表）"""
-        # 优先找名字包含 Subscriber/User 的实体
         candidates = self.db.query(OntologyEntity).filter(
             OntologyEntity.status == "active"
         ).all()
         for e in candidates:
             if "subscriber" in e.name.lower() or "user" in e.name.lower():
-                ds = self.resolver._get_datasource(e)
-                if ds and ds.table_name:
-                    return e, ds
-        # 退而求其次：找第一个有数据源的 tier=3 实体
+                resolved = self.resolver._get_entity_asset(e)
+                if resolved:
+                    asset, _ = resolved
+                    if self._data_svc.get_table_name(asset):
+                        return e, asset
         for e in candidates:
             if e.tier == 3:
-                ds = self.resolver._get_datasource(e)
-                if ds and ds.table_name:
-                    return e, ds
+                resolved = self.resolver._get_entity_asset(e)
+                if resolved:
+                    asset, _ = resolved
+                    if self._data_svc.get_table_name(asset):
+                        return e, asset
         return None, None
 
     def _resolver_pk(self, entity: OntologyEntity) -> str:
@@ -537,11 +547,13 @@ class RuleScreener:
         if not entity:
             return None
 
-        ds = self.resolver._get_datasource(entity)
-        if not ds or not ds.table_name:
+        resolved = self.resolver._get_entity_asset(entity)
+        if not resolved:
             return None
-
-        table = ds.table_name
+        asset, _ = resolved
+        table = self._data_svc.get_table_name(asset)
+        if not table:
+            return None
         pk = self._resolver_pk(entity)
 
         # 检查是否为 computed_property
@@ -639,6 +651,7 @@ class ActionExecutor:
     def __init__(self, db: Session):
         self.db = db
         self.resolver = FieldResolver(db)
+        self._data_svc = EntityDataService(db)
 
     def execute(self, action: EntityAction, params: dict, dry_run: bool = True) -> ActionResult:
         """
@@ -757,12 +770,18 @@ class ActionExecutor:
             ).first()
             if not entity:
                 return True  # 实体不存在时跳过检查
-            ds = self.resolver._get_datasource(entity)
-            if not ds or not ds.table_name:
-                return True  # 无数据源时跳过
+            resolved = self.resolver._get_entity_asset(entity)
+            if not resolved:
+                return True  # 无数据资产时跳过
+            asset, _ = resolved
+            table_name = self._data_svc.get_table_name(asset)
+            if not table_name:
+                return True
             pk = self.resolver._get_join_field(entity)
-            sql = f"SELECT COUNT(*) FROM {ds.table_name} WHERE {pk} = '{value}' LIMIT 1"
-            result = execute_readonly_sql(ds, sql, limit=1)
+            sql = f"SELECT COUNT(*) FROM {table_name} WHERE {pk} = :val LIMIT 1"
+            result = self._data_svc.execute_sql_on_entity(
+                entity.id, sql, params={"val": value}, purpose="rule_engine.precondition",
+            )
             if result.get("rows") and int(result["rows"][0][0] or 0) > 0:
                 return True
             return False

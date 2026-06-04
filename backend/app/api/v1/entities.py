@@ -89,7 +89,7 @@ def get_scene_layer_stats(
 
 @router.get("/data-layer")
 def get_data_layer(db: Session = Depends(get_db)):
-    from app.models.datasource import DataSource
+    from app.models.asset import Asset
     from sqlalchemy import distinct
     rows = (
         db.query(
@@ -106,15 +106,19 @@ def get_data_layer(db: Session = Depends(get_db)):
         entity_tables[r.entity_id] = r.source_table
         entity_field_counts[r.entity_id] = entity_field_counts.get(r.entity_id, 0) + 1
 
+    # build asset index by table_name
+    all_assets = db.query(Asset).filter(Asset.status == "active").all()
+    asset_by_table = {(a.locator or {}).get("table", ""): a for a in all_assets if (a.locator or {}).get("table")}
+
     from app.models import OntologyEntity
     result = []
     for entity_id, table_name in entity_tables.items():
         e = db.get(OntologyEntity, entity_id)
         if not e:
             continue
-        ds = db.query(DataSource).filter(DataSource.table_name == table_name).first()
-        record_count = ds.record_count if ds else 0
-        datasource_name = ds.name if ds else ''
+        asset = asset_by_table.get(table_name)
+        record_count = (asset.profile or {}).get("row_count", 0) if asset else 0
+        datasource_name = asset.name if asset else ''
         result.append({
             'entity_id': entity_id,
             'entity_name_cn': e.name_cn,
@@ -243,14 +247,16 @@ def create_from_datasource(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    from app.models.datasource import DataSource
-    from app.services.datasource_utils import get_table_schema as _get_table_schema
+    from app.models.asset import Asset
+    from app.services.data_plane.connection_service import ConnectionService
 
-    ds = db.get(DataSource, body.datasource_id)
-    if not ds:
+    asset = db.get(Asset, body.datasource_id)
+    if not asset:
         raise HTTPException(status_code=404, detail="数据源不存在")
 
-    columns = _get_table_schema(ds, body.table_name)
+    if not asset.connection_id:
+        raise HTTPException(status_code=400, detail="资产未关联连接")
+    columns = ConnectionService(db).get_table_schema(asset.connection_id, body.table_name)
     if not columns:
         raise HTTPException(status_code=400, detail="表无列信息")
 
@@ -270,10 +276,10 @@ def create_from_datasource(
         name_cn=body.name_cn,
         tier=body.tier,
         status="active",
-        description=f"从数据源 {ds.name} 的表 {body.table_name} 自动生成",
+        description=f"从数据源 {asset.name} 的表 {body.table_name} 自动生成",
         schema_json={
-            "datasource_id": ds.id,
-            "datasource_name": ds.name,
+            "datasource_id": asset.id,
+            "datasource_name": asset.name,
             "table_name": body.table_name,
             "primary_key": primary_key,
         },
@@ -297,7 +303,7 @@ def create_from_datasource(
         user_name=user.name if user else None,
         action="create", target_type="entity",
         target_id=eid, target_name=table_pascal,
-        snapshot_after={"source": "datasource", "datasource": ds.name, "table": body.table_name},
+        snapshot_after={"source": "datasource", "datasource": asset.name, "table": body.table_name},
     )
     db.commit()
     return get_entity(eid, db)
