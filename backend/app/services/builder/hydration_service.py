@@ -80,6 +80,28 @@ class HydrationService:
         loaded_assets = 0
         asset_cache: dict[str, Asset] = {}  # asset_id -> Asset
 
+        # ── 前置校验：没有任何可用资产则直接快速失败 ──────────
+        has_backing = any(obj.backing_asset_ids for obj in req.objects)
+        if not req.asset_ids and not has_backing:
+            yield {"type": "phase_log", "phase": "ingest", "level": "ERR",
+                   "msg": "未找到可用数据资产，请先在「资产目录」中注册数据表，或在对象上绑定 backing asset"}
+            yield {
+                "type": "drill_complete",
+                "result": {
+                    "phases": [{
+                        "key": "ingest", "label": "数据接入", "status": "error",
+                        "metrics": [{"label": "装载资产数", "value": "0/0", "tone": "warn"}],
+                    }],
+                    "logs": [],
+                    "selectedRows": 0, "selectedColumns": 0, "selectedSources": 0,
+                    "entityCount": 0, "relationCount": 0,
+                    "attributionAccuracy": "N/A",
+                    "highConfidenceAttribution": 0, "manualReview": 0,
+                },
+                "status": "error",
+            }
+            return
+
         # ── Phase 1: 数据接入 ─────────────────────────────
         yield {"type": "phase_progress", "phase": "ingest", "progress": 0}
         ingest_start = time.time()
