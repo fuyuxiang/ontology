@@ -37,7 +37,7 @@ def _svc(db: Session) -> AssetService:
 @router.get("", response_model=list[AssetDetail])
 def list_assets(
     kind: str | None = None,
-    kinds: list[str] | None = Query(None),
+    kinds: str | None = Query(None),
     connection_id: str | None = None,
     domain: str | None = None,
     document_source_type: str | None = None,
@@ -45,8 +45,9 @@ def list_assets(
     q: str | None = None,
     db: Session = Depends(get_db),
 ):
+    kinds_list = [k.strip() for k in kinds.split(",") if k.strip()] if kinds else None
     return _svc(db).list(
-        kind=kind, kinds=kinds, connection_id=connection_id, domain=domain,
+        kind=kind, kinds=kinds_list, connection_id=connection_id, domain=domain,
         document_source_type=document_source_type, status=status, q=q,
     )
 
