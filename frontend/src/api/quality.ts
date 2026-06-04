@@ -74,7 +74,50 @@ export interface RuleUpdate {
   description?: string | null
 }
 
+// Dashboard types
+export interface DashboardEntity {
+  entity_id: string
+  entity_name: string
+  score: number
+  dimensions: Record<string, HealthStatusValue>
+  rule_count: number
+  pass_count: number
+}
+
+export interface DashboardTrend {
+  date: string
+  score: number
+  warnings: number
+  failures: number
+}
+
+export interface DashboardIssue {
+  id: string
+  entity_name: string
+  asset_name: string
+  rule_kind: string
+  column_name: string | null
+  severity: string
+  value: number | null
+  threshold: number | null
+  message: string
+  occurred_at: string
+}
+
+export interface QualityDashboard {
+  overall_score: number
+  summary: Record<HealthStatusValue, number>
+  entities: DashboardEntity[]
+  trend: DashboardTrend[]
+  recent_issues: DashboardIssue[]
+}
+
 export const qualityApi = {
+  // Dashboard
+  dashboard: () => get<QualityDashboard>('/data-plane/quality/dashboard'),
+  evaluateAll: () => post<{ evaluated: number }>('/data-plane/quality/evaluate-all'),
+
+  // Legacy
   ruleKinds: () => get<RuleKindTemplate[]>('/quality/rule_kinds'),
   listRules: (asset_id?: string) =>
     get<QualityRule[]>('/quality/rules', { params: asset_id ? { asset_id } : {} }),
