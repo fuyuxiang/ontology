@@ -36,6 +36,7 @@
             style="flex:1"
             size="small"
             @dropdown-visible-change="onAssetDropdownOpen"
+            @change="syncStore"
           />
           <button class="step2-ai-btn" :disabled="autoMapping || !selectedAssetIds.length" @click="runAutoMap">
             {{ autoMapping ? '映射中...' : '自动映射' }}
@@ -306,6 +307,7 @@ function syncStore() {
     ontologyObjects: [...objects.value],
     ontologyRelations: [...relations.value],
     hints: { ...hints.value },
+    selectedAssetIds: [...selectedAssetIds.value],
   })
 }
 
