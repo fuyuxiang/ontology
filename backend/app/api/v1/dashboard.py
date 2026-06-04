@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from app.database import get_db
 from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction, AuditLog
 from app.models.function import OntologyFunction
-from app.models.datasource import DataSource
+from app.models.asset import Asset
 from app.models.dashboard_config import DashboardConfig
 from app.models.agent import Agent
 
@@ -77,7 +77,7 @@ class DashboardRepository:
         active_rule_count = db.query(func.count(BusinessRule.id)).filter(BusinessRule.status == 'active').scalar() or 0
         action_count = db.query(func.count(EntityAction.id)).scalar() or 0
         function_count = db.query(func.count(OntologyFunction.id)).scalar() or 0
-        datasource_count = db.query(func.count(DataSource.id)).scalar() or 0
+        datasource_count = db.query(func.count(Asset.id)).filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"])).scalar() or 0
 
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -102,7 +102,7 @@ class DashboardRepository:
         agent_active = db.query(func.count(Agent.id)).filter(Agent.status == "published").scalar() or 0
 
         top_rules = db.query(BusinessRule).order_by(BusinessRule.priority.desc()).limit(4).all()
-        datasources = db.query(DataSource).limit(8).all()
+        datasources = db.query(Asset).filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"])).limit(8).all()
         recent_logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(10).all()
 
         return {

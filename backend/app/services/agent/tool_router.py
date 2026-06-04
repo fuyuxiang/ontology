@@ -6,11 +6,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, EntityRelation, BusinessRule, DataSource
-from app.services.datasource_utils import (
-    get_table_schema as ds_get_table_schema,
-    execute_readonly_sql,
-)
+from app.models import OntologyEntity, EntityRelation, BusinessRule
+from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.rule_engine import RuleEvaluator, ActionExecutor, RuleScreener
 
 logger = logging.getLogger(__name__)
@@ -85,39 +82,32 @@ class ToolRouter:
         return result, f"本体模型: {len(entity_list)} 实体, {len(rel_list)} 关系, {len(rules)} 规则", len(entity_list)
 
     def _tool_list_datasources(self, args: dict) -> tuple[Any, str, int]:
-        datasources = self.db.query(DataSource).filter(DataSource.enabled == True).all()
-        ds_list = [{
-            "name": ds.name, "type": ds.type, "table_name": ds.table_name,
-            "record_count": ds.record_count, "database": ds.database,
-        } for ds in datasources]
-        return ds_list, f"返回 {len(ds_list)} 个已启用数据源", len(ds_list)
+        svc = EntityDataService(self.db)
+        assets = svc.list_assets()
+        return assets, f"返回 {len(assets)} 个已启用数据资产", len(assets)
 
     def _tool_get_table_schema(self, args: dict) -> tuple[Any, str, int]:
-        ds_name = str(args.get("datasource_name", "")).strip()
+        asset_name = str(args.get("datasource_name", "") or args.get("asset_name", "")).strip()
         table_name = str(args.get("table_name", "")).strip()
-        if not ds_name:
-            return {"error": "需要提供 datasource_name"}, "参数不完整", 0
-        ds = self.db.query(DataSource).filter(DataSource.name == ds_name, DataSource.enabled == True).first()
-        if not ds:
-            return {"error": f"数据源 '{ds_name}' 不存在或未启用"}, "数据源不可用", 0
-        tbl = table_name or ds.table_name
-        if not tbl:
-            return {"error": "需要提供 table_name 或数据源需配置默认表"}, "表名缺失", 0
-        columns = ds_get_table_schema(ds, tbl)
+        if not asset_name:
+            return {"error": "需要提供 asset_name（或 datasource_name）"}, "参数不完整", 0
+        svc = EntityDataService(self.db)
+        columns = svc.get_table_schema_for_asset(asset_name, table_name)
+        if isinstance(columns, dict) and "error" in columns:
+            return columns, columns["error"], 0
+        tbl = table_name or asset_name
         return {"table": tbl, "columns": columns}, f"表 {tbl} 共 {len(columns)} 列", len(columns)
 
     def _tool_query_datasource(self, args: dict) -> tuple[Any, str, int]:
-        ds_name = str(args.get("datasource_name", "")).strip()
+        asset_name = str(args.get("datasource_name", "") or args.get("asset_name", "")).strip()
         sql = str(args.get("sql", "")).strip()
-        if not ds_name or not sql:
-            return {"error": "需要提供 datasource_name 和 sql"}, "参数不完整", 0
-        ds = self.db.query(DataSource).filter(DataSource.name == ds_name, DataSource.enabled == True).first()
-        if not ds:
-            return {"error": f"数据源 '{ds_name}' 不存在或未启用"}, "数据源不可用", 0
-        result = execute_readonly_sql(ds, sql)
+        if not asset_name or not sql:
+            return {"error": "需要提供 asset_name（或 datasource_name）和 sql"}, "参数不完整", 0
+        svc = EntityDataService(self.db)
+        result = svc.execute_sql_on_asset(asset_name, sql, purpose="agent.query_datasource")
         if "error" in result:
             return result, f"查询失败: {result['error']}", 0
-        return result, f"查询返回 {result['rowCount']} 行", result["rowCount"]
+        return result, f"查询返回 {result.get('rowCount', 0)} 行", result.get("rowCount", 0)
 
     def _tool_get_entity_detail(self, args: dict) -> tuple[Any, str, int]:
         entity_name = str(args.get("entity_name", "")).strip()
@@ -154,51 +144,22 @@ class ToolRouter:
         if not entity:
             return {"error": f"本体中不存在实体 '{entity_name}'"}, "实体不存在", 0
 
-        schema = entity.schema_json or {}
-        ds_ref = schema.get("datasource_ref", "")
-        if not ds_ref:
-            return {"error": f"实体 '{entity_name}' 未关联数据源"}, "无数据源映射", 0
-
-        ds = self.db.query(DataSource).filter(
-            DataSource.name == ds_ref, DataSource.enabled == True
-        ).first()
-        if not ds:
-            return {"error": f"数据源 '{ds_ref}' 不存在或未启用"}, "数据源不可用", 0
-        if not ds.table_name:
-            return {"error": f"数据源 '{ds_ref}' 未配置表名"}, "表名缺失", 0
-
         valid_attrs = {a.name for a in entity.attributes}
-        select_cols = "*"
-        if fields:
-            valid_fields = [f for f in fields if f in valid_attrs]
-            if valid_fields:
-                select_cols = ", ".join(valid_fields)
-
-        sql = f"SELECT {select_cols} FROM {ds.table_name}"
-
-        where_parts = []
-        for attr_name, value in filters.items():
-            if attr_name not in valid_attrs:
-                continue
-            if isinstance(value, str):
-                where_parts.append(f"{attr_name} = '{value}'")
-            elif isinstance(value, (int, float)):
-                where_parts.append(f"{attr_name} = {value}")
-            elif isinstance(value, bool):
-                where_parts.append(f"{attr_name} = {1 if value else 0}")
-
-        if where_parts:
-            sql += " WHERE " + " AND ".join(where_parts)
-
-        result = execute_readonly_sql(ds, sql, limit)
+        svc = EntityDataService(self.db)
+        result = svc.query_entity_data(
+            entity.id,
+            filters=filters,
+            fields=fields,
+            limit=limit,
+            purpose="agent.query_entity_data",
+            valid_attrs=valid_attrs,
+        )
         if "error" in result:
             return result, f"查询失败: {result['error']}", 0
 
         result["entity"] = entity_name
         result["entity_cn"] = entity.name_cn
-        result["datasource"] = ds_ref
-        result["table"] = ds.table_name
-        return result, f"通过本体 {entity.name_cn} 查询到 {result['rowCount']} 条记录", result["rowCount"]
+        return result, f"通过本体 {entity.name_cn} 查询到 {result.get('rowCount', 0)} 条记录", result.get("rowCount", 0)
 
     def _tool_get_business_rules(self, args: dict) -> tuple[Any, str, int]:
         entity_name = str(args.get("entity_name", "")).strip()

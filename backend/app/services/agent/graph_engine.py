@@ -1024,19 +1024,12 @@ class GraphEngine:
 
         # 落到本体对应数据源
         from app.models.entity import OntologyEntity
-        from app.models.datasource import DataSource
+        from app.services.data_plane.entity_data_service import EntityDataService
         from app.connectors.factory import get_connector  # noqa: F401  仅校验
         ent = self.db.query(OntologyEntity).filter(OntologyEntity.name == target).first()
         if not ent:
             return {"error": f"本体 {target} 不存在"}, "本体不存在"
-        ds_ref = (ent.schema_json or {}).get("datasource_ref") or (ent.schema_json or {}).get("datasource")
-        ds = None
-        if ds_ref:
-            ds = (
-                self.db.query(DataSource)
-                .filter((DataSource.name == ds_ref) | (DataSource.id == ds_ref))
-                .first()
-            )
+        asset_result = EntityDataService(self.db).resolve_entity_asset(ent.id)
         # 暂时落到 audit / 节点结果（连接外部库写入由 ActionExecutor 复用），返回写入预览
         return (
             {
@@ -1044,7 +1037,7 @@ class GraphEngine:
                 "target": target,
                 "operation": operation,
                 "row": _safe_jsonable(row),
-                "datasource": ds.name if ds else "",
+                "datasource": asset_result[0].name if asset_result else "",
                 "preview": True,
             },
             f"写回 {target}({operation}) — {len(row)} 列",
