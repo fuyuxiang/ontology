@@ -4,8 +4,8 @@ from datetime import datetime
 
 from app.database import get_db
 from app.models import BusinessRule, OntologyEntity
-from app.schemas.entity import RuleOut
 from app.schemas.rule import (
+    RuleOut,
     RuleCreate, RuleUpdate, RuleExecuteResult,
     RuleEvaluateRequest, RuleEvaluateResult,
 )
@@ -19,12 +19,14 @@ router = APIRouter(prefix="/rules", tags=["rules"])
 
 def _rule_to_out(r: BusinessRule, entity_name: str) -> RuleOut:
     return RuleOut(
-        id=r.id, name=r.name, entity_id=r.entity_id,
-        entity_name=entity_name,
+        id=r.id, name=r.name, description=r.description or "",
+        entity_id=r.entity_id, entity_name=entity_name,
         condition_expr=r.condition_expr, action_desc=r.action_desc,
         status=r.status, priority=r.priority,
         trigger_count=r.trigger_count, last_triggered=r.last_triggered,
         conditions_json=r.conditions_json, rule_meta_json=r.rule_meta_json,
+        tags=r.tags, input_params=r.input_params,
+        output_schema=r.output_schema, action_id=r.action_id,
     )
 
 
@@ -63,9 +65,12 @@ def create_rule(
 
     rule = BusinessRule(
         entity_id=data.entity_id, name=data.name,
+        description=data.description,
         condition_expr=data.condition_expr, action_desc=data.action_desc,
         status=data.status, priority=data.priority,
         conditions_json=data.conditions_json, rule_meta_json=data.rule_meta_json,
+        tags=data.tags, input_params=data.input_params,
+        output_schema=data.output_schema, action_id=data.action_id,
     )
     repo.create(rule)
 

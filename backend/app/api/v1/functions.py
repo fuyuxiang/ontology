@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from datetime import datetime
-import time
 
 from app.database import get_db
 from app.models import OntologyEntity
@@ -21,12 +20,12 @@ router = APIRouter(prefix="/functions", tags=["functions"])
 def _func_to_out(f: OntologyFunction, entity_name: str) -> FunctionOut:
     return FunctionOut(
         id=f.id, entity_id=f.entity_id, entity_name=entity_name,
-        name=f.name, description=f.description,
-        return_type=f.return_type, input_schema=f.input_schema,
-        logic_type=f.logic_type, logic_body=f.logic_body,
-        is_derived_property=f.is_derived_property,
+        name=f.name, callable_name=f.callable_name or "",
+        description=f.description, return_type=f.return_type,
+        input_schema=f.input_schema, logic_type=f.logic_type,
+        logic_body=f.logic_body, is_derived_property=f.is_derived_property,
         status=f.status, execution_count=f.execution_count,
-        last_executed=f.last_executed,
+        last_executed=f.last_executed, tags=f.tags,
         created_at=f.created_at, updated_at=f.updated_at,
     )
 
@@ -67,10 +66,11 @@ def create_function(
 
     func = OntologyFunction(
         entity_id=data.entity_id, name=data.name,
+        callable_name=data.callable_name,
         description=data.description, return_type=data.return_type,
         input_schema=data.input_schema, logic_type=data.logic_type,
         logic_body=data.logic_body, is_derived_property=data.is_derived_property,
-        status=data.status,
+        status=data.status, tags=data.tags,
     )
     repo.create(func)
 
@@ -146,22 +146,19 @@ def test_function(
     if not func:
         raise HTTPException(status_code=404, detail="函数不存在")
 
+    from app.services.function_executor import FunctionExecutor
+    executor = FunctionExecutor(db)
     params = data.params if data else {}
-    start = time.time()
+    result = executor.execute(func, params)
 
-    try:
-        if func.logic_type == "expression":
-            safe_globals = {"__builtins__": {}, "params": params}
-            result = eval(func.logic_body, safe_globals) if func.logic_body else None
-        else:
-            result = f"[模拟执行] {func.name}({params})"
-
-        elapsed = (time.time() - start) * 1000
+    if result.success:
         func.execution_count += 1
         func.last_executed = datetime.utcnow()
         repo.commit()
 
-        return FunctionTestResult(success=True, result=result, execution_ms=elapsed)
-    except Exception as e:
-        elapsed = (time.time() - start) * 1000
-        return FunctionTestResult(success=False, error=str(e), execution_ms=elapsed)
+    return FunctionTestResult(
+        success=result.success,
+        result=result.value,
+        error=result.error,
+        execution_ms=result.execution_ms,
+    )
