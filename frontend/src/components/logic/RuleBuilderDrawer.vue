@@ -128,7 +128,7 @@ async function save() {
       <div class="drawer-panel">
         <div class="drawer-panel__header">
           <h2>{{ editId ? '编辑规则' : '新建规则' }}</h2>
-          <button class="btn-sm-edit" @click="emit('close')">✕</button>
+          <button class="btn-icon" @click="emit('close')">✕</button>
         </div>
 
         <div class="drawer-panel__body">
@@ -144,20 +144,24 @@ async function save() {
                 <label class="form-label">描述</label>
                 <textarea class="form-input" v-model="form.description" rows="2" placeholder="规则描述（可选）" />
               </div>
-              <div class="form-row">
-                <label class="form-label">关联实体</label>
-                <select class="form-input" v-model="form.entity_id" :disabled="!!lockedEntityId">
-                  <option value="">— 不绑定实体 —</option>
-                  <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
-                </select>
-              </div>
-              <div class="form-row">
-                <label class="form-label">优先级</label>
-                <div style="display:flex;gap:16px;align-items:center;margin-top:4px;">
-                  <label v-for="p in ['high','medium','low']" :key="p" style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;">
-                    <input type="radio" :value="p" v-model="form.priority" />
-                    {{ p === 'high' ? '高' : p === 'medium' ? '中' : '低' }}
-                  </label>
+              <div class="form-row-inline">
+                <div class="form-row" style="flex:1;">
+                  <label class="form-label">关联实体</label>
+                  <select class="form-input" v-model="form.entity_id" :disabled="!!lockedEntityId">
+                    <option value="">— 不绑定实体 —</option>
+                    <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
+                  </select>
+                </div>
+                <div class="form-row" style="flex:1;">
+                  <label class="form-label">优先级</label>
+                  <div class="mode-switch" style="margin-bottom:0;">
+                    <button
+                      v-for="p in (['high','medium','low'] as const)" :key="p"
+                      type="button"
+                      :class="{ active: form.priority === p }"
+                      @click="form.priority = p"
+                    >{{ p === 'high' ? '高' : p === 'medium' ? '中' : '低' }}</button>
+                  </div>
                 </div>
               </div>
               <div class="form-row">
@@ -194,13 +198,15 @@ async function save() {
           <div class="form-section">
             <div class="form-section__title">动作引用</div>
             <div class="rule-form">
-              <div class="form-row">
-                <label class="form-label">动作 ID</label>
-                <input class="form-input" v-model="form.action_id" placeholder="action_id（可选）" />
-              </div>
-              <div class="form-row">
-                <label class="form-label">动作说明</label>
-                <input class="form-input" v-model="form.action_desc" placeholder="简述触发后执行的动作" />
+              <div class="form-row-inline">
+                <div class="form-row" style="flex:1;">
+                  <label class="form-label">动作 ID</label>
+                  <input class="form-input" v-model="form.action_id" placeholder="action_id（可选）" />
+                </div>
+                <div class="form-row" style="flex:1.5;">
+                  <label class="form-label">动作说明</label>
+                  <input class="form-input" v-model="form.action_desc" placeholder="简述触发后执行的动作" />
+                </div>
               </div>
             </div>
           </div>
@@ -227,7 +233,7 @@ async function save() {
         </div>
 
         <div class="drawer-panel__footer">
-          <button class="btn-sm-edit" @click="emit('close')">取消</button>
+          <button class="btn-secondary" @click="emit('close')">取消</button>
           <button class="btn-primary" :disabled="saving" @click="save">
             {{ saving ? '保存中…' : '保存' }}
           </button>
