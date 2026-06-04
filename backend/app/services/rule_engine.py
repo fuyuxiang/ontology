@@ -327,6 +327,9 @@ class RuleEvaluator:
 
     def _evaluate_condition(self, cond: dict, user_id: str) -> ConditionResult:
         """评估单个条件"""
+        if cond.get("type") == "function_call":
+            return self._evaluate_function_condition(cond, user_id)
+
         field_ref = cond.get("field", "")
         operator = cond.get("operator", "==")
         expected = cond.get("value")
@@ -370,6 +373,42 @@ class RuleEvaluator:
             logger.warning(f"条件评估失败 {field_ref}: {e}")
             return ConditionResult(
                 field=field_ref, display=display, operator=operator,
+                expected=expected, matched=False, error=str(e),
+            )
+
+    def _evaluate_function_condition(self, cond: dict, user_id: str) -> ConditionResult:
+        """评估函数调用类型条件"""
+        callable_name = cond.get("callable_name", "")
+        params = dict(cond.get("params", {}))
+        operator = cond.get("operator", "==")
+        expected = cond.get("value")
+        display = cond.get("display", f"{callable_name}()")
+
+        for k, v in params.items():
+            if v == "$context.user_id":
+                params[k] = user_id
+
+        try:
+            from app.services.function_executor import FunctionExecutor
+            executor = FunctionExecutor(self.db)
+            result = executor.execute_by_callable_name(callable_name, params)
+
+            if not result.success:
+                return ConditionResult(
+                    field=callable_name, display=display, operator=operator,
+                    expected=expected, matched=False, error=result.error,
+                )
+
+            actual = result.value
+            matched = _compare(actual, operator, expected)
+            return ConditionResult(
+                field=callable_name, display=display, operator=operator,
+                expected=expected, actual=actual, matched=matched,
+            )
+        except Exception as e:
+            logger.warning(f"Function condition evaluation failed {callable_name}: {e}")
+            return ConditionResult(
+                field=callable_name, display=display, operator=operator,
                 expected=expected, matched=False, error=str(e),
             )
 
