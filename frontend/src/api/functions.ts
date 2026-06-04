@@ -5,6 +5,7 @@ export interface FunctionItem {
   entity_id: string | null
   entity_name: string
   name: string
+  callable_name: string
   description: string
   return_type: string
   input_schema: any[] | null
@@ -14,6 +15,8 @@ export interface FunctionItem {
   status: string
   execution_count: number
   last_executed: string | null
+  tags: string[] | null
+  ref_count: number
   created_at: string | null
   updated_at: string | null
 }
