@@ -6,7 +6,7 @@
         <span class="aip-header__logo">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4.5H14l-3.7 2.7L11.8 13 8 10.3 4.2 13l1.5-4.8L2 5.5h4.5L8 1z" fill="#2E5BFF"/></svg>
         </span>
-        <span class="aip-header__title">AIP 场景平台</span>
+        <span class="aip-header__title">流程编排</span>
         <template v-if="store.currentBrief">
           <span class="aip-header__divider">|</span>
           <span class="aip-header__scene">{{ store.currentBrief.name }}</span>

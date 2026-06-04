@@ -10,7 +10,7 @@ from app.schemas.entity import (
     AttributeOut, AttributeMappingUpdate, RelationOut, RuleOut, ActionOut,
     FunctionBriefOut,
     GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
-    FileImportResult,
+    FileImportResult, OntologyPreviewResult,
 )
 from app.repositories import EntityRepository
 from app.core.deps import get_current_user
@@ -467,6 +467,32 @@ async def create_from_file(
         actions_created=result.actions_created,
         errors=result.errors,
     )
+
+
+@router.post("/preview-file", response_model=OntologyPreviewResult)
+async def preview_from_file(
+    file: UploadFile = File(...),
+    file_type: str = Form(...),
+    namespace: str = Form(""),
+):
+    """预览本体文件：仅解析为草稿结构，不落库、不写审计。供模版构建使用。"""
+    from app.services.file_import import preview_json_ontology
+
+    if file_type != "json":
+        raise HTTPException(status_code=400, detail="预览目前仅支持 json 格式")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+
+    try:
+        import json as _json
+        data = _json.loads(content.decode("utf-8"))
+        preview = preview_json_ontology(data, namespace)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}")
+
+    return OntologyPreviewResult(**preview)
 
 
 @router.get("/{entity_id}", response_model=EntityDetail)

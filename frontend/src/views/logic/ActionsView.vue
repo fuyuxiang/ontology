@@ -4,7 +4,7 @@
     <div class="logic-page__header">
       <div>
         <h1 class="text-display">行动管理</h1>
-        <p class="text-caption" style="margin-top: 4px;">行动注册表 · 多类型配置 · 领域行动与系统行动</p>
+        <p class="text-caption" style="margin-top: 4px;">行动注册与执行管理</p>
       </div>
       <div class="logic-page__actions">
         <button class="btn-primary" @click="openCreate">
@@ -35,114 +35,160 @@
       </div>
     </div>
 
-    <div class="logic-page__filter">
-      <input v-model="search" class="logic-search" placeholder="搜索行动名称..." @input="fetchActions" />
-      <div class="logic-filter-tags">
-        <button v-for="f in filterOptions" :key="f.value" class="filter-tag" :class="{ 'filter-tag--active': activeFilter === f.value }" @click="setFilter(f.value)">{{ f.label }}</button>
-      </div>
-    </div>
-
-    <div class="logic-page__list">
-      <div v-for="action in filteredActions" :key="action.id" class="rule-card" :class="{ 'rule-card--expanded': expandedId === action.id }" @click="expandedId = expandedId === action.id ? null : action.id">
-        <div class="rule-card__header">
-          <span class="rule-card__status" :class="`rule-card__status--${action.status}`"></span>
-          <span class="rule-card__name text-body-medium">{{ action.name }}</span>
-          <span class="rule-card__entity text-caption">{{ action.entity_name || '系统行动' }}</span>
-          <span class="rule-card__priority" :class="`priority--${action.category}`">{{ action.category === 'domain' ? '领域' : '系统' }}</span>
-          <span class="rule-card__type text-caption" style="margin-left: 8px;">{{ getTypeLabel(action.action_type) }}</span>
+    <div class="master-detail">
+      <div class="master-detail__list">
+        <div class="master-detail__toolbar">
+          <input v-model="search" class="logic-search" placeholder="搜索行动名称..." />
+          <div class="logic-filter-tags">
+            <button
+              v-for="f in filterOptions" :key="f.value"
+              class="filter-tag"
+              :class="{ 'filter-tag--active': activeFilter === f.value }"
+              @click="setFilter(f.value)"
+            >{{ f.label }}</button>
+          </div>
         </div>
-        <div v-if="expandedId === action.id" class="rule-card__detail">
-          <div class="rule-detail-row" v-if="action.description">
-            <span class="rule-detail-label">描述</span>
-            <span>{{ action.description }}</span>
+
+        <div class="master-detail__items">
+          <div
+            v-for="action in filteredActions" :key="action.id"
+            class="list-item"
+            :class="{ 'list-item--active': selectedId === action.id }"
+            @click="selectedId = action.id"
+          >
+            <span class="list-item__status" :class="`list-item__status--${action.status}`"></span>
+            <span class="list-item__name">{{ action.name }}</span>
+            <span class="list-item__badge" :class="`priority--${action.category}`">{{ action.category === 'domain' ? '领域' : '系统' }}</span>
+            <span class="list-item__meta">{{ action.entity_name || '系统' }}</span>
           </div>
-          <div class="rule-detail-row">
-            <span class="rule-detail-label">行动类型</span>
-            <span>{{ getTypeLabel(action.action_type) }}</span>
+          <div v-if="filteredActions.length === 0" class="logic-empty">
+            <p class="text-caption">无匹配行动</p>
           </div>
-          <div class="rule-detail-row">
-            <span class="rule-detail-label">执行次数</span>
-            <span>{{ action.impact_count ?? 0 }} 次</span>
+        </div>
+      </div>
+
+      <div class="master-detail__detail">
+        <template v-if="selectedAction">
+          <div class="detail-panel__header">
+            <h2 class="detail-panel__title">{{ selectedAction.name }}</h2>
+            <span class="list-item__badge" :class="`priority--${selectedAction.category}`">{{ selectedAction.category === 'domain' ? '领域行动' : '系统行动' }}</span>
           </div>
-          <div class="rule-detail-row" v-if="action.parameters_json?.length">
-            <span class="rule-detail-label">参数</span>
-            <code class="text-code">{{ action.parameters_json.map((p: any) => p.name || p).join(', ') }}</code>
+
+          <div class="detail-panel__meta">
+            <div class="detail-meta-item">
+              <span class="detail-meta-label">状态</span>
+              <span class="detail-meta-value">
+                <span class="list-item__status" :class="`list-item__status--${selectedAction.status}`"></span>
+                {{ selectedAction.status === 'active' ? '已激活' : '未激活' }}
+              </span>
+            </div>
+            <div class="detail-meta-item">
+              <span class="detail-meta-label">关联实体</span>
+              <span class="detail-meta-value">{{ selectedAction.entity_name || '系统行动' }}</span>
+            </div>
+            <div class="detail-meta-item">
+              <span class="detail-meta-label">行动类型</span>
+              <span class="detail-meta-value">{{ getTypeLabel(selectedAction.action_type) }}</span>
+            </div>
+            <div class="detail-meta-item">
+              <span class="detail-meta-label">执行次数</span>
+              <span class="detail-meta-value">{{ selectedAction.impact_count ?? 0 }} 次</span>
+            </div>
           </div>
-          <div class="rule-card__actions">
-            <button class="btn-sm-exec" @click.stop="handleExecute(action)">
+
+          <div v-if="selectedAction.description" class="detail-panel__section">
+            <h3 class="detail-section-title">描述</h3>
+            <p class="detail-section-text">{{ selectedAction.description }}</p>
+          </div>
+
+          <div v-if="selectedAction.parameters_json?.length" class="detail-panel__section">
+            <h3 class="detail-section-title">参数</h3>
+            <code class="detail-code-block">{{ selectedAction.parameters_json.map((p: any) => p.name || p).join(', ') }}</code>
+          </div>
+
+          <div class="detail-panel__actions">
+            <button class="btn-sm-exec" @click="handleExecute(selectedAction)">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor"/></svg>
               执行
             </button>
-            <button class="btn-sm-del" @click.stop="handleDelete(action)">
+            <button class="btn-sm-del" @click="handleDelete(selectedAction)">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4 3V2h4v1M3 3v7h6V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               删除
             </button>
           </div>
+        </template>
+        <div v-else class="detail-panel__empty">
+          <p class="text-caption">选择一个行动查看详情</p>
         </div>
-      </div>
-      <div v-if="filteredActions.length === 0" class="logic-empty">
-        <p class="text-caption">无匹配行动</p>
       </div>
     </div>
 
-    <ModalDialog :visible="showAdd" title="新建行动" width="640px" @close="closeCreate">
-      <div class="create-steps">
-        <div class="create-steps__indicators">
-          <span v-for="(s, i) in stepLabels" :key="i" class="step-dot" :class="{ 'step-dot--active': createStep === i, 'step-dot--done': createStep > i }">{{ i + 1 }}. {{ s }}</span>
-        </div>
-
-        <form class="rule-form" @submit.prevent="handleStepNext">
-          <!-- Step 0: basic info -->
-          <template v-if="createStep === 0">
-            <div class="form-row"><label class="form-label">行动名称</label><input v-model="form.name" class="form-input" required /></div>
-            <div class="form-row"><label class="form-label">描述</label><input v-model="form.description" class="form-input" /></div>
-            <div class="form-row"><label class="form-label">分类</label>
-              <select v-model="form.category" class="form-input" required>
-                <option value="domain">领域行动（绑定实体）</option>
-                <option value="system">系统行动（不绑定实体）</option>
-              </select>
-            </div>
-          </template>
-
-          <!-- Step 1: entity (domain only) + action type -->
-          <template v-if="createStep === 1">
-            <div v-if="form.category === 'domain'" class="form-row">
-              <label class="form-label">关联实体</label>
-              <select v-model="form.entity_id" class="form-input" required>
-                <option value="" disabled>选择实体</option>
-                <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name_cn || e.name }} ({{ e.name }})</option>
-              </select>
-            </div>
-            <div class="form-row">
-              <label class="form-label">行动类型</label>
-              <select v-model="form.action_type" class="form-input" required>
-                <option value="" disabled>选择类型</option>
-                <option v-for="t in actionTypes" :key="t.type_key" :value="t.type_key">{{ t.label }} - {{ t.description }}</option>
-              </select>
-            </div>
-          </template>
-
-          <!-- Step 2: type config -->
-          <template v-if="createStep === 2">
-            <p class="text-caption" style="margin-bottom: 12px;">配置「{{ getTypeLabel(form.action_type) }}」的执行参数：</p>
-            <div v-for="(field, key) in currentConfigSchema" :key="key" class="form-row">
-              <label class="form-label">{{ field.description || key }}</label>
-              <textarea v-if="field.type === 'object' || key === 'script' || key === 'sql'" v-model="typeConfigValues[key as string]" class="form-input form-textarea" rows="3"></textarea>
-              <select v-else-if="field.enum" v-model="typeConfigValues[key as string]" class="form-input">
-                <option v-for="opt in field.enum" :key="opt" :value="opt">{{ opt }}</option>
-              </select>
-              <input v-else v-model="typeConfigValues[key as string]" class="form-input" :required="field.required" />
-            </div>
-          </template>
-
-          <div class="form-row" style="justify-content: flex-end; gap: 8px;">
-            <button v-if="createStep > 0" type="button" class="btn-secondary" @click="createStep--">上一步</button>
-            <button v-if="createStep < 2" type="submit" class="btn-primary">下一步</button>
-            <button v-else type="button" class="btn-primary" @click="handleCreate">创建</button>
+    <Transition name="drawer">
+      <div v-if="showAdd" class="drawer-overlay" @click.self="closeCreate">
+        <div class="drawer-panel">
+          <div class="drawer-panel__header">
+            <h2>新建行动</h2>
+            <button class="btn-icon" @click="closeCreate">✕</button>
           </div>
-        </form>
+
+          <div class="drawer-panel__body">
+            <div class="create-steps">
+              <div class="create-steps__indicators">
+                <span v-for="(s, i) in stepLabels" :key="i" class="step-dot" :class="{ 'step-dot--active': createStep === i, 'step-dot--done': createStep > i }">{{ i + 1 }}. {{ s }}</span>
+              </div>
+
+              <form class="rule-form" @submit.prevent="handleStepNext">
+                <template v-if="createStep === 0">
+                  <div class="form-row"><label class="form-label">行动名称</label><input v-model="form.name" class="form-input" required /></div>
+                  <div class="form-row"><label class="form-label">描述</label><input v-model="form.description" class="form-input" /></div>
+                  <div class="form-row"><label class="form-label">分类</label>
+                    <select v-model="form.category" class="form-input" required>
+                      <option value="domain">领域行动（绑定实体）</option>
+                      <option value="system">系统行动（不绑定实体）</option>
+                    </select>
+                  </div>
+                </template>
+
+                <template v-if="createStep === 1">
+                  <div v-if="form.category === 'domain'" class="form-row">
+                    <label class="form-label">关联实体</label>
+                    <select v-model="form.entity_id" class="form-input" required>
+                      <option value="" disabled>选择实体</option>
+                      <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name_cn || e.name }} ({{ e.name }})</option>
+                    </select>
+                  </div>
+                  <div class="form-row">
+                    <label class="form-label">行动类型</label>
+                    <select v-model="form.action_type" class="form-input" required>
+                      <option value="" disabled>选择类型</option>
+                      <option v-for="t in actionTypes" :key="t.type_key" :value="t.type_key">{{ t.label }} - {{ t.description }}</option>
+                    </select>
+                  </div>
+                </template>
+
+                <template v-if="createStep === 2">
+                  <p class="text-caption" style="margin-bottom: 12px;">配置「{{ getTypeLabel(form.action_type) }}」的执行参数：</p>
+                  <div v-for="(field, key) in currentConfigSchema" :key="key" class="form-row">
+                    <label class="form-label">{{ field.description || key }}</label>
+                    <textarea v-if="field.type === 'object' || key === 'script' || key === 'sql'" v-model="typeConfigValues[key as string]" class="form-input form-textarea" rows="3"></textarea>
+                    <select v-else-if="field.enum" v-model="typeConfigValues[key as string]" class="form-input">
+                      <option v-for="opt in field.enum" :key="opt" :value="opt">{{ opt }}</option>
+                    </select>
+                    <input v-else v-model="typeConfigValues[key as string]" class="form-input" :required="field.required" />
+                  </div>
+                </template>
+
+                <div class="form-row" style="justify-content: flex-end; gap: 8px;">
+                  <button v-if="createStep > 0" type="button" class="btn-secondary" @click="createStep--">上一步</button>
+                  <button v-if="createStep < 2" type="submit" class="btn-primary">下一步</button>
+                  <button v-else type="button" class="btn-primary" @click="handleCreate">创建</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
       </div>
-    </ModalDialog>
+    </Transition>
   </div>
 </template>
 
@@ -151,7 +197,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { actionApi, type ActionItem, type ActionTypeInfo } from '../../api/actions'
 import { get } from '../../api/client'
-import ModalDialog from '../../components/common/ModalDialog.vue'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 
 const route = useRoute()
@@ -162,7 +207,7 @@ const entities = ref<any[]>([])
 const actionTypes = ref<ActionTypeInfo[]>([])
 const search = ref('')
 const activeFilter = ref('all')
-const expandedId = ref<string | null>(null)
+const selectedId = ref<string | null>(null)
 const showAdd = ref(false)
 const createStep = ref(0)
 
@@ -183,6 +228,8 @@ const filterOptions = [
   { label: '领域', value: 'domain' },
   { label: '系统', value: 'system' },
 ]
+
+const selectedAction = computed(() => filteredActions.value.find(a => a.id === selectedId.value) || null)
 
 const stats = computed(() => {
   const all = actions.value
@@ -293,6 +340,7 @@ async function handleExecute(action: ActionItem) {
 async function handleDelete(action: ActionItem) {
   if (!confirm(`确定删除行动「${action.name}」？`)) return
   await actionApi.remove(action.id)
+  if (selectedId.value === action.id) selectedId.value = null
   await fetchActions()
 }
 
@@ -316,40 +364,221 @@ onMounted(() => {
 <style scoped>
 @import './logic-shared.css';
 
+.master-detail {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 1px;
+  background: var(--neutral-200, #e5e5e5);
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: var(--radius-lg, 12px);
+  overflow: hidden;
+  min-height: 480px;
+}
+
+.master-detail__list {
+  background: var(--neutral-0, #fff);
+  display: flex;
+  flex-direction: column;
+}
+
+.master-detail__toolbar {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid var(--neutral-100, #f0f0f0);
+}
+
+.master-detail__toolbar .logic-search {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.master-detail__items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.list-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.list-item:hover {
+  background: var(--neutral-50, #fafafa);
+}
+
+.list-item--active {
+  background: var(--semantic-50, #eef2ff);
+  border: 1px solid var(--semantic-200, #c7d2fe);
+}
+
+.list-item__status {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.list-item__status--active { background: var(--status-success, #22c55e); }
+.list-item__status--inactive { background: var(--neutral-300, #d4d4d4); }
+
+.list-item__name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list-item__badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.list-item__meta {
+  font-size: 11px;
+  color: var(--neutral-500, #888);
+  flex-shrink: 0;
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-detail__detail {
+  background: var(--neutral-0, #fff);
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.detail-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.detail-panel__title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.detail-panel__meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--neutral-50, #fafafa);
+  border-radius: var(--radius-md, 8px);
+}
+
+.detail-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-meta-label {
+  font-size: 11px;
+  color: var(--neutral-500, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.detail-meta-value {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--neutral-800, #333);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-panel__section {
+  margin-bottom: 20px;
+}
+
+.detail-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--neutral-500, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin: 0 0 8px;
+}
+
+.detail-code-block {
+  display: block;
+  padding: 12px 16px;
+  background: var(--neutral-50, #fafafa);
+  border: 1px solid var(--neutral-100, #f0f0f0);
+  border-radius: var(--radius-md, 8px);
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--neutral-700, #495057);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.detail-section-text {
+  font-size: 13px;
+  color: var(--neutral-700, #495057);
+  margin: 0;
+}
+
+.detail-panel__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--neutral-100, #f0f0f0);
+}
+
+.detail-panel__empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--neutral-400, #aaa);
+}
+
 .create-steps__indicators {
   display: flex;
   gap: 16px;
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-subtle, #eee);
+  border-bottom: 1px solid var(--neutral-100, #f0f0f0);
 }
 
 .step-dot {
   font-size: 12px;
-  color: var(--text-tertiary, #999);
+  color: var(--neutral-500, #999);
 }
 
 .step-dot--active {
-  color: var(--color-primary, #1677ff);
+  color: var(--semantic-600, #4c6ef5);
   font-weight: 600;
 }
 
 .step-dot--done {
-  color: var(--color-success, #52c41a);
+  color: var(--status-success, #22c55e);
 }
 
 .form-textarea {
   min-height: 72px;
   resize: vertical;
   font-family: monospace;
-}
-
-.btn-secondary {
-  padding: 6px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--border-default, #d9d9d9);
-  background: transparent;
-  cursor: pointer;
-  font-size: 13px;
 }
 </style>
