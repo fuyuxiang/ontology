@@ -1,3 +1,5 @@
+import asyncio
+
 from .base import BaseActionExecutor, ExecutionResult
 from .api_call import ApiCallExecutor
 from .sql_exec import SqlExecExecutor
@@ -33,3 +35,19 @@ def get_all_type_info() -> list[dict]:
             "config_schema": cls.get_config_schema(),
         })
     return result
+
+
+def run_executor_sync(action_type: str, type_config: dict, params: dict, dry_run: bool = False) -> ExecutionResult:
+    """Synchronous wrapper for executing an action in a sync context."""
+    executor = get_executor(action_type)
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(asyncio.run, executor.execute(type_config, params, dry_run))
+                return future.result()
+        else:
+            return loop.run_until_complete(executor.execute(type_config, params, dry_run))
+    except RuntimeError:
+        return asyncio.run(executor.execute(type_config, params, dry_run))
