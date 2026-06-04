@@ -358,7 +358,9 @@ function confirmAll() {
       type: p.type || 'string', required: !!p.required,
       description: p.description || '',
       source_asset_id: p.source_asset_id ?? null,
-      source_column: p.source_column ?? null,
+      source_column: p.source_column ?? p.source_field ?? null,
+      source_field: p.source_field ?? null,
+      source_table: p.source_table ?? null,
     } as OntologyProperty)),
     derivedProperties: [], rules: [], actions: [], approved: false,
   }))

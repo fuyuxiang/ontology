@@ -54,6 +54,8 @@ export interface OntologyProperty {
   // M2.2：AI 召回回写 backing —— 让发布链路可自动落 ObjectBinding
   source_asset_id?: string | null
   source_column?: string | null
+  source_field?: string | null
+  source_table?: string | null
 }
 
 export interface OntologyObjectDraft {

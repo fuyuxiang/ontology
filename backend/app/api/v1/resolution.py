@@ -9,8 +9,9 @@ from typing import Any
 import logging
 
 from app.database import get_db
-from app.models import OntologyEntity, EntityAttribute, EntityRelation, DataSource
-from app.services.datasource_utils import execute_readonly_sql, get_connection, get_table_schema
+from app.models import OntologyEntity, EntityAttribute, EntityRelation
+from app.models.asset import Asset
+from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
 
 logger = logging.getLogger(__name__)
 
@@ -91,11 +92,15 @@ def list_resolvable_entities(db: Session = Depends(get_db)):
         # enrich with datasource info
         enriched_sources = []
         for t in tables:
-            ds = db.query(DataSource).filter(DataSource.table_name == t["table_name"]).first()
+            asset = next(
+                (a for a in db.query(Asset).filter(Asset.status == "active").all()
+                 if (a.locator or {}).get("table") == t["table_name"]),
+                None,
+            )
             enriched_sources.append({
                 "table_name": t["table_name"],
-                "datasource_name": ds.name if ds else "",
-                "datasource_id": ds.id if ds else "",
+                "datasource_name": asset.name if asset else "",
+                "datasource_id": asset.id if asset else "",
                 "field_count": t["field_count"],
             })
 
@@ -167,23 +172,27 @@ def preview_source_data(
         raise HTTPException(status_code=400, detail=f"表 {target_table} 没有映射到该实体")
 
     # 查数据源
-    ds = db.query(DataSource).filter(DataSource.table_name == target_table).first()
-    if not ds:
+    asset = next(
+        (a for a in db.query(Asset).filter(Asset.status == "active").all()
+         if (a.locator or {}).get("table") == target_table),
+        None,
+    )
+    if not asset:
         raise HTTPException(status_code=400, detail=f"未找到表 {target_table} 对应的数据源")
 
     # 查数据
     col_names = [f.source_field for f in fields]
     cols_str = ", ".join(f"`{c}`" for c in col_names)
+    exec_svc = ExecuteService(db)
 
     count_sql = f"SELECT COUNT(*) FROM `{target_table}`"
-    count_result = execute_readonly_sql(ds, count_sql)
-    total_rows = count_result["rows"][0][0] if count_result.get("rows") else 0
+    count_r = exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=count_sql, purpose="resolution.preview"))
+    total_rows = count_r.rows[0][0] if count_r.rows else 0
 
     offset = (page - 1) * page_size
     data_sql = f"SELECT {cols_str} FROM `{target_table}` LIMIT {page_size} OFFSET {offset}"
-    data_result = execute_readonly_sql(ds, data_sql)
-
-    rows = data_result.get("rows", []) if not data_result.get("error") else []
+    data_r = exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=data_sql, purpose="resolution.preview"))
+    rows = data_r.rows
 
     return SourceDataPreview(
         columns=col_names,
@@ -192,7 +201,7 @@ def preview_source_data(
         page=page,
         page_size=page_size,
         table_name=target_table,
-        datasource_name=ds.name,
+        datasource_name=asset.name,
     )
 
 
@@ -213,13 +222,19 @@ def get_resolution_stats(
 
     # 取第一个 source_table
     table_name = mapped_attrs[0].source_table
-    ds = db.query(DataSource).filter(DataSource.table_name == table_name).first()
-    if not ds:
+    asset = next(
+        (a for a in db.query(Asset).filter(Asset.status == "active").all()
+         if (a.locator or {}).get("table") == table_name),
+        None,
+    )
+    if not asset:
         raise HTTPException(status_code=400, detail=f"未找到数据源")
 
+    exec_svc = ExecuteService(db)
+
     count_sql = f"SELECT COUNT(*) FROM `{table_name}`"
-    count_result = execute_readonly_sql(ds, count_sql)
-    total_rows = count_result["rows"][0][0] if count_result.get("rows") else 0
+    count_r = exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=count_sql, purpose="resolution.stats"))
+    total_rows = count_r.rows[0][0] if count_r.rows else 0
 
     # 统计已映射字段的完整度
     mapped_field_names = [a.source_field for a in mapped_attrs]
@@ -230,8 +245,8 @@ def get_resolution_stats(
     if mapped_field_names:
         null_checks = " + ".join(f"CASE WHEN `{f}` IS NULL OR `{f}` = '' THEN 1 ELSE 0 END" for f in mapped_field_names)
         completeness_sql = f"SELECT COUNT(*) - ({null_checks}) FROM `{table_name}`"
-        comp_result = execute_readonly_sql(ds, completeness_sql)
-        non_null_cells = comp_result["rows"][0][0] if comp_result.get("rows") else 0
+        comp_r = exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=completeness_sql, purpose="resolution.stats"))
+        non_null_cells = comp_r.rows[0][0] if comp_r.rows else 0
         total_cells = total_rows * len(mapped_field_names)
         completeness = non_null_cells / total_cells if total_cells > 0 else 0
     else:
@@ -239,12 +254,12 @@ def get_resolution_stats(
 
     if identifier_field:
         distinct_sql = f"SELECT COUNT(DISTINCT `{identifier_field}`) FROM `{table_name}`"
-        distinct_result = execute_readonly_sql(ds, distinct_sql)
-        distinct_id_rows = distinct_result["rows"][0][0] if distinct_result.get("rows") else 0
+        distinct_r = exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=distinct_sql, purpose="resolution.stats"))
+        distinct_id_rows = distinct_r.rows[0][0] if distinct_r.rows else 0
 
         null_sql = f"SELECT COUNT(*) FROM `{table_name}` WHERE `{identifier_field}` IS NULL OR `{identifier_field}` = ''"
-        null_result = execute_readonly_sql(ds, null_sql)
-        null_id_rows = null_result["rows"][0][0] if null_result.get("rows") else 0
+        null_r = exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=null_sql, purpose="resolution.stats"))
+        null_id_rows = null_r.rows[0][0] if null_r.rows else 0
 
     return ResolutionStats(
         entity_id=entity_id,

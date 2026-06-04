@@ -39,6 +39,10 @@
             <div class="card-label">属性总数</div>
           </div>
           <div class="import-summary__card">
+            <div class="card-num">{{ parsedSummary.actionCount }}</div>
+            <div class="card-label">动作</div>
+          </div>
+          <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.fileSize }}</div>
             <div class="card-label">文件大小</div>
           </div>
@@ -72,7 +76,9 @@
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore, buildPresetClasses, buildPresetRelations } from '../../../store/builder'
-import type { BuilderSession, OntologyObjectDraft } from '../../../types/builder'
+import type { BuilderSession, OntologyObjectDraft, OntologyRelationDraft } from '../../../types/builder'
+import { entityApi } from '../../../api/ontology'
+import type { OntologyPreviewResult } from '../../../api/ontology'
 
 const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'next'): void }>()
@@ -84,6 +90,7 @@ const parsedSummary = ref<{
   classCount: number
   relationCount: number
   propertyCount: number
+  actionCount: number
   fileSize: string
   preview: OntologyObjectDraft[]
 } | null>(null)
@@ -100,32 +107,130 @@ function onFileChange(e: Event) {
 
 async function parseFile(file: File) {
   message.loading({ content: '正在解析本体文件...', key: 'parse', duration: 0 })
-  await new Promise(r => setTimeout(r, 1200))
-  const classes = buildPresetClasses(props.session.scenarioId || 'refund-root-cause')
-  const relations = buildPresetRelations(props.session.scenarioId || 'refund-root-cause', classes)
-  const propertyCount = classes.reduce((sum, c) => sum + c.properties.length, 0)
-  parsedSummary.value = {
-    classCount: classes.length,
-    relationCount: relations.length,
-    propertyCount,
-    fileSize: (file.size / 1024).toFixed(1) + ' KB',
-    preview: classes.slice(0, 10),
+
+  const ext = (file.name.split('.').pop() || '').toLowerCase()
+
+  if (ext === 'json') {
+    try {
+      // 统一走后端预览接口（只解析不落库），消除前后端两套解析逻辑
+      // namespace 留空，由后端从 JSON 的 scenario.namespace 推导
+      const preview: OntologyPreviewResult = await entityApi.previewFile(file, 'json')
+
+      if (!preview.objects.length) {
+        message.error({ content: '未在 JSON 中找到 object_types / entities 定义', key: 'parse' })
+        return
+      }
+
+      const stamp = Date.now().toString(36)
+      const nameToId = new Map<string, string>()
+      const classes: OntologyObjectDraft[] = preview.objects.map((o, i) => {
+        const id = `obj-${stamp}-${i}`
+        nameToId.set(o.name, id)
+        return {
+          id,
+          name: o.name,
+          displayName: o.display_name || o.name,
+          tier: (o.tier || 2) as 1 | 2 | 3,
+          namespace: o.namespace || undefined,
+          description: o.description || '',
+          primaryKey: o.primary_key || 'id',
+          icon: '🔷',
+          instanceCount: 0,
+          backing_asset_ids: [],
+          properties: o.properties.map((p, pi) => ({
+            id: `prop-${stamp}-${i}-${pi}`,
+            name: p.name,
+            displayName: p.display_name || p.name,
+            type: p.type || 'string',
+            required: !!p.required,
+            description: p.description || '',
+            source_asset_id: null,
+            source_column: p.source_field || null,
+            source_field: p.source_field || null,
+            source_table: p.source_table || null,
+          })),
+          derivedProperties: [],
+          rules: [],
+          actions: [],
+          approved: false,
+        }
+      })
+
+      // 基数归一：后端已归一（1:N / N:1 / 1:1 / N:N），N:1 在草稿模型里折叠为 1:N
+      const toDraftCardinality = (c: string): '1:1' | '1:N' | 'N:N' =>
+        c === 'N:N' ? 'N:N' : c === '1:1' ? '1:1' : '1:N'
+
+      const relations: OntologyRelationDraft[] = preview.relations.map((r, i) => ({
+        id: `rel-${stamp}-${i}`,
+        name: r.name || `relation_${i}`,
+        displayName: r.display_name || r.name || `关系${i + 1}`,
+        source: nameToId.get(r.source)!,
+        target: nameToId.get(r.target)!,
+        cardinality: toDraftCardinality(r.cardinality),
+        description: r.description || '',
+        relationType: 'ObjectProperty' as const,
+        semanticType: 'association' as const,
+      }))
+
+      // actions 按 target_object 挂到对应对象（仅记录名称，发布链路再落库）
+      const objByName = new Map(classes.map(c => [c.name, c]))
+      preview.actions.forEach(a => {
+        if (a.target_object && objByName.has(a.target_object)) {
+          objByName.get(a.target_object)!.actions.push(a.display_name || a.name)
+        }
+      })
+
+      const skipped = preview.summary.relation_count < preview.relations.length
+      if (skipped) {
+        message.warning('部分关系因实体缺失被跳过')
+      }
+
+      parsedSummary.value = {
+        classCount: preview.summary.object_count,
+        relationCount: preview.summary.relation_count,
+        propertyCount: preview.summary.property_count,
+        actionCount: preview.summary.action_count,
+        fileSize: (file.size / 1024).toFixed(1) + ' KB',
+        preview: classes.slice(0, 10),
+      }
+      store.patchActive({
+        ontologyObjects: classes,
+        ontologyRelations: relations,
+      })
+    } catch (e: any) {
+      message.error({ content: `本体文件解析失败: ${e?.response?.data?.detail || e?.message || '未知错误'}`, key: 'parse' })
+      return
+    }
+  } else {
+    // OWL / TTL / RDF — 使用 preset fallback
+    const classes = buildPresetClasses(props.session.scenarioId || 'refund-root-cause')
+    const relations = buildPresetRelations(props.session.scenarioId || 'refund-root-cause', classes)
+    const propertyCount = classes.reduce((sum, c) => sum + c.properties.length, 0)
+    parsedSummary.value = {
+      classCount: classes.length,
+      relationCount: relations.length,
+      propertyCount,
+      actionCount: 0,
+      fileSize: (file.size / 1024).toFixed(1) + ' KB',
+      preview: classes.slice(0, 10),
+    }
+    store.patchActive({
+      ontologyObjects: classes,
+      ontologyRelations: relations,
+    })
   }
-  store.patchActive({
-    ontologyObjects: classes,
-    ontologyRelations: relations,
-  })
+
   store.addUploadRecord({
     fileName: file.name,
-    fileType: (file.name.split('.').pop() || 'OWL').toUpperCase(),
+    fileType: ext.toUpperCase() || 'JSON',
     fileSize: (file.size / 1024).toFixed(0) + ' KB',
     sourceOntology: props.session.ontologyName,
     scenarioName: props.session.scenarioName || props.session.ontologyName,
     status: 'completed',
-    statusText: `已提取 ${classes.length} 对象、${relations.length} 关系`,
+    statusText: `已提取 ${parsedSummary.value!.classCount} 对象、${parsedSummary.value!.relationCount} 关系`,
     extractedSummary: '本体定义已解析',
     extractedRules: 0,
-    extractedFields: propertyCount,
+    extractedFields: parsedSummary.value!.propertyCount,
     mimeCategory: 'structured',
   })
   message.success({ content: '本体文件解析完成', key: 'parse' })

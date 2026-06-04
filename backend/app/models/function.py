@@ -20,6 +20,8 @@ class OntologyFunction(Base):
     logic_body: Mapped[str] = mapped_column(Text, default="")
     is_derived_property: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="active")
+    tags: Mapped[list | None] = mapped_column(JSON)
+    callable_name: Mapped[str] = mapped_column(String(100), default="")
     execution_count: Mapped[int] = mapped_column(Integer, default=0)
     last_executed: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
