@@ -84,10 +84,10 @@
 
           <button
             class="step3-drill-btn"
-            :disabled="assetList.length > 0 && selectedSourceIds.length === 0"
+            :disabled="assetLoading || selectedSourceIds.length === 0"
             @click="startDrill"
           >
-            开始演练
+            {{ assetLoading ? '加载资产中...' : '开始演练' }}
           </button>
         </div>
 
@@ -324,7 +324,11 @@ const gates = computed<PublishGate[]>(() => {
 const canPublish = computed(() => gates.value.every(g => g.pass))
 
 // ── 资产加载 ──
-async function loadAssetDetails() {
+// 解析本次演练应使用的资产 ID 集合：
+// 1) 对象上绑定的 backing_asset_ids
+// 2) Step2 选中的 selectedAssetIds
+// 3) 兜底：后端所有 active 的 table / sql_view 资产
+async function resolveAssetIds(): Promise<string[]> {
   const allIds = new Set<string>()
   for (const obj of props.session.ontologyObjects) {
     for (const aid of (obj.backing_asset_ids || [])) {
@@ -342,24 +346,29 @@ async function loadAssetDetails() {
     try {
       const { get } = await import('../../../api/client')
       const assets = await get('/assets?kinds=table%2Csql_view&status=active') as any[]
-      if (assets && assets.length) {
-        for (const a of assets) {
-          allIds.add(a.id)
-        }
+      for (const a of (assets || [])) {
+        allIds.add(a.id)
       }
-    } catch { /* ignore */ }
+    } catch (e) {
+      console.error('兜底资产查询失败', e)
+    }
   }
+  return [...allIds]
+}
 
-  if (allIds.size === 0) {
-    assetList.value = []
-    return
-  }
-
+async function loadAssetDetails() {
   assetLoading.value = true
   try {
+    const ids = await resolveAssetIds()
+    if (ids.length === 0) {
+      assetList.value = []
+      selectedSourceIds.value = []
+      return
+    }
+
     const { get } = await import('../../../api/client')
     const items: AssetDisplayItem[] = []
-    for (const aid of allIds) {
+    for (const aid of ids) {
       try {
         const res = await get(`/assets/${aid}`)
         const a = res as any
@@ -385,8 +394,10 @@ async function loadAssetDetails() {
     }
     assetList.value = items
     selectedSourceIds.value = items.map(i => i.id)
-  } catch {
+  } catch (e) {
+    console.error('加载资产详情失败', e)
     assetList.value = []
+    selectedSourceIds.value = []
   } finally {
     assetLoading.value = false
   }
@@ -425,8 +436,18 @@ function resetDrill() {
 // PLACEHOLDER_DRILL_FN
 
 async function startDrill() {
-  if (assetList.value.length > 0 && selectedSourceIds.value.length === 0) {
-    message.warning('请至少选择 1 个数据资产后再开始演练。')
+  // 发请求前最后兜底：选中为空时再尝试解析一次资产，避免发出空 asset_ids 请求
+  if (selectedSourceIds.value.length === 0) {
+    const ids = await resolveAssetIds()
+    if (ids.length > 0) {
+      selectedSourceIds.value = ids
+      if (assetList.value.length === 0) {
+        await loadAssetDetails()
+      }
+    }
+  }
+  if (selectedSourceIds.value.length === 0) {
+    message.warning('未找到可用数据资产，请先在「资产目录」注册数据表，或在对象上绑定 backing asset。')
     return
   }
   drillStarted.value = true
