@@ -13,6 +13,11 @@ export interface ModelRegistry {
   created_at: string
 }
 
+export interface ReferencedScene {
+  id: string
+  name: string
+}
+
 export interface AgentItem {
   id: string
   name: string
@@ -28,6 +33,7 @@ export interface AgentItem {
   api_key: string | null
   created_at: string
   updated_at: string
+  referenced_scenes?: ReferencedScene[]
 }
 
 export interface ApiInfo {
@@ -53,4 +59,6 @@ export const agentsApi = {
   publish: (id: string) => client.post<AgentItem>(`/agents/${id}/publish`).then(r => r.data),
   apiInfo: (id: string) => client.get<ApiInfo>(`/agents/${id}/api-info`).then(r => r.data),
   chatUrl: (id: string) => `/api/v1/agents/${id}/chat`,
+  acknowledgeStale: (id: string) =>
+    client.post(`/agents/${id}/acknowledge-stale`).then(r => r.data),
 }

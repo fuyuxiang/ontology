@@ -6,7 +6,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, DataSource
+from app.models import OntologyEntity
+from app.models.asset import Asset
 from app.services.copilot import build_ontology_context
 from app.services.agent_tools import agent_tool_catalog
 
@@ -19,10 +20,15 @@ def build_system_prompt(
     ontology_ctx = build_ontology_context(db, entity_id)
     tool_catalog = json.dumps(agent_tool_catalog(), ensure_ascii=False)
 
-    datasources = db.query(DataSource).filter(DataSource.enabled == True).all()
+    assets = db.query(Asset).filter(
+        Asset.status == "active",
+        Asset.kind.in_(["table", "sql_view"]),
+    ).all()
     ds_lines = []
-    for ds in datasources:
-        ds_lines.append(f"- {ds.name} (类型: {ds.type}, 表: {ds.table_name}, 记录数: {ds.record_count})")
+    for a in assets:
+        table = (a.locator or {}).get("table", "")
+        desc = a.description or ""
+        ds_lines.append(f"- {a.name} (表: {table}, 描述: {desc})")
     ds_summary = "\n".join(ds_lines) if ds_lines else "暂无已启用的数据源"
 
     app_prefix = ""

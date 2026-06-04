@@ -226,3 +226,15 @@ export const listFunctionsAsResources = () => get<any[]>('/functions')
 export const listEntitiesAsResources = () => get<any[]>('/entities')
 export const listModelsAsResources = () => get<any[]>('/models')
 export const listDatasourcesAsResources = () => get<any[]>('/datasources')
+
+// ── 本体发布影响预览 & 陈旧确认 ────────────────────────────
+
+export const ontologyPublishApi = {
+  previewImpact: (versionId: string) =>
+    get<any>(`/ontology-publish/versions/${versionId}/impact`),
+}
+
+export const sceneStaleApi = {
+  acknowledgeStale: (sceneId: string) =>
+    post<any>(`/aip-scenes/${sceneId}/acknowledge-stale`),
+}

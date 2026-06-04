@@ -6,7 +6,7 @@
         <span class="aip-header__logo">
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 4.5H14l-3.7 2.7L11.8 13 8 10.3 4.2 13l1.5-4.8L2 5.5h4.5L8 1z" fill="#2E5BFF"/></svg>
         </span>
-        <span class="aip-header__title">AIP 场景平台</span>
+        <span class="aip-header__title">流程编排</span>
         <template v-if="store.currentBrief">
           <span class="aip-header__divider">|</span>
           <span class="aip-header__scene">{{ store.currentBrief.name }}</span>
@@ -56,6 +56,21 @@
     </div>
 
     <!-- 主体：画布 -->
+    <div v-if="store.currentScene?.ontology_stale" class="aip-stale-banner">
+      <span class="aip-stale-banner__icon">⚠</span>
+      <span class="aip-stale-banner__text">该场景依赖的本体实体已发生变更</span>
+      <button class="aip-stale-banner__btn" @click="showStaleDetail = !showStaleDetail">查看变更</button>
+      <button class="aip-stale-banner__btn aip-stale-banner__btn--ack" @click="acknowledgeStale">确认已知</button>
+    </div>
+    <div v-if="showStaleDetail && store.currentScene?.ontology_stale_detail" class="aip-stale-detail">
+      <ul>
+        <li v-for="c in store.currentScene.ontology_stale_detail.breaking_changes" :key="c.entity_name">
+          <strong>{{ c.entity_name }}</strong> —
+          <span v-if="c.change_type === 'deleted'">已删除</span>
+          <span v-else>改名为 {{ c.new_name }}</span>
+        </li>
+      </ul>
+    </div>
     <div class="aip-body">
       <SceneSidebar @open-import="onCreateNew" />
 
@@ -123,6 +138,7 @@ import '@vue-flow/minimap/dist/style.css'
 import { useAipStore } from '../../store/aip'
 import { NODE_TYPES } from './aipData'
 import type { AipSceneBrief } from '../../api/aip'
+import { sceneStaleApi } from '../../api/aip'
 import AipNode from './nodes/AipNode.vue'
 import SceneSidebar from './panels/SceneSidebar.vue'
 import PropertyPanel from './panels/PropertyPanel.vue'
@@ -135,6 +151,15 @@ const store = useAipStore()
 const showAddNode = ref(false)
 const canvasWrapEl = ref<HTMLElement | null>(null)
 const selectedEdgeId = ref<string | null>(null)
+const showStaleDetail = ref(false)
+
+async function acknowledgeStale() {
+  if (!store.currentScene) return
+  await sceneStaleApi.acknowledgeStale(store.currentScene.id)
+  store.currentScene.ontology_stale = false
+  store.currentScene.ontology_stale_detail = null
+  showStaleDetail.value = false
+}
 
 const nodeTypes = NODE_TYPES.reduce((acc, t) => { acc[t.type] = markRaw(AipNode); return acc }, {} as Record<string, any>)
 
@@ -409,4 +434,39 @@ function pad(n: number) { return String(n).padStart(2, '0') }
 
 .aip-drawer-enter-active, .aip-drawer-leave-active { transition: width .2s, opacity .2s; }
 .aip-drawer-enter-from, .aip-drawer-leave-to { width: 0; opacity: 0; }
+
+.aip-stale-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fef3c7;
+  border-bottom: 1px solid #fde68a;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.aip-stale-banner__icon { color: #d97706; }
+.aip-stale-banner__text { flex: 1; color: #92400e; }
+.aip-stale-banner__btn {
+  padding: 4px 10px;
+  border: 1px solid #d97706;
+  border-radius: 4px;
+  background: transparent;
+  color: #d97706;
+  cursor: pointer;
+  font-size: 12px;
+}
+.aip-stale-banner__btn--ack {
+  background: #d97706;
+  color: #fff;
+}
+.aip-stale-detail {
+  padding: 8px 16px;
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.aip-stale-detail ul { margin: 0; padding-left: 16px; }
+.aip-stale-detail li { margin: 2px 0; }
 </style>

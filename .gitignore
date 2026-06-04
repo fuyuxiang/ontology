@@ -51,3 +51,5 @@ tmp/
 *.sw?
 # OS
 # AI workspace
+docs/superpowers/
+.legacy-vue-snapshot/

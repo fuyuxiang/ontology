@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OntologyEntity, Agent, DataSource, BusinessRule
+from app.models import OntologyEntity, Agent, BusinessRule
+from app.models.asset import Asset
 from app.models.skill import Skill
 from app.models.pipeline import Pipeline
 from app.repositories.monitor_repo import MonitorRepository
@@ -126,7 +127,7 @@ def get_agent_activity(db: Session = Depends(get_db)):
 
 @router.get("/platform-stats", response_model=PlatformStatsResponse)
 def get_platform_stats(db: Session = Depends(get_db)):
-    total_datasources = db.query(DataSource).count()
+    total_datasources = db.query(Asset).filter(Asset.status == "active").count()
     total_rules = db.query(BusinessRule).count()
     total_pipelines = db.query(Pipeline).count()
     return PlatformStatsResponse(
