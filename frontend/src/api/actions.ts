@@ -1,4 +1,4 @@
-import request from '@/utils/request'
+import { get, post, put, del } from './client'
 
 export interface ParameterDef {
   name: string
@@ -54,12 +54,12 @@ export interface ActionExecuteResult {
 }
 
 export const actionApi = {
-  list: (params?: ActionQuery) => request.get<ActionItem[]>('/actions', { params }),
-  detail: (id: string) => request.get<ActionItem>(`/actions/${id}`),
-  create: (data: Partial<ActionItem>) => request.post<ActionItem>('/actions', data),
-  update: (id: string, data: Partial<ActionItem>) => request.put<ActionItem>(`/actions/${id}`, data),
-  remove: (id: string) => request.delete(`/actions/${id}`),
+  list: (params?: ActionQuery) => get<ActionItem[]>('/actions', { params }),
+  detail: (id: string) => get<ActionItem>(`/actions/${id}`),
+  create: (data: Partial<ActionItem>) => post<ActionItem>('/actions', data),
+  update: (id: string, data: Partial<ActionItem>) => put<ActionItem>(`/actions/${id}`, data),
+  remove: (id: string) => del(`/actions/${id}`),
   execute: (id: string, params: Record<string, any>, dryRun = false) =>
-    request.post<ActionExecuteResult>(`/actions/${id}/execute`, { params, dry_run: dryRun }),
-  types: () => request.get<ActionTypeInfo[]>('/actions/types'),
+    post<ActionExecuteResult>(`/actions/${id}/execute`, { params, dry_run: dryRun }),
+  types: () => get<ActionTypeInfo[]>('/actions/types'),
 }

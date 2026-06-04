@@ -71,40 +71,38 @@ function toggleSubmenu(path: string) {
 }
 
 const ico = {
-  dashboard: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="2" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="9" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="9" width="5" height="5" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>`,
-  catalog: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="3" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="13" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 6v2M8 8L3 10M8 8l5 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-  graph: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 4h4M5 5.5L7 10.5M11 5.5L9 10.5" stroke="currentColor" stroke-width="1.5"/></svg>`,
-  version: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="4" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="12" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 6v4" stroke="currentColor" stroke-width="1.5"/></svg>`,
-  datasource: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><ellipse cx="8" cy="4" rx="5" ry="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 4v4c0 1.1 2.24 2 5 2s5-.9 5-2V4" stroke="currentColor" stroke-width="1.5"/><path d="M3 8v4c0 1.1 2.24 2 5 2s5-.9 5-2V8" stroke="currentColor" stroke-width="1.5"/></svg>`,
-  mapping: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="4" cy="5" r="2" stroke="currentColor" stroke-width="1.5"/><circle cx="12" cy="11" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M6 5h2l2 6h-2" stroke="currentColor" stroke-width="1.5"/></svg>`,
-  quality: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M4 5l4 3-4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 5l-4 3 4 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg>`,
-  model: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><rect x="10" y="6" width="4" height="4" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M6 8h4" stroke="currentColor" stroke-width="1.5"/><path d="M8 3v3M8 10v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-  rules: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3h10v2H3V3zM3 7h7v2H3V7zM3 11h10v2H3v-2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/></svg>`,
-  workflow: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="6" y="7" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><rect x="11" y="3" width="4" height="3" rx="1" stroke="currentColor" stroke-width="1.3"/><path d="M5 4.5h6M8 5.5v1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>`,
-  sdk: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 4l-2 4 2 4M12 4l2 4-2 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 2L7 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-  agent: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M3 14c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="4" r="1.5" fill="currentColor" opacity="0.4"/></svg>`,
-  tool: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 2a3 3 0 00-2.83 4L3 10.17V13h2.83L10 8.83A3 3 0 1010 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
-  settings: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-  scene: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="5" cy="4" r="1.5" fill="currentColor"/><circle cx="11" cy="8" r="1.5" fill="currentColor"/><circle cx="7" cy="12" r="1.5" fill="currentColor"/></svg>`,
-  sandbox: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 10l6 3 6-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 7l6 3 6-3-6-3-6 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
-  tracking: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 12l3-4 3 2 4-6 2 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="7" r="1.5" fill="currentColor"/></svg>`,
-  evals: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-  copilot: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 100 12A6 6 0 008 2z" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 9.5s.5 1.5 2.5 1.5 2.5-1.5 2.5-1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="6" cy="7" r="0.75" fill="currentColor"/><circle cx="10" cy="7" r="0.75" fill="currentColor"/></svg>`,
-  bizApp: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M2 6h12" stroke="currentColor" stroke-width="1.5"/><circle cx="4.5" cy="4.5" r="0.5" fill="currentColor"/><circle cx="6.5" cy="4.5" r="0.5" fill="currentColor"/></svg>`,
-  api: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M5 4L2 8l3 4M11 4l3 4-3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 3L7 13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-  audit: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M4 2h8a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M6 5h4M6 8h4M6 11h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+  dashboard: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 5v6M8 7.5v3.5M11 4v7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  sysBoard: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.5 10.5a6 6 0 1111 0" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M8 9.5l2.5-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="10" r="1.2" fill="currentColor"/></svg>`,
+  datasource: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 2v3M10 2v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><rect x="4" y="5" width="8" height="4" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M6 9v2a2 2 0 004 0V9" stroke="currentColor" stroke-width="1.4"/><path d="M8 11v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  catalog: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4.5A1.5 1.5 0 013.5 3H6l1.5 1.5h5A1.5 1.5 0 0114 6v6.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 12.5v-8z" stroke="currentColor" stroke-width="1.4"/><path d="M6 9h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  pipeline: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="5" width="4" height="6" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="10.5" y="5" width="4" height="6" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 7h5M5.5 9h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M8.5 5.5l1.5 1.5-1.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  lineage: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="3" cy="4" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="3" cy="12" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="13" cy="8" r="1.8" stroke="currentColor" stroke-width="1.4"/><path d="M4.8 4.6C7 5.2 9.5 6.5 11.2 7.6M4.8 11.4C7 10.8 9.5 9.5 11.2 8.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  quality: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5L3 3.5v4c0 3.5 2.5 5.8 5 7 2.5-1.2 5-3.5 5-7v-4L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M5.5 8l2 2 3-3.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  model: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5l5.5 3v7L8 14.5 2.5 11.5v-7L8 1.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 7.5v7M2.5 4.5L8 7.5l5.5-3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`,
+  ontologyMgr: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="3" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="13" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="13" r="1.8" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.8V8M8 8l-4 3.2M8 8l4 3.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  graph: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="2" stroke="currentColor" stroke-width="1.4"/><circle cx="3" cy="3.5" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="13.5" cy="4.5" r="1.5" stroke="currentColor" stroke-width="1.4"/><circle cx="4" cy="13" r="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M4.3 4.8L6.5 6.8M10 7.2l2.2-1.8M5.3 11.8L6.8 9.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  version: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 1.5c0 0-4.5 3-4.5 8h9c0-5-4.5-8-4.5-8z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M6 14.5v-2.5a2 2 0 014 0v2.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="7" r="1.2" fill="currentColor"/></svg>`,
+  api: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="2" width="6" height="12" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M7.5 5h1M7.5 7.5h1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M2 6h3M2 10h3M11 6h3M11 10h3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  agent: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="10" height="8" rx="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="9" r="1" fill="currentColor"/><circle cx="10" cy="9" r="1" fill="currentColor"/><path d="M8 2v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="1.5" r="1" stroke="currentColor" stroke-width="1.2"/></svg>`,
+  tool: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 1.5L4 9h4l-1 5.5L12 7H8l1-5.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`,
+  orchestrate: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="2.5" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="3.5" cy="13" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="13" r="1.8" stroke="currentColor" stroke-width="1.4"/><rect x="5.5" y="7" width="5" height="3" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.3V7M6.5 10l-3 1.2M9.5 10l3 1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  scene: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="7.5" cy="9.5" r="2" stroke="currentColor" stroke-width="1.4"/><path d="M9 11l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  monitor: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4 8.5h2l1-2.5 1.5 5L10 6l1 2.5h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  audit: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 3h8M2 6h6M2 9h5M2 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="11.5" cy="10.5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M11.5 9v1.5l1.2 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  permissions: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5.5" cy="6.5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M8 8.5l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M11 11.5l1.5 1.5M12 10.5l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/></svg>`,
+  config: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4h4M10 4h4M2 8h7M12 8h2M2 12h2M7 12h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="10.5" cy="8" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.8" stroke="currentColor" stroke-width="1.4"/></svg>`,
 }
 
 const navGroups = [
   { label: '工作台', items: [
     { path: '/workspace/business', label: '业务总览', icon: ico.dashboard },
-    { path: '/dashboard', label: '系统看版', icon: ico.tracking, exact: true },
+    { path: '/dashboard', label: '系统看板', icon: ico.sysBoard, exact: true },
   ]},
   { label: '数据集成', items: [
     { path: '/data/connections', label: '数据接入', icon: ico.datasource },
     { path: '/data/assets', label: '资产目录', icon: ico.catalog },
-    { path: '/data/pipeline', label: '数据管道', icon: ico.workflow },
-    { path: '/data/lineage', label: '数据血缘', icon: ico.graph },
+    { path: '/data/pipeline', label: '数据管道', icon: ico.pipeline },
+    { path: '/data/lineage', label: '数据血缘', icon: ico.lineage },
     { path: '/data/quality', label: '数据质量', icon: ico.quality },
   ]},
   { label: '本体中心', items: [
@@ -114,10 +112,11 @@ const navGroups = [
       { path: '/builder/doc', label: '文档构建' },
       { path: '/builder/ai', label: '资产构建' },
     ]},
-    { path: '/browser', label: '本体管理', icon: ico.catalog, children: [
-      { path: '/browser', label: '对象与关系管理', exact: true },
+    { path: '/browser', label: '本体管理', icon: ico.ontologyMgr, children: [
+      { path: '/browser', label: '对象管理', exact: true },
       { path: '/data/mapping', label: '映射管理' },
-      { path: '/logic/rules', label: '规则与函数管理' },
+      { path: '/logic/rules', label: '规则管理' },
+      { path: '/logic/functions', label: '函数管理' },
       { path: '/logic/actions', label: '行动管理' },
     ]},
     { path: '/studio', label: '图谱探索', icon: ico.graph },
@@ -127,16 +126,15 @@ const navGroups = [
   { label: '智能体应用中心', items: [
     { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
     { path: '/agent/toolbox', label: '技能管理', icon: ico.tool },
-    { path: '/aip', label: '流程编排', icon: ico.workflow },
+    { path: '/aip', label: '流程编排', icon: ico.orchestrate },
   ]},
   { label: '场景中心', items: [
     { path: '/scene/broadband', label: '宽带退单稽核', icon: ico.scene },
   ]},
   { label: '运维与安全中心', items: [
-    { path: '/ops/monitor', label: '运维监控', icon: ico.tracking },
     { path: '/ops/log-audit', label: '日志与审计', icon: ico.audit },
-    { path: '/ops/permissions', label: '权限管理', icon: ico.settings },
-    { path: '/ops/config', label: '系统配置', icon: ico.settings },
+    { path: '/ops/permissions', label: '权限管理', icon: ico.permissions },
+    { path: '/ops/config', label: '系统配置', icon: ico.config },
   ]},
 ]
 </script>

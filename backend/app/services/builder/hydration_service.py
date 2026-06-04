@@ -33,6 +33,8 @@ class HydrateProperty(BaseModel):
     required: bool = False
     source_asset_id: str | None = None
     source_column: str | None = None
+    source_field: str | None = None
+    source_table: str | None = None
 
 
 class HydrateObject(BaseModel):
@@ -178,6 +180,14 @@ class HydrationService:
         matched_props = 0
         unmatched_props: list[str] = []
 
+        # 如果没有任何可用资产 schema，直接跳过逐属性匹配
+        _skip_instantiate = not asset_cache
+        if _skip_instantiate:
+            yield {"type": "phase_log", "phase": "instantiate", "level": "ERR",
+                   "msg": "未找到可用数据资产，请先在「资产目录」中注册数据表，或在对象上绑定 backing asset"}
+            instantiate_status = "error"
+            total_props = sum(len(obj.properties) for obj in req.objects)
+
         # 导入启发式打分函数
         try:
             from app.services.data_plane.mapping_suggest_service import _heuristic_score, _tier
@@ -185,7 +195,8 @@ class HydrationService:
             _heuristic_score = None
             _tier = None
 
-        for obj in req.objects:
+        _objs_to_check = [] if _skip_instantiate else req.objects
+        for obj in _objs_to_check:
             obj_matched = 0
             obj_total = len(obj.properties)
             total_props += obj_total
@@ -202,38 +213,96 @@ class HydrationService:
                         for col in asset.schema_snapshot:
                             col_copy = dict(col)
                             col_copy["_asset_id"] = aid
+                            col_copy["_asset_name"] = asset.name
                             all_columns.append(col_copy)
 
+            # 构建 source_table → asset 列的索引，用于 source_field fallback
+            table_columns: dict[str, list[dict]] = {}
+            for aid in effective_asset_ids:
+                asset = asset_cache.get(aid)
+                if asset and asset.schema_snapshot:
+                    table_name = (asset.locator or {}).get("table", asset.name) if asset.locator else asset.name
+                    table_columns[table_name.lower()] = [
+                        {**dict(col), "_asset_id": aid} for col in asset.schema_snapshot
+                    ]
+
             for prop in obj.properties:
-                # 优先检查 source_asset_id + source_column 是否真实存在
-                if prop.source_asset_id and prop.source_column:
+                # 统一获取有效的列名：source_column 优先，fallback 到 source_field
+                effective_column = prop.source_column or prop.source_field
+                effective_asset_id = prop.source_asset_id
+
+                # 如果有 source_table 但没有 source_asset_id，尝试通过表名找到对应资产
+                if not effective_asset_id and prop.source_table:
+                    st_lower = prop.source_table.lower()
+                    for aid in effective_asset_ids:
+                        a = asset_cache.get(aid)
+                        if a:
+                            a_table = ((a.locator or {}).get("table", a.name) if a.locator else a.name).lower()
+                            if a_table == st_lower or a.name.lower() == st_lower:
+                                effective_asset_id = aid
+                                break
+
+                # 优先检查 effective_asset_id + effective_column 是否真实存在
+                if effective_asset_id and effective_column:
                     # 先从已收集的列中查找
                     found = any(
-                        c.get("name") == prop.source_column and c.get("_asset_id") == prop.source_asset_id
+                        c.get("name") == effective_column and c.get("_asset_id") == effective_asset_id
                         for c in all_columns
                     )
                     # 如果不在 all_columns 中，尝试直接加载该资产验证
                     if not found:
-                        src_asset = asset_cache.get(prop.source_asset_id) or self.asset_svc.get(prop.source_asset_id)
+                        src_asset = asset_cache.get(effective_asset_id) or self.asset_svc.get(effective_asset_id)
                         if src_asset and src_asset.schema_snapshot:
-                            asset_cache[prop.source_asset_id] = src_asset
+                            asset_cache[effective_asset_id] = src_asset
                             found = any(
-                                c.get("name") == prop.source_column for c in src_asset.schema_snapshot
+                                c.get("name") == effective_column for c in src_asset.schema_snapshot
                             )
                             if found:
                                 for col in src_asset.schema_snapshot:
                                     col_copy = dict(col)
-                                    col_copy["_asset_id"] = prop.source_asset_id
+                                    col_copy["_asset_id"] = effective_asset_id
+                                    col_copy["_asset_name"] = src_asset.name
                                     all_columns.append(col_copy)
                     if found:
                         obj_matched += 1
                         yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
-                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {prop.source_column} ✓"}
+                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} ✓"}
                         continue
                     else:
+                        # 有明确指定但列不存在——可能是 schema 未同步，尝试在 table_columns 中查
+                        if prop.source_table:
+                            st_lower = prop.source_table.lower()
+                            t_cols = table_columns.get(st_lower, [])
+                            if any(c.get("name") == effective_column for c in t_cols):
+                                obj_matched += 1
+                                yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
+                                       "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} (via {prop.source_table}) ✓"}
+                                continue
                         yield {"type": "phase_log", "phase": "instantiate", "level": "ERR",
-                               "msg": f"{obj.displayName or obj.name}.{prop.name}: 指定列 {prop.source_column} 不存在"}
+                               "msg": f"{obj.displayName or obj.name}.{prop.name}: 指定列 {effective_column} 不存在"}
                         unmatched_props.append(f"{obj.name}.{prop.name}")
+                        continue
+
+                # 如果有 effective_column 但无 effective_asset_id，在所有列中查找
+                if effective_column and not effective_asset_id:
+                    found_in_any = any(
+                        c.get("name") == effective_column for c in all_columns
+                    )
+                    # 也检查 table_columns
+                    if not found_in_any and prop.source_table:
+                        st_lower = prop.source_table.lower()
+                        t_cols = table_columns.get(st_lower, [])
+                        found_in_any = any(c.get("name") == effective_column for c in t_cols)
+                    if found_in_any:
+                        obj_matched += 1
+                        yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
+                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} ✓"}
+                        continue
+                    # 如果 schema 全空但有声明式的 source_field，信任声明
+                    if not all_columns and (prop.source_field or prop.source_column):
+                        obj_matched += 1
+                        yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
+                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} (声明式，schema 未同步)"}
                         continue
 
                 # 启发式打分找最佳匹配
