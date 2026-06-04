@@ -4,12 +4,14 @@
       <div class="gauge-item">
         <div class="gauge-chart">
           <svg viewBox="0 0 100 60" class="gauge-svg" aria-hidden="true">
-            <path class="gauge-track" d="M10 50 A40 40 0 0 1 90 50" />
-            <path
-              class="gauge-progress"
+            <path class="gauge-track" d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="#f1f3f5" stroke-width="10" stroke-linecap="round" />
+            <path class="gauge-progress"
               d="M10 50 A40 40 0 0 1 90 50"
+              fill="none"
               :stroke="gaugeColor(cpuPercent)"
               :stroke-dasharray="gaugeDashArray(cpuPercent)"
+              stroke-width="10"
+              stroke-linecap="round"
             />
           </svg>
           <span class="gauge-value" :style="{ color: gaugeColor(cpuPercent) }">{{ formatPercent(cpuPercent) }}</span>
@@ -20,12 +22,14 @@
       <div class="gauge-item">
         <div class="gauge-chart">
           <svg viewBox="0 0 100 60" class="gauge-svg" aria-hidden="true">
-            <path class="gauge-track" d="M10 50 A40 40 0 0 1 90 50" />
-            <path
-              class="gauge-progress"
+            <path class="gauge-track" d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="#f1f3f5" stroke-width="10" stroke-linecap="round" />
+            <path class="gauge-progress"
               d="M10 50 A40 40 0 0 1 90 50"
+              fill="none"
               :stroke="gaugeColor(memoryPercent)"
               :stroke-dasharray="gaugeDashArray(memoryPercent)"
+              stroke-width="10"
+              stroke-linecap="round"
             />
           </svg>
           <span class="gauge-value" :style="{ color: gaugeColor(memoryPercent) }">{{ formatPercent(memoryPercent) }}</span>
@@ -36,12 +40,14 @@
       <div class="gauge-item">
         <div class="gauge-chart">
           <svg viewBox="0 0 100 60" class="gauge-svg" aria-hidden="true">
-            <path class="gauge-track" d="M10 50 A40 40 0 0 1 90 50" />
-            <path
-              class="gauge-progress"
+            <path class="gauge-track" d="M10 50 A40 40 0 0 1 90 50" fill="none" stroke="#f1f3f5" stroke-width="10" stroke-linecap="round" />
+            <path class="gauge-progress"
               d="M10 50 A40 40 0 0 1 90 50"
+              fill="none"
               :stroke="gaugeColor(diskPercent)"
               :stroke-dasharray="gaugeDashArray(diskPercent)"
+              stroke-width="10"
+              stroke-linecap="round"
             />
           </svg>
           <span class="gauge-value" :style="{ color: gaugeColor(diskPercent) }">{{ formatPercent(diskPercent) }}</span>
@@ -90,15 +96,6 @@ function formatPercent(value: number): string {
   display: block;
   width: 100%;
   height: 100%;
-}
-.gauge-track,
-.gauge-progress {
-  fill: none;
-  stroke-width: 10;
-  stroke-linecap: round;
-}
-.gauge-track {
-  stroke: #f1f3f5;
 }
 .gauge-value {
   position: absolute;
