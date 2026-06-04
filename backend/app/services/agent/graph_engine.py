@@ -870,8 +870,7 @@ class GraphEngine:
         target = data.get("target") or data.get("targetObjectType") or ""
         msg = data.get("message", "")
         msg = self._resolve_template(msg, context) if msg else ""
-        # 接 EntityAction 的 sms / push / email 通用动作
-        from app.services.rule_engine import ActionExecutor
+        from app.services.action_executors import run_executor_sync
         from app.models.rule import EntityAction
         act = (
             self.db.query(EntityAction)
@@ -880,11 +879,9 @@ class GraphEngine:
         )
         if act:
             try:
-                executor = ActionExecutor(self.db)
-                params = {"target": target, "message": msg, **(data.get("params") or {})}
-                res = executor.execute(act, params, dry_run=False)
+                res = run_executor_sync(act.action_type, act.type_config or {}, {"target": target, "message": msg, **(data.get("params") or {})}, dry_run=False)
                 return (
-                    {"notified": res.success, "type": notify_type, "effects": res.effects, "message": res.message},
+                    {"notified": res.success, "type": notify_type, "effects": res.output or {}, "message": res.message},
                     f"通知触达 ({notify_type}) — {res.message}",
                 )
             except Exception as e:
@@ -905,22 +902,27 @@ class GraphEngine:
             if isinstance(v, dict):
                 for kk, vv in v.items():
                     params.setdefault(kk, vv)
-        from app.services.rule_engine import ActionExecutor
-        executor = ActionExecutor(self.db)
+        from app.services.action_executors import run_executor_sync
         try:
             if action_id:
                 act = self.db.get(EntityAction, action_id)
                 if not act:
                     return {"error": f"动作 {action_id} 不存在"}, "动作不存在"
-                res = executor.execute(act, params, dry_run=bool(data.get("dry_run", False)))
+                res = run_executor_sync(act.action_type, act.type_config or {}, params, dry_run=bool(data.get("dry_run", False)))
             elif action_name:
-                res = executor.execute_by_name(action_name, params, dry_run=bool(data.get("dry_run", False)))
+                act = self.db.query(EntityAction).filter(
+                    EntityAction.name == action_name,
+                    EntityAction.status == "active",
+                ).first()
+                if not act:
+                    return {"error": f"动作 '{action_name}' 不存在或未激活"}, "动作不存在"
+                res = run_executor_sync(act.action_type, act.type_config or {}, params, dry_run=bool(data.get("dry_run", False)))
             else:
                 return {"error": "未指定 action_id / action_name"}, "未指定动作"
         except Exception as e:
             return {"error": str(e)}, f"动作执行失败: {e}"
         return (
-            {"success": res.success, "message": res.message, "effects": res.effects},
+            {"success": res.success, "message": res.message, "effects": res.output or {}},
             f"{'✔' if res.success else '✘'} {res.message}",
         )
 

@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.models import OntologyEntity, EntityRelation, BusinessRule
 from app.services.data_plane.entity_data_service import EntityDataService
-from app.services.rule_engine import RuleEvaluator, ActionExecutor, RuleScreener
+from app.services.rule_engine import RuleEvaluator, RuleScreener
+from app.services.action_executors import run_executor_sync
 
 logger = logging.getLogger(__name__)
 
@@ -241,18 +242,27 @@ class ToolRouter:
         if not action_name:
             return {"error": "需要提供 action_name"}, "参数不完整", 0
 
-        executor = ActionExecutor(self.db)
-        result = executor.execute_by_name(action_name, params, dry_run)
-        result_dict = {
-            "action_name": result.action_name,
-            "success": result.success,
-            "message": result.message,
-            "effects": result.effects,
-            "precondition_results": result.precondition_results,
-        }
-        mode = "模拟执行" if dry_run else "执行"
-        summary = f"{mode} '{action_name}' {'成功' if result.success else '失败'}"
-        return result_dict, summary, 1
+        from app.models.rule import EntityAction
+        action = self.db.query(EntityAction).filter(
+            EntityAction.name == action_name,
+            EntityAction.status == "active",
+        ).first()
+        if not action:
+            return {"error": f"动作 '{action_name}' 不存在或未激活"}, f"动作 '{action_name}' 不存在", 0
+
+        try:
+            result = run_executor_sync(action.action_type, action.type_config or {}, params, dry_run)
+            result_dict = {
+                "action_name": action_name,
+                "success": result.success,
+                "message": result.message,
+                "effects": result.output or {},
+            }
+            mode = "模拟执行" if dry_run else "执行"
+            summary = f"{mode} '{action_name}' {'成功' if result.success else '失败'}"
+            return result_dict, summary, 1
+        except Exception as e:
+            return {"error": str(e)}, f"执行失败: {e}", 0
 
     # ── 本体构建器（chat 模式）三件套 ────────────────────────────
 

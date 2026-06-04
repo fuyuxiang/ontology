@@ -144,11 +144,13 @@ def execute_action(
     if action.status != "active":
         raise HTTPException(status_code=400, detail="动作未激活")
 
-    from app.services.rule_engine import ActionExecutor
-    executor = ActionExecutor(db)
+    from app.services.action_executors import run_executor_sync
     params = data.params if data else {}
     dry_run = data.dry_run if data else False
-    result = executor.execute(action, params, dry_run=dry_run)
+    try:
+        result = run_executor_sync(action.action_type, action.type_config or {}, params, dry_run=dry_run)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
     if not dry_run:
         action.impact_count = (action.impact_count or 0) + 1
@@ -163,5 +165,5 @@ def execute_action(
     return ActionExecuteResult(
         success=result.success,
         message=result.message,
-        effects=result.effects,
+        output=result.output,
     )

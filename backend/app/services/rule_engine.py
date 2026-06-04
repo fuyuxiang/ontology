@@ -1,12 +1,10 @@
 """
 规则引擎 — 将本体规则和动作从描述性文本变为可调用函数
 
-三个核心组件：
+两个核心组件：
 - FieldResolver: 将 "EntityName.property" 解析为真实数据查询
 - RuleEvaluator: 评估规则条件，返回结构化判断结果
-- ActionExecutor: 校验参数、检查前置条件、模拟/执行动作
 """
-import json
 import logging
 import re
 from dataclasses import dataclass, field
@@ -16,7 +14,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models import OntologyEntity
-from app.models.rule import BusinessRule, EntityAction
+from app.models.rule import BusinessRule
 from app.services.data_plane.entity_data_service import EntityDataService
 
 logger = logging.getLogger(__name__)
@@ -45,15 +43,6 @@ class RuleResult:
     conditions: list[ConditionResult] = field(default_factory=list)
     risk_level: str | None = None
     rule_id: str | None = None
-
-
-@dataclass
-class ActionResult:
-    action_name: str
-    success: bool
-    message: str
-    effects: list[dict] = field(default_factory=list)
-    precondition_results: list[dict] = field(default_factory=list)
 
 
 # ── FieldResolver ───────────────────────────────────────
@@ -681,158 +670,3 @@ class RuleScreener:
             return f"DATE_SUB(NOW(), INTERVAL {days} DAY)"
         return None
 
-
-# ── ActionExecutor ──────────────────────────────────────
-
-class ActionExecutor:
-    """执行或模拟执行动作"""
-
-    def __init__(self, db: Session):
-        self.db = db
-        self.resolver = FieldResolver(db)
-        self._data_svc = EntityDataService(db)
-
-    def execute(self, action: EntityAction, params: dict, dry_run: bool = True) -> ActionResult:
-        """
-        执行动作。
-        dry_run=True: 模拟执行，返回"将会做什么"
-        dry_run=False: 预留真实执行（当前阶段全部 dry_run）
-        """
-        action_name = action.name
-        parameters_def = action.parameters_json or []
-        preconditions = action.preconditions_json or []
-        effects = action.effects_json or []
-        meta = action.action_meta_json or {}
-
-        # 1. 校验必填参数
-        missing = []
-        for p in parameters_def:
-            if p.get("required") and p["name"] not in params:
-                missing.append(p["name"])
-        if missing:
-            return ActionResult(
-                action_name=action_name, success=False,
-                message=f"缺少必填参数: {', '.join(missing)}",
-            )
-
-        # 2. 检查前置条件
-        precond_results = []
-        for pc in preconditions:
-            expr = pc.get("expression", "")
-            error_msg = pc.get("error_message", "前置条件不满足")
-            passed = self._check_precondition(expr, params)
-            precond_results.append({
-                "expression": expr,
-                "passed": passed,
-                "error_message": error_msg if not passed else None,
-            })
-
-        failed_preconditions = [p for p in precond_results if not p["passed"]]
-        if failed_preconditions:
-            return ActionResult(
-                action_name=action_name, success=False,
-                message=f"前置条件不满足: {failed_preconditions[0]['error_message']}",
-                precondition_results=precond_results,
-            )
-
-        # 3. 构建执行效果描述
-        effect_descriptions = []
-        for eff in effects:
-            target = eff.get("target", "?")
-            operation = eff.get("operation", "?")
-            fields = eff.get("fields", [])
-            effect_descriptions.append({
-                "target": target,
-                "operation": operation,
-                "fields": fields,
-                "description": f"{operation} {target} ({', '.join(fields[:5])})",
-            })
-
-        if dry_run:
-            reasoning = meta.get("reasoning_mode", "rule_engine")
-            message = (
-                f"[模拟执行] {action_name}\n"
-                f"推理模式: {reasoning}\n"
-                f"输入参数: {json.dumps(params, ensure_ascii=False)}\n"
-                f"预期效果:\n"
-            )
-            for ed in effect_descriptions:
-                message += f"  - {ed['description']}\n"
-            return ActionResult(
-                action_name=action_name, success=True,
-                message=message, effects=effect_descriptions,
-                precondition_results=precond_results,
-            )
-
-        # 真实执行预留
-        return ActionResult(
-            action_name=action_name, success=True,
-            message=f"{action_name} 执行完成",
-            effects=effect_descriptions,
-            precondition_results=precond_results,
-        )
-
-    def execute_by_name(self, action_name: str, params: dict, dry_run: bool = True) -> ActionResult:
-        """按名称查找并执行动作"""
-        action = self.db.query(EntityAction).filter(
-            EntityAction.name == action_name,
-            EntityAction.status == "active",
-        ).first()
-        if not action:
-            # 也尝试从 action_meta_json.action_name 查找
-            actions = self.db.query(EntityAction).filter(EntityAction.status == "active").all()
-            action = next(
-                (a for a in actions
-                 if (a.action_meta_json or {}).get("action_name") == action_name),
-                None,
-            )
-        if not action:
-            return ActionResult(
-                action_name=action_name, success=False,
-                message=f"动作 '{action_name}' 不存在或未激活",
-            )
-        return self.execute(action, params, dry_run)
-
-    def _check_precondition(self, expression: str, params: dict) -> bool:
-        """
-        检查前置条件表达式。
-        简单模式：检查 "EntityName EXISTS for field_name" 类型的表达式
-        """
-        m = re.match(r"(\w+)\s+EXISTS\s+for\s+(\w+)", expression)
-        if m:
-            entity_name, field_name = m.group(1), m.group(2)
-            value = params.get(field_name)
-            if not value:
-                return False
-            entity = self.db.query(OntologyEntity).filter(
-                OntologyEntity.name == entity_name
-            ).first()
-            if not entity:
-                return True  # 实体不存在时跳过检查
-            resolved = self.resolver._get_entity_asset(entity)
-            if not resolved:
-                return True  # 无数据资产时跳过
-            asset, _ = resolved
-            table_name = self._data_svc.get_table_name(asset)
-            if not table_name:
-                return True
-            pk = self.resolver._get_join_field(entity)
-            sql = f"SELECT COUNT(*) FROM {table_name} WHERE {pk} = :val LIMIT 1"
-            result = self._data_svc.execute_sql_on_entity(
-                entity.id, sql, params={"val": value}, purpose="rule_engine.precondition",
-            )
-            if result.get("rows") and int(result["rows"][0][0] or 0) > 0:
-                return True
-            return False
-
-        # 简单相等检查: "Entity.field == 'value'"
-        m = re.match(r"(\w+\.\w+)\s*(==|!=)\s*'([^']*)'", expression)
-        if m:
-            field_ref, op, expected = m.group(1), m.group(2), m.group(3)
-            # 需要从 params 中推断 user_id
-            user_id = params.get("user_id", params.get("warning_id", ""))
-            actual = self.resolver.resolve(field_ref, user_id)
-            return _compare(actual, op, expected)
-
-        # 无法解析的表达式默认通过
-        return True
