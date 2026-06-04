@@ -32,7 +32,7 @@ class EntityBase(BaseModel):
     tier: int
     status: str = "active"
     description: str | None = None
-    schema_json: dict | None = None
+    config_json: dict | None = None
 
 
 class EntityCreate(EntityBase):
@@ -45,7 +45,7 @@ class EntityUpdate(BaseModel):
     tier: int | None = None
     status: str | None = None
     description: str | None = None
-    schema_json: dict | None = None
+    config_json: dict | None = None
 
 
 class FromDatasourceRequest(BaseModel):

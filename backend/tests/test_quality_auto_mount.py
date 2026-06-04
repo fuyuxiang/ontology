@@ -10,7 +10,7 @@ def _make_entity_with_attrs(attrs):
     entity.id = "entity-001"
     entity.name = "TestEntity"
     entity.attributes = []
-    entity.schema_json = {"primary_key": "user_id"}
+    entity.config_json = {"primary_key": "user_id"}
     for a in attrs:
         attr = MagicMock()
         attr.name = a["name"]
