@@ -40,7 +40,7 @@ def list_entities(
             attr_count=len(e.attributes),
             relation_count=rel_count,
             rule_count=len(e.rules),
-            datasource_name=(e.schema_json or {}).get("datasource_name"),
+            datasource_name=(e.config_json or {}).get("datasource_name"),
         ))
     return result
 
@@ -277,7 +277,7 @@ def create_from_datasource(
         tier=body.tier,
         status="active",
         description=f"从数据源 {asset.name} 的表 {body.table_name} 自动生成",
-        schema_json={
+        config_json={
             "datasource_id": asset.id,
             "datasource_name": asset.name,
             "table_name": body.table_name,
@@ -367,7 +367,7 @@ def create_from_asset(
         tier=body.tier,
         status="active",
         description=f"从 Asset {asset.name} 自动生成",
-        schema_json={
+        config_json={
             "asset_id": asset.id,
             "asset_alias": asset.alias,
             "table_name": table_name,
@@ -495,7 +495,7 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
     return EntityDetail(
         id=entity.id, name=entity.name, name_cn=entity.name_cn,
         tier=entity.tier, status=entity.status, description=entity.description,
-        schema_json=entity.schema_json,
+        config_json=entity.config_json,
         attributes=[AttributeOut.model_validate(a) for a in entity.attributes],
         relations=rel_list,
         rules=[RuleOut(
@@ -520,7 +520,7 @@ def create_entity(
     entity = OntologyEntity(
         name=data.name, name_cn=data.name_cn, tier=data.tier,
         status=data.status, description=data.description,
-        schema_json=data.schema_json,
+        config_json=data.config_json,
         created_by=user.id if user else None,
     )
     for attr in data.attributes:

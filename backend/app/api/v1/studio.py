@@ -594,13 +594,13 @@ def _now_iso() -> str:
 
 
 def _scenario_of(e: OntologyEntity | None) -> str:
-    """从 entity 的 publish_config / schema_json 中提取场景代码，缺省按 tier 推断"""
+    """从 entity 的 publish_config / config_json 中提取场景代码，缺省按 tier 推断"""
     if not e:
         return "core"
     cfg = e.publish_config or {}
     if isinstance(cfg, dict) and cfg.get("scenarioCode"):
         return cfg["scenarioCode"]
-    sj = e.schema_json or {}
+    sj = e.config_json or {}
     if isinstance(sj, dict) and sj.get("scenarioCode"):
         return sj["scenarioCode"]
     return "core" if e.tier in (1, 2) else "s1"

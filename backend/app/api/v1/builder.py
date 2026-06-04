@@ -693,7 +693,7 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
                 id=eid, name=obj.name, name_cn=obj.displayName or obj.name,
                 tier=int(obj.tier or 2), status="active",
                 description=obj.description,
-                schema_json={"primary_key": obj.primaryKey,
+                config_json={"primary_key": obj.primaryKey,
                              "backing_asset_ids": obj.backing_asset_ids},
             )
             db.add(entity)

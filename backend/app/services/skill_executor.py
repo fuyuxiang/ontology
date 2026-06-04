@@ -108,7 +108,7 @@ def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: 
     table_name = svc.get_table_name(asset)
     if not table_name:
         return {}
-    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
+    pk_field = (entity.config_json or {}).get("primary_key", "user_id")
     if pk_field in ("sheet_id",) and device_number:
         where_col, where_val = "device_number", device_number
     elif pk_field == "device_number" and device_number:
