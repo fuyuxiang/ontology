@@ -1,0 +1,21 @@
+#!/bin/sh
+
+# Git hooks only run during Git commands; they cannot know when an editor or
+# agent has finished making changes. Warn after each commit if anything was
+# left uncommitted.
+
+if git diff --quiet --ignore-submodules -- \
+  && git diff --cached --quiet --ignore-submodules -- \
+  && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+  exit 0
+fi
+
+cat <<'MSG'
+
+[post-commit] There are still uncommitted changes in this working tree.
+Run:
+  git status --short
+  git add <files>
+  git commit -m "<message>"
+
+MSG
