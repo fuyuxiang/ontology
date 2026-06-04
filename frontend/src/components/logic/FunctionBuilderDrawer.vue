@@ -263,3 +263,7 @@ async function runTest() {
     </div>
   </Transition>
 </template>
+
+<style scoped>
+@import '../../views/logic/logic-shared.css';
+</style>
