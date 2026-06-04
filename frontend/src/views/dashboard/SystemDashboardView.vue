@@ -77,6 +77,7 @@ import { ReloadOutlined } from '@ant-design/icons-vue'
 import { monitorApi } from '../../api/monitor'
 import type { ResourceMetrics, ServiceStatus, AlertItem, LLMStatsResponse, OntologyStatsResponse, AgentActivityResponse, PlatformStatsResponse } from '../../api/monitor'
 import { useMonitorWS } from '../../composables/useMonitorWS'
+import { mergeDashboardFetchState } from './dashboardFetchState'
 
 import ServiceHealthCards from './components/ServiceHealthCards.vue'
 import ResourceGauges from './components/ResourceGauges.vue'
@@ -124,7 +125,7 @@ const autoRefreshLabel = computed(() => {
 async function fetchAll() {
   loading.value = true
   try {
-    const [res, svc, alt, llm, ont, agent, platform] = await Promise.all([
+    const [res, svc, alt, llm, ont, agent, platform] = await Promise.allSettled([
       monitorApi.resources(),
       monitorApi.services(),
       monitorApi.alerts(20),
@@ -133,14 +134,40 @@ async function fetchAll() {
       monitorApi.agentActivity(),
       monitorApi.platformStats(),
     ])
-    resources.value = res
-    services.value = svc
-    alerts.value = alt
-    llmStats.value = llm
-    ontologyStats.value = ont
-    agentActivity.value = agent
-    platformStats.value = platform
+
+    const { next, failedKeys } = mergeDashboardFetchState(
+      {
+        resources: resources.value,
+        services: services.value,
+        alerts: alerts.value,
+        llmStats: llmStats.value,
+        ontologyStats: ontologyStats.value,
+        agentActivity: agentActivity.value,
+        platformStats: platformStats.value,
+      },
+      {
+        resources: res,
+        services: svc,
+        alerts: alt,
+        llmStats: llm,
+        ontologyStats: ont,
+        agentActivity: agent,
+        platformStats: platform,
+      },
+    )
+
+    resources.value = next.resources
+    services.value = next.services
+    alerts.value = next.alerts
+    llmStats.value = next.llmStats
+    ontologyStats.value = next.ontologyStats
+    agentActivity.value = next.agentActivity
+    platformStats.value = next.platformStats
     lastUpdate.value = new Date().toLocaleTimeString('zh-CN')
+
+    if (failedKeys.length) {
+      console.error('Dashboard partial fetch error:', failedKeys)
+    }
   } catch (e) {
     console.error('Dashboard fetch error:', e)
   } finally {
