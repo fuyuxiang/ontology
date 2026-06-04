@@ -247,6 +247,17 @@ async def lifespan(app: FastAPI):
     # 启动：建表 + 初始化管理员
     Base.metadata.create_all(bind=engine)
 
+    # 迁移：schema_json → config_json 列重命名
+    with engine.connect() as conn:
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(engine)
+        for tbl in ("ontology_entities", "ontology_version_entities"):
+            if tbl in inspector.get_table_names():
+                cols = {c["name"] for c in inspector.get_columns(tbl)}
+                if "schema_json" in cols and "config_json" not in cols:
+                    conn.execute(text(f"ALTER TABLE {tbl} RENAME COLUMN schema_json TO config_json"))
+        conn.commit()
+
     # SQLite 迁移：datasources 表增加 table_name / record_count 列
     with engine.connect() as conn:
         from sqlalchemy import text, inspect as sa_inspect
@@ -300,13 +311,39 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE business_rules ADD COLUMN rule_meta_json JSON"))
             conn.commit()
 
-        # entity_actions 表增加结构化列
+        # entity_actions 表增加结构化列（旧字段兼容 + 新字段迁移）
         if "entity_actions" in inspector.get_table_names():
             cols = {c["name"] for c in inspector.get_columns("entity_actions")}
             for col in ("parameters_json", "preconditions_json", "effects_json", "action_meta_json"):
                 if col not in cols:
                     conn.execute(text(f"ALTER TABLE entity_actions ADD COLUMN {col} JSON"))
+            # 新 schema 列（Task-11 重构）
+            if "category" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN category VARCHAR(20) DEFAULT 'domain'"))
+            if "action_type" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN action_type VARCHAR(30)"))
+            if "type_config" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN type_config JSON"))
+            if "output_schema" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN output_schema JSON"))
+            if "updated_at" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN updated_at DATETIME"))
             conn.commit()
+            # 数据迁移：为旧行填充 category / action_type（幂等）
+            result = conn.execute(
+                text("SELECT COUNT(*) FROM entity_actions WHERE category IS NULL OR action_type IS NULL")
+            )
+            legacy_count = result.scalar()
+            if legacy_count and legacy_count > 0:
+                conn.execute(
+                    text(
+                        "UPDATE entity_actions"
+                        " SET category = 'domain', action_type = 'custom_script'"
+                        " WHERE category IS NULL OR action_type IS NULL"
+                    )
+                )
+                conn.commit()
+                logger.info(f"entity_actions 数据迁移完成：{legacy_count} 条旧记录已补全 category/action_type")
 
         # entity_attributes 表增加映射字段
         if "entity_attributes" in inspector.get_table_names():
@@ -439,7 +476,7 @@ async def lifespan(app: FastAPI):
             finally:
                 db.close()
         except Exception as e:
-            logger.warning(f"预热案例用户缓存失败: {e}")
+            logger.debug(f"预热案例用户缓存跳过: {e}")
 
     asyncio.create_task(asyncio.to_thread(_preheat_sync))
 
