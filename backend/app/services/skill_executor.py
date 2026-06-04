@@ -560,6 +560,56 @@ def broadband_audit_stream(params: dict, db: Session):
     }
 
 
+def execute_skill_tool_call(tool_type: str, tool_config: dict, params: dict, db: Session) -> dict:
+    """Execute a rule or function tool referenced by a skill."""
+    if tool_type == "rule":
+        rule_id = tool_config.get("rule_id")
+        if not rule_id:
+            return {"success": False, "summary": "Missing rule_id", "data": {}}
+        rule = db.query(BusinessRule).get(rule_id)
+        if not rule:
+            return {"success": False, "summary": f"Rule {rule_id} not found", "data": {}}
+        user_id = params.get("user_id", "")
+        evaluator = RuleEvaluator(db)
+        result = evaluator.evaluate(rule, user_id)
+        db.commit()
+        return {
+            "success": True,
+            "summary": f"Rule '{result.rule_name}' {'triggered' if result.triggered else 'not triggered'}",
+            "data": {
+                "triggered": result.triggered,
+                "confidence": result.confidence,
+                "risk_level": result.risk_level,
+                "matched_count": result.matched_count,
+                "total_count": result.total_count,
+            },
+        }
+
+    elif tool_type == "function":
+        from app.services.function_executor import FunctionExecutor
+        callable_name = tool_config.get("callable_name")
+        func_id = tool_config.get("function_id")
+        executor = FunctionExecutor(db)
+        if callable_name:
+            result = executor.execute_by_callable_name(callable_name, params)
+        elif func_id:
+            from app.models.function import OntologyFunction
+            func = db.get(OntologyFunction, func_id)
+            if not func:
+                return {"success": False, "summary": f"Function {func_id} not found", "data": {}}
+            result = executor.execute(func, params)
+        else:
+            return {"success": False, "summary": "Missing callable_name or function_id", "data": {}}
+
+        return {
+            "success": result.success,
+            "summary": f"Function returned: {result.value}" if result.success else f"Error: {result.error}",
+            "data": {"value": result.value, "execution_ms": result.execution_ms},
+        }
+
+    return {"success": False, "summary": f"Unknown tool type: {tool_type}", "data": {}}
+
+
 def execute_generated_skill(skill, params: dict, db) -> dict:
     """Execute a generated skill by running its tools in sandbox."""
     from app.models.skill_tool import SkillTool
