@@ -16,7 +16,7 @@ from app.core.deps import get_current_user
 from app.database import get_db
 from app.models.user import User
 from app.services.data_plane.quality_rule_service import QualityRuleService, RULE_DEFAULTS
-from app.models.quality_rule import RULE_KINDS
+from app.models.quality_rule import RULE_KINDS, STATUS_RANK
 
 router = APIRouter(prefix="/quality", tags=["data-plane:quality"])
 
@@ -195,3 +195,164 @@ def health_asset(asset_id: str, db: Session = Depends(get_db)) -> dict:
 @router.get("/health/rules/{rule_id}/history", response_model=list[HealthStatusOut])
 def rule_history(rule_id: str, limit: int = 100, db: Session = Depends(get_db)):
     return _svc(db).history(rule_id, limit=limit)
+
+
+# ── Dashboard schemas ────────────────────────────────
+class DashboardEntity(BaseModel):
+    entity_id: str
+    entity_name: str
+    score: int
+    dimensions: dict
+    rule_count: int
+    pass_count: int
+
+
+class DashboardIssue(BaseModel):
+    id: str
+    entity_name: str
+    asset_name: str
+    rule_kind: str
+    column_name: str | None
+    severity: str
+    value: float | None
+    threshold: float | None
+    message: str
+    occurred_at: datetime
+
+
+class DashboardResponse(BaseModel):
+    overall_score: int
+    summary: dict
+    entities: list[DashboardEntity]
+    trend: list[dict]
+    recent_issues: list[DashboardIssue]
+
+
+# ── Dashboard helpers ────────────────────────────────
+def _get_entity_quality_data(db: Session, entity_id: str, svc: QualityRuleService) -> dict | None:
+    """Aggregate quality data for one entity across all its bound assets."""
+    from app.models.object_binding import ObjectBinding
+    from app.models.entity import OntologyEntity
+
+    entity = db.get(OntologyEntity, entity_id)
+    if not entity:
+        return None
+
+    bindings = db.query(ObjectBinding).filter(
+        ObjectBinding.object_type_id == entity_id,
+        ObjectBinding.status == "active",
+    ).all()
+    if not bindings:
+        return None
+
+    total_rules = 0
+    pass_rules = 0
+    dim_status = {"null_ratio": "unknown", "pk_uniqueness": "unknown", "freshness": "unknown", "row_count": "unknown", "schema": "unknown"}
+    dim_map = {"null_ratio_max": "null_ratio", "pk_uniqueness": "pk_uniqueness", "freshness": "freshness", "row_count_min": "row_count", "row_count_max": "row_count", "schema_stable": "schema"}
+
+    for b in bindings:
+        rules = svc.list_rules(b.asset_id)
+        for r in rules:
+            if not r.enabled:
+                continue
+            total_rules += 1
+            st = svc.latest_status(r.id)
+            status = st.status if st else "unknown"
+            if status == "healthy":
+                pass_rules += 1
+            dim_key = dim_map.get(r.kind)
+            if dim_key and STATUS_RANK.get(status, 0) > STATUS_RANK.get(dim_status[dim_key], 0):
+                dim_status[dim_key] = status
+
+    score = round(pass_rules / total_rules * 100) if total_rules > 0 else 100
+    return {
+        "entity_id": entity_id,
+        "entity_name": entity.name,
+        "score": score,
+        "dimensions": dim_status,
+        "rule_count": total_rules,
+        "pass_count": pass_rules,
+    }
+
+
+# ── Dashboard endpoints ──────────────────────────────
+@router.get("/dashboard", response_model=DashboardResponse)
+def quality_dashboard(db: Session = Depends(get_db)):
+    """Dashboard: overall score, entity scorecards, trend, recent issues."""
+    from app.models.object_binding import ObjectBinding
+
+    entity_ids = [
+        r[0] for r in db.query(ObjectBinding.object_type_id).filter(
+            ObjectBinding.status == "active"
+        ).distinct().all()
+    ]
+
+    svc = _svc(db)
+    entities = []
+    total_rules = 0
+    total_pass = 0
+    summary = {"healthy": 0, "warning": 0, "failure": 0, "unknown": 0}
+
+    for eid in entity_ids:
+        data = _get_entity_quality_data(db, eid, svc)
+        if not data:
+            continue
+        entities.append(data)
+        total_rules += data["rule_count"]
+        total_pass += data["pass_count"]
+        worst = max(data["dimensions"].values(), key=lambda s: STATUS_RANK.get(s, 0))
+        summary[worst] = summary.get(worst, 0) + 1
+
+    overall_score = round(total_pass / total_rules * 100) if total_rules > 0 else 100
+    entities.sort(key=lambda e: e["score"])
+
+    # Recent issues
+    from app.models.quality_rule import HealthStatus as HS, QualityRule as QR
+    from app.models.asset import Asset as A
+    from app.models.object_binding import ObjectBinding as OB
+    from app.models.entity import OntologyEntity
+
+    issues_raw = (
+        db.query(HS, QR, A)
+        .join(QR, HS.rule_id == QR.id)
+        .join(A, HS.asset_id == A.id)
+        .filter(HS.status.in_(["warning", "failure"]))
+        .order_by(HS.ran_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    recent_issues = []
+    for hs, rule, asset in issues_raw:
+        binding = db.query(OB).filter(OB.asset_id == asset.id, OB.status == "active").first()
+        entity_name = ""
+        if binding:
+            ent = db.get(OntologyEntity, binding.object_type_id)
+            entity_name = ent.name if ent else ""
+        recent_issues.append(DashboardIssue(
+            id=hs.id,
+            entity_name=entity_name,
+            asset_name=asset.alias or asset.name,
+            rule_kind=rule.kind,
+            column_name=rule.column_name,
+            severity=hs.status,
+            value=hs.value_numeric,
+            threshold=(rule.params or {}).get("max") or (rule.params or {}).get("min"),
+            message=hs.message or "",
+            occurred_at=hs.ran_at,
+        ))
+
+    return DashboardResponse(
+        overall_score=overall_score,
+        summary=summary,
+        entities=[DashboardEntity(**e) for e in entities],
+        trend=[],
+        recent_issues=recent_issues,
+    )
+
+
+@router.post("/evaluate-all")
+def evaluate_all_rules(db: Session = Depends(get_db)):
+    """Trigger evaluation of all enabled quality rules."""
+    count = _svc(db).evaluate_all()
+    return {"evaluated": count}

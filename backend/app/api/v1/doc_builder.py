@@ -1,13 +1,30 @@
 """文档构建 API — 上传文档 + 多轮对话抽取本体"""
 from __future__ import annotations
 
-from fastapi import APIRouter, File, UploadFile
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+import os
 
-from app.services import doc_builder
+from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.database import get_db
+from app.services import doc_builder, doc_mapping_persist_service
 
 router = APIRouter(prefix="/doc-builder", tags=["doc-builder"])
+
+_TEMPLATE_PATH = os.path.join(
+    os.path.dirname(__file__), "..", "..", "..", "static", "templates", "ontology_doc_template.md"
+)
+
+
+@router.get("/template")
+async def download_template():
+    return FileResponse(
+        path=os.path.abspath(_TEMPLATE_PATH),
+        filename="本体建模业务文档模板.md",
+        media_type="text/markdown",
+    )
 
 
 @router.post("/upload")
@@ -46,4 +63,35 @@ async def chat(req: ChatRequest):
         doc_builder.chat_stream(req.session_id, req.message, req.business_desc),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+class MappingPreviewRequest(BaseModel):
+    session_id: str
+    mapping_result: dict
+
+
+class MappingApplyItem(BaseModel):
+    entity_id: str | None = None
+    asset_id: str | None = None
+    conflict_action: str | None = None
+    register_asset: bool = False
+    table_name: str | None = None
+    field_mappings: list[dict] = []
+
+
+class MappingApplyRequest(BaseModel):
+    session_id: str
+    items: list[MappingApplyItem]
+
+
+@router.post("/mapping/preview")
+async def mapping_preview(req: MappingPreviewRequest, db: Session = Depends(get_db)):
+    return doc_mapping_persist_service.preview_mappings(req.mapping_result, db)
+
+
+@router.post("/mapping/apply")
+async def mapping_apply(req: MappingApplyRequest, db: Session = Depends(get_db)):
+    return doc_mapping_persist_service.apply_mappings(
+        [item.model_dump() for item in req.items], db
     )

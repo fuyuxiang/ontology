@@ -38,8 +38,9 @@ def get_tbox(db: Session = Depends(get_db)) -> dict[str, Any]:
     entity_map = {e.id: e for e in entities}
 
     # 数据源索引：按主表名查 record_count
-    from app.models.datasource import DataSource
-    ds_by_table = {ds.table_name: ds for ds in db.query(DataSource).all() if ds.table_name}
+    from app.models.asset import Asset
+    all_assets = db.query(Asset).filter(Asset.status == "active").all()
+    ds_by_table = {(a.locator or {}).get("table", ""): a for a in all_assets if (a.locator or {}).get("table")}
 
     object_types = []
     for e in entities:
@@ -60,13 +61,13 @@ def get_tbox(db: Session = Depends(get_db)) -> dict[str, Any]:
                 "dataStatus": a.data_status,
             })
 
-        # 实例数：从主映射表的 datasource.record_count 推算
+        # 实例数：从主映射表的 asset.profile.row_count 推算
         primary_tables = [a.source_table for a in e.attributes if a.source_table]
         abox_scale = 0
         if primary_tables:
             ds = ds_by_table.get(primary_tables[0])
             if ds:
-                abox_scale = ds.record_count or 0
+                abox_scale = (ds.profile or {}).get("row_count", 0) or 0
 
         object_types.append({
             "apiName": e.name,
@@ -133,13 +134,14 @@ def get_abox(db: Session = Depends(get_db)) -> dict[str, Any]:
     """A-box 断言层：基于属性映射推算实例数 + 字段覆盖率"""
     entities = db.query(OntologyEntity).all()
 
-    # 一次性加载所有 datasource，按 table_name 建索引
-    from app.models.datasource import DataSource
-    datasources = db.query(DataSource).all()
-    ds_by_table: dict[str, DataSource] = {}
-    for ds in datasources:
-        if ds.table_name:
-            ds_by_table[ds.table_name] = ds
+    # 一次性加载所有 asset，按 table_name 建索引
+    from app.models.asset import Asset
+    all_assets = db.query(Asset).filter(Asset.status == "active").all()
+    ds_by_table: dict[str, Asset] = {}
+    for a in all_assets:
+        tbl = (a.locator or {}).get("table")
+        if tbl:
+            ds_by_table[tbl] = a
 
     hydration = []
     individuals_total = 0
@@ -157,7 +159,7 @@ def get_abox(db: Session = Depends(get_db)) -> dict[str, Any]:
                 primary_table = tables[0]
                 ds = ds_by_table.get(primary_table)
                 if ds:
-                    instance_count = ds.record_count or 0
+                    instance_count = (ds.profile or {}).get("row_count", 0) or 0
                     backing_source = ds.name
                 else:
                     backing_source = primary_table
@@ -336,8 +338,9 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
     actions = db.query(EntityAction).all()
     functions = db.query(OntologyFunction).all()
 
-    from app.models.datasource import DataSource
-    ds_by_table = {ds.table_name: ds for ds in db.query(DataSource).all() if ds.table_name}
+    from app.models.asset import Asset
+    all_assets = db.query(Asset).filter(Asset.status == "active").all()
+    ds_by_table = {(a.locator or {}).get("table", ""): a for a in all_assets if (a.locator or {}).get("table")}
 
     prop_count = sum(len(e.attributes) for e in entities)
 
@@ -363,7 +366,7 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
         if primary_tables:
             ds = ds_by_table.get(primary_tables[0])
             if ds:
-                count = ds.record_count or 0
+                count = (ds.profile or {}).get("row_count", 0) or 0
         abox_total += count
         abox_by_object[e.name] = count
         sc = _scenario_of(e)
@@ -550,30 +553,35 @@ def narrator_explain(req: NarratorRequest) -> dict[str, Any]:
     return {"source": "fallback", "content": fallback}
 
 
-# ─── 数据刷新：手动触发所有 datasource 实例计数 ──────────────────────
+# ─── 数据刷新：手动触发所有 asset 实例计数 ──────────────────────
 def refresh_counts(db: Session = Depends(get_db)) -> dict[str, Any]:
-    """触发所有启用的数据源重新统计 record_count，刷新 A-Box 实例数"""
-    from app.models.datasource import DataSource
-    from app.api.v1.datasources import _count_records
+    """触发所有启用的数据资产重新统计 row_count，刷新 A-Box 实例数"""
+    from app.models.asset import Asset
+    from app.services.data_plane.entity_data_service import EntityDataService
 
-    sources = db.query(DataSource).filter(DataSource.enabled == True).all()  # noqa: E712
+    assets = db.query(Asset).filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"])).all()
     results = []
     success = 0
-    for ds in sources:
-        if not ds.table_name:
-            results.append({"id": ds.id, "name": ds.name, "status": "skip", "message": "未关联数据表"})
+    svc = EntityDataService(db)
+    for asset in assets:
+        table_name = (asset.locator or {}).get("table")
+        if not table_name:
+            results.append({"id": asset.id, "name": asset.name, "status": "skip", "message": "未关联数据表"})
             continue
-        count, err = _count_records(ds)
-        if err:
-            results.append({"id": ds.id, "name": ds.name, "status": "error", "message": err})
+        r = svc.execute_sql_on_asset(asset.name, f"SELECT COUNT(*) FROM `{table_name}`", purpose="refresh_counts")
+        if r.get("error"):
+            results.append({"id": asset.id, "name": asset.name, "status": "error", "message": r["error"]})
             continue
-        ds.record_count = count
+        count = r["rows"][0][0] if r.get("rows") else 0
+        profile = asset.profile or {}
+        profile["row_count"] = count
+        asset.profile = profile
         success += 1
-        results.append({"id": ds.id, "name": ds.name, "status": "ok", "count": count})
+        results.append({"id": asset.id, "name": asset.name, "status": "ok", "count": count})
     db.commit()
     return {
         "refreshedAt": _now_iso(),
-        "total": len(sources),
+        "total": len(assets),
         "success": success,
         "results": results,
     }
@@ -586,13 +594,13 @@ def _now_iso() -> str:
 
 
 def _scenario_of(e: OntologyEntity | None) -> str:
-    """从 entity 的 publish_config / schema_json 中提取场景代码，缺省按 tier 推断"""
+    """从 entity 的 publish_config / config_json 中提取场景代码，缺省按 tier 推断"""
     if not e:
         return "core"
     cfg = e.publish_config or {}
     if isinstance(cfg, dict) and cfg.get("scenarioCode"):
         return cfg["scenarioCode"]
-    sj = e.schema_json or {}
+    sj = e.config_json or {}
     if isinstance(sj, dict) and sj.get("scenarioCode"):
         return sj["scenarioCode"]
     return "core" if e.tier in (1, 2) else "s1"

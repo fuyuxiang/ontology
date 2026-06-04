@@ -37,6 +37,9 @@ class AipScene(Base):
     status: Mapped[str] = mapped_column(String(20), default="draft")  # draft/reviewing/published/archived
     version: Mapped[int] = mapped_column(Integer, default=0)
     published_version_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    ontology_version_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
+    ontology_stale: Mapped[bool] = mapped_column(Boolean, default=False)
+    ontology_stale_detail: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

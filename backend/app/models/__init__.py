@@ -4,7 +4,6 @@ from app.models.rule import BusinessRule, EntityAction
 from app.models.function import OntologyFunction
 from app.models.audit import AuditLog
 from app.models.user import User
-from app.models.datasource import DataSource
 from app.models.dashboard_config import DashboardConfig
 from app.models.agent import ModelRegistry, Agent
 from app.models.prompt_template import PromptTemplate
@@ -30,12 +29,15 @@ from app.models.object_binding import ObjectBinding
 from app.models.quality_metric import QualityMetric
 from app.models.quality_rule import QualityRule, HealthStatus
 from app.models.monitor import ServiceMetric, LLMCallRecord, Alert
+from app.models.skill import Skill
+from app.models.skill_version import SkillVersion
+from app.models.skill_tool import SkillTool
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
     "BusinessRule", "EntityAction", "OntologyFunction",
     "AuditLog", "User",
-    "DataSource", "DashboardConfig",
+    "DashboardConfig",
     "ModelRegistry", "Agent", "PromptTemplate",
     "AgentTrace", "EvalSuite", "EvalCase", "EvalRun", "EvalResult",
     "OntologyVersion", "OntologyVersionEntity",
@@ -48,4 +50,6 @@ __all__ = [
     "LineageEdge", "ObjectBinding", "QualityMetric",
     "QualityRule", "HealthStatus",
     "ServiceMetric", "LLMCallRecord", "Alert",
+    # Skill Generation Platform
+    "Skill", "SkillVersion", "SkillTool",
 ]

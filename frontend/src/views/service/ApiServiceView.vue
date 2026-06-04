@@ -1,7 +1,7 @@
 <template>
   <div class="api-service">
     <div class="api-service__header">
-      <h1 class="page-title">API 服务</h1>
+      <h1 class="page-title">本体服务</h1>
       <p class="page-desc">基于本体 Schema 自动生成语义化 API，支持实体查询、关系遍历和规则执行</p>
     </div>
 

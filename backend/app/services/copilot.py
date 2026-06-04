@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import OntologyEntity, EntityRelation, BusinessRule
 from app.models.rule import EntityAction
+from app.services.data_plane.entity_data_service import EntityDataService
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +89,10 @@ def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
     # 实体→数据源映射
     ctx_parts.append("\n### 实体数据源映射")
     for e in entities:
-        ds_ref = (e.schema_json or {}).get("datasource_ref", "")
-        pk = (e.schema_json or {}).get("primary_key", "")
-        if ds_ref:
-            ctx_parts.append(f"- {e.name} ({e.name_cn}) → 数据源: {ds_ref}, 主键: {pk}")
+        asset_result = EntityDataService(db).resolve_entity_asset(e.id)
+        pk = (e.config_json or {}).get("primary_key", "")
+        if asset_result:
+            ctx_parts.append(f"- {e.name} ({e.name_cn}) → 数据源: {asset_result[0].name}, 主键: {pk}")
 
     # 动作类型
     actions = db.query(EntityAction).filter(

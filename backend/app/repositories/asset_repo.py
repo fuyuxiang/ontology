@@ -64,5 +64,16 @@ class AssetRepository(BaseRepository[Asset]):
             .first()
         )
 
+    def find_table_by_name(self, table_name: str) -> Asset | None:
+        """按表名查 table 资产（不限 connection）。"""
+        return (
+            self.db.query(Asset)
+            .filter(
+                Asset.kind == "table",
+                Asset.locator["table"].as_string() == table_name,
+            )
+            .first()
+        )
+
     def count_by_connection(self, connection_id: str) -> int:
         return self.db.query(Asset).filter(Asset.connection_id == connection_id).count()

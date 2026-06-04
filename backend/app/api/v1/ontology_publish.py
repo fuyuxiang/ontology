@@ -19,6 +19,12 @@ from app.models.version import (
     OntologyVersionAttribute, OntologyVersionRelation,
 )
 from app.models.user import User
+from app.models.scene import AipScene
+from app.models.agent import Agent
+from app.services.ontology_impact import (
+    mark_stale_dependents, compute_breaking_changes,
+    find_affected_scenes, find_affected_agents,
+)
 
 router = APIRouter(prefix="/ontology-publish", tags=["ontology-publish"])
 
@@ -136,7 +142,7 @@ def add_entities(version_id: str, req: AddEntitiesRequest, db: Session = Depends
             name_cn=entity.name_cn,
             tier=entity.tier,
             description=entity.description,
-            schema_json=entity.schema_json,
+            config_json=entity.config_json,
             publish_config=entity.publish_config,
         )
         db.add(ve)
@@ -242,6 +248,53 @@ def consistency_check(version_id: str, db: Session = Depends(get_db)):
     }
 
 
+# ─── 影响面预览 ──────────────────────────────────────────────────────
+
+@router.get("/versions/{version_id}/impact")
+def preview_impact(version_id: str, db: Session = Depends(get_db)):
+    """预览某版本发布后的影响面（不执行实际标记）"""
+    v = _get_version(version_id, db)
+
+    old_active = db.query(OntologyVersion).filter(
+        OntologyVersion.is_active == True, OntologyVersion.id != v.id
+    ).first()
+
+    old_entities = []
+    if old_active:
+        old_ve = db.query(OntologyVersionEntity).filter(
+            OntologyVersionEntity.version_id == old_active.id
+        ).all()
+        old_entities = [
+            {"source_entity_id": ve.source_entity_id, "name": ve.name}
+            for ve in old_ve
+        ]
+
+    new_entities = [
+        {"source_entity_id": ve.source_entity_id, "name": ve.name}
+        for ve in v.entities
+    ]
+
+    changes = compute_breaking_changes(old_entities, new_entities)
+    if not changes:
+        return {"breaking_changes": [], "affected_scenes": [], "affected_agents": []}
+
+    scenes = db.query(AipScene).filter(AipScene.ontology_bindings.isnot(None)).all()
+    scene_dicts = [{"id": s.id, "ontology_bindings": s.ontology_bindings, "name": s.name} for s in scenes]
+    affected_scene_ids = set(find_affected_scenes(scene_dicts, changes))
+    affected_scenes_info = [{"id": s.id, "name": s.name} for s in scenes if s.id in affected_scene_ids]
+
+    agents = db.query(Agent).filter(Agent.entity_ids.isnot(None)).all()
+    agent_dicts = [{"id": a.id, "entity_ids": a.entity_ids, "name": a.name} for a in agents]
+    affected_agent_ids = set(find_affected_agents(agent_dicts, changes))
+    affected_agents_info = [{"id": a.id, "name": a.name} for a in agents if a.id in affected_agent_ids]
+
+    return {
+        "breaking_changes": changes,
+        "affected_scenes": affected_scenes_info,
+        "affected_agents": affected_agents_info,
+    }
+
+
 # ─── 审批流程 ────────────────────────────────────────────────────────
 
 @router.post("/versions/{version_id}/submit")
@@ -268,13 +321,16 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User |
     if v.status != "pending_approval":
         raise HTTPException(400, "只有待审批状态可以通过")
 
+    old_active = db.query(OntologyVersion).filter(
+        OntologyVersion.is_active == True, OntologyVersion.id != v.id
+    ).first()
+
     db.query(OntologyVersion).filter(OntologyVersion.is_active == True).update({"is_active": False})
     v.status = "published"
     v.is_active = True
     v.published_at = datetime.utcnow()
     v.approved_by = user.id if user else None
 
-    # 同步实体状态：将本版本包含的实体标记为 published，其余恢复为 active
     published_entity_ids = [ve.source_entity_id for ve in v.entities]
     if published_entity_ids:
         db.query(OntologyEntity).filter(
@@ -284,8 +340,14 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User |
             OntologyEntity.id.in_(published_entity_ids)
         ).update({"status": "published"})
 
+    impact = mark_stale_dependents(old_active, v, db)
+
     db.commit()
-    return {"message": f"版本 v{v.version_number} 已发布", "status": "published"}
+    return {
+        "message": f"版本 v{v.version_number} 已发布",
+        "status": "published",
+        "impact": impact,
+    }
 
 
 @router.post("/versions/{version_id}/reject")
@@ -331,7 +393,7 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
             name_cn=ve.name_cn,
             tier=ve.tier,
             description=ve.description,
-            schema_json=ve.schema_json,
+            config_json=ve.config_json,
             publish_config=ve.publish_config,
         )
         db.add(new_ve)

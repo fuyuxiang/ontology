@@ -10,11 +10,23 @@ from pydantic import BaseModel
 from typing import Any
 
 from app.database import get_db
-from app.models import OntologyEntity, DataSource, BusinessRule, EntityAction
-from app.services.datasource_utils import execute_readonly_sql
+from app.models import OntologyEntity, BusinessRule, EntityAction
+from app.models.asset import Asset
+from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.rule_engine import RuleEvaluator
 
 router = APIRouter(prefix="/scenes", tags=["scenes"])
+
+
+def _asset_table(asset: Asset) -> str:
+    """从 Asset.locator 中提取表名"""
+    return (asset.locator or {}).get("table", "")
+
+
+def _execute_asset_sql(db: Session, asset: Asset, sql: str, limit: int = 200) -> dict:
+    """通过 EntityDataService 执行 SQL"""
+    svc = EntityDataService(db)
+    return svc.execute_sql_on_asset(asset.name, sql, purpose="scenes")
 
 
 # ── 响应模型 ──────────────────────────────────────────
@@ -81,7 +93,7 @@ _ENTITY_ALIAS: dict[str, str] = {
 _MNP_ENTITIES = list(_ENTITY_ALIAS.keys())
 
 
-def _get_entity_and_ds(db: Session, entity_name: str) -> tuple[OntologyEntity | None, DataSource | None]:
+def _get_entity_and_ds(db: Session, entity_name: str) -> tuple[OntologyEntity | None, Asset | None]:
     """通过实体名查找本体实体和关联数据源，支持别名映射"""
     # 先通过别名映射到数据库实际名称
     db_name = _ENTITY_ALIAS.get(entity_name, entity_name)
@@ -96,11 +108,11 @@ def _get_entity_and_ds(db: Session, entity_name: str) -> tuple[OntologyEntity | 
     if not entity:
         return None, None
 
-    ds_ref = (entity.schema_json or {}).get("datasource_ref", "")
+    ds_ref = (entity.config_json or {}).get("datasource_ref", "")
     if not ds_ref:
         return entity, None
 
-    ds = db.query(DataSource).filter(DataSource.name == ds_ref, DataSource.enabled == True).first()
+    ds = db.query(Asset).filter(Asset.name == ds_ref, Asset.status == "active").first()
     return entity, ds
 
 
@@ -109,14 +121,12 @@ def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: 
 
     M2 改造：改用参数化绑定 + ExecuteService.execute_on_connection 走统一闸口。
     """
-    from app.repositories.asset_repo import AssetRepository
-    from app.services.data_plane.execute_service import ExecuteBlocked, ExecuteService
-
     entity, ds = _get_entity_and_ds(db, entity_name)
-    if not entity or not ds or not ds.table_name:
+    table_name = _asset_table(ds) if ds else ""
+    if not entity or not ds or not table_name:
         return {}
 
-    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
+    pk_field = (entity.config_json or {}).get("primary_key", "user_id")
 
     # 选择参数化 WHERE
     if pk_field in ("sheet_id",) and device_number:
@@ -131,12 +141,11 @@ def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: 
     # 列名校验防注入（仅允许 [a-zA-Z0-9_]）
     if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", where_col):
         return {}
-    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", ds.table_name):
+    if not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", table_name):
         return {}
 
-    sql = f"SELECT * FROM {ds.table_name} WHERE {where_col} = :v LIMIT 1"
-    # 通过 datasource_utils 兼容层转发（自动走 ExecuteService）
-    result = execute_readonly_sql(ds, sql, limit=1)
+    sql = f"SELECT * FROM {table_name} WHERE {where_col} = :v LIMIT 1"
+    result = _execute_asset_sql(db, ds, sql, limit=1)
     if result.get("error") or not result.get("rows"):
         return {}
 
@@ -154,12 +163,13 @@ def list_mnp_users(
 ):
     """从 CbssSubscriber 数据源获取候选用户列表"""
     entity, ds = _get_entity_and_ds(db, "CbssSubscriber")
-    if not entity or not ds or not ds.table_name:
+    table_name = _asset_table(ds) if ds else ""
+    if not entity or not ds or not table_name:
         raise HTTPException(status_code=404, detail="CbssSubscriber 实体未关联可用数据源")
 
-    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
-    sql = f"SELECT * FROM {ds.table_name} LIMIT {limit}"
-    result = execute_readonly_sql(ds, sql, limit=limit)
+    pk_field = (entity.config_json or {}).get("primary_key", "user_id")
+    sql = f"SELECT * FROM {table_name} LIMIT {limit}"
+    result = _execute_asset_sql(db, ds, sql, limit=limit)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
 
@@ -208,12 +218,13 @@ def list_mnp_case_users(db: Session = Depends(get_db)):
         return _case_users_cache
     # 1. 拉取足够多的候选用户
     entity, ds = _get_entity_and_ds(db, "CbssSubscriber")
-    if not entity or not ds or not ds.table_name:
+    table_name = _asset_table(ds) if ds else ""
+    if not entity or not ds or not table_name:
         raise HTTPException(status_code=404, detail="CbssSubscriber 实体未关联可用数据源")
 
-    pk_field = (entity.schema_json or {}).get("primary_key", "user_id")
-    sql = f"SELECT * FROM {ds.table_name} LIMIT 50"
-    result = execute_readonly_sql(ds, sql, limit=50)
+    pk_field = (entity.config_json or {}).get("primary_key", "user_id")
+    sql = f"SELECT * FROM {table_name} LIMIT 50"
+    result = _execute_asset_sql(db, ds, sql, limit=50)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
 
@@ -516,9 +527,9 @@ _BB_NS = "s1"
 
 def _get_bb_conn(db: Session):
     """获取 bb_churn_audit 数据库连接（复用已有数据源配置）"""
-    ds = db.query(DataSource).filter(
-        DataSource.name == "bb_install_churn",
-        DataSource.enabled == True,
+    ds = db.query(Asset).filter(
+        Asset.name == "bb_install_churn",
+        Asset.status == "active",
     ).first()
     if not ds:
         raise HTTPException(status_code=503, detail="bb_churn_audit 数据源未配置")
@@ -527,7 +538,7 @@ def _get_bb_conn(db: Session):
 
 def _bb_query(db: Session, sql: str, limit: int = 200) -> list[dict]:
     ds = _get_bb_conn(db)
-    result = execute_readonly_sql(ds, sql, limit=limit)
+    result = _execute_asset_sql(db, ds, sql, limit=limit)
     if result.get("error"):
         raise HTTPException(status_code=500, detail=result["error"])
     cols = result.get("columns", [])
@@ -541,7 +552,7 @@ def bb_stats(db: Session = Depends(get_db)):
     ds = _get_bb_conn(db)
 
     def q(sql):
-        r = execute_readonly_sql(ds, sql, limit=1)
+        r = _execute_asset_sql(db, ds, sql, limit=1)
         if r.get("rows"):
             return r["rows"][0][0]
         return 0
@@ -551,10 +562,10 @@ def bb_stats(db: Session = Depends(get_db)):
     archived = q("SELECT COUNT(*) FROM bb_install_churn WHERE audit_status='已归档'")
     manual = q("SELECT COUNT(*) FROM bb_install_churn WHERE audit_status='人工审核中'")
     pending_cb = q("SELECT COUNT(*) FROM bb_install_churn WHERE audit_status='待补全回访'")
-    avg_conf_r = execute_readonly_sql(ds, "SELECT AVG(root_cause_confidence) FROM bb_install_churn WHERE root_cause_confidence IS NOT NULL", limit=1)
+    avg_conf_r = _execute_asset_sql(db, ds, "SELECT AVG(root_cause_confidence) FROM bb_install_churn WHERE root_cause_confidence IS NOT NULL", limit=1)
     avg_conf = round(float(avg_conf_r["rows"][0][0] or 0), 3) if avg_conf_r.get("rows") else 0
 
-    cause_r = execute_readonly_sql(ds, "SELECT root_cause_level_one, COUNT(*) cnt FROM bb_install_churn GROUP BY root_cause_level_one ORDER BY cnt DESC", limit=10)
+    cause_r = _execute_asset_sql(db, ds, "SELECT root_cause_level_one, COUNT(*) cnt FROM bb_install_churn GROUP BY root_cause_level_one ORDER BY cnt DESC", limit=10)
     cause_dist = {row[0]: row[1] for row in cause_r.get("rows", []) if row[0]}
 
     return {
@@ -586,7 +597,7 @@ def bb_list_churns(
     where = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
     offset = (page - 1) * page_size
 
-    count_r = execute_readonly_sql(ds, f"SELECT COUNT(*) FROM bb_install_churn c {where}", limit=1)
+    count_r = _execute_asset_sql(db, ds, f"SELECT COUNT(*) FROM bb_install_churn c {where}", limit=1)
     total = count_r["rows"][0][0] if count_r.get("rows") else 0
 
     sql = f"""
@@ -601,7 +612,7 @@ def bb_list_churns(
         ORDER BY c.churn_time DESC
         LIMIT {page_size} OFFSET {offset}
     """
-    result = execute_readonly_sql(ds, sql, limit=page_size)
+    result = _execute_asset_sql(db, ds, sql, limit=page_size)
     cols = result.get("columns", [])
     rows = []
     for row in result.get("rows", []):
@@ -617,7 +628,7 @@ def bb_churn_detail(churn_id: str, db: Session = Depends(get_db)):
     ds = _get_bb_conn(db)
 
     def q(sql, lim=50):
-        r = execute_readonly_sql(ds, sql, limit=lim)
+        r = _execute_asset_sql(db, ds, sql, limit=lim)
         cols = r.get("columns", [])
         return [{cols[i]: (row[i].isoformat() if hasattr(row[i], 'isoformat') else row[i])
                  for i in range(len(cols))} for row in r.get("rows", [])]

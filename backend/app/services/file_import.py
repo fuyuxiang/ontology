@@ -64,13 +64,13 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
         if existing:
             entity_map[obj["name"]] = eid
             # 更新已有实体的 datasource_ref（可能之前是逻辑名）
-            schema = existing.schema_json or {}
+            schema = existing.config_json or {}
             old_ref = schema.get("datasource_ref", "")
             if raw_ds_ref and old_ref != resolved_ds_ref:
                 schema["datasource_ref"] = resolved_ds_ref
-                existing.schema_json = schema
+                existing.config_json = schema
                 from sqlalchemy.orm.attributes import flag_modified
-                flag_modified(existing, "schema_json")
+                flag_modified(existing, "config_json")
             result.entities_skipped += 1
             continue
 
@@ -81,7 +81,7 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
             tier=obj.get("tier", 3),
             status="active",
             description=obj.get("description", ""),
-            schema_json={
+            config_json={
                 "namespace": namespace,
                 "primary_key": obj.get("primary_key"),
                 "datasource_ref": resolved_ds_ref,
@@ -325,6 +325,147 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
         result.rules_created += 1
 
     return result
+
+
+# ── 共享解析小函数（落库与预览两条路径复用，保证口径一致）──
+
+# v5 link_types cardinality → 平台基数。注意 many_to_one 归一为 N:1（与落库一致）
+_CARDINALITY_MAP = {
+    "one_to_many": "1:N", "many_to_one": "N:1",
+    "one_to_one": "1:1", "many_to_many": "N:N",
+}
+
+
+def _normalize_cardinality(raw: str) -> str:
+    """归一基数；已是 1:N / N:1 / 1:1 / N:N 形式则原样返回，未知默认 1:N。"""
+    if raw in ("1:N", "N:1", "1:1", "N:N"):
+        return raw
+    return _CARDINALITY_MAP.get(raw, "1:N")
+
+
+def _build_ds_logical_to_physical(data: dict) -> dict[str, str]:
+    """构建数据源逻辑名→物理表名映射（取每个 source 的第一张表）。"""
+    mapping: dict[str, str] = {}
+    for ds_def in data.get("data_sources", []):
+        source_id = ds_def.get("source_id", "")
+        tables = ds_def.get("tables", [])
+        if source_id and tables:
+            table_name = tables[0].get("table_name", "")
+            if table_name:
+                mapping[source_id] = table_name
+    return mapping
+
+
+def preview_json_ontology(data: dict, namespace: str) -> dict:
+    """纯解析：把 v5 本体 JSON 解析成内存草稿结构，不接触数据库、不落库。
+
+    供模版构建预览使用。解析口径与 parse_json_ontology 保持一致（类型映射、
+    基数归一、数据源逻辑名→物理表映射、动作关联实体推断）。
+    """
+    if not namespace:
+        namespace = data.get("scenario", {}).get("namespace", "")
+
+    ds_map = _build_ds_logical_to_physical(data)
+
+    # ── object_types → objects（含属性，物理表映射）──
+    objects: list[dict] = []
+    object_names: set[str] = set()
+    obj_ds_table: dict[str, str] = {}  # object name → 物理表名（属性 source_table 兜底用）
+    property_count = 0
+    for obj in data.get("object_types", []):
+        name = obj["name"]
+        object_names.add(name)
+        ds_table = ds_map.get(obj.get("datasource_ref", ""), obj.get("datasource_ref", ""))
+        obj_ds_table[name] = ds_table
+
+        props: list[dict] = []
+        for prop in obj.get("properties", []):
+            props.append({
+                "name": prop["name"],
+                "display_name": prop.get("display_name", prop["name"]),
+                "type": _JSON_TYPE_MAP.get(prop.get("type", "string"), "string"),
+                "raw_type": prop.get("type", "string"),
+                "required": prop.get("required", False),
+                "description": prop.get("description", ""),
+                "source_table": prop.get("source_table") or ds_table or None,
+                "source_field": prop.get("source_field"),
+            })
+        property_count += len(props)
+
+        objects.append({
+            "name": name,
+            "display_name": obj.get("display_name", name),
+            "tier": obj.get("tier", 3),
+            "namespace": obj.get("namespace", namespace) or None,
+            "primary_key": obj.get("primary_key"),
+            "description": obj.get("description", ""),
+            "properties": props,
+        })
+
+    # ── link_types → relations（按对象名引用；缺失实体的关系跳过）──
+    relations: list[dict] = []
+    for link in data.get("link_types", []):
+        source = link.get("source_type", "")
+        target = link.get("target_type", "")
+        if source not in object_names or target not in object_names:
+            continue
+        relations.append({
+            "name": link.get("name", ""),
+            "display_name": link.get("display_name", link.get("name", "")),
+            "source": source,
+            "target": target,
+            "cardinality": _normalize_cardinality(link.get("cardinality", "")),
+            "description": link.get("description", ""),
+        })
+
+    # ── action_types → actions（关联实体推断：effects.target > 名称/描述匹配 > 首个对象）──
+    actions: list[dict] = []
+    obj_name_list = list(object_names)
+    for act in data.get("action_types", []):
+        target_object = None
+        for eff in act.get("effects", []):
+            t = eff.get("target", "")
+            if t in object_names:
+                target_object = t
+                break
+        if not target_object:
+            for obj_name in obj_name_list:
+                if obj_name.lower() in act.get("description", "").lower() \
+                        or obj_name.lower() in act["name"].lower():
+                    target_object = obj_name
+                    break
+        if not target_object and obj_name_list:
+            target_object = obj_name_list[0]
+        actions.append({
+            "name": act["name"],
+            "display_name": act.get("display_name", act["name"]),
+            "trigger": act.get("trigger", "automatic"),
+            "target_object": target_object,
+            "description": act.get("description", ""),
+        })
+
+    # ── data_sources（逻辑名 → 物理表）──
+    data_sources: list[dict] = []
+    for ds_def in data.get("data_sources", []):
+        data_sources.append({
+            "source_id": ds_def.get("source_id", ""),
+            "physical_table": ds_map.get(ds_def.get("source_id", ""), ""),
+            "display_name": ds_def.get("display_name", ""),
+        })
+
+    return {
+        "objects": objects,
+        "relations": relations,
+        "actions": actions,
+        "data_sources": data_sources,
+        "summary": {
+            "object_count": len(objects),
+            "relation_count": len(relations),
+            "property_count": property_count,
+            "action_count": len(actions),
+        },
+    }
+
 
 
 def _resolve_entity_from_conditions(

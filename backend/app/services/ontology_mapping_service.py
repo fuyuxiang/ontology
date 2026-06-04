@@ -58,13 +58,15 @@ def _filter_tables_prompt(ontology_summary: str, tables_text: str) -> str:
 
 
 def get_all_tables_summary(db: Session | None = None) -> list[dict]:
-    from sqlalchemy import text as sa_text
-    from app.services.dwd_catalog import _get_engine
-    with _get_engine(db).connect() as conn:
-        rows = conn.execute(sa_text(
-            "SELECT table_name, table_desc FROM dwd_table_list ORDER BY serial_number"
-        ))
-        return [{"table_name": r[0], "table_desc": r[1] or ""} for r in rows]
+    from app.services.dwd_catalog import _find_asset, _execute, _TABLE_LIST_ASSET_NAME
+    if not db:
+        return []
+    asset = _find_asset(db, _TABLE_LIST_ASSET_NAME)
+    if not asset:
+        return []
+    sql = "SELECT table_name, table_desc FROM dwd_table_list ORDER BY serial_number"
+    rows = _execute(db, asset, sql)
+    return [{"table_name": r[0], "table_desc": r[1] or ""} for r in rows]
 
 
 _MAPPING_PROMPT_TEMPLATE = """你是本体映射专家。将本体中的实体、属性、关系精确映射到数据表及字段。

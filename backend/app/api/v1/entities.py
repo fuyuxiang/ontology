@@ -10,7 +10,7 @@ from app.schemas.entity import (
     AttributeOut, AttributeMappingUpdate, RelationOut, RuleOut, ActionOut,
     FunctionBriefOut,
     GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
-    FileImportResult,
+    FileImportResult, OntologyPreviewResult,
 )
 from app.repositories import EntityRepository
 from app.core.deps import get_current_user
@@ -40,7 +40,7 @@ def list_entities(
             attr_count=len(e.attributes),
             relation_count=rel_count,
             rule_count=len(e.rules),
-            datasource_name=(e.schema_json or {}).get("datasource_name"),
+            datasource_name=(e.config_json or {}).get("datasource_name"),
         ))
     return result
 
@@ -89,7 +89,7 @@ def get_scene_layer_stats(
 
 @router.get("/data-layer")
 def get_data_layer(db: Session = Depends(get_db)):
-    from app.models.datasource import DataSource
+    from app.models.asset import Asset
     from sqlalchemy import distinct
     rows = (
         db.query(
@@ -106,15 +106,19 @@ def get_data_layer(db: Session = Depends(get_db)):
         entity_tables[r.entity_id] = r.source_table
         entity_field_counts[r.entity_id] = entity_field_counts.get(r.entity_id, 0) + 1
 
+    # build asset index by table_name
+    all_assets = db.query(Asset).filter(Asset.status == "active").all()
+    asset_by_table = {(a.locator or {}).get("table", ""): a for a in all_assets if (a.locator or {}).get("table")}
+
     from app.models import OntologyEntity
     result = []
     for entity_id, table_name in entity_tables.items():
         e = db.get(OntologyEntity, entity_id)
         if not e:
             continue
-        ds = db.query(DataSource).filter(DataSource.table_name == table_name).first()
-        record_count = ds.record_count if ds else 0
-        datasource_name = ds.name if ds else ''
+        asset = asset_by_table.get(table_name)
+        record_count = (asset.profile or {}).get("row_count", 0) if asset else 0
+        datasource_name = asset.name if asset else ''
         result.append({
             'entity_id': entity_id,
             'entity_name_cn': e.name_cn,
@@ -243,14 +247,16 @@ def create_from_datasource(
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
-    from app.models.datasource import DataSource
-    from app.services.datasource_utils import get_table_schema as _get_table_schema
+    from app.models.asset import Asset
+    from app.services.data_plane.connection_service import ConnectionService
 
-    ds = db.get(DataSource, body.datasource_id)
-    if not ds:
+    asset = db.get(Asset, body.datasource_id)
+    if not asset:
         raise HTTPException(status_code=404, detail="数据源不存在")
 
-    columns = _get_table_schema(ds, body.table_name)
+    if not asset.connection_id:
+        raise HTTPException(status_code=400, detail="资产未关联连接")
+    columns = ConnectionService(db).get_table_schema(asset.connection_id, body.table_name)
     if not columns:
         raise HTTPException(status_code=400, detail="表无列信息")
 
@@ -270,10 +276,10 @@ def create_from_datasource(
         name_cn=body.name_cn,
         tier=body.tier,
         status="active",
-        description=f"从数据源 {ds.name} 的表 {body.table_name} 自动生成",
-        schema_json={
-            "datasource_id": ds.id,
-            "datasource_name": ds.name,
+        description=f"从数据源 {asset.name} 的表 {body.table_name} 自动生成",
+        config_json={
+            "datasource_id": asset.id,
+            "datasource_name": asset.name,
             "table_name": body.table_name,
             "primary_key": primary_key,
         },
@@ -297,7 +303,7 @@ def create_from_datasource(
         user_name=user.name if user else None,
         action="create", target_type="entity",
         target_id=eid, target_name=table_pascal,
-        snapshot_after={"source": "datasource", "datasource": ds.name, "table": body.table_name},
+        snapshot_after={"source": "datasource", "datasource": asset.name, "table": body.table_name},
     )
     db.commit()
     return get_entity(eid, db)
@@ -361,7 +367,7 @@ def create_from_asset(
         tier=body.tier,
         status="active",
         description=f"从 Asset {asset.name} 自动生成",
-        schema_json={
+        config_json={
             "asset_id": asset.id,
             "asset_alias": asset.alias,
             "table_name": table_name,
@@ -463,6 +469,32 @@ async def create_from_file(
     )
 
 
+@router.post("/preview-file", response_model=OntologyPreviewResult)
+async def preview_from_file(
+    file: UploadFile = File(...),
+    file_type: str = Form(...),
+    namespace: str = Form(""),
+):
+    """预览本体文件：仅解析为草稿结构，不落库、不写审计。供模版构建使用。"""
+    from app.services.file_import import preview_json_ontology
+
+    if file_type != "json":
+        raise HTTPException(status_code=400, detail="预览目前仅支持 json 格式")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="文件内容为空")
+
+    try:
+        import json as _json
+        data = _json.loads(content.decode("utf-8"))
+        preview = preview_json_ontology(data, namespace)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}")
+
+    return OntologyPreviewResult(**preview)
+
+
 @router.get("/{entity_id}", response_model=EntityDetail)
 def get_entity(entity_id: str, db: Session = Depends(get_db)):
     repo = EntityRepository(db)
@@ -489,7 +521,7 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
     return EntityDetail(
         id=entity.id, name=entity.name, name_cn=entity.name_cn,
         tier=entity.tier, status=entity.status, description=entity.description,
-        schema_json=entity.schema_json,
+        config_json=entity.config_json,
         attributes=[AttributeOut.model_validate(a) for a in entity.attributes],
         relations=rel_list,
         rules=[RuleOut(
@@ -514,7 +546,7 @@ def create_entity(
     entity = OntologyEntity(
         name=data.name, name_cn=data.name_cn, tier=data.tier,
         status=data.status, description=data.description,
-        schema_json=data.schema_json,
+        config_json=data.config_json,
         created_by=user.id if user else None,
     )
     for attr in data.attributes:

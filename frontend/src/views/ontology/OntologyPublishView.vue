@@ -121,6 +121,13 @@
             <template v-else-if="detail.status === 'published'">
               <button class="btn-secondary" @click="rollbackVersion" :disabled="loading">回滚到此版本</button>
             </template>
+            <button
+              v-if="detail.status === 'draft' || detail.status === 'pending_approval'"
+              class="btn-outline"
+              @click="previewImpact"
+            >
+              预览影响
+            </button>
           </div>
         </template>
         <div v-else class="version-empty-main">
@@ -182,12 +189,47 @@
         </div>
       </div>
     </div>
+
+    <!-- Impact Preview -->
+    <div v-if="showImpact" class="impact-overlay">
+      <div class="impact-dialog">
+        <div class="impact-dialog__header">
+          <h3>发布影响预览</h3>
+          <button class="impact-dialog__close" @click="showImpact = false">&times;</button>
+        </div>
+        <div class="impact-dialog__body">
+          <div v-if="impactLoading" class="impact-dialog__loading">分析中...</div>
+          <div v-else-if="!impactData?.breaking_changes?.length" class="impact-dialog__empty">
+            无破坏性变更，可安全发布
+          </div>
+          <template v-else>
+            <h4>破坏性变更 ({{ impactData.breaking_changes.length }})</h4>
+            <ul class="impact-dialog__list">
+              <li v-for="c in impactData.breaking_changes" :key="c.entity_name">
+                <strong>{{ c.entity_name }}</strong> —
+                <span v-if="c.change_type === 'deleted'" class="impact-dialog__tag--del">已删除</span>
+                <span v-else class="impact-dialog__tag--ren">改名为 {{ c.new_name }}</span>
+              </li>
+            </ul>
+            <h4 v-if="impactData.affected_scenes?.length">受影响的场景 ({{ impactData.affected_scenes.length }})</h4>
+            <ul v-if="impactData.affected_scenes?.length" class="impact-dialog__list">
+              <li v-for="s in impactData.affected_scenes" :key="s.id">{{ s.name }}</li>
+            </ul>
+            <h4 v-if="impactData.affected_agents?.length">受影响的 Agent ({{ impactData.affected_agents.length }})</h4>
+            <ul v-if="impactData.affected_agents?.length" class="impact-dialog__list">
+              <li v-for="a in impactData.affected_agents" :key="a.id">{{ a.name }}</li>
+            </ul>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { get, post, put, del } from '../../api/client'
+import { ontologyPublishApi } from '../../api/aip'
 
 interface VersionSummary {
   id: string; version_number: number; name: string; description: string | null
@@ -221,6 +263,9 @@ const loading = ref(false)
 const showCreateDialog = ref(false)
 const showEntitySelector = ref(false)
 const showRejectDialog = ref(false)
+const showImpact = ref(false)
+const impactData = ref<any>(null)
+const impactLoading = ref(false)
 
 const newVersion = reactive({ name: '', description: '' })
 const rejectReason = ref('')
@@ -335,6 +380,20 @@ async function rollbackVersion() {
   loading.value = false
 }
 
+async function previewImpact() {
+  if (!detail.value) return
+  showImpact.value = true
+  impactLoading.value = true
+  try {
+    const res = await ontologyPublishApi.previewImpact(detail.value.id)
+    impactData.value = res
+  } catch (e) {
+    impactData.value = null
+  } finally {
+    impactLoading.value = false
+  }
+}
+
 function formatStatus(status: string) {
   const map: Record<string, string> = { draft: '草稿', pending_approval: '待审批', published: '已发布', rejected: '已驳回' }
   return map[status] || status
@@ -443,4 +502,48 @@ function formatTime(iso: string) {
 .selector-item__name { font-weight: 500; }
 .selector-item__en { color: var(--neutral-400); font-size: 11px; }
 .selector-item__tier { margin-left: auto; font-size: 11px; color: var(--neutral-500); }
+
+.btn-outline { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--neutral-300); background: #fff; color: var(--neutral-700); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-outline:hover { background: var(--neutral-50); }
+
+.impact-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.impact-dialog {
+  background: #fff;
+  border-radius: 8px;
+  width: 480px;
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+.impact-dialog__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+}
+.impact-dialog__header h3 { margin: 0; font-size: 16px; }
+.impact-dialog__close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #6b7280;
+}
+.impact-dialog__body { padding: 16px 20px; }
+.impact-dialog__body h4 { margin: 12px 0 6px; font-size: 13px; color: #374151; }
+.impact-dialog__list { margin: 0; padding-left: 16px; font-size: 13px; }
+.impact-dialog__list li { margin: 4px 0; }
+.impact-dialog__loading { text-align: center; color: #6b7280; padding: 20px; }
+.impact-dialog__empty { text-align: center; color: #059669; padding: 20px; }
+.impact-dialog__tag--del { color: #dc2626; }
+.impact-dialog__tag--ren { color: #d97706; }
 </style>

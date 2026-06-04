@@ -341,7 +341,7 @@ async function loadAssetDetails() {
   if (allIds.size === 0) {
     try {
       const { get } = await import('../../../api/client')
-      const assets = await get('/assets?kinds=table&kinds=sql_view&status=active') as any[]
+      const assets = await get('/assets?kinds=table%2Csql_view&status=active') as any[]
       if (assets && assets.length) {
         for (const a of assets) {
           allIds.add(a.id)
@@ -456,6 +456,8 @@ async function startDrill() {
           required: !!p.required,
           source_asset_id: p.source_asset_id ?? null,
           source_column: p.source_column ?? null,
+          source_field: (p as any).source_field ?? null,
+          source_table: (p as any).source_table ?? null,
         })),
         backing_asset_ids: o.backing_asset_ids || [],
       })),

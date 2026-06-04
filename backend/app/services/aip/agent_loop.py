@@ -212,11 +212,10 @@ class AgentNodeRunner:
             return {"error": str(e)}
 
     def _exec_action(self, action: EntityAction, params: dict) -> dict:
-        from app.services.rule_engine import ActionExecutor
-        executor = ActionExecutor(self.db)
+        from app.services.action_executors import run_executor_sync
         try:
-            res = executor.execute(action, params, dry_run=False)
-            return {"success": res.success, "message": res.message, "effects": res.effects}
+            res = run_executor_sync(action.action_type, action.type_config or {}, params, dry_run=False)
+            return {"success": res.success, "message": res.message, "effects": res.output or {}}
         except Exception as e:
             return {"error": str(e)}
 

@@ -8,6 +8,59 @@ export interface EntityQuery {
   namespace?: string
 }
 
+// ── 本体文件预览（只解析不落库）──
+export interface PreviewProperty {
+  name: string
+  display_name: string
+  type: string
+  raw_type: string
+  required: boolean
+  description: string
+  source_table: string | null
+  source_field: string | null
+}
+export interface PreviewObject {
+  name: string
+  display_name: string
+  tier: number
+  namespace: string | null
+  primary_key: string | null
+  description: string
+  properties: PreviewProperty[]
+}
+export interface PreviewRelation {
+  name: string
+  display_name: string
+  source: string
+  target: string
+  cardinality: string
+  description: string
+}
+export interface PreviewAction {
+  name: string
+  display_name: string
+  trigger: string
+  target_object: string | null
+  description: string
+}
+export interface PreviewDataSource {
+  source_id: string
+  physical_table: string
+  display_name: string
+}
+export interface OntologyPreviewResult {
+  objects: PreviewObject[]
+  relations: PreviewRelation[]
+  actions: PreviewAction[]
+  data_sources: PreviewDataSource[]
+  summary: {
+    object_count: number
+    relation_count: number
+    property_count: number
+    action_count: number
+  }
+}
+
 export const entityApi = {
   list(query?: EntityQuery) {
     return get<EntityListItem[]>('/entities', { params: query })
@@ -61,6 +114,14 @@ export const entityApi = {
     formData.append('file_type', fileType)
     if (namespace) formData.append('namespace', namespace)
     return post<FileImportResult>('/entities/from-file', formData)
+  },
+
+  previewFile(file: File, fileType: string, namespace?: string) {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('file_type', fileType)
+    if (namespace) formData.append('namespace', namespace)
+    return post<OntologyPreviewResult>('/entities/preview-file', formData)
   },
 
   dataLayer() {

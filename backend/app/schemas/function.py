@@ -5,6 +5,7 @@ from datetime import datetime
 class FunctionCreate(BaseModel):
     entity_id: str | None = None
     name: str
+    callable_name: str = ""
     description: str = ""
     return_type: str = "string"
     input_schema: list | None = None
@@ -12,10 +13,12 @@ class FunctionCreate(BaseModel):
     logic_body: str = ""
     is_derived_property: bool = False
     status: str = "active"
+    tags: list[str] | None = None
 
 
 class FunctionUpdate(BaseModel):
     name: str | None = None
+    callable_name: str | None = None
     entity_id: str | None = None
     description: str | None = None
     return_type: str | None = None
@@ -24,6 +27,7 @@ class FunctionUpdate(BaseModel):
     logic_body: str | None = None
     is_derived_property: bool | None = None
     status: str | None = None
+    tags: list[str] | None = None
 
 
 class FunctionOut(BaseModel):
@@ -31,6 +35,7 @@ class FunctionOut(BaseModel):
     entity_id: str | None = None
     entity_name: str = ""
     name: str
+    callable_name: str = ""
     description: str = ""
     return_type: str
     input_schema: list | None = None
@@ -40,6 +45,8 @@ class FunctionOut(BaseModel):
     status: str
     execution_count: int = 0
     last_executed: datetime | None = None
+    tags: list[str] | None = None
+    ref_count: int = 0
     created_at: datetime | None = None
     updated_at: datetime | None = None
     model_config = {"from_attributes": True}

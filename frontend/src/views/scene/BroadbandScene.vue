@@ -3,7 +3,7 @@
     <!-- Left Panel: List -->
     <div class="bb-left">
       <div class="bb-left__header">
-        <h1 class="bb-left__title">宽带装机退单稽核</h1>
+        <h1 class="bb-left__title">宽带退单稽核</h1>
         <p class="bb-left__desc">基于本体规则与大模型协同，自动判断退单原因合理性</p>
       </div>
 

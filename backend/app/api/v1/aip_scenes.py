@@ -546,3 +546,20 @@ def test_fire_trigger(sid: str, db: Session = Depends(get_db)):
     t.start()
     t.join(timeout=0.1)
     return {"ok": True, "scheduled": True}
+
+
+@router.post("/{scene_id}/acknowledge-stale")
+def acknowledge_stale(scene_id: str, db: Session = Depends(get_db)):
+    scene = db.query(AipScene).filter(AipScene.id == scene_id).first()
+    if not scene:
+        raise HTTPException(404, "场景不存在")
+    if not scene.ontology_stale:
+        return {"message": "该场景没有过期标记"}
+
+    from app.models.version import OntologyVersion
+    active_version = db.query(OntologyVersion).filter(OntologyVersion.is_active == True).first()
+    scene.ontology_stale = False
+    scene.ontology_stale_detail = None
+    scene.ontology_version_id = active_version.id if active_version else None
+    db.commit()
+    return {"message": "已确认，过期标记已清除"}

@@ -194,13 +194,15 @@ from app.api.v1.rules import router as rules_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.copilot import router as copilot_router
 from app.api.v1.relations import router as relations_router
-from app.api.v1.datasources import router as datasources_router
+# datasources_router 已废弃，数据接入统一走 data_plane/connections + assets
 from app.api.v1.mnp import router as mnp_router
 from app.api.v1.scenes import router as scenes_router
 from app.api.v1.broadband import router as broadband_router
 from app.api.v1.models import router as models_router
 from app.api.v1.agents import router as agents_router, open_router as agents_open_router
 from app.api.v1.skills import router as skills_router
+from app.api.v1.skill_gen import router as skill_gen_router
+from app.api.v1.registry import router as registry_router
 from app.api.v1.resolution import router as resolution_router
 from app.api.v1.governance import router as governance_router
 from app.api.v1.prompt_templates import router as prompt_templates_router
@@ -245,6 +247,17 @@ async def lifespan(app: FastAPI):
     # 启动：建表 + 初始化管理员
     Base.metadata.create_all(bind=engine)
 
+    # 迁移：schema_json → config_json 列重命名
+    with engine.connect() as conn:
+        from sqlalchemy import text, inspect as sa_inspect
+        inspector = sa_inspect(engine)
+        for tbl in ("ontology_entities", "ontology_version_entities"):
+            if tbl in inspector.get_table_names():
+                cols = {c["name"] for c in inspector.get_columns(tbl)}
+                if "schema_json" in cols and "config_json" not in cols:
+                    conn.execute(text(f"ALTER TABLE {tbl} RENAME COLUMN schema_json TO config_json"))
+        conn.commit()
+
     # SQLite 迁移：datasources 表增加 table_name / record_count 列
     with engine.connect() as conn:
         from sqlalchemy import text, inspect as sa_inspect
@@ -263,6 +276,30 @@ async def lifespan(app: FastAPI):
                     conn.execute(text("UPDATE datasources SET table_count = 0 WHERE table_count IS NULL"))
                 except Exception:
                     pass
+            if "enabled" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN enabled TINYINT(1) DEFAULT 0"))
+            if "source_category" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN source_category VARCHAR(20) DEFAULT 'database'"))
+            if "file_path" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN file_path VARCHAR(500)"))
+            if "file_type" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN file_type VARCHAR(20)"))
+            if "api_url" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_url VARCHAR(500)"))
+            if "api_method" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_method VARCHAR(10) DEFAULT 'GET'"))
+            if "api_headers" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_headers JSON"))
+            if "api_body" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN api_body TEXT"))
+            if "mq_topic" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN mq_topic VARCHAR(200)"))
+            if "mq_group" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN mq_group VARCHAR(200)"))
+            if "poll_interval" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN poll_interval INTEGER DEFAULT 60"))
+            if "parsed_content" not in cols:
+                conn.execute(text("ALTER TABLE datasources ADD COLUMN parsed_content TEXT"))
             conn.commit()
 
         # business_rules 表增加结构化列
@@ -274,13 +311,39 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE business_rules ADD COLUMN rule_meta_json JSON"))
             conn.commit()
 
-        # entity_actions 表增加结构化列
+        # entity_actions 表增加结构化列（旧字段兼容 + 新字段迁移）
         if "entity_actions" in inspector.get_table_names():
             cols = {c["name"] for c in inspector.get_columns("entity_actions")}
             for col in ("parameters_json", "preconditions_json", "effects_json", "action_meta_json"):
                 if col not in cols:
                     conn.execute(text(f"ALTER TABLE entity_actions ADD COLUMN {col} JSON"))
+            # 新 schema 列（Task-11 重构）
+            if "category" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN category VARCHAR(20) DEFAULT 'domain'"))
+            if "action_type" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN action_type VARCHAR(30)"))
+            if "type_config" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN type_config JSON"))
+            if "output_schema" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN output_schema JSON"))
+            if "updated_at" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN updated_at DATETIME"))
             conn.commit()
+            # 数据迁移：为旧行填充 category / action_type（幂等）
+            result = conn.execute(
+                text("SELECT COUNT(*) FROM entity_actions WHERE category IS NULL OR action_type IS NULL")
+            )
+            legacy_count = result.scalar()
+            if legacy_count and legacy_count > 0:
+                conn.execute(
+                    text(
+                        "UPDATE entity_actions"
+                        " SET category = 'domain', action_type = 'custom_script'"
+                        " WHERE category IS NULL OR action_type IS NULL"
+                    )
+                )
+                conn.commit()
+                logger.info(f"entity_actions 数据迁移完成：{legacy_count} 条旧记录已补全 category/action_type")
 
         # entity_attributes 表增加映射字段
         if "entity_attributes" in inspector.get_table_names():
@@ -300,6 +363,23 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE agents ADD COLUMN nodes_json JSON"))
             if "edges_json" not in cols:
                 conn.execute(text("ALTER TABLE agents ADD COLUMN edges_json JSON"))
+            if "ontology_version_id" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN ontology_version_id VARCHAR(36)"))
+            if "ontology_stale" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN ontology_stale TINYINT(1) NOT NULL DEFAULT 0"))
+            if "ontology_stale_detail" not in cols:
+                conn.execute(text("ALTER TABLE agents ADD COLUMN ontology_stale_detail JSON"))
+            conn.commit()
+
+        # aip_scenes 表增加 ontology_stale 相关列
+        if "aip_scenes" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("aip_scenes")}
+            if "ontology_version_id" not in cols:
+                conn.execute(text("ALTER TABLE aip_scenes ADD COLUMN ontology_version_id VARCHAR(36)"))
+            if "ontology_stale" not in cols:
+                conn.execute(text("ALTER TABLE aip_scenes ADD COLUMN ontology_stale TINYINT(1) NOT NULL DEFAULT 0"))
+            if "ontology_stale_detail" not in cols:
+                conn.execute(text("ALTER TABLE aip_scenes ADD COLUMN ontology_stale_detail JSON"))
             conn.commit()
 
         # audit_log 表补充 details / status 列
@@ -309,6 +389,36 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE audit_log ADD COLUMN details TEXT"))
             if "status" not in cols:
                 conn.execute(text("ALTER TABLE audit_log ADD COLUMN status VARCHAR(16) DEFAULT 'success'"))
+            conn.commit()
+
+        # skills 表增加技能平台扩展列
+        if "skills" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("skills")}
+            if "current_version" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN current_version INTEGER DEFAULT 0"))
+            if "input_schema" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN input_schema JSON"))
+            if "output_schema" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN output_schema JSON"))
+            if "prompt_template" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN prompt_template TEXT"))
+            if "tools" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN tools JSON"))
+            if "test_cases" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN test_cases JSON"))
+            if "asset_refs" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN asset_refs JSON"))
+            if "created_by" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN created_by VARCHAR(100) DEFAULT ''"))
+            if "reviewed_by" not in cols:
+                conn.execute(text("ALTER TABLE skills ADD COLUMN reviewed_by VARCHAR(100) DEFAULT ''"))
+            conn.commit()
+
+        # ontology_entities 表增加 publish_config 列
+        if "ontology_entities" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("ontology_entities")}
+            if "publish_config" not in cols:
+                conn.execute(text("ALTER TABLE ontology_entities ADD COLUMN publish_config JSON"))
             conn.commit()
 
     db = SessionLocal()
@@ -366,7 +476,7 @@ async def lifespan(app: FastAPI):
             finally:
                 db.close()
         except Exception as e:
-            logger.warning(f"预热案例用户缓存失败: {e}")
+            logger.debug(f"预热案例用户缓存跳过: {e}")
 
     asyncio.create_task(asyncio.to_thread(_preheat_sync))
 
@@ -406,7 +516,7 @@ app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(copilot_router, prefix="/api/v1")
 app.include_router(relations_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
-app.include_router(datasources_router, prefix="/api/v1")
+# app.include_router(datasources_router, prefix="/api/v1")  # 已废弃
 app.include_router(mnp_router, prefix="/api/v1")
 app.include_router(scenes_router, prefix="/api/v1")
 app.include_router(broadband_router, prefix="/api/v1")
@@ -448,6 +558,8 @@ app.include_router(dp_mapping_router, prefix="/api/v1")
 app.include_router(ai_builder_v2_router, prefix="/api/v1")
 app.include_router(doc_builder_router, prefix="/api/v1")
 app.include_router(ontology_mapping_router, prefix="/api/v1")
+app.include_router(skill_gen_router, prefix="/api/v1")
+app.include_router(registry_router, prefix="/api/v1")
 
 
 @app.get("/api/health")

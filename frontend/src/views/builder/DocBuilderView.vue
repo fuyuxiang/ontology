@@ -11,29 +11,44 @@
       <StepDocUpload v-if="step === 0" @next="onUploadDone" />
       <StepDocChat v-else-if="step === 1" :session-id="sessionId" :business-desc="businessDesc" @next="onChatDone" />
       <StepDocMapping v-else-if="step === 2" :session-id="sessionId" :ontology="extractionResult!" @next="onMappingDone" />
-      <StepDocReview v-else-if="step === 3" :result="mappedResult!" @prev="step = 2" @confirm="onConfirm" />
+      <StepDocMappingPersist v-else-if="step === 3" :session-id="sessionId" :mapping-result="mappedResult!" @prev="step = 2" @next="onPersistDone" />
+      <div v-else-if="step === 4" class="ai-builder__review">
+        <Step2Review :session="session!" @prev="step = 3" @next="step = 5" />
+      </div>
+      <div v-else-if="step === 5" class="ai-builder__hydrate">
+        <Step3Hydrate :session="session!" @prev="step = 4" @goto-studio="gotoStudio" />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
 import { useBuilderStore } from '../../store/builder'
 import StepDocUpload from './components/doc/StepDocUpload.vue'
 import StepDocChat from './components/doc/StepDocChat.vue'
 import StepDocMapping from './components/doc/StepDocMapping.vue'
-import StepDocReview from './components/doc/StepDocReview.vue'
+import StepDocMappingPersist from './components/doc/StepDocMappingPersist.vue'
+import Step2Review from './components/Step2Review.vue'
+import Step3Hydrate from './components/Step3Hydrate.vue'
 
 const router = useRouter()
 const store = useBuilderStore()
+const { sessions, activeSession } = storeToRefs(store)
 
-const steps = ['需求与文档', 'AI对话抽取', '资产映射', '确认入库']
+const steps = ['需求与文档', 'AI对话抽取', '资产映射', '映射确认', '专家审核', '水合验证']
 const step = ref(0)
 const sessionId = ref('')
 const businessDesc = ref('')
 const extractionResult = ref<any>(null)
 const mappedResult = ref<any>(null)
+
+const session = computed(() => {
+  if (activeSession.value && activeSession.value.buildMethod === 'chat') return activeSession.value
+  return sessions.value.find(s => s.buildMethod === 'chat' && s.status === 'drafting') || null
+})
 
 function onUploadDone(payload: { sessionId: string; businessDesc: string }) {
   sessionId.value = payload.sessionId
@@ -51,8 +66,11 @@ function onMappingDone(ontology: any) {
   step.value = 3
 }
 
-function onConfirm(ontology: any) {
-  store.createSession({ ontologyName: `文档构建-${Date.now().toString(36).slice(-4)}`, buildMethod: 'chat' })
+function onPersistDone() {
+  if (!session.value) {
+    store.createSession({ ontologyName: `文档构建-${Date.now().toString(36).slice(-4)}`, buildMethod: 'chat' })
+  }
+  const ontology = mappedResult.value
   const objects = ontology.entities.map((e: any, i: number) => ({
     id: `obj-${Date.now().toString(36)}-${i}`,
     name: e.name,
@@ -97,8 +115,20 @@ function onConfirm(ontology: any) {
     mappingConfidence: r.confidence || undefined,
   }))
   store.patchActive({ ontologyObjects: objects, ontologyRelations: relations })
+  step.value = 4
+}
+
+function gotoStudio() {
   router.push('/studio')
 }
+
+onMounted(() => {
+  if (!session.value) {
+    store.createSession({ ontologyName: `文档构建-${Date.now().toString(36).slice(-4)}`, buildMethod: 'chat' })
+  } else {
+    store.setActiveSession(session.value.sessionId)
+  }
+})
 </script>
 
 <style scoped>
@@ -111,4 +141,5 @@ function onConfirm(ontology: any) {
 .ai-builder__step--active .ai-builder__step-num { background: #4a6fa5; color: #fff; border-color: #4a6fa5; }
 .ai-builder__step--done .ai-builder__step-num { background: #2e7d32; color: #fff; border-color: #2e7d32; }
 .ai-builder__content { flex: 1; overflow-y: auto; }
+.ai-builder__review, .ai-builder__hydrate { height: 100%; }
 </style>
