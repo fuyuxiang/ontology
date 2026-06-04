@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import engine, SessionLocal
+from app.db_compat import ensure_legacy_schema_compat
 from app.models import *  # noqa: F401,F403 — 确保所有模型注册
 from app.database import Base
 from app.api.v1.entities import router as entities_router
@@ -246,6 +247,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     # 启动：建表 + 初始化管理员
     Base.metadata.create_all(bind=engine)
+    ensure_legacy_schema_compat(engine)
 
     # 迁移：schema_json → config_json 列重命名
     with engine.connect() as conn:
