@@ -4,6 +4,7 @@ from datetime import datetime
 
 import psutil
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -127,9 +128,11 @@ def get_agent_activity(db: Session = Depends(get_db)):
 
 @router.get("/platform-stats", response_model=PlatformStatsResponse)
 def get_platform_stats(db: Session = Depends(get_db)):
-    total_datasources = db.query(Asset).filter(Asset.status == "active").count()
-    total_rules = db.query(BusinessRule).count()
-    total_pipelines = db.query(Pipeline).count()
+    total_datasources = db.scalar(
+        select(func.count(Asset.id)).where(Asset.status == "active")
+    ) or 0
+    total_rules = db.scalar(select(func.count(BusinessRule.id))) or 0
+    total_pipelines = db.scalar(select(func.count(Pipeline.id))) or 0
     return PlatformStatsResponse(
         total_datasources=total_datasources,
         total_rules=total_rules,
