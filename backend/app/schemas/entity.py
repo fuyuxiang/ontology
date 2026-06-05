@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from datetime import datetime
 
 
@@ -87,7 +87,7 @@ class RelationOut(BaseModel):
 class ActionOut(BaseModel):
     id: str
     name: str
-    type: str
+    type: str = Field(validation_alias="action_type")
     status: str
     impact_count: int | None = None
     parameters_json: list | None = None
@@ -95,7 +95,7 @@ class ActionOut(BaseModel):
     effects_json: list | None = None
     action_meta_json: dict | None = None
     created_at: datetime | None = None
-    model_config = {"from_attributes": True}
+    model_config = {"from_attributes": True, "populate_by_name": True}
 
 
 class FunctionBriefOut(BaseModel):
