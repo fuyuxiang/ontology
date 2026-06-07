@@ -344,6 +344,13 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE entity_actions ADD COLUMN output_schema JSON"))
             if "updated_at" not in cols:
                 conn.execute(text("ALTER TABLE entity_actions ADD COLUMN updated_at DATETIME"))
+            # 旧 type 列已被 action_type 取代，设为 nullable 避免 INSERT 报错
+            if "type" in cols:
+                try:
+                    conn.execute(text("ALTER TABLE entity_actions MODIFY COLUMN `type` VARCHAR(50) NULL"))
+                    conn.commit()
+                except Exception:
+                    pass
             conn.commit()
             # 数据迁移：为旧行填充 category / action_type（幂等）
             result = conn.execute(
