@@ -52,6 +52,40 @@ def list_assets(
     )
 
 
+@router.get("/scopes", response_model=None)
+def list_scopes(db: Session = Depends(get_db)):
+    """返回可选的数据范围（数据库连接）列表，仅包含有结构化资产的连接。"""
+    from app.models.connection import Connection
+    from app.models.asset import Asset
+
+    conns = (
+        db.query(Connection)
+        .filter(Connection.category == "database")
+        .filter(
+            Connection.id.in_(
+                db.query(Asset.connection_id)
+                .filter(Asset.kind.in_(["table", "sql_view"]))
+                .filter(Asset.status == "active")
+                .filter(Asset.connection_id.isnot(None))
+                .distinct()
+            )
+        )
+        .all()
+    )
+    return {
+        "scopes": [
+            {
+                "id": c.id,
+                "name": c.name,
+                "display_name": f"{c.name}（{c.type} · {c.database or c.host}）",
+                "type": c.type,
+                "database": c.database,
+            }
+            for c in conns
+        ]
+    }
+
+
 @router.get("/{asset_id}", response_model=AssetDetail)
 def get_asset(asset_id: str, db: Session = Depends(get_db)):
     a = _svc(db).get(asset_id)
