@@ -28,3 +28,9 @@ def require_user(user: User | None = Depends(get_current_user)) -> User:
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="请先登录")
     return user
+
+
+def require_admin(user: User = Depends(require_user)) -> User:
+    if user.role != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="需要管理员权限")
+    return user

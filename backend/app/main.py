@@ -191,6 +191,57 @@ def _seed_cron(schedule: dict) -> str:
         return f"{m} {h} 1 * *"
     return schedule.get("cron", f"{m} {h} * * *")
 
+
+def _seed_system_config(db):
+    """初始化默认系统配置项（幂等：已存在则跳过）"""
+    from app.models.system_config import SystemConfig
+    defaults = [
+        # basic
+        ("basic", "system_name", "本体管理平台", "系统名称"),
+        ("basic", "language", "zh-CN", "界面语言"),
+        ("basic", "timezone", "Asia/Shanghai", "系统时区"),
+        # auth
+        ("auth", "password_min_length", "8", "密码最小长度"),
+        ("auth", "password_complexity", "upper,lower,digit", "密码复杂度要求"),
+        ("auth", "session_timeout", "30", "会话超时（分钟）"),
+        ("auth", "sso_enabled", "false", "是否启用 SSO"),
+        ("auth", "sso_provider", "oidc", "SSO 提供商（oidc/saml/ldap）"),
+        ("auth", "client_id", "", "SSO Client ID"),
+        ("auth", "client_secret", "", "SSO Client Secret"),
+        # storage
+        ("storage", "backend", "local", "存储后端（local/minio/oss）"),
+        ("storage", "local_path", "./uploads", "本地文件存储路径"),
+        ("storage", "max_upload_mb", "50", "最大上传大小（MB）"),
+        ("storage", "allowed_types", ".owl,.rdf,.ttl,.csv,.xlsx,.json,.docx,.pdf", "允许的文件类型"),
+        # ai
+        ("ai", "model", "claude-sonnet-4-20250514", "LLM 模型"),
+        ("ai", "api_key", "", "API Key"),
+        ("ai", "api_secret", "", "API Secret（部分模型需要）"),
+        ("ai", "base_url", "https://api.anthropic.com", "API Base URL"),
+        ("ai", "temperature", "0.7", "Temperature（0.0-2.0）"),
+        ("ai", "max_tokens", "4096", "最大 Token 数"),
+        ("ai", "top_p", "1.0", "Top P 采样"),
+        ("ai", "timeout_seconds", "60", "请求超时（秒）"),
+        # notification
+        ("notification", "smtp_host", "", "SMTP 服务器地址"),
+        ("notification", "smtp_port", "465", "SMTP 端口"),
+        ("notification", "smtp_encryption", "ssl", "加密方式（ssl/tls/none）"),
+        ("notification", "smtp_username", "", "SMTP 用户名"),
+        ("notification", "smtp_password", "", "SMTP 密码"),
+        ("notification", "smtp_from_name", "本体管理平台", "发件人名称"),
+        ("notification", "webhook_url", "", "Webhook URL"),
+        ("notification", "webhook_secret", "", "Webhook 签名密钥"),
+    ]
+    existing = {r.key for r in db.query(SystemConfig.key).all()}
+    added = 0
+    for group, key, value, desc in defaults:
+        if key not in existing:
+            db.add(SystemConfig(group=group, key=key, value=value, description=desc))
+            added += 1
+    if added:
+        db.commit()
+        logger.info(f"系统配置初始化完成：新增 {added} 项")
+
 from app.api.v1.rules import router as rules_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.copilot import router as copilot_router
@@ -226,6 +277,7 @@ from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
 from app.api.v1.aip_webhooks import router as aip_webhooks_router
 from app.api.v1.doc_builder import router as doc_builder_router
 from app.api.v1.ontology_mapping import router as ontology_mapping_router
+from app.api.v1.system_config import router as system_config_router
 
 # ── Data Plane（M1 新增 7 个 router）──
 from app.api.v1.data_plane.connections import router as dp_connections_router
@@ -423,12 +475,26 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE ontology_entities ADD COLUMN publish_config JSON"))
             conn.commit()
 
+        # users 表增加 email / is_active / last_login_at / updated_at 列
+        if "users" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("users")}
+            if "email" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN email VARCHAR(100)"))
+            if "is_active" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN is_active TINYINT(1) DEFAULT 1"))
+            if "last_login_at" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at DATETIME"))
+            if "updated_at" not in cols:
+                conn.execute(text("ALTER TABLE users ADD COLUMN updated_at DATETIME"))
+            conn.commit()
+
     db = SessionLocal()
     try:
         seed_admin(db)
         _seed_agents(db)
         _seed_skills(db)
         _seed_aip_scenes(db)
+        _seed_system_config(db)
     finally:
         db.close()
 
@@ -562,6 +628,7 @@ app.include_router(doc_builder_router, prefix="/api/v1")
 app.include_router(ontology_mapping_router, prefix="/api/v1")
 app.include_router(skill_gen_router, prefix="/api/v1")
 app.include_router(registry_router, prefix="/api/v1")
+app.include_router(system_config_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
