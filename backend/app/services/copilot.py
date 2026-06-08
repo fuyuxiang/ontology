@@ -24,6 +24,11 @@ def get_llm_client(api_key: str | None = None, api_base: str | None = None, db: 
     return _resolve(db=db, scene=scene, api_key=api_key, api_base=api_base)
 
 
+def _get_model_name(db: Session | None = None, scene: str = "general") -> str:
+    from app.services.llm_resolver import get_model_name
+    return get_model_name(db=db, scene=scene)
+
+
 def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
     """构建本体感知的上下文（仅使用已发布实体，若无已发布实体则回退到全量）"""
     published = db.query(OntologyEntity).filter(OntologyEntity.status == "published").all()
