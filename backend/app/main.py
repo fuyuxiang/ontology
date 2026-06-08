@@ -238,6 +238,63 @@ def _seed_system_config(db):
         if key not in existing:
             db.add(SystemConfig(group=group, key=key, value=value, description=desc))
             added += 1
+
+    # 初始化默认 AI 模型列表（JSON）
+    if "ai.models" not in existing:
+        import json
+        default_models = json.dumps([
+            {
+                "id": "claude-sonnet",
+                "name": "Claude Sonnet 4",
+                "provider": "Anthropic",
+                "model_id": "claude-sonnet-4-20250514",
+                "api_key": "",
+                "base_url": "https://api.anthropic.com",
+                "temperature": 0.7,
+                "max_tokens": 4096,
+                "scenes": ["ontology", "general"],
+                "is_default": True,
+            },
+            {
+                "id": "claude-opus",
+                "name": "Claude Opus 4",
+                "provider": "Anthropic",
+                "model_id": "claude-opus-4-20250514",
+                "api_key": "",
+                "base_url": "https://api.anthropic.com",
+                "temperature": 0.5,
+                "max_tokens": 8192,
+                "scenes": ["ontology"],
+                "is_default": False,
+            },
+            {
+                "id": "gpt-4o",
+                "name": "GPT-4o",
+                "provider": "OpenAI",
+                "model_id": "gpt-4o",
+                "api_key": "",
+                "base_url": "https://api.openai.com",
+                "temperature": 0.7,
+                "max_tokens": 4096,
+                "scenes": ["agent", "data"],
+                "is_default": False,
+            },
+            {
+                "id": "deepseek-v3",
+                "name": "DeepSeek V3",
+                "provider": "DeepSeek",
+                "model_id": "deepseek-chat",
+                "api_key": "",
+                "base_url": "https://api.deepseek.com",
+                "temperature": 0.7,
+                "max_tokens": 4096,
+                "scenes": ["data", "general"],
+                "is_default": False,
+            },
+        ], ensure_ascii=False)
+        db.add(SystemConfig(group="ai", key="ai.models", value=default_models, description="AI 模型列表"))
+        added += 1
+
     if added:
         db.commit()
         logger.info(f"系统配置初始化完成：新增 {added} 项")
