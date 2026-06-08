@@ -3,8 +3,8 @@
     <!-- 标题区 -->
     <div class="config-page__header">
       <div>
-        <h1 class="config-page__title">系统配置</h1>
-        <p class="config-page__subtitle">平台全局参数与集成配置管理</p>
+        <h1 class="config-page__title">{{ t('systemConfig.title') }}</h1>
+        <p class="config-page__subtitle">{{ t('systemConfig.subtitle') }}</p>
       </div>
       <div class="config-page__actions">
         <button class="config-btn" @click="showHistory = true">
