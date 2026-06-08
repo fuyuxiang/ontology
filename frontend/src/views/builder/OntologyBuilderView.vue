@@ -14,7 +14,6 @@
       <BuilderShell
         v-if="session"
         :session="session"
-        @back="onBack"
         @goto-studio="gotoStudio"
       />
       <div v-else class="builder-page__loading">正在初始化构建会话…</div>
@@ -54,10 +53,6 @@ function ensureSession() {
       buildMethod: 'manual',
     })
   }
-}
-
-function onBack() {
-  editorMode.value = 'protege'
 }
 
 function gotoStudio() {
