@@ -514,12 +514,15 @@ class AutoMapProperty(BaseModel):
 
 class AutoMapObject(BaseModel):
     id: str
+    name: str = ""
+    displayName: str = ""
     properties: list[AutoMapProperty] = []
 
 
 class AutoMapRequest(BaseModel):
     objects: list[AutoMapObject]
-    asset_ids: list[str]
+    asset_ids: list[str] | None = None
+    scope: str | None = None
 
 
 class _AttrAdapter:
@@ -533,34 +536,72 @@ class _AttrAdapter:
 
 @router.post("/auto-map")
 async def auto_map(body: AutoMapRequest, db: Session = Depends(get_db)):
-    """根据启发式打分，自动为草稿属性推荐数据源列映射。"""
+    """智能映射：根据 scope 或 asset_ids 匹配最优表和列。
+
+    三层匹配逻辑：
+    1. 确定候选资产范围（scope → connection_id 筛选，或 asset_ids 指定，或全部结构化资产）
+    2. 对象名 → 表名 匹配，为每个对象找出最相关的表
+    3. 属性 → 列 匹配，在匹配到的表内做列级映射
+    """
+    from difflib import SequenceMatcher
     from app.models.asset import Asset
     from app.services.data_plane.mapping_suggest_service import _heuristic_score
 
-    if not body.asset_ids or not body.objects:
+    if not body.objects:
         return {"mappings": {}}
 
-    assets = db.query(Asset).filter(Asset.id.in_(body.asset_ids)).all()
-    # 按 asset_id 建立 schema 索引
-    asset_schemas: list[tuple[str, list[dict]]] = []
+    # 第一层：确定候选资产范围
+    query = db.query(Asset).filter(
+        Asset.kind.in_(["table", "sql_view"]),
+        Asset.status == "active",
+    )
+    if body.asset_ids:
+        query = query.filter(Asset.id.in_(body.asset_ids))
+    elif body.scope:
+        query = query.filter(Asset.connection_id == body.scope)
+
+    assets = query.all()
+    if not assets:
+        return {"mappings": {}}
+
+    # 构建 asset 索引: [(asset_id, table_name, schema)]
+    asset_index: list[tuple[str, str, list[dict]]] = []
     for a in assets:
         schema = a.schema_snapshot or []
         if schema:
-            asset_schemas.append((a.id, schema))
+            asset_index.append((a.id, a.alias or a.name, schema))
 
-    if not asset_schemas:
+    if not asset_index:
         return {"mappings": {}}
 
     result: dict[str, dict] = {}
-    for obj in body.objects:
-        best_asset_id: str | None = None
-        prop_mappings: dict[str, dict] = {}
-        total_score = 0.0
 
-        # 对每个 asset 计算总分，选最佳
-        for asset_id, schema in asset_schemas:
+    for obj in body.objects:
+        obj_label = obj.displayName or obj.name or obj.id
+
+        # 第二层：对象名 → 表名 匹配，找出 top-N 相关表
+        table_scores: list[tuple[int, float]] = []
+        for idx, (asset_id, table_name, schema) in enumerate(asset_index):
+            name_sim = _table_name_similarity(obj_label, obj.name, table_name)
+            table_scores.append((idx, name_sim))
+
+        table_scores.sort(key=lambda x: x[1], reverse=True)
+        # 取 top 5 候选表（至少 0.2 分以上）
+        top_tables = [(idx, score) for idx, score in table_scores[:5] if score >= 0.2]
+        if not top_tables:
+            # 退化：取前 10 张表全部尝试
+            top_tables = table_scores[:10]
+
+        # 第三层：属性 → 列 匹配
+        best_total_score = 0.0
+        best_result = None
+        matched_tables_for_obj: list[dict] = []
+
+        for idx, table_sim in top_tables:
+            asset_id, table_name, schema = asset_index[idx]
             obj_score = 0.0
             obj_mappings: dict[str, dict] = {}
+
             for prop in obj.properties:
                 adapter = _AttrAdapter(prop.name, prop.type, prop.description)
                 best_s = 0.0
@@ -577,18 +618,68 @@ async def auto_map(body: AutoMapRequest, db: Session = Depends(get_db)):
                         "asset_id": asset_id,
                     }
                     obj_score += best_s
-            if obj_score > total_score:
-                total_score = obj_score
-                best_asset_id = asset_id
-                prop_mappings = obj_mappings
 
-        if best_asset_id:
+            combined_score = obj_score + table_sim * len(obj.properties) * 0.3
+            matched_tables_for_obj.append({
+                "asset_id": asset_id,
+                "table_name": table_name,
+                "columns": [col.get("name", "") for col in schema],
+                "score": round(combined_score, 3),
+            })
+
+            if combined_score > best_total_score:
+                best_total_score = combined_score
+                best_result = {"asset_id": asset_id, "mappings": obj_mappings}
+
+        # 按分数排序，返回 top 相关表
+        matched_tables_for_obj.sort(key=lambda x: x["score"], reverse=True)
+        top_matched = matched_tables_for_obj[:5]
+
+        if best_result:
             result[obj.id] = {
-                "asset_id": best_asset_id,
-                "property_mappings": prop_mappings,
+                "asset_id": best_result["asset_id"],
+                "matched_tables": top_matched,
+                "property_mappings": best_result["mappings"],
+            }
+        else:
+            result[obj.id] = {
+                "asset_id": None,
+                "matched_tables": top_matched,
+                "property_mappings": {},
             }
 
     return {"mappings": result}
+
+
+def _table_name_similarity(obj_display: str, obj_name: str, table_name: str) -> float:
+    """计算对象名与表名的相似度。综合中文名匹配和英文名匹配。"""
+    from difflib import SequenceMatcher
+    import re
+
+    table_lower = table_name.lower().replace("_", "").replace("-", "")
+    scores: list[float] = []
+
+    if obj_name:
+        obj_lower = obj_name.lower().replace("_", "").replace("-", "")
+        if obj_lower == table_lower:
+            return 1.0
+        if obj_lower in table_lower or table_lower in obj_lower:
+            scores.append(0.8)
+        scores.append(SequenceMatcher(None, obj_lower, table_lower).ratio())
+
+    if obj_display:
+        display_lower = obj_display.lower()
+        if display_lower in table_lower or table_lower in display_lower:
+            scores.append(0.7)
+        # 拆分 token 比较
+        obj_tokens = set(re.findall(r'[一-鿿]+|[a-z0-9]+', display_lower))
+        table_tokens = set(re.findall(r'[一-鿿]+|[a-z0-9]+', table_lower))
+        if obj_tokens and table_tokens:
+            overlap = len(obj_tokens & table_tokens)
+            if overlap:
+                scores.append(overlap / max(len(obj_tokens), len(table_tokens)) * 0.75)
+
+    return max(scores) if scores else 0.0
 
 
 # ── 水合演练（hydrate）── 验证本体草稿与真实数据的映射 ──────────────

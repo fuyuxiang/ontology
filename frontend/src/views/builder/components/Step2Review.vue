@@ -18,8 +18,8 @@
       >完成走测</button>
     </header>
 
-    <!-- 数据源绑定面板（仅手工建模/文档抽取路径显示） -->
-    <div class="step2-binding-panel" v-if="props.session.buildMethod !== 'chat'">
+    <!-- 数据源绑定面板（仅文档抽取/导入路径显示，手工建模在独立步骤处理） -->
+    <div class="step2-binding-panel" v-if="props.session.buildMethod !== 'chat' && props.session.buildMethod !== 'manual'">
       <div class="step2-binding-head" @click="bindingOpen = !bindingOpen">
         <span>🔗 数据源绑定与自动映射</span>
         <span class="step2-binding-toggle">{{ bindingOpen ? '收起' : '展开' }}</span>

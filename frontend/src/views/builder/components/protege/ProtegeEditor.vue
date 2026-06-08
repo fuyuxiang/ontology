@@ -34,11 +34,11 @@ import './styles/protege-theme.css'
 const store = useOwlEditorStore()
 
 const tabs = [
-  { key: 'ontology', label: 'Active Ontology' },
-  { key: 'classes', label: 'Classes' },
-  { key: 'objectProperties', label: 'Object Properties' },
-  { key: 'dataProperties', label: 'Data Properties' },
-  { key: 'individuals', label: 'Individuals' },
+  { key: 'ontology', label: '活动本体' },
+  { key: 'classes', label: '类' },
+  { key: 'objectProperties', label: '对象属性' },
+  { key: 'dataProperties', label: '数据属性' },
+  { key: 'individuals', label: '实例' },
 ]
 
 function onOpen() {

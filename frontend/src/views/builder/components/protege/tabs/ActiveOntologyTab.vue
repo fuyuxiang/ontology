@@ -2,7 +2,7 @@
   <div style="padding: 16px; overflow-y: auto; flex: 1;">
     <!-- Ontology IRI -->
     <div class="pg-panel">
-      <div class="pg-panel__header">Ontology IRI</div>
+      <div class="pg-panel__header">本体 IRI</div>
       <div class="pg-panel__body">
         <input class="pg-input" :value="store.ontology.iri" @change="store.updateOntologyMeta({ iri: ($event.target as HTMLInputElement).value })" />
       </div>
@@ -10,22 +10,22 @@
 
     <!-- Version IRI -->
     <div class="pg-panel">
-      <div class="pg-panel__header">Version IRI</div>
+      <div class="pg-panel__header">版本 IRI</div>
       <div class="pg-panel__body">
-        <input class="pg-input" :value="store.ontology.versionIRI || ''" placeholder="(optional)" @change="store.updateOntologyMeta({ versionIRI: ($event.target as HTMLInputElement).value || undefined })" />
+        <input class="pg-input" :value="store.ontology.versionIRI || ''" placeholder="（可选）" @change="store.updateOntologyMeta({ versionIRI: ($event.target as HTMLInputElement).value || undefined })" />
       </div>
     </div>
 
     <!-- Metrics -->
     <div class="pg-panel">
-      <div class="pg-panel__header">Ontology Metrics</div>
+      <div class="pg-panel__header">本体统计</div>
       <div class="pg-panel__body">
         <table class="pg-table">
           <tbody>
-            <tr><td>Classes</td><td>{{ store.metrics.classCount }}</td></tr>
-            <tr><td>Object Properties</td><td>{{ store.metrics.objectPropertyCount }}</td></tr>
-            <tr><td>Data Properties</td><td>{{ store.metrics.dataPropertyCount }}</td></tr>
-            <tr><td>Individuals</td><td>{{ store.metrics.individualCount }}</td></tr>
+            <tr><td>类</td><td>{{ store.metrics.classCount }}</td></tr>
+            <tr><td>对象属性</td><td>{{ store.metrics.objectPropertyCount }}</td></tr>
+            <tr><td>数据属性</td><td>{{ store.metrics.dataPropertyCount }}</td></tr>
+            <tr><td>实例</td><td>{{ store.metrics.individualCount }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -33,10 +33,10 @@
 
     <!-- Namespaces -->
     <div class="pg-panel">
-      <div class="pg-panel__header">Prefixes / Namespaces</div>
+      <div class="pg-panel__header">前缀 / 命名空间</div>
       <div class="pg-panel__body">
         <table class="pg-table">
-          <thead><tr><th>Prefix</th><th>IRI</th><th></th></tr></thead>
+          <thead><tr><th>前缀</th><th>IRI</th><th></th></tr></thead>
           <tbody>
             <tr v-for="(ns, idx) in store.ontology.namespaces" :key="idx">
               <td><input class="pg-input" :value="ns.prefix" @change="updateNs(idx, 'prefix', ($event.target as HTMLInputElement).value)" /></td>
@@ -45,7 +45,7 @@
             </tr>
           </tbody>
         </table>
-        <button class="pg-btn" style="margin-top:4px" @click="addNs">+ Add Prefix</button>
+        <button class="pg-btn" style="margin-top:4px" @click="addNs">+ 添加前缀</button>
       </div>
     </div>
 

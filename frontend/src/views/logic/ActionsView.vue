@@ -319,16 +319,21 @@ async function handleCreate() {
     payload.entity_id = form.value.entity_id
   }
 
-  const created = await actionApi.create(payload)
-  closeCreate()
-  await fetchActions()
+  try {
+    const created = await actionApi.create(payload)
+    closeCreate()
+    await fetchActions()
 
-  if (route.query.from === 'builder') {
-    const sid = route.query.session_id as string
-    const oid = route.query.object_id as string
-    if (sid && oid && (created as any)?.id) {
-      router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: (created as any).id, kind: 'action' } })
+    if (route.query.from === 'builder') {
+      const sid = route.query.session_id as string
+      const oid = route.query.object_id as string
+      if (sid && oid && (created as any)?.id) {
+        router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: (created as any).id, kind: 'action' } })
+      }
     }
+  } catch (e: any) {
+    const msg = e?.response?.data?.detail || e?.message || '创建失败'
+    alert(`创建行动失败: ${msg}`)
   }
 }
 

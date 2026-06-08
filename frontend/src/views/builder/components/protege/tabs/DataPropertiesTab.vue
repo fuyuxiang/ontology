@@ -2,10 +2,10 @@
   <div class="pg-split">
     <div class="pg-split__left">
       <div class="pg-toolbar">
-        <button class="pg-toolbar__btn" title="Add sub-property" @click="addSub">⊕</button>
-        <button class="pg-toolbar__btn" title="Delete property" :disabled="!store.selectedDataPropertyId" @click="deleteSel">✕</button>
+        <button class="pg-toolbar__btn" title="添加子属性" @click="addSub">⊕</button>
+        <button class="pg-toolbar__btn" title="删除属性" :disabled="!store.selectedDataPropertyId" @click="deleteSel">✕</button>
       </div>
-      <EntitySearchInput v-model="filter" placeholder="Filter..." />
+      <EntitySearchInput v-model="filter" placeholder="筛选..." />
       <div class="pg-tree">
         <PropertyTreeNode v-for="p in rootProperties" :key="p.id" :node="p" :depth="0" :filter="filter" kind="data" />
       </div>
@@ -20,16 +20,16 @@
         </div>
         <AnnotationsPanel :entity="store.selectedDataProperty" @update="a => store.updateDataProperty(store.selectedDataPropertyId!, { annotations: a })" />
         <div class="pg-panel">
-          <div class="pg-panel__header">Characteristics</div>
+          <div class="pg-panel__header">特性</div>
           <div class="pg-panel__body">
             <label style="font-size:11px;cursor:pointer">
-              <input type="checkbox" :checked="store.selectedDataProperty.functional" @change="toggleFunctional" /> Functional
+              <input type="checkbox" :checked="store.selectedDataProperty.functional" @change="toggleFunctional" /> 函数型
             </label>
           </div>
         </div>
         <DomainRangePanel :property="store.selectedDataProperty" kind="data" />
       </template>
-      <div v-else class="pg-empty">Select a data property to view its details</div>
+      <div v-else class="pg-empty">选择一个数据属性以查看详情</div>
     </div>
   </div>
 </template>
