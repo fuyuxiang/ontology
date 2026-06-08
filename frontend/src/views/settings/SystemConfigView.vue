@@ -8,7 +8,7 @@
       </div>
       <div class="config-page__actions">
         <button class="config-btn" @click="showHistory = true">
-          <span style="margin-right: 6px">🕐</span> 变更记录
+          <span style="margin-right: 6px">🕐</span> {{ t('common.changeHistory') }}
         </button>
       </div>
     </div>
