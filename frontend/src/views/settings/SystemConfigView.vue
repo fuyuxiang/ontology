@@ -216,13 +216,13 @@ import { useLanguage } from '../../composables/useLanguage'
 const { success, error } = useToast()
 const { switchLanguage, t } = useLanguage()
 
-const groupList = [
-  { key: 'basic', label: '基础配置', desc: '系统名称、语言、时区等基础参数', icon: '⚙️' },
-  { key: 'auth', label: '认证配置', desc: '密码策略、会话超时、SSO 集成', icon: '🔐' },
-  { key: 'storage', label: '存储配置', desc: '文件存储路径、上传大小限制', icon: '📁' },
-  { key: 'ai', label: 'AI 配置', desc: '大模型管理，支持多模型多场景配置', icon: '🤖' },
-  { key: 'notification', label: '通知配置', desc: '邮件服务器、Webhook 集成', icon: '📧' },
-]
+const groupList = computed(() => [
+  { key: 'basic', label: t('systemConfig.basic'), desc: t('systemConfig.basicDesc'), icon: '⚙️' },
+  { key: 'auth', label: t('systemConfig.auth'), desc: t('systemConfig.authDesc'), icon: '🔐' },
+  { key: 'storage', label: t('systemConfig.storage'), desc: t('systemConfig.storageDesc'), icon: '📁' },
+  { key: 'ai', label: t('systemConfig.ai'), desc: t('systemConfig.aiDesc'), icon: '🤖' },
+  { key: 'notification', label: t('systemConfig.notification'), desc: t('systemConfig.notificationDesc'), icon: '📧' },
+])
 
 const activeGroup = ref('basic')
 const showHistory = ref(false)
