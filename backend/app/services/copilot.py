@@ -141,7 +141,7 @@ def chat_stream(messages: list[dict], db: Session, entity_id: str | None = None)
         api_messages.append({"role": m["role"], "content": m["content"]})
 
     stream = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(db),
         messages=api_messages,
         stream=True,
         max_tokens=2048,
@@ -164,7 +164,7 @@ def chat_sync(messages: list[dict], db: Session, entity_id: str | None = None) -
         api_messages.append({"role": m["role"], "content": m["content"]})
 
     response = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(db),
         messages=api_messages,
         max_tokens=2048,
         temperature=0.7,
