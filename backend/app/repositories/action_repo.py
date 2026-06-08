@@ -5,8 +5,10 @@ from app.repositories.base import BaseRepository
 
 
 class ActionRepository(BaseRepository[EntityAction]):
+    model = EntityAction
+
     def __init__(self, db: Session):
-        super().__init__(EntityAction, db)
+        super().__init__(db)
 
     def list_with_filters(self, entity_id=None, status=None, action_type=None, category=None, search=None):
         query = select(EntityAction)

@@ -2,24 +2,24 @@
   <div>
     <!-- Domains -->
     <div class="pg-panel">
-      <div class="pg-panel__header">Domains</div>
+      <div class="pg-panel__header">定义域</div>
       <div class="pg-panel__body">
         <div v-for="d in domains" :key="d" class="pg-tag">
           {{ d.split(/[#/]/).pop() }}
           <span class="pg-tag__remove" @click="removeDomain(d)">✕</span>
         </div>
-        <button class="pg-btn" style="margin-top:4px" @click="addDomain">+ Add Domain</button>
+        <button class="pg-btn" style="margin-top:4px" @click="addDomain">+ 添加定义域</button>
       </div>
     </div>
     <!-- Ranges -->
     <div class="pg-panel">
-      <div class="pg-panel__header">Ranges</div>
+      <div class="pg-panel__header">值域</div>
       <div class="pg-panel__body">
         <div v-for="r in ranges" :key="r" class="pg-tag">
           {{ r.split(/[#/]/).pop() }}
           <span class="pg-tag__remove" @click="removeRange(r)">✕</span>
         </div>
-        <button class="pg-btn" style="margin-top:4px" @click="addRange">+ Add Range</button>
+        <button class="pg-btn" style="margin-top:4px" @click="addRange">+ 添加值域</button>
       </div>
     </div>
   </div>
@@ -37,7 +37,7 @@ const domains = computed(() => props.property.domains)
 const ranges = computed(() => props.property.ranges)
 
 function addDomain() {
-  const val = prompt('Enter class IRI or name:')
+  const val = prompt('输入类 IRI 或名称：')
   if (!val) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   const iri = val.includes(':') || val.includes('/') ? val : `${base}${val}`
@@ -53,7 +53,7 @@ function removeDomain(d: string) {
 }
 
 function addRange() {
-  const val = prompt(props.kind === 'data' ? 'Enter XSD datatype (e.g. xsd:string):' : 'Enter class IRI or name:')
+  const val = prompt(props.kind === 'data' ? '输入 XSD 数据类型（如 xsd:string）：' : '输入类 IRI 或名称：')
   if (!val) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   const iri = val.includes(':') || val.includes('/') ? val : `${base}${val}`

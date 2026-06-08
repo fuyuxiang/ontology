@@ -63,13 +63,6 @@
           <label class="agent-detail__label">标签</label>
           <input class="agent-detail__input" v-model="form.tagsStr" placeholder="多个标签用逗号分隔" />
         </div>
-        <div class="agent-detail__form-group">
-          <label class="agent-detail__label">模型</label>
-          <select class="agent-detail__select" v-model="form.model_id">
-            <option value="">请选择模型</option>
-            <option v-for="m in models" :key="m.id" :value="m.id">{{ m.name }} ({{ m.model_name }})</option>
-          </select>
-        </div>
         <div class="agent-detail__form-group agent-detail__form-group--grow">
           <label class="agent-detail__label">系统提示词</label>
           <textarea class="agent-detail__textarea agent-detail__textarea--tall" v-model="form.system_prompt" placeholder="系统提示词"></textarea>
@@ -111,7 +104,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { agentsApi, modelsApi, type AgentItem, type ModelRegistry } from '../../api/agents'
+import { agentsApi, type AgentItem } from '../../api/agents'
 import { entityApi } from '../../api/ontology'
 
 const route = useRoute()
@@ -119,7 +112,6 @@ const router = useRouter()
 
 const isNew = computed(() => route.params.id === 'new')
 
-const models = ref<ModelRegistry[]>([])
 const entities = ref<{ id: string; name: string; name_cn?: string }[]>([])
 const current = ref<AgentItem | null>(null)
 const saving = ref(false)
@@ -130,7 +122,6 @@ const form = reactive({
   name: '',
   description: '',
   tagsStr: '',
-  model_id: '',
   system_prompt: '',
   entity_ids: [] as string[],
 })
@@ -146,7 +137,6 @@ function formToPayload() {
     name: form.name || '未命名智能体',
     description: form.description,
     tags: form.tagsStr.split(',').map(t => t.trim()).filter(Boolean),
-    model_id: form.model_id || null,
     system_prompt: form.system_prompt,
     entity_ids: form.entity_ids,
   }
@@ -163,7 +153,6 @@ function loadFormFromAgent(a: AgentItem) {
   form.name = a.name
   form.description = a.description
   form.tagsStr = (a.tags || []).join(', ')
-  form.model_id = a.model_id || ''
   form.system_prompt = a.system_prompt
   form.entity_ids = a.entity_ids || []
   current.value = a
@@ -267,11 +256,7 @@ function scrollToBottom() {
 }
 
 onMounted(async () => {
-  const [modelList, entityList] = await Promise.all([
-    modelsApi.list(),
-    entityApi.list(),
-  ])
-  models.value = modelList
+  const entityList = await entityApi.list()
   entities.value = entityList as any
 
   if (!isNew.value) {

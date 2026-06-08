@@ -3,24 +3,75 @@
     <div class="builder-page__toolbar">
       <span class="builder-page__toolbar-label">工具选择</span>
       <select class="builder-page__select" v-model="editorMode">
+        <option value="local">本地构建</option>
         <option value="protege">Protégé</option>
         <option value="webowl">WebOWL</option>
         <option value="vocbench">VocBench</option>
       </select>
     </div>
-    <ProtegeEditor v-if="editorMode === 'protege'" />
+
+    <template v-if="editorMode === 'local'">
+      <BuilderShell
+        v-if="session"
+        :session="session"
+        @goto-studio="gotoStudio"
+      />
+      <div v-else class="builder-page__loading">正在初始化构建会话…</div>
+    </template>
+
+    <ProtegeEditor v-else-if="editorMode === 'protege'" />
     <WebVowlEditor v-else-if="editorMode === 'webowl'" />
     <VocBenchEditor v-else />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { useBuilderStore } from '../../store/builder'
 import ProtegeEditor from './components/protege/ProtegeEditor.vue'
 import WebVowlEditor from './components/WebVowlEditor.vue'
 import VocBenchEditor from './components/VocBenchEditor.vue'
+import BuilderShell from './components/BuilderShell.vue'
 
-const editorMode = ref<'protege' | 'webowl' | 'vocbench'>('protege')
+const router = useRouter()
+const store = useBuilderStore()
+const { sessions, activeSession } = storeToRefs(store)
+
+const editorMode = ref<'local' | 'protege' | 'webowl' | 'vocbench'>('local')
+
+const session = computed(() => {
+  if (activeSession.value && activeSession.value.buildMethod === 'manual') return activeSession.value
+  return sessions.value.find(s => s.buildMethod === 'manual' && s.status !== 'published') || null
+})
+
+function ensureSession() {
+  if (editorMode.value === 'local' && !session.value) {
+    store.createSession({
+      ontologyName: `本地构建-${Date.now().toString(36).slice(-4)}`,
+      buildMethod: 'manual',
+    })
+  }
+}
+
+function gotoStudio() {
+  router.push('/studio')
+}
+
+watch(editorMode, (mode) => {
+  if (mode === 'local') ensureSession()
+})
+
+onMounted(() => {
+  if (editorMode.value === 'local') {
+    if (session.value) {
+      store.setActiveSession(session.value.sessionId)
+    } else {
+      ensureSession()
+    }
+  }
+})
 </script>
 
 <style scoped>
@@ -46,16 +97,12 @@ const editorMode = ref<'protege' | 'webowl' | 'vocbench'>('protege')
   background: #fff;
   cursor: pointer;
 }
-.builder-page__placeholder {
+.builder-page__loading {
   flex: 1;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  color: #666;
+  color: #999;
+  font-size: 14px;
 }
-.builder-page__placeholder-icon { font-size: 48px; }
-.builder-page__placeholder-title { font-size: 18px; font-weight: 600; color: #333; }
-.builder-page__placeholder-sub { font-size: 13px; color: #999; }
 </style>

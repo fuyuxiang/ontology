@@ -1,19 +1,19 @@
 <template>
   <div class="webvowl-root">
     <div class="webvowl-toolbar">
-      <button class="webvowl-btn" @click="resetZoom">Reset View</button>
-      <button class="webvowl-btn" @click="toggleLabels">{{ showLabels ? 'Hide Labels' : 'Show Labels' }}</button>
+      <button class="webvowl-btn" @click="resetZoom">重置视图</button>
+      <button class="webvowl-btn" @click="toggleLabels">{{ showLabels ? '隐藏标签' : '显示标签' }}</button>
       <div class="webvowl-toolbar__sep"></div>
-      <button class="webvowl-btn" @click="addClassNode">+ Class</button>
-      <button class="webvowl-btn" @click="addPropertyNode">+ Property</button>
-      <button class="webvowl-btn" @click="addRelation">+ Relation</button>
-      <button class="webvowl-btn" :disabled="!selectedNode" @click="deleteSelected">Delete</button>
+      <button class="webvowl-btn" @click="addClassNode">+ 类</button>
+      <button class="webvowl-btn" @click="addPropertyNode">+ 属性</button>
+      <button class="webvowl-btn" @click="addRelation">+ 关系</button>
+      <button class="webvowl-btn" :disabled="!selectedNode" @click="deleteSelected">删除</button>
       <div class="webvowl-toolbar__sep"></div>
-      <span class="webvowl-info">Classes: {{ classes.length }} | Properties: {{ properties.length }}</span>
+      <span class="webvowl-info">类: {{ classes.length }} | 属性: {{ properties.length }}</span>
       <span style="flex:1"></span>
-      <button class="webvowl-btn" @click="store.saveDraft()">Save Draft</button>
-      <button class="webvowl-btn webvowl-btn--primary" @click="onImport">Import OWL</button>
-      <button class="webvowl-btn" @click="onExport">Export OWL</button>
+      <button class="webvowl-btn" @click="store.saveDraft()">保存草稿</button>
+      <button class="webvowl-btn webvowl-btn--primary" @click="onImport">导入 OWL</button>
+      <button class="webvowl-btn" @click="onExport">导出 OWL</button>
     </div>
     <div class="webvowl-main">
       <div class="webvowl-canvas" ref="canvasRef"></div>
@@ -25,7 +25,7 @@
             <span>{{ selectedNode.label }}</span>
           </div>
           <div class="webvowl-sidebar__section">
-            <div class="webvowl-sidebar__label">Name</div>
+            <div class="webvowl-sidebar__label">名称</div>
             <input class="webvowl-input" :value="selectedNode.label" @change="renameSelected(($event.target as HTMLInputElement).value)" />
           </div>
           <div class="webvowl-sidebar__section">
@@ -33,18 +33,18 @@
             <div class="webvowl-sidebar__value">{{ selectedNode.iri }}</div>
           </div>
           <div class="webvowl-sidebar__section">
-            <div class="webvowl-sidebar__label">Type</div>
+            <div class="webvowl-sidebar__label">类型</div>
             <div class="webvowl-sidebar__value">{{ selectedNode.type }}</div>
           </div>
           <div class="webvowl-sidebar__section" v-if="selectedNode.type === 'class'">
-            <div class="webvowl-sidebar__label">Annotations</div>
-            <button class="webvowl-btn-sm" @click="addAnnotation">+ Add Label</button>
+            <div class="webvowl-sidebar__label">注解</div>
+            <button class="webvowl-btn-sm" @click="addAnnotation">+ 添加标签</button>
           </div>
           <div class="webvowl-sidebar__section">
-            <button class="webvowl-btn webvowl-btn--danger" @click="deleteSelected">Delete this entity</button>
+            <button class="webvowl-btn webvowl-btn--danger" @click="deleteSelected">删除此实体</button>
           </div>
         </template>
-        <div v-else class="webvowl-sidebar__empty">Click a node to edit</div>
+        <div v-else class="webvowl-sidebar__empty">点击节点进行编辑</div>
       </div>
     </div>
   </div>
@@ -289,7 +289,7 @@ function onExport() {
 }
 
 function addClassNode() {
-  const name = prompt('Class name:')
+  const name = prompt('类名：')
   if (!name) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   store.addClass()
@@ -299,7 +299,7 @@ function addClassNode() {
 }
 
 function addPropertyNode() {
-  const name = prompt('Object Property name:')
+  const name = prompt('对象属性名：')
   if (!name) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   store.addObjectProperty()
@@ -309,14 +309,14 @@ function addPropertyNode() {
 }
 
 function addRelation() {
-  if (store.ontology.classes.length < 2) { alert('Need at least 2 classes to add a relation.'); return }
-  const domain = prompt('Domain class name (source):')
-  const range = prompt('Range class name (target):')
-  const propName = prompt('Property name:')
+  if (store.ontology.classes.length < 2) { alert('至少需要 2 个类才能添加关系'); return }
+  const domain = prompt('定义域类名（源）：')
+  const range = prompt('值域类名（目标）：')
+  const propName = prompt('属性名：')
   if (!domain || !range || !propName) return
   const domainClass = store.ontology.classes.find(c => c.localName === domain)
   const rangeClass = store.ontology.classes.find(c => c.localName === range)
-  if (!domainClass || !rangeClass) { alert('Class not found.'); return }
+  if (!domainClass || !rangeClass) { alert('未找到该类'); return }
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   store.addObjectProperty()
   const p = store.ontology.objectProperties[store.ontology.objectProperties.length - 1]
@@ -347,7 +347,7 @@ function addAnnotation() {
   if (!selectedNode.value) return
   const cls = store.ontology.classes.find(c => c.iri === selectedNode.value!.iri)
   if (!cls) return
-  const val = prompt('Label value:')
+  const val = prompt('标签值：')
   if (!val) return
   store.updateClass(cls.id, { annotations: [...cls.annotations, { id: uid('ann'), property: 'rdfs:label', value: val }] })
 }
