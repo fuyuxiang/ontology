@@ -2,12 +2,12 @@
   <div class="pg-split">
     <div class="pg-split__left">
       <div class="pg-toolbar">
-        <button class="pg-toolbar__btn" title="Add subclass" @click="addSubclass">⊕</button>
-        <button class="pg-toolbar__btn" title="Add sibling class" @click="addSibling">⊞</button>
-        <button class="pg-toolbar__btn" title="Delete class" :disabled="!store.selectedClassId" @click="deleteSelected">✕</button>
+        <button class="pg-toolbar__btn" title="添加子类" @click="addSubclass">⊕</button>
+        <button class="pg-toolbar__btn" title="添加同级类" @click="addSibling">⊞</button>
+        <button class="pg-toolbar__btn" title="删除类" :disabled="!store.selectedClassId" @click="deleteSelected">✕</button>
         <div class="pg-toolbar__sep"></div>
       </div>
-      <EntitySearchInput v-model="filter" placeholder="Filter..." />
+      <EntitySearchInput v-model="filter" placeholder="筛选..." />
       <div class="pg-tree">
         <ClassTreeNode :node="thingNode" :depth="0" :filter="filter" />
       </div>
@@ -21,16 +21,16 @@
           </div>
           <div class="pg-panel__body">
             <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
-              <label style="font-size:11px;color:#666;white-space:nowrap">Name:</label>
+              <label style="font-size:11px;color:#666;white-space:nowrap">名称：</label>
               <input class="pg-input" :value="store.selectedClass.localName" @change="renameClass(($event.target as HTMLInputElement).value)" />
             </div>
-            <div style="font-size:10px;color:#999;word-break:break-all">IRI: {{ store.selectedClass.iri }}</div>
+            <div style="font-size:10px;color:#999;word-break:break-all">IRI：{{ store.selectedClass.iri }}</div>
           </div>
         </div>
         <AnnotationsPanel :entity="store.selectedClass" @update="onUpdateAnnotations" />
         <ClassDescriptionPanel :owl-class="store.selectedClass" />
       </template>
-      <div v-else class="pg-empty">Select a class to view its details</div>
+      <div v-else class="pg-empty">选择一个类以查看详情</div>
     </div>
   </div>
 </template>

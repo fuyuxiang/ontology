@@ -10,7 +10,10 @@
       <div class="audit-detail__meta">
         <div class="audit-detail__meta-row">
           <span class="audit-detail__meta-label">操作人</span>
-          <span class="audit-detail__meta-value">{{ item.user_name || '系统' }}</span>
+          <span class="audit-detail__meta-value">
+            <span class="audit-detail__user-avatar">{{ (item.user_name || '系')[0] }}</span>
+            {{ item.user_name || '系统' }}
+          </span>
         </div>
         <div class="audit-detail__meta-row">
           <span class="audit-detail__meta-label">时间</span>
@@ -29,8 +32,8 @@
         <div class="audit-detail__meta-row">
           <span class="audit-detail__meta-label">结果</span>
           <span class="audit-detail__meta-value">
-            <span :class="item.status === 'success' ? 'status--success' : 'status--fail'">
-              {{ item.status === 'success' ? '成功' : '失败' }}
+            <span class="status-badge" :class="item.status === 'success' ? 'status-badge--ok' : 'status-badge--err'">
+              {{ item.status === 'success' ? '✓ 成功' : '✗ 失败' }}
             </span>
           </span>
         </div>
@@ -55,7 +58,10 @@
             </tr>
           </tbody>
         </table>
-        <p v-else class="audit-detail__no-changes">此操作无字段变更记录</p>
+        <div v-else class="audit-detail__no-changes">
+          <div class="audit-detail__no-changes-icon">📝</div>
+          <p>此操作无字段变更记录</p>
+        </div>
       </div>
     </template>
   </a-drawer>
@@ -95,11 +101,12 @@ function formatValue(val: unknown) {
 <style scoped>
 .audit-detail__meta {
   background: var(--neutral-50);
-  padding: 16px;
-  border-radius: 8px;
+  padding: 18px;
+  border-radius: 10px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  border: 1px solid var(--neutral-100);
 }
 .audit-detail__meta-row {
   display: flex;
@@ -109,63 +116,93 @@ function formatValue(val: unknown) {
 .audit-detail__meta-label {
   width: 72px;
   flex-shrink: 0;
-  font-size: 13px;
-  color: var(--neutral-500);
+  font-size: 12px;
+  color: var(--neutral-400);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding-top: 2px;
 }
 .audit-detail__meta-value {
   font-size: 13px;
   color: var(--neutral-800);
   word-break: break-all;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .audit-detail__mono {
   font-family: var(--font-mono);
   font-size: 12px;
 }
+.audit-detail__user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--semantic-100, #e8f0fe);
+  color: var(--semantic-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
 
 .action-tag {
   font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.action--create { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.action--update { background: rgba(92, 124, 250, 0.1); color: #5c7cfa; }
+.action--delete { background: rgba(250, 82, 82, 0.1); color: #fa5252; }
+.action--login  { background: rgba(51, 154, 240, 0.1); color: #339af0; }
+.action--export { background: rgba(245, 159, 0, 0.1); color: #f59f00; }
+.action--import { background: rgba(121, 80, 242, 0.1); color: #7950f2; }
+
+.status-badge {
+  font-size: 12px;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
-  font-weight: 500;
 }
-.action--create { background: #e6fcf5; color: #10b981; }
-.action--update { background: #edf2ff; color: #5c7cfa; }
-.action--delete { background: #fff5f5; color: #fa5252; }
-.action--login  { background: #e7f5ff; color: #339af0; }
-.action--export { background: #fff9db; color: #f59f00; }
-.action--import { background: #f3f0ff; color: #7950f2; }
-
-.status--success { color: var(--status-success, #10b981); font-weight: 500; }
-.status--fail { color: var(--status-error, #fa5252); font-weight: 500; }
+.status-badge--ok { color: var(--status-success, #10b981); background: rgba(16, 185, 129, 0.08); }
+.status-badge--err { color: var(--status-error, #fa5252); background: rgba(250, 82, 82, 0.08); }
 
 .audit-detail__changes {
-  margin-top: 24px;
+  margin-top: 28px;
 }
 .audit-detail__changes-title {
   font-size: 15px;
   font-weight: 600;
   color: var(--neutral-800);
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .audit-detail__diff-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
+  border: 1px solid var(--neutral-100);
+  border-radius: 8px;
+  overflow: hidden;
 }
 .audit-detail__diff-table th {
   text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--neutral-200);
+  padding: 10px 12px;
+  border-bottom: 2px solid var(--neutral-200);
+  background: var(--neutral-50);
   color: var(--neutral-500);
-  font-weight: 500;
-  font-size: 12px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 .audit-detail__diff-table td {
-  padding: 8px 10px;
+  padding: 10px 12px;
   border-bottom: 1px solid var(--neutral-100);
 }
 .audit-detail__diff-field {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--neutral-700);
   width: 80px;
 }
@@ -173,15 +210,24 @@ function formatValue(val: unknown) {
   color: var(--status-error, #fa5252);
   text-decoration: line-through;
   opacity: 0.7;
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 .audit-detail__diff-after {
   color: var(--status-success, #10b981);
-  font-weight: 500;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 .audit-detail__no-changes {
   text-align: center;
   color: var(--neutral-400);
   font-size: 13px;
-  padding: 24px 0;
+  padding: 32px 0;
+}
+.audit-detail__no-changes-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+  opacity: 0.6;
 }
 </style>

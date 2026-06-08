@@ -16,8 +16,14 @@ from app.services import dwd_catalog, minio_docs
 logger = logging.getLogger(__name__)
 
 
-def _get_llm_client() -> OpenAI:
-    return OpenAI(base_url=settings.LLM_BASE_URL, api_key=settings.LLM_API_KEY)
+def _get_llm_client(db: Session | None = None) -> OpenAI:
+    from app.services.llm_resolver import get_llm_client
+    return get_llm_client(db=db, scene="ontology")
+
+
+def _get_model_name(db: Session | None = None) -> str:
+    from app.services.llm_resolver import get_model_name
+    return get_model_name(db=db, scene="ontology")
 
 
 def _extract_json(text: str) -> str:
@@ -47,7 +53,7 @@ def match_domain(business_desc: str, db: Session | None = None) -> dict:
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
     )
@@ -88,7 +94,7 @@ def recommend_tables(business_desc: str, tables: list[dict], db: Session | None 
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
@@ -168,7 +174,7 @@ def extract_ontology_stream(
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
         stream=True,

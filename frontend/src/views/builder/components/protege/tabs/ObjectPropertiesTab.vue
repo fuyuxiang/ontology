@@ -2,10 +2,10 @@
   <div class="pg-split">
     <div class="pg-split__left">
       <div class="pg-toolbar">
-        <button class="pg-toolbar__btn" title="Add sub-property" @click="addSub">⊕</button>
-        <button class="pg-toolbar__btn" title="Delete property" :disabled="!store.selectedObjectPropertyId" @click="deleteSel">✕</button>
+        <button class="pg-toolbar__btn" title="添加子属性" @click="addSub">⊕</button>
+        <button class="pg-toolbar__btn" title="删除属性" :disabled="!store.selectedObjectPropertyId" @click="deleteSel">✕</button>
       </div>
-      <EntitySearchInput v-model="filter" placeholder="Filter..." />
+      <EntitySearchInput v-model="filter" placeholder="筛选..." />
       <div class="pg-tree">
         <PropertyTreeNode v-for="p in rootProperties" :key="p.id" :node="p" :depth="0" :filter="filter" kind="object" />
       </div>
@@ -22,7 +22,7 @@
         <PropertyCharacteristics :property="store.selectedObjectProperty" />
         <DomainRangePanel :property="store.selectedObjectProperty" kind="object" />
       </template>
-      <div v-else class="pg-empty">Select an object property to view its details</div>
+      <div v-else class="pg-empty">选择一个对象属性以查看详情</div>
     </div>
   </div>
 </template>

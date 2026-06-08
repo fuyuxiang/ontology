@@ -238,6 +238,63 @@ def _seed_system_config(db):
         if key not in existing:
             db.add(SystemConfig(group=group, key=key, value=value, description=desc))
             added += 1
+
+    # 初始化默认 AI 模型列表（JSON）
+    if "ai.models" not in existing:
+        import json
+        default_models = json.dumps([
+            {
+                "id": "claude-sonnet",
+                "name": "Claude Sonnet 4",
+                "provider": "Anthropic",
+                "model_id": "claude-sonnet-4-20250514",
+                "api_key": "",
+                "base_url": "https://api.anthropic.com",
+                "temperature": 0.7,
+                "max_tokens": 4096,
+                "scenes": ["ontology", "general"],
+                "is_default": True,
+            },
+            {
+                "id": "claude-opus",
+                "name": "Claude Opus 4",
+                "provider": "Anthropic",
+                "model_id": "claude-opus-4-20250514",
+                "api_key": "",
+                "base_url": "https://api.anthropic.com",
+                "temperature": 0.5,
+                "max_tokens": 8192,
+                "scenes": ["ontology"],
+                "is_default": False,
+            },
+            {
+                "id": "gpt-4o",
+                "name": "GPT-4o",
+                "provider": "OpenAI",
+                "model_id": "gpt-4o",
+                "api_key": "",
+                "base_url": "https://api.openai.com",
+                "temperature": 0.7,
+                "max_tokens": 4096,
+                "scenes": ["agent", "data"],
+                "is_default": False,
+            },
+            {
+                "id": "deepseek-v3",
+                "name": "DeepSeek V3",
+                "provider": "DeepSeek",
+                "model_id": "deepseek-chat",
+                "api_key": "",
+                "base_url": "https://api.deepseek.com",
+                "temperature": 0.7,
+                "max_tokens": 4096,
+                "scenes": ["data", "general"],
+                "is_default": False,
+            },
+        ], ensure_ascii=False)
+        db.add(SystemConfig(group="ai", key="ai.models", value=default_models, description="AI 模型列表"))
+        added += 1
+
     if added:
         db.commit()
         logger.info(f"系统配置初始化完成：新增 {added} 项")
@@ -363,6 +420,17 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE business_rules ADD COLUMN conditions_json JSON"))
             if "rule_meta_json" not in cols:
                 conn.execute(text("ALTER TABLE business_rules ADD COLUMN rule_meta_json JSON"))
+            # 规则元数据扩展列（与 models/rule.py BusinessRule 对齐）
+            if "description" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN description TEXT"))
+            if "tags" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN tags JSON"))
+            if "input_params" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN input_params JSON"))
+            if "output_schema" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN output_schema JSON"))
+            if "action_id" not in cols:
+                conn.execute(text("ALTER TABLE business_rules ADD COLUMN action_id VARCHAR(36)"))
             conn.commit()
 
         # entity_actions 表增加结构化列（旧字段兼容 + 新字段迁移）
@@ -371,6 +439,9 @@ async def lifespan(app: FastAPI):
             for col in ("parameters_json", "preconditions_json", "effects_json", "action_meta_json"):
                 if col not in cols:
                     conn.execute(text(f"ALTER TABLE entity_actions ADD COLUMN {col} JSON"))
+            # description 列（与 models/rule.py EntityAction 对齐）
+            if "description" not in cols:
+                conn.execute(text("ALTER TABLE entity_actions ADD COLUMN description TEXT"))
             # 新 schema 列（Task-11 重构）
             if "category" not in cols:
                 conn.execute(text("ALTER TABLE entity_actions ADD COLUMN category VARCHAR(20) DEFAULT 'domain'"))
@@ -382,6 +453,13 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE entity_actions ADD COLUMN output_schema JSON"))
             if "updated_at" not in cols:
                 conn.execute(text("ALTER TABLE entity_actions ADD COLUMN updated_at DATETIME"))
+            # 旧 type 列已被 action_type 取代，设为 nullable 避免 INSERT 报错
+            if "type" in cols:
+                try:
+                    conn.execute(text("ALTER TABLE entity_actions MODIFY COLUMN `type` VARCHAR(50) NULL"))
+                    conn.commit()
+                except Exception:
+                    pass
             conn.commit()
             # 数据迁移：为旧行填充 category / action_type（幂等）
             result = conn.execute(
@@ -486,6 +564,15 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE users ADD COLUMN last_login_at DATETIME"))
             if "updated_at" not in cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN updated_at DATETIME"))
+            conn.commit()
+
+        # ontology_functions 表增加扩展列（与 models/function.py 对齐）
+        if "ontology_functions" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("ontology_functions")}
+            if "callable_name" not in cols:
+                conn.execute(text("ALTER TABLE ontology_functions ADD COLUMN callable_name VARCHAR(100)"))
+            if "tags" not in cols:
+                conn.execute(text("ALTER TABLE ontology_functions ADD COLUMN tags JSON"))
             conn.commit()
 
     db = SessionLocal()

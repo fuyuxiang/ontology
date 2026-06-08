@@ -661,6 +661,72 @@ def delete_entity(
         pass
 
 
+# ── 删除属性 ──────────────────────────────────────────────────
+
+
+@router.delete("/{entity_id}/attributes/{attribute_id}", status_code=204)
+def delete_attribute(
+    entity_id: str,
+    attribute_id: str,
+    force: bool = Query(False),
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
+    from app.models.object_binding import ObjectBinding
+
+    repo = EntityRepository(db)
+    entity = repo.get_by_id(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="实体不存在")
+
+    if entity.status == "published":
+        raise HTTPException(status_code=403, detail="已发布版本中的属性不可删除")
+
+    attr = db.get(EntityAttribute, attribute_id)
+    if not attr or attr.entity_id != entity_id:
+        raise HTTPException(status_code=404, detail="属性不存在")
+
+    bindings = db.query(ObjectBinding).filter(
+        ObjectBinding.object_type_id == entity_id
+    ).all()
+    references = []
+    for binding in bindings:
+        for mapping in (binding.field_mappings or []):
+            if mapping.get("attribute_id") == attribute_id:
+                references.append({
+                    "type": "field_mapping",
+                    "binding_id": binding.id,
+                    "asset_id": binding.asset_id,
+                    "source_column": mapping.get("source_column"),
+                })
+
+    if references and not force:
+        raise HTTPException(status_code=409, detail={
+            "message": f"该属性被 {len(references)} 个映射引用，请确认是否强制删除",
+            "references": references,
+        })
+
+    if references:
+        for binding in bindings:
+            original = binding.field_mappings or []
+            updated = [m for m in original if m.get("attribute_id") != attribute_id]
+            if len(updated) != len(original):
+                binding.field_mappings = updated
+                from sqlalchemy.orm.attributes import flag_modified
+                flag_modified(binding, "field_mappings")
+
+    write_audit(
+        db, user_id=user.id if user else None,
+        user_name=user.name if user else None,
+        action="delete", target_type="attribute",
+        target_id=attr.id, target_name=attr.name,
+        snapshot_before={"entity_id": entity_id, "name": attr.name, "type": attr.type},
+    )
+
+    db.delete(attr)
+    db.commit()
+
+
 # ── AI 智能提取本体 ──────────────────────────────────────────
 
 from pydantic import BaseModel

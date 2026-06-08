@@ -18,24 +18,15 @@ from app.services.data_plane.entity_data_service import EntityDataService
 logger = logging.getLogger(__name__)
 
 
-def get_llm_client(api_key: str | None = None, api_base: str | None = None) -> OpenAI:
-    client_kwargs = {
-        "api_key": api_key or settings.LLM_API_KEY,
-        "base_url": api_base or settings.LLM_BASE_URL,
-    }
-    try:
-        return OpenAI(**client_kwargs)
-    except ImportError as exc:
-        # Some environments export a SOCKS proxy, but the runtime does not
-        # include socksio. Retrying without inheriting proxy env avoids a hard
-        # failure during client construction and lets the API degrade gracefully.
-        if "socksio" not in str(exc).lower():
-            raise
-        logger.warning("检测到 SOCKS 代理但未安装 socksio，改为忽略代理环境变量直连 LLM。")
-        return OpenAI(
-            **client_kwargs,
-            http_client=httpx.Client(trust_env=False),
-        )
+def get_llm_client(api_key: str | None = None, api_base: str | None = None, db: Session | None = None, scene: str = "general") -> OpenAI:
+    """获取 LLM 客户端，优先使用数据库配置"""
+    from app.services.llm_resolver import get_llm_client as _resolve
+    return _resolve(db=db, scene=scene, api_key=api_key, api_base=api_base)
+
+
+def _get_model_name(db: Session | None = None, scene: str = "general") -> str:
+    from app.services.llm_resolver import get_model_name
+    return get_model_name(db=db, scene=scene)
 
 
 def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
@@ -150,7 +141,7 @@ def chat_stream(messages: list[dict], db: Session, entity_id: str | None = None)
         api_messages.append({"role": m["role"], "content": m["content"]})
 
     stream = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(db),
         messages=api_messages,
         stream=True,
         max_tokens=2048,
@@ -173,7 +164,7 @@ def chat_sync(messages: list[dict], db: Session, entity_id: str | None = None) -
         api_messages.append({"role": m["role"], "content": m["content"]})
 
     response = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(db),
         messages=api_messages,
         max_tokens=2048,
         temperature=0.7,

@@ -143,6 +143,7 @@
                     <th>类型</th>
                     <th>描述</th>
                     <th>必填</th>
+                    <th>操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,6 +153,11 @@
                     <td class="text-body">{{ attr.desc }}</td>
                     <td>
                       <span class="status-dot" :class="attr.required ? 'status-dot--success' : 'status-dot--muted'"></span>
+                    </td>
+                    <td>
+                      <button class="btn-icon-del" @click="handleDeleteAttribute(attr.id, attr.name)" title="删除属性">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M9 7v4M5 7v4M3 4l.5 7.5a1 1 0 001 .5h5a1 1 0 001-.5L11 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -345,6 +351,7 @@ import EntityCreateForm from '../../components/common/EntityCreateForm.vue'
 import EntityEditForm from '../../components/common/EntityEditForm.vue'
 import ModalDialog from '../../components/common/ModalDialog.vue'
 import { relationApi } from '../../api/relations'
+import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
 import { useOntologyStore } from '../../store/ontology'
 
@@ -489,6 +496,7 @@ const metrics = computed(() => {
 
 const selectedAttrs = computed(() =>
   detail.value?.attributes.map(a => ({
+    id: a.id,
     name: a.name,
     type: a.type,
     desc: a.description,
@@ -584,6 +592,32 @@ async function handleDeleteRelation(id: string, name: string) {
     if (selectedId.value) store.fetchEntity(selectedId.value)
   } catch (e) {
     toast.error(`删除失败: ${(e as Error).message}`)
+  }
+}
+
+async function handleDeleteAttribute(id: string, name: string) {
+  if (!selectedId.value) return
+  try {
+    await entityApi.deleteAttribute(selectedId.value, id, false)
+    toast.success('属性已删除')
+    store.fetchEntity(selectedId.value)
+  } catch (e: any) {
+    if (e.response?.status === 409) {
+      const refs = e.response.data?.detail?.references || []
+      const msg = `属性「${name}」被 ${refs.length} 个映射引用，删除后将一并清理映射关系。确认删除？`
+      if (!confirm(msg)) return
+      try {
+        await entityApi.deleteAttribute(selectedId.value!, id, true)
+        toast.success('属性已删除')
+        store.fetchEntity(selectedId.value!)
+      } catch (e2) {
+        toast.error(`删除失败: ${(e2 as Error).message}`)
+      }
+    } else if (e.response?.status === 403) {
+      toast.error(e.response.data?.detail || '已发布版本中的属性不可删除')
+    } else {
+      toast.error(`删除失败: ${(e as Error).message}`)
+    }
   }
 }
 </script>

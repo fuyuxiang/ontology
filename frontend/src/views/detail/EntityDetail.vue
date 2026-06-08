@@ -76,6 +76,7 @@
               <th>源表</th>
               <th>源字段</th>
               <th>状态</th>
+              <th>操作</th>
             </tr>
           </thead>
           <tbody>
@@ -129,9 +130,33 @@
                 </select>
                 <span v-else class="status-tag" :class="`status-tag--${mappingTone(attr.data_status)}`">{{ attr.data_status || '未确认来源' }}</span>
               </td>
+              <td>
+                <button class="btn-icon btn-icon--danger" title="删除属性" @click="confirmDeleteAttr(attr)">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1M9 7v4M5 7v4M3 4l.5 7.5a1 1 0 001 .5h5a1 1 0 001-.5L11 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
+
+        <!-- 删除确认对话框 -->
+        <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="cancelDeleteAttr">
+          <div class="modal-dialog">
+            <h3 class="modal-dialog__title">确认删除属性</h3>
+            <p class="modal-dialog__body">
+              属性「<strong>{{ deletingAttr?.name }}</strong>」被以下映射引用，删除后将一并清理映射关系：
+            </p>
+            <ul class="modal-dialog__list">
+              <li v-for="(ref, idx) in deleteReferences" :key="idx">
+                绑定 {{ ref.binding_id.slice(0, 8) }}… → 字段 {{ ref.source_column }}
+              </li>
+            </ul>
+            <div class="modal-dialog__actions">
+              <button class="btn-secondary" @click="cancelDeleteAttr">取消</button>
+              <button class="btn-danger" @click="forceDeleteAttr">确认删除</button>
+            </div>
+          </div>
+        </div>
       </template>
 
       <!-- 关系 -->
@@ -503,6 +528,48 @@ function mappingTone(status: string | undefined): string {
   if (status === '已确认') return 'success'
   if (status === '待校验') return 'warning'
   return 'danger'
+}
+
+// 删除属性
+const deletingAttr = ref<{ id: string; name: string } | null>(null)
+const deleteReferences = ref<{ type: string; binding_id: string; asset_id: string; source_column: string }[]>([])
+const showDeleteConfirm = ref(false)
+
+async function confirmDeleteAttr(attr: { id: string; name: string }) {
+  try {
+    await entityApi.deleteAttribute(entityId.value, attr.id, false)
+    await store.fetchEntity(entityId.value)
+  } catch (e: any) {
+    if (e.response?.status === 409) {
+      deletingAttr.value = attr
+      deleteReferences.value = e.response.data?.detail?.references || []
+      showDeleteConfirm.value = true
+    } else if (e.response?.status === 403) {
+      alert(e.response.data?.detail || '已发布版本中的属性不可删除')
+    } else {
+      alert('删除失败')
+    }
+  }
+}
+
+async function forceDeleteAttr() {
+  if (!deletingAttr.value) return
+  try {
+    await entityApi.deleteAttribute(entityId.value, deletingAttr.value.id, true)
+    await store.fetchEntity(entityId.value)
+  } catch {
+    alert('删除失败')
+  } finally {
+    showDeleteConfirm.value = false
+    deletingAttr.value = null
+    deleteReferences.value = []
+  }
+}
+
+function cancelDeleteAttr() {
+  showDeleteConfirm.value = false
+  deletingAttr.value = null
+  deleteReferences.value = []
 }
 
 const relations = computed(() =>
@@ -946,4 +1013,20 @@ watch(activeTab, (tab) => {
   font-size: 11px; font-weight: 500; padding: 2px 8px;
   border-radius: var(--radius-full); border: 1px solid;
 }
+
+.btn-icon { background: none; border: none; cursor: pointer; padding: 6px; border-radius: var(--radius-md); transition: all var(--transition-fast); display: inline-flex; align-items: center; justify-content: center; }
+.btn-icon:hover { background: var(--neutral-100); }
+.btn-icon--danger { color: var(--neutral-400); }
+.btn-icon--danger:hover { color: #dc2626; background: #fef2f2; }
+
+.btn-danger { padding: 6px 16px; border-radius: var(--radius-md); border: none; background: #dc2626; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-danger:hover { background: #b91c1c; }
+
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.modal-dialog { background: #fff; border-radius: var(--radius-lg); padding: 24px; width: 420px; max-width: 90vw; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+.modal-dialog__title { margin: 0 0 12px; font-size: 16px; font-weight: 600; color: var(--neutral-800); }
+.modal-dialog__body { margin: 0 0 12px; font-size: 13px; color: var(--neutral-600); line-height: 1.5; }
+.modal-dialog__list { margin: 0 0 16px; padding-left: 20px; font-size: 12px; color: var(--neutral-500); }
+.modal-dialog__list li { margin-bottom: 4px; }
+.modal-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; }
 </style>
