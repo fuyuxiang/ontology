@@ -18,8 +18,14 @@ logger = logging.getLogger(__name__)
 _BATCH_SIZE = 100
 
 
-def _get_llm_client() -> OpenAI:
-    return OpenAI(base_url=settings.LLM_BASE_URL, api_key=settings.LLM_API_KEY)
+def _get_llm_client(db=None) -> OpenAI:
+    from app.services.llm_resolver import get_llm_client
+    return get_llm_client(db=db, scene="data")
+
+
+def _get_model_name(db=None) -> str:
+    from app.services.llm_resolver import get_model_name
+    return get_model_name(db=db, scene="data")
 
 
 def _extract_json(text: str) -> str:
