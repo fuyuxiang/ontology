@@ -333,8 +333,20 @@ async function fetchConfig() {
         originalValues[item.key] = item.value ?? ''
       }
     }
+    // 同步语言设置到 i18n
+    const savedLang = editingValues['language']
+    if (savedLang && (savedLang === 'zh-CN' || savedLang === 'en')) {
+      switchLanguage(savedLang as string)
+    }
   } catch { /* ignore */ }
 }
+
+// 监听语言配置变化，实时切换界面语言
+watch(() => editingValues['language'], (newLang) => {
+  if (newLang && (newLang === 'zh-CN' || newLang === 'en')) {
+    switchLanguage(newLang as string)
+  }
+})
 
 async function fetchAiModels() {
   try {
