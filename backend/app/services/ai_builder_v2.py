@@ -53,7 +53,7 @@ def match_domain(business_desc: str, db: Session | None = None) -> dict:
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.3,
     )
@@ -94,7 +94,7 @@ def recommend_tables(business_desc: str, tables: list[dict], db: Session | None 
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
@@ -174,7 +174,7 @@ def extract_ontology_stream(
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
         stream=True,
