@@ -23,6 +23,11 @@ def _get_llm_client(db=None) -> OpenAI:
     return get_llm_client(db=db, scene="ontology")
 
 
+def _get_model_name(db=None) -> str:
+    from app.services.llm_resolver import get_model_name
+    return get_model_name(db=db, scene="ontology")
+
+
 def _extract_json(text: str) -> str:
     text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
     if text.startswith("```"):
