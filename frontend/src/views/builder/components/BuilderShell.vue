@@ -1,12 +1,6 @@
 <template>
   <div class="ob-shell">
     <header class="ob-shell-topbar">
-      <button class="ob-back-btn" @click="$emit('back')">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M9 11L5 7l4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        返回构建列表
-      </button>
       <div class="ob-shell-title">
         <span class="name">{{ session.ontologyName }}</span>
         <span class="meta">{{ methodLabel }}<template v-if="session.scenarioName"> · {{ session.scenarioName }}</template></span>
@@ -75,7 +69,6 @@ import Step3Hydrate from './Step3Hydrate.vue'
 
 const props = defineProps<{ session: BuilderSession }>()
 defineEmits<{
-  (e: 'back'): void
   (e: 'goto-studio'): void
 }>()
 
@@ -152,14 +145,6 @@ function goPrev() { currentStep.value = Math.max(1, currentStep.value - 1) }
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
 }
-.ob-back-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: transparent; border: 0;
-  padding: 6px 10px; border-radius: 8px;
-  color: #475569; font-size: 13px; cursor: pointer;
-}
-.ob-back-btn:hover { background: #f1f5f9; color: #0f172a; }
-
 .ob-shell-title {
   display: flex; flex-direction: column; gap: 2px;
 }
