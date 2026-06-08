@@ -1,12 +1,17 @@
 <template>
   <div class="perm-page">
     <div class="perm-page__header">
-      <h1 class="text-display">权限管理</h1>
-      <p class="text-caption" style="margin-top: 4px;">用户账号 · 角色配置 · 权限矩阵</p>
+      <div>
+        <h1 class="perm-page__title">权限管理</h1>
+        <p class="perm-page__subtitle">用户账号 · 角色配置 · 权限矩阵</p>
+      </div>
     </div>
 
     <div class="perm-page__tabs">
-      <button v-for="tab in tabs" :key="tab.key" class="perm-tab" :class="{ 'perm-tab--active': activeTab === tab.key }" @click="activeTab = tab.key">{{ tab.label }}</button>
+      <button v-for="tab in tabs" :key="tab.key" class="perm-tab" :class="{ 'perm-tab--active': activeTab === tab.key }" @click="activeTab = tab.key">
+        <span class="perm-tab__icon">{{ tab.icon }}</span>
+        {{ tab.label }}
+      </button>
     </div>
 
     <!-- ========== 用户管理 ========== -->
@@ -15,19 +20,29 @@
         <a-input-search v-model:value="userKeyword" placeholder="搜索姓名或账号" style="width: 260px" allow-clear @search="fetchUsers" @change="(e: Event) => { if (!(e.target as HTMLInputElement).value) fetchUsers() }" />
         <a-select v-model:value="userRoleFilter" placeholder="全部角色" allow-clear style="width: 140px" :options="roleOptions" @change="fetchUsers" />
         <a-select v-model:value="userStatusFilter" placeholder="全部状态" allow-clear style="width: 120px" :options="[{label:'启用',value:true},{label:'禁用',value:false}]" @change="fetchUsers" />
-        <button class="perm-btn perm-btn--primary" style="margin-left:auto" @click="openCreateUser">＋ 新增用户</button>
+        <button class="perm-btn perm-btn--primary" style="margin-left:auto" @click="openCreateUser">
+          <span style="margin-right:4px">＋</span> 新增用户
+        </button>
       </div>
 
-      <table class="data-table" v-if="users.length">
-        <thead><tr><th style="width:100px">姓名</th><th style="width:130px">账号</th><th style="width:160px">邮箱</th><th style="width:120px">角色</th><th style="width:80px">状态</th><th style="width:140px">最近登录</th><th style="width:80px">操作</th></tr></thead>
+      <table class="user-table" v-if="users.length">
+        <thead><tr><th>姓名</th><th>账号</th><th>邮箱</th><th>角色</th><th>状态</th><th>最近登录</th><th>操作</th></tr></thead>
         <tbody>
-          <tr v-for="u in users" :key="u.id">
-            <td class="perm-table__name">{{ u.name }}</td>
-            <td class="perm-table__mono">{{ u.username }}</td>
-            <td class="perm-table__mono">{{ u.email || '-' }}</td>
+          <tr v-for="u in users" :key="u.id" class="user-table__row">
+            <td>
+              <div class="user-table__name-cell">
+                <span class="user-table__avatar" :class="`user-table__avatar--${u.role}`">{{ u.name[0] }}</span>
+                <span class="user-table__name">{{ u.name }}</span>
+              </div>
+            </td>
+            <td class="user-table__mono">{{ u.username }}</td>
+            <td class="user-table__mono">{{ u.email || '-' }}</td>
             <td><span class="role-tag" :class="`role--${u.role}`">{{ roleLabel(u.role) }}</span></td>
-            <td><span :class="u.is_active ? 'status--on' : 'status--off'">● {{ u.is_active ? '启用' : '禁用' }}</span></td>
-            <td class="perm-table__mono">{{ formatTime(u.last_login_at) }}</td>
+            <td>
+              <span class="status-dot" :class="u.is_active ? 'status-dot--on' : 'status-dot--off'"></span>
+              {{ u.is_active ? '启用' : '禁用' }}
+            </td>
+            <td class="user-table__mono">{{ formatTime(u.last_login_at) }}</td>
             <td>
               <a-dropdown>
                 <button class="perm-btn--icon">⋯</button>
@@ -44,9 +59,9 @@
         </tbody>
       </table>
       <div v-else-if="!usersLoading" class="perm-empty">
-        <div style="font-size:36px;margin-bottom:8px">👥</div>
-        <p>暂无用户</p>
-        <p class="text-caption">点击「新增用户」添加第一个用户</p>
+        <div class="perm-empty__icon">👥</div>
+        <p class="perm-empty__title">暂无用户</p>
+        <p class="perm-empty__desc">点击「新增用户」添加第一个用户</p>
       </div>
 
       <div class="perm-pagination" v-if="usersTotal > 0">
@@ -58,25 +73,38 @@
     <!-- ========== 角色管理 ========== -->
     <div v-if="activeTab === 'roles'" class="perm-section">
       <div class="role-grid">
-        <div v-for="role in roles" :key="role.key" class="role-card">
-          <div class="role-card__icon" :class="`role-card__icon--${role.key}`">{{ roleIcon(role.key) }}</div>
+        <div v-for="role in roles" :key="role.key" class="role-card" @click="openRoleDrawer(role)">
+          <div class="role-card__header">
+            <div class="role-card__icon" :class="`role-card__icon--${role.key}`">{{ roleIcon(role.key) }}</div>
+            <span v-if="role.is_system" class="role-card__system-tag">系统</span>
+          </div>
           <div class="role-card__name">{{ role.label }}</div>
-          <span v-if="role.is_system" class="role-card__system-tag">系统</span>
           <div class="role-card__desc">{{ role.description }}</div>
-          <div class="role-card__stats">👤 {{ role.user_count }}人 · 🔑 {{ role.permissions.length }}项权限</div>
-          <button class="role-card__edit-btn" @click="openRoleDrawer(role)">编辑权限</button>
+          <div class="role-card__stats">
+            <span>👤 {{ role.user_count }}人</span>
+            <span>🔑 {{ role.permissions.length }}项权限</span>
+          </div>
+          <button class="role-card__edit-btn" @click.stop="openRoleDrawer(role)">编辑权限</button>
         </div>
       </div>
     </div>
 
     <!-- ========== 权限矩阵 ========== -->
     <div v-if="activeTab === 'matrix'" class="perm-section">
+      <div class="matrix-header">
+        <p class="matrix-header__hint">点击单元格可切换权限级别</p>
+        <button v-if="matrixChanged" class="perm-btn perm-btn--primary" @click="handleSaveMatrix" :disabled="savingMatrix">
+          {{ savingMatrix ? '保存中...' : '保存变更' }}
+        </button>
+      </div>
       <div class="matrix-wrap">
         <table class="matrix-table">
           <thead>
             <tr>
               <th class="matrix-table__corner">角色</th>
-              <th v-for="mod in modules" :key="mod.key" :colspan="mod.permissions.length">{{ mod.label }}</th>
+              <template v-for="mod in modules" :key="mod.key">
+                <th :colspan="mod.permissions.length" class="matrix-table__group-th">{{ mod.label }}</th>
+              </template>
             </tr>
             <tr>
               <th></th>
@@ -86,11 +114,20 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="role in roles" :key="role.key">
-              <td class="matrix-table__role">{{ role.label }}</td>
+            <tr v-for="role in roles" :key="role.key" class="matrix-table__row">
+              <td class="matrix-table__role">
+                <span class="matrix-table__role-icon">{{ roleIcon(role.key) }}</span>
+                {{ role.label }}
+              </td>
               <template v-for="mod in modules" :key="mod.key">
-                <td v-for="p in mod.permissions" :key="p" class="matrix-table__cell" :class="getCellClass(role.permissions, p)">
-                  {{ getPermSymbol(role.permissions, p) }}
+                <td
+                  v-for="p in mod.permissions"
+                  :key="p"
+                  class="matrix-table__cell"
+                  :class="[getCellClass(getRolePerms(role.key), p), { 'matrix-table__cell--changed': isCellChanged(role.key, p) }]"
+                  @click="cyclePerm(role.key, p)"
+                >
+                  {{ getPermSymbol(getRolePerms(role.key), p) }}
                 </td>
               </template>
             </tr>
@@ -178,9 +215,9 @@ const { success, error } = useToast()
 
 const activeTab = ref<'users' | 'roles' | 'matrix'>('users')
 const tabs = [
-  { key: 'users', label: '用户管理' },
-  { key: 'roles', label: '角色管理' },
-  { key: 'matrix', label: '权限矩阵' },
+  { key: 'users', label: '用户管理', icon: '👥' },
+  { key: 'roles', label: '角色管理', icon: '🛡' },
+  { key: 'matrix', label: '权限矩阵', icon: '📊' },
 ]
 
 // ── 用户管理 ──
@@ -287,13 +324,11 @@ function isModuleIndeterminate(mod: PermissionModule) {
 
 function toggleModule(mod: PermissionModule) {
   if (isModuleAllChecked(mod)) {
-    // 取消全部
     mod.permissions.forEach(p => {
       const idx = editingRolePerms.value.indexOf(p)
       if (idx >= 0) editingRolePerms.value.splice(idx, 1)
     })
   } else {
-    // 全选
     mod.permissions.forEach(p => {
       if (!editingRolePerms.value.includes(p)) editingRolePerms.value.push(p)
     })
@@ -308,14 +343,53 @@ async function handleSaveRolePerms() {
     success('权限已保存')
     roleDrawerOpen.value = false
     fetchRoles()
-    fetchModules() // 刷新矩阵
   } catch (e: any) { error(e?.response?.data?.detail || '保存失败') } finally { savingRolePerms.value = false }
 }
 
 // ── 权限矩阵 ──
 const modules = ref<PermissionModule[]>([])
+const matrixPerms = reactive<Record<string, string[]>>({})
+const matrixChanged = ref(false)
+const savingMatrix = ref(false)
+
+function getRolePerms(roleKey: string) {
+  return matrixPerms[roleKey] || []
+}
+
+function isCellChanged(roleKey: string, perm: string) {
+  const role = roles.value.find(r => r.key === roleKey)
+  if (!role) return false
+  const has = role.permissions.includes(perm)
+  const nowHas = (matrixPerms[roleKey] || []).includes(perm)
+  return has !== nowHas
+}
+
+function cyclePerm(roleKey: string, perm: string) {
+  if (!matrixPerms[roleKey]) matrixPerms[roleKey] = [...(roles.value.find(r => r.key === roleKey)?.permissions || [])]
+  const idx = matrixPerms[roleKey].indexOf(perm)
+  if (idx >= 0) matrixPerms[roleKey].splice(idx, 1)
+  else matrixPerms[roleKey].push(perm)
+  matrixChanged.value = true
+}
+
+async function handleSaveMatrix() {
+  savingMatrix.value = true
+  try {
+    for (const [roleKey, perms] of Object.entries(matrixPerms)) {
+      await authApi.updateRolePerms(roleKey, perms)
+    }
+    success('权限矩阵已保存')
+    matrixChanged.value = false
+    fetchRoles()
+  } catch (e: any) { error(e?.response?.data?.detail || '保存失败') } finally { savingMatrix.value = false }
+}
+
 async function fetchModules() {
-  try { modules.value = await authApi.listPermissionModules() } catch { modules.value = [] }
+  try {
+    modules.value = await authApi.listPermissionModules()
+    // 初始化矩阵权限
+    roles.value.forEach(r => { matrixPerms[r.key] = [...r.permissions] })
+  } catch { modules.value = [] }
 }
 
 function permLabel(perm: string) {
@@ -342,80 +416,101 @@ onMounted(() => { fetchUsers(); fetchRoles(); fetchModules() })
 
 <style scoped>
 .perm-page { padding: 24px 32px; max-width: 1400px; }
-.perm-page__header { margin-bottom: 16px; }
-.perm-page__tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid var(--neutral-100); }
-.perm-tab { padding: 10px 18px; border: none; background: transparent; font-size: 13px; color: var(--neutral-500); cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; font-family: inherit; }
-.perm-tab:hover { color: var(--neutral-800); }
-.perm-tab--active { color: var(--semantic-600); border-bottom-color: var(--semantic-600); font-weight: 500; }
-.perm-section { animation: fadeIn 0.2s; }
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.perm-page__title { font-size: 28px; font-weight: 700; color: var(--neutral-900); margin: 0; }
+.perm-page__subtitle { font-size: 13px; color: var(--neutral-500); margin: 6px 0 0; }
+.perm-page__tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--neutral-100); }
+.perm-tab { display: flex; align-items: center; gap: 6px; padding: 12px 20px; border: none; background: transparent; font-size: 14px; color: var(--neutral-500); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.2s; font-family: inherit; }
+.perm-tab:hover { color: var(--neutral-700); background: var(--neutral-50); border-radius: 8px 8px 0 0; }
+.perm-tab--active { color: var(--semantic-600); border-bottom-color: var(--semantic-600); font-weight: 600; }
+.perm-tab__icon { font-size: 16px; }
+.perm-section { animation: slideUp 0.3s ease; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-.perm-section__toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 16px; }
-.perm-btn { padding: 6px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid var(--neutral-200); background: var(--neutral-0); color: var(--neutral-700); transition: all 0.15s; font-family: inherit; }
+.perm-section__toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+.perm-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid var(--neutral-200); background: var(--neutral-0); color: var(--neutral-700); transition: all 0.2s; font-family: inherit; }
+.perm-btn:hover { border-color: var(--neutral-300); }
 .perm-btn--primary { background: var(--semantic-600); color: #fff; border-color: var(--semantic-600); }
-.perm-btn--primary:hover { opacity: 0.9; }
+.perm-btn--primary:hover { background: var(--semantic-700, #4f46e5); }
 .perm-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.perm-btn--icon { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--neutral-500); padding: 4px 8px; border-radius: 4px; }
-.perm-btn--icon:hover { background: var(--neutral-100); }
+.perm-btn--icon { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--neutral-500); padding: 4px 8px; border-radius: 6px; transition: all 0.15s; }
+.perm-btn--icon:hover { background: var(--neutral-100); color: var(--neutral-700); }
 
-.data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.data-table th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--neutral-200); background: var(--neutral-50); color: var(--neutral-500); font-weight: 600; font-size: 12px; }
-.data-table td { padding: 12px; border-bottom: 1px solid var(--neutral-100); color: var(--neutral-700); }
-.perm-table__name { font-weight: 600; color: var(--neutral-900); }
-.perm-table__mono { font-family: var(--font-mono); font-size: 12px; color: var(--neutral-600); }
+/* 用户表格 */
+.user-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.user-table th { text-align: left; padding: 12px 14px; border-bottom: 2px solid var(--neutral-200); background: var(--neutral-50); color: var(--neutral-500); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.3px; }
+.user-table td { padding: 14px; border-bottom: 1px solid var(--neutral-100); color: var(--neutral-700); }
+.user-table__row { transition: background 0.15s; }
+.user-table__row:hover { background: var(--neutral-50); }
+.user-table__name-cell { display: flex; align-items: center; gap: 10px; }
+.user-table__avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; flex-shrink: 0; }
+.user-table__avatar--admin { background: #fff5f5; color: #fa5252; }
+.user-table__avatar--editor { background: #edf2ff; color: #5c7cfa; }
+.user-table__avatar--operator { background: #e6fcf5; color: #10b981; }
+.user-table__avatar--viewer { background: var(--neutral-100); color: var(--neutral-600); }
+.user-table__name { font-weight: 600; color: var(--neutral-900); }
+.user-table__mono { font-family: var(--font-mono); font-size: 12px; color: var(--neutral-500); }
 
-.role-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 500; }
-.role--admin { background: #fff5f5; color: #fa5252; }
-.role--editor { background: #edf2ff; color: #5c7cfa; }
-.role--operator { background: #e6fcf5; color: #10b981; }
+.role-tag { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 600; }
+.role--admin { background: rgba(250, 82, 82, 0.1); color: #fa5252; }
+.role--editor { background: rgba(92, 124, 250, 0.1); color: #5c7cfa; }
+.role--operator { background: rgba(16, 185, 129, 0.1); color: #10b981; }
 .role--viewer { background: var(--neutral-100); color: var(--neutral-600); }
 
-.status--on { color: var(--status-success, #10b981); font-size: 12px; }
-.status--off { color: var(--neutral-400); font-size: 12px; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.status-dot--on { background: var(--status-success, #10b981); }
+.status-dot--off { background: var(--neutral-300); }
 
 .perm-pagination { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; }
 .perm-pagination__total { font-size: 13px; color: var(--neutral-500); }
-.perm-empty { text-align: center; padding: 60px; color: var(--neutral-400); }
+.perm-empty { text-align: center; padding: 60px; }
+.perm-empty__icon { font-size: 48px; margin-bottom: 12px; opacity: 0.8; }
+.perm-empty__title { font-size: 16px; font-weight: 600; color: var(--neutral-700); margin-bottom: 4px; }
+.perm-empty__desc { font-size: 13px; color: var(--neutral-400); }
 
 /* 角色卡片 */
 .role-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.role-card { background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: 12px; padding: 20px; transition: all 0.2s; position: relative; }
-.role-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.08)); }
-.role-card__icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; margin-bottom: 12px; }
+.role-card { background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: 12px; padding: 20px; transition: all 0.25s ease; cursor: pointer; }
+.role-card:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); border-color: var(--neutral-300); }
+.role-card__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.role-card__icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
 .role-card__icon--admin { background: #fff5f5; }
 .role-card__icon--editor { background: #edf2ff; }
 .role-card__icon--operator { background: #e6fcf5; }
 .role-card__icon--viewer { background: var(--neutral-100); }
-.role-card__name { font-size: 16px; font-weight: 600; color: var(--neutral-900); }
-.role-card__system-tag { position: absolute; top: 16px; right: 16px; font-size: 11px; padding: 2px 8px; background: var(--neutral-100); color: var(--neutral-600); border-radius: 4px; }
-.role-card__desc { font-size: 13px; color: var(--neutral-500); margin-top: 8px; line-height: 1.5; }
-.role-card__stats { font-size: 12px; color: var(--neutral-400); margin-top: 12px; }
-.role-card__edit-btn { margin-top: 12px; width: 100%; padding: 6px; border: 1px solid var(--neutral-200); background: transparent; border-radius: 6px; font-size: 12px; color: var(--neutral-600); cursor: pointer; transition: all 0.15s; font-family: inherit; }
-.role-card__edit-btn:hover { border-color: var(--semantic-400); color: var(--semantic-600); }
+.role-card__system-tag { font-size: 11px; padding: 2px 8px; background: var(--neutral-100); color: var(--neutral-600); border-radius: 4px; font-weight: 500; }
+.role-card__name { font-size: 16px; font-weight: 600; color: var(--neutral-900); margin-bottom: 6px; }
+.role-card__desc { font-size: 13px; color: var(--neutral-500); line-height: 1.5; margin-bottom: 12px; }
+.role-card__stats { display: flex; gap: 16px; font-size: 12px; color: var(--neutral-400); margin-bottom: 12px; }
+.role-card__edit-btn { width: 100%; padding: 8px; border: 1px solid var(--neutral-200); background: transparent; border-radius: 8px; font-size: 13px; color: var(--neutral-600); cursor: pointer; transition: all 0.2s; font-family: inherit; }
+.role-card__edit-btn:hover { border-color: var(--semantic-400); color: var(--semantic-600); background: var(--semantic-50, #f0f4ff); }
 
 /* 角色编辑抽屉 */
 .role-drawer__desc { font-size: 13px; color: var(--neutral-500); margin-bottom: 20px; }
-.role-drawer__tree { display: flex; flex-direction: column; gap: 16px; }
-.role-drawer__module { border: 1px solid var(--neutral-100); border-radius: 8px; overflow: hidden; }
-.role-drawer__module-header { padding: 10px 14px; background: var(--neutral-50); border-bottom: 1px solid var(--neutral-100); }
-.role-drawer__check-all { display: flex; align-items: center; gap: 8px; cursor: pointer; font-weight: 500; font-size: 14px; color: var(--neutral-800); }
-.role-drawer__module-name { }
-.role-drawer__perms { padding: 8px 14px; display: flex; flex-direction: column; gap: 6px; }
-.role-drawer__perm-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--neutral-700); cursor: pointer; padding: 4px 0; }
-.role-drawer__perm-item input[type="checkbox"] { cursor: pointer; }
-.role-drawer__perm-item input[type="checkbox"]:disabled { cursor: not-allowed; opacity: 0.5; }
+.role-drawer__tree { display: flex; flex-direction: column; gap: 14px; }
+.role-drawer__module { border: 1px solid var(--neutral-100); border-radius: 10px; overflow: hidden; }
+.role-drawer__module-header { padding: 12px 16px; background: var(--neutral-50); border-bottom: 1px solid var(--neutral-100); }
+.role-drawer__check-all { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 14px; color: var(--neutral-800); }
+.role-drawer__perms { padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+.role-drawer__perm-item { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--neutral-700); cursor: pointer; padding: 6px 0; }
+.role-drawer__perm-item input[type="checkbox"] { cursor: pointer; width: 16px; height: 16px; }
 .role-drawer__perm-key { font-size: 11px; color: var(--neutral-400); font-family: var(--font-mono); margin-left: auto; }
-.role-drawer__system-notice { margin-top: 20px; padding: 10px 14px; background: #fff9db; border-radius: 6px; font-size: 13px; color: #e67700; }
 .role-drawer__footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--neutral-100); position: sticky; bottom: 0; background: var(--neutral-0); padding-bottom: 8px; }
 
 /* 权限矩阵 */
-.matrix-wrap { overflow-x: auto; margin-bottom: 12px; }
-.matrix-table { border-collapse: collapse; font-size: 13px; min-width: 600px; }
-.matrix-table th { padding: 8px 12px; border-bottom: 1px solid var(--neutral-200); background: var(--neutral-50); color: var(--neutral-600); font-weight: 600; font-size: 12px; text-align: center; }
+.matrix-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.matrix-header__hint { font-size: 13px; color: var(--neutral-400); }
+.matrix-wrap { overflow-x: auto; margin-bottom: 12px; border: 1px solid var(--neutral-100); border-radius: 10px; }
+.matrix-table { border-collapse: collapse; font-size: 13px; min-width: 600px; width: 100%; }
+.matrix-table th { padding: 10px 12px; border-bottom: 2px solid var(--neutral-200); background: var(--neutral-50); color: var(--neutral-600); font-weight: 600; font-size: 12px; text-align: center; }
 .matrix-table__corner { text-align: left !important; width: 120px; }
+.matrix-table__group-th { font-size: 13px; color: var(--neutral-700); }
 .matrix-table__sub-th { font-weight: 400; font-size: 11px; padding: 4px 8px; color: var(--neutral-400); }
-.matrix-table__role { font-weight: 500; color: var(--neutral-800); padding: 10px 12px; border-bottom: 1px solid var(--neutral-100); text-align: left; background: var(--neutral-0); position: sticky; left: 0; }
-.matrix-table__cell { text-align: center; padding: 10px; border-bottom: 1px solid var(--neutral-100); font-size: 16px; }
+.matrix-table__row:hover { background: var(--neutral-50); }
+.matrix-table__role { font-weight: 600; color: var(--neutral-800); padding: 12px 14px; border-bottom: 1px solid var(--neutral-100); text-align: left; background: var(--neutral-0); position: sticky; left: 0; display: flex; align-items: center; gap: 8px; }
+.matrix-table__role-icon { font-size: 16px; }
+.matrix-table__cell { text-align: center; padding: 12px; border-bottom: 1px solid var(--neutral-100); font-size: 18px; cursor: pointer; transition: all 0.15s; }
+.matrix-table__cell:hover { background: var(--neutral-100); }
+.matrix-table__cell--changed { box-shadow: inset 0 0 0 2px var(--semantic-400, #818cf8); }
 .matrix-cell--manage { color: var(--semantic-600, #5c7cfa); }
 .matrix-cell--write { color: var(--dynamic-500, #12b886); }
 .matrix-cell--read { color: var(--kinetic-500, #f59f00); }
@@ -423,7 +518,7 @@ onMounted(() => { fetchUsers(); fetchRoles(); fetchModules() })
 
 .matrix-legend { display: flex; gap: 20px; font-size: 13px; color: var(--neutral-600); }
 .matrix-legend__item { display: flex; align-items: center; gap: 6px; }
-.matrix-legend__icon { font-size: 14px; }
+.matrix-legend__icon { font-size: 16px; }
 .matrix-legend__icon--manage { color: var(--semantic-600); }
 .matrix-legend__icon--write { color: var(--dynamic-500); }
 .matrix-legend__icon--read { color: var(--kinetic-500); }

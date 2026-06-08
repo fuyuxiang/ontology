@@ -1,18 +1,11 @@
 <template>
   <div class="ob-shell">
     <header class="ob-shell-topbar">
-      <button class="ob-back-btn" @click="$emit('back')">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M9 11L5 7l4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        返回构建列表
-      </button>
       <div class="ob-shell-title">
         <span class="name">{{ session.ontologyName }}</span>
         <span class="meta">{{ methodLabel }}<template v-if="session.scenarioName"> · {{ session.scenarioName }}</template></span>
       </div>
       <div class="ob-shell-actions">
-        <button class="ob-shell-doc-btn" @click="openDocs" title="业务文档库">📚 文档库</button>
         <span class="ob-shell-version">{{ versionLabel }}</span>
       </div>
     </header>
@@ -47,8 +40,14 @@
         @prev="goPrev"
         @next="goNext"
       />
+      <Step3Mapping
+        v-else-if="currentStep === 3 && session.buildMethod === 'manual'"
+        :session="session"
+        @prev="goPrev"
+        @next="goNext"
+      />
       <Step3Hydrate
-        v-else-if="currentStep === 3"
+        v-else-if="(currentStep === 4 && session.buildMethod === 'manual') || (currentStep === 3 && session.buildMethod !== 'manual')"
         :session="session"
         @prev="goPrev"
         @goto-studio="$emit('goto-studio')"
@@ -65,17 +64,15 @@ import Step1Import from './Step1Import.vue'
 import Step1Extract from './Step1Extract.vue'
 import Step1Build from './Step1Build.vue'
 import Step2Review from './Step2Review.vue'
+import Step3Mapping from './Step3Mapping.vue'
 import Step3Hydrate from './Step3Hydrate.vue'
 
 const props = defineProps<{ session: BuilderSession }>()
 defineEmits<{
-  (e: 'back'): void
   (e: 'goto-studio'): void
 }>()
 
 const currentStep = ref(1)
-
-function openDocs() { window.open('/logic/documents', '_blank') }
 
 const stepOneCmp = computed(() => ({
   manual:  Step1Manual,
@@ -95,8 +92,9 @@ const methodLabel = computed(() => METHOD_LABEL[props.session.buildMethod] || '�
 const STEP_DEFS: Record<BuildMethod, { key: string; label: string; sub: string }[]> = {
   manual: [
     { key: 'build', label: '手工建模', sub: '逐项录入对象、属性、关系' },
-    { key: 'review', label: '专家走测审批', sub: '逐对象通过 / 修正 / 挂载' },
-    { key: 'hydrate', label: '水合演练 · 发布', sub: '数据接入 · 端到端验证' },
+    { key: 'review', label: '专家审批', sub: '逐对象通过 / 修正 / 挂载' },
+    { key: 'mapping', label: '数据映射', sub: '数据源绑定 · 属性列映射' },
+    { key: 'hydrate', label: '水合演练 · 发布', sub: '基于映射 · 端到端验证' },
   ],
   import: [
     { key: 'import', label: '文件导入', sub: 'OWL / RDF / JSON 标准本体' },
@@ -147,26 +145,12 @@ function goPrev() { currentStep.value = Math.max(1, currentStep.value - 1) }
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
 }
-.ob-back-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: transparent; border: 0;
-  padding: 6px 10px; border-radius: 8px;
-  color: #475569; font-size: 13px; cursor: pointer;
-}
-.ob-back-btn:hover { background: #f1f5f9; color: #0f172a; }
-
 .ob-shell-title {
   display: flex; flex-direction: column; gap: 2px;
 }
 .ob-shell-title .name { font-size: 15px; font-weight: 600; color: #0f172a; }
 .ob-shell-title .meta { font-size: 12px; color: #94a3b8; }
 .ob-shell-actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-.ob-shell-doc-btn {
-  padding: 4px 12px; border-radius: 6px;
-  background: #fff; border: 1px solid #e2e8f0;
-  font-size: 12px; color: #475569; cursor: pointer;
-}
-.ob-shell-doc-btn:hover { border-color: #4f46e5; color: #4f46e5; }
 .ob-shell-version {
   display: inline-block; padding: 4px 10px; border-radius: 6px;
   background: rgba(79, 70, 229, 0.08); color: #4f46e5;
