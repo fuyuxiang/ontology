@@ -32,41 +32,48 @@
 
     <!-- 审计表格 -->
     <div class="audit-tab__table-wrap">
-      <table class="data-table" v-if="items.length">
-        <thead>
-          <tr>
-            <th style="width: 160px">时间</th>
-            <th style="width: 100px">操作人</th>
-            <th style="width: 100px">操作类型</th>
-            <th>目标对象</th>
-            <th style="width: 100px">结果</th>
-            <th style="width: 60px">详情</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="item in items"
-            :key="item.id"
-            class="data-table__row--clickable"
-            @click="selectedItem = item; drawerOpen = true"
-          >
-            <td class="audit-tab__mono">{{ formatTime(item.timestamp) }}</td>
-            <td>{{ item.user_name || '系统' }}</td>
-            <td>
-              <span class="action-tag" :class="`action--${item.action}`">{{ actionLabel(item.action) }}</span>
-            </td>
-            <td class="audit-tab__target">{{ item.target_name || item.target_id }}</td>
-            <td class="audit-tab__status">
-              <span :class="item.status === 'success' ? 'status--success' : 'status--fail'">
-                {{ item.status === 'success' ? '✓ 成功' : '✗ 失败' }}
-              </span>
-            </td>
-            <td class="audit-tab__detail-btn">
-              <span class="audit-tab__detail-icon">→</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <template v-if="items.length">
+        <table class="audit-table">
+          <thead>
+            <tr>
+              <th style="width: 160px">时间</th>
+              <th style="width: 100px">操作人</th>
+              <th style="width: 100px">操作类型</th>
+              <th>目标对象</th>
+              <th style="width: 100px">结果</th>
+              <th style="width: 60px">详情</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="item in items"
+              :key="item.id"
+              class="audit-table__row"
+              @click="selectedItem = item; drawerOpen = true"
+            >
+              <td class="audit-table__mono">{{ formatTime(item.timestamp) }}</td>
+              <td>
+                <div class="audit-table__user">
+                  <span class="audit-table__user-avatar">{{ (item.user_name || '系')[0] }}</span>
+                  {{ item.user_name || '系统' }}
+                </div>
+              </td>
+              <td>
+                <span class="action-tag" :class="`action--${item.action}`">{{ actionLabel(item.action) }}</span>
+              </td>
+              <td class="audit-table__target">{{ item.target_name || item.target_id }}</td>
+              <td class="audit-table__status">
+                <span class="status-badge" :class="item.status === 'success' ? 'status-badge--ok' : 'status-badge--err'">
+                  {{ item.status === 'success' ? '✓ 成功' : '✗ 失败' }}
+                </span>
+              </td>
+              <td class="audit-table__detail-btn">
+                <span class="audit-table__detail-icon">→</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
 
       <!-- 空状态 -->
       <div v-else-if="!loading" class="audit-tab__empty">
@@ -89,7 +96,7 @@
 
     <!-- 分页 -->
     <div class="audit-tab__pagination" v-if="total > 0">
-      <span class="audit-tab__total">共 {{ total.toLocaleString() }} 条</span>
+      <span class="audit-tab__total">共 {{ total.toLocaleString() }} 条记录</span>
       <a-pagination
         v-model:current="currentPage"
         :page-size="pageSize"
@@ -106,11 +113,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { RangePicker as ARangePicker, Select as ASelect, InputSearch as AInputSearch, Pagination as APagination } from 'ant-design-vue'
 import dayjs, { type Dayjs } from 'dayjs'
 import { governanceApi, type AuditLogItem } from '../../api/governance'
 import AuditDetailDrawer from './AuditDetailDrawer.vue'
+
+const emit = defineEmits<{ 'count-change': [count: number] }>()
 
 const items = ref<AuditLogItem[]>([])
 const total = ref(0)
@@ -118,15 +127,12 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 
-// 筛选条件
 const dateRange = ref<[Dayjs, Dayjs] | null>(null)
 const filterAction = ref<string | undefined>(undefined)
 const filterKeyword = ref('')
 
-// 操作类型选项
 const actionOptions = ref<{ label: string; value: string }[]>([])
 
-// 详情抽屉
 const drawerOpen = ref(false)
 const selectedItem = ref<AuditLogItem | null>(null)
 
@@ -166,6 +172,7 @@ async function fetchData() {
     const res = await governanceApi.listAuditLogs(params)
     items.value = res.items
     total.value = res.total
+    emit('count-change', res.total)
   } catch {
     items.value = []
     total.value = 0
@@ -192,72 +199,107 @@ onMounted(() => {
 .audit-tab__filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
 }
 
 /* 表格 */
-.data-table {
+.audit-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
-.data-table th {
+.audit-table th {
   text-align: left;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--neutral-200);
+  padding: 12px 14px;
+  border-bottom: 2px solid var(--neutral-200);
   background: var(--neutral-50);
   color: var(--neutral-500);
   font-weight: 600;
   font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
-.data-table td {
-  padding: 12px;
+.audit-table td {
+  padding: 14px;
   border-bottom: 1px solid var(--neutral-100);
   color: var(--neutral-700);
 }
-.data-table__row--clickable {
+.audit-table__row {
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
 }
-.data-table__row--clickable:hover {
+.audit-table__row:hover {
   background: var(--neutral-50);
 }
 
-.audit-tab__mono {
+.audit-table__mono {
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--neutral-500);
 }
-.audit-tab__target {
+
+.audit-table__user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.audit-table__user-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--semantic-100, #e8f0fe);
+  color: var(--semantic-600);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.audit-table__target {
   color: var(--neutral-800);
-}
-.audit-tab__status {
-  text-align: center;
-}
-.status--success { color: var(--status-success, #10b981); font-weight: 500; }
-.status--fail { color: var(--status-error, #fa5252); font-weight: 500; }
-.audit-tab__detail-btn {
-  text-align: center;
-}
-.audit-tab__detail-icon {
-  color: var(--neutral-400);
-  font-size: 16px;
+  font-weight: 500;
 }
 
 /* 操作类型标签 */
 .action-tag {
   font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+.action--create { background: rgba(16, 185, 129, 0.1); color: #10b981; }
+.action--update { background: rgba(92, 124, 250, 0.1); color: #5c7cfa; }
+.action--delete { background: rgba(250, 82, 82, 0.1); color: #fa5252; }
+.action--login  { background: rgba(51, 154, 240, 0.1); color: #339af0; }
+.action--export { background: rgba(245, 159, 0, 0.1); color: #f59f00; }
+.action--import { background: rgba(121, 80, 242, 0.1); color: #7950f2; }
+
+/* 状态徽章 */
+.status-badge {
+  font-size: 12px;
+  font-weight: 600;
   padding: 2px 8px;
   border-radius: 4px;
-  font-weight: 500;
 }
-.action--create { background: #e6fcf5; color: #10b981; }
-.action--update { background: #edf2ff; color: #5c7cfa; }
-.action--delete { background: #fff5f5; color: #fa5252; }
-.action--login  { background: #e7f5ff; color: #339af0; }
-.action--export { background: #fff9db; color: #f59f00; }
-.action--import { background: #f3f0ff; color: #7950f2; }
+.status-badge--ok { color: var(--status-success, #10b981); background: rgba(16, 185, 129, 0.08); }
+.status-badge--err { color: var(--status-error, #fa5252); background: rgba(250, 82, 82, 0.08); }
+
+.audit-table__detail-btn {
+  text-align: center;
+}
+.audit-table__detail-icon {
+  color: var(--neutral-400);
+  font-size: 16px;
+  transition: transform 0.2s;
+}
+.audit-table__row:hover .audit-table__detail-icon {
+  transform: translateX(4px);
+  color: var(--semantic-600);
+}
 
 /* 分页 */
 .audit-tab__pagination {
@@ -279,14 +321,15 @@ onMounted(() => {
   padding: 60px 20px;
 }
 .audit-tab__empty-icon {
-  font-size: 40px;
-  margin-bottom: 12px;
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.8;
 }
 .audit-tab__empty-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--neutral-600);
-  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--neutral-700);
+  margin-bottom: 6px;
 }
 .audit-tab__empty-desc {
   font-size: 13px;
@@ -297,12 +340,12 @@ onMounted(() => {
 .audit-tab__skeleton {
   display: flex;
   flex-direction: column;
-  gap: 12px;
 }
 .skeleton-row {
   display: flex;
   gap: 16px;
-  padding: 12px 0;
+  padding: 14px;
+  border-bottom: 1px solid var(--neutral-100);
 }
 .skeleton {
   height: 16px;
