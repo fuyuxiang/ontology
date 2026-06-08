@@ -65,6 +65,11 @@ def _get_llm_client(db=None) -> OpenAI:
     return get_llm_client(db=db, scene="agent")
 
 
+def _get_model_name(db=None) -> str:
+    from app.services.llm_resolver import get_model_name
+    return get_model_name(db=db, scene="agent")
+
+
 def create_session(asset_ids: dict, db: Session) -> dict:
     """Create a generation session with selected ontology assets."""
     assets_context = _load_assets_context(asset_ids, db)
