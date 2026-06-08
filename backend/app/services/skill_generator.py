@@ -106,7 +106,7 @@ def chat_stream(session_id: str, message: str) -> Generator[str, None, None]:
     client = _get_llm_client()
     try:
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=_get_model_name(),
             messages=messages,
             temperature=0.3,
             stream=True,
@@ -147,7 +147,7 @@ def generate_skill(session_id: str) -> dict:
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[
             {"role": "system", "content": GENERATE_SYSTEM_PROMPT},
             {"role": "user", "content": user_content},
@@ -187,7 +187,7 @@ def regenerate_section(session_id: str, section: str, current_draft: dict) -> di
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[
             {"role": "system", "content": GENERATE_SYSTEM_PROMPT},
             {"role": "user", "content": prompt},
