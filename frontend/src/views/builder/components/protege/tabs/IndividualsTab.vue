@@ -2,10 +2,10 @@
   <div class="pg-split">
     <div class="pg-split__left">
       <div class="pg-toolbar">
-        <button class="pg-toolbar__btn" title="Add individual" @click="store.addIndividual()">⊕</button>
-        <button class="pg-toolbar__btn" title="Delete" :disabled="!store.selectedIndividualId" @click="deleteSel">✕</button>
+        <button class="pg-toolbar__btn" title="添加实例" @click="store.addIndividual()">⊕</button>
+        <button class="pg-toolbar__btn" title="删除" :disabled="!store.selectedIndividualId" @click="deleteSel">✕</button>
       </div>
-      <EntitySearchInput v-model="filter" placeholder="Filter..." />
+      <EntitySearchInput v-model="filter" placeholder="筛选..." />
       <div class="pg-tree">
         <div v-for="ind in filteredIndividuals" :key="ind.id"
              class="pg-tree-node" :class="{ 'pg-tree-node--selected': store.selectedIndividualId === ind.id }"
@@ -13,7 +13,7 @@
           <span class="pg-tree-node__icon"><span class="pg-icon-individual"></span></span>
           <span class="pg-tree-node__label">{{ ind.localName }}</span>
         </div>
-        <div v-if="!filteredIndividuals.length" class="pg-empty">No individuals</div>
+        <div v-if="!filteredIndividuals.length" class="pg-empty">暂无实例</div>
       </div>
     </div>
     <div class="pg-split__right">
@@ -27,21 +27,21 @@
         <AnnotationsPanel :entity="store.selectedIndividual" @update="a => store.updateIndividual(store.selectedIndividualId!, { annotations: a })" />
         <!-- Types -->
         <div class="pg-panel">
-          <div class="pg-panel__header">Types</div>
+          <div class="pg-panel__header">类型</div>
           <div class="pg-panel__body">
             <div v-for="t in store.selectedIndividual.types" :key="t" class="pg-tag">
               {{ t.split(/[#/]/).pop() }}
               <span class="pg-tag__remove" @click="removeType(t)">✕</span>
             </div>
-            <button class="pg-btn" style="margin-top:4px" @click="addType">+ Add Type</button>
+            <button class="pg-btn" style="margin-top:4px" @click="addType">+ 添加类型</button>
           </div>
         </div>
         <!-- Data Property Assertions -->
         <div class="pg-panel">
-          <div class="pg-panel__header">Data Property Assertions</div>
+          <div class="pg-panel__header">数据属性断言</div>
           <div class="pg-panel__body">
             <table class="pg-table" v-if="store.selectedIndividual.dataPropertyAssertions.length">
-              <thead><tr><th>Property</th><th>Value</th><th></th></tr></thead>
+              <thead><tr><th>属性</th><th>值</th><th></th></tr></thead>
               <tbody>
                 <tr v-for="a in store.selectedIndividual.dataPropertyAssertions" :key="a.id">
                   <td>{{ a.propertyIRI.split(/[#/]/).pop() }}</td>
@@ -50,11 +50,11 @@
                 </tr>
               </tbody>
             </table>
-            <button class="pg-btn" style="margin-top:4px" @click="addDataAssertion">+ Add</button>
+            <button class="pg-btn" style="margin-top:4px" @click="addDataAssertion">+ 添加</button>
           </div>
         </div>
       </template>
-      <div v-else class="pg-empty">Select an individual to view its details</div>
+      <div v-else class="pg-empty">选择一个实例以查看详情</div>
     </div>
   </div>
 </template>
@@ -79,7 +79,7 @@ function deleteSel() {
 }
 
 function addType() {
-  const t = prompt('Enter class IRI or name:')
+  const t = prompt('输入类 IRI 或名称：')
   if (!t || !store.selectedIndividualId || !store.selectedIndividual) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   const iri = t.includes(':') || t.includes('/') ? t : `${base}${t}`

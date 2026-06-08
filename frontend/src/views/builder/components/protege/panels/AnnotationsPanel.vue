@@ -2,11 +2,11 @@
   <div class="pg-panel">
     <div class="pg-panel__header" @click="open = !open">
       <span class="pg-panel__header-icon">{{ open ? '▾' : '▸' }}</span>
-      <span>Annotations</span>
+      <span>注解</span>
     </div>
     <div v-show="open" class="pg-panel__body">
       <table class="pg-table" v-if="entity.annotations.length">
-        <thead><tr><th>Property</th><th>Value</th><th>Lang</th><th></th></tr></thead>
+        <thead><tr><th>属性</th><th>值</th><th>语言</th><th></th></tr></thead>
         <tbody>
           <tr v-for="a in entity.annotations" :key="a.id">
             <td>
@@ -23,8 +23,8 @@
           </tr>
         </tbody>
       </table>
-      <div v-else class="pg-empty" style="padding:8px">No annotations</div>
-      <button class="pg-btn" style="margin-top:4px" @click="addAnnotation">+ Add Annotation</button>
+      <div v-else class="pg-empty" style="padding:8px">暂无注解</div>
+      <button class="pg-btn" style="margin-top:4px" @click="addAnnotation">+ 添加注解</button>
     </div>
   </div>
 </template>
