@@ -136,7 +136,7 @@ def map_entities_and_relations(ontology: dict, candidate_table_names: list[str],
 
     client = _get_llm_client()
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=_get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
@@ -215,7 +215,7 @@ def map_ontology_stream(ontology: dict, db: Session | None = None) -> Generator[
 
         try:
             resp = client.chat.completions.create(
-                model=settings.LLM_MODEL,
+                model=_get_model_name(),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
             )
