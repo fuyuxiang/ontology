@@ -194,7 +194,7 @@ def chat_stream(
     client = _get_llm_client()
     try:
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=_get_model_name(),
             messages=messages,
             temperature=0.3,
             stream=True,
@@ -258,7 +258,7 @@ def chat_stream(
 
             def retry_caller(retry_prompt: str) -> str:
                 resp = client.chat.completions.create(
-                    model=settings.LLM_MODEL,
+                    model=_get_model_name(),
                     messages=[
                         {"role": "system", "content": retry_prompt},
                         {"role": "user", "content": "请输出修正后的完整JSON。"},
