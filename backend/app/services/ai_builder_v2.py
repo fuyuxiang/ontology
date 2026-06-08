@@ -16,8 +16,9 @@ from app.services import dwd_catalog, minio_docs
 logger = logging.getLogger(__name__)
 
 
-def _get_llm_client() -> OpenAI:
-    return OpenAI(base_url=settings.LLM_BASE_URL, api_key=settings.LLM_API_KEY)
+def _get_llm_client(db: Session | None = None) -> OpenAI:
+    from app.services.llm_resolver import get_llm_client
+    return get_llm_client(db=db, scene="ontology")
 
 
 def _extract_json(text: str) -> str:
