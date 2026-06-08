@@ -1,24 +1,24 @@
 <template>
   <div class="pg-menubar" @click.stop>
     <div class="pg-menubar__item" @click="toggleFile">
-      File
+      文件
       <div v-if="fileMenuOpen" class="pg-menu-dropdown">
-        <div class="pg-menu-item" @click.stop="emit('new'); closeAll()">New Ontology</div>
-        <div class="pg-menu-item" @click.stop="emit('open'); closeAll()">Open...</div>
+        <div class="pg-menu-item" @click.stop="emit('new'); closeAll()">新建本体</div>
+        <div class="pg-menu-item" @click.stop="emit('open'); closeAll()">打开...</div>
         <div class="pg-menu-sep"></div>
-        <div class="pg-menu-item" @click.stop="store.saveDraft(); closeAll()">Save Draft</div>
-        <div class="pg-menu-item" @click.stop="emit('save'); closeAll()">Export as OWL/XML...</div>
+        <div class="pg-menu-item" @click.stop="store.saveDraft(); closeAll()">保存草稿</div>
+        <div class="pg-menu-item" @click.stop="emit('save'); closeAll()">导出为 OWL/XML...</div>
       </div>
     </div>
     <div class="pg-menubar__item" @click="toggleEdit">
-      Edit
+      编辑
       <div v-if="editMenuOpen" class="pg-menu-dropdown">
-        <div class="pg-menu-item" @click.stop="store.undo(); closeAll()">Undo</div>
-        <div class="pg-menu-item" @click.stop="store.redo(); closeAll()">Redo</div>
+        <div class="pg-menu-item" @click.stop="store.undo(); closeAll()">撤销</div>
+        <div class="pg-menu-item" @click.stop="store.redo(); closeAll()">重做</div>
       </div>
     </div>
     <div style="flex:1"></div>
-    <div class="pg-menubar__status" v-if="store.isDirty">● Modified</div>
+    <div class="pg-menubar__status" v-if="store.isDirty">● 已修改</div>
   </div>
 </template>
 

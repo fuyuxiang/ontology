@@ -7,9 +7,9 @@
         <span class="vb-topbar__name">{{ store.ontology.iri.split(/[#/]/).pop() || 'Ontology Project' }}</span>
       </div>
       <div class="vb-topbar__actions">
-        <button class="vb-btn" @click="store.saveDraft()">Save Draft</button>
-        <button class="vb-btn" @click="onImport">Import</button>
-        <button class="vb-btn vb-btn--primary" @click="store.exportAndDownload()">Export OWL</button>
+        <button class="vb-btn" @click="store.saveDraft()">保存草稿</button>
+        <button class="vb-btn" @click="onImport">导入</button>
+        <button class="vb-btn vb-btn--primary" @click="store.exportAndDownload()">导出 OWL</button>
       </div>
     </div>
 
@@ -26,9 +26,9 @@
       <!-- Left: Tree -->
       <div class="vb-left">
         <div class="vb-left__toolbar">
-          <input class="vb-input" v-model="filter" placeholder="Search..." />
-          <button class="vb-btn-sm" title="Add" @click="addEntity">+</button>
-          <button class="vb-btn-sm" title="Delete" @click="deleteEntity">−</button>
+          <input class="vb-input" v-model="filter" placeholder="搜索..." />
+          <button class="vb-btn-sm" title="添加" @click="addEntity">+</button>
+          <button class="vb-btn-sm" title="删除" @click="deleteEntity">−</button>
         </div>
         <div class="vb-tree">
           <template v-if="activeNav === 'classes'">
@@ -57,13 +57,13 @@
             <span class="vb-detail-header__iri">{{ selectedEntity.iri }}</span>
           </div>
           <div class="vb-detail-tabs">
-            <div v-for="dt in detailTabs" :key="dt" class="vb-detail-tab" :class="{ 'vb-detail-tab--active': activeDetail === dt }" @click="activeDetail = dt">{{ dt }}</div>
+            <div v-for="dt in detailTabs" :key="dt" class="vb-detail-tab" :class="{ 'vb-detail-tab--active': activeDetail === dt }" @click="activeDetail = dt">{{ detailTabLabels[dt] || dt }}</div>
           </div>
           <div class="vb-detail-body">
             <!-- Properties tab -->
             <template v-if="activeDetail === 'Properties'">
               <div class="vb-section" v-if="selectedEntity.type === 'class'">
-                <div class="vb-section__title">SubClass Of <button class="vb-btn-sm" @click="addSuperClass">+</button></div>
+                <div class="vb-section__title">父类 <button class="vb-btn-sm" @click="addSuperClass">+</button></div>
                 <div class="vb-section__content">
                   <div v-for="s in (selectedClass?.superClassExpressions || [])" :key="s.id" class="vb-chip">
                     {{ s.classIRI?.split(/[#/]/).pop() || s.type }}
@@ -73,7 +73,7 @@
                 </div>
               </div>
               <div class="vb-section" v-if="selectedEntity.type === 'class'">
-                <div class="vb-section__title">Disjoint With <button class="vb-btn-sm" @click="addDisjoint">+</button></div>
+                <div class="vb-section__title">互斥类 <button class="vb-btn-sm" @click="addDisjoint">+</button></div>
                 <div class="vb-section__content">
                   <div v-for="d in (selectedClass?.disjointWith || [])" :key="d" class="vb-chip">
                     {{ d.split(/[#/]/).pop() }}
@@ -83,7 +83,7 @@
                 </div>
               </div>
               <div class="vb-section" v-if="selectedEntity.type === 'property'">
-                <div class="vb-section__title">Domain <button class="vb-btn-sm" @click="addDomain">+</button></div>
+                <div class="vb-section__title">定义域 <button class="vb-btn-sm" @click="addDomain">+</button></div>
                 <div class="vb-section__content">
                   <div v-for="d in (selectedProp?.domains || [])" :key="d" class="vb-chip">
                     {{ d.split(/[#/]/).pop() }}
@@ -93,7 +93,7 @@
                 </div>
               </div>
               <div class="vb-section" v-if="selectedEntity.type === 'property'">
-                <div class="vb-section__title">Range <button class="vb-btn-sm" @click="addRange">+</button></div>
+                <div class="vb-section__title">值域 <button class="vb-btn-sm" @click="addRange">+</button></div>
                 <div class="vb-section__content">
                   <div v-for="r in (selectedProp?.ranges || [])" :key="r" class="vb-chip">
                     {{ r.split(/[#/]/).pop() }}
@@ -106,7 +106,7 @@
             <!-- Annotations tab -->
             <template v-else-if="activeDetail === 'Annotations'">
               <table class="vb-table" v-if="annotations.length">
-                <thead><tr><th>Property</th><th>Value</th><th>Lang</th><th></th></tr></thead>
+                <thead><tr><th>属性</th><th>值</th><th>语言</th><th></th></tr></thead>
                 <tbody>
                   <tr v-for="a in annotations" :key="a.id">
                     <td>{{ a.property }}</td>
@@ -116,17 +116,17 @@
                   </tr>
                 </tbody>
               </table>
-              <div v-else class="vb-muted" style="padding:16px">No annotations</div>
-              <button class="vb-btn-sm" style="margin-top:8px" @click="addAnnotation">+ Add Annotation</button>
+              <div v-else class="vb-muted" style="padding:16px">暂无注解</div>
+              <button class="vb-btn-sm" style="margin-top:8px" @click="addAnnotation">+ 添加注解</button>
             </template>
             <!-- Other -->
             <template v-else>
-              <div class="vb-muted" style="padding:16px">Select a tab above</div>
+              <div class="vb-muted" style="padding:16px">请选择上方标签页</div>
             </template>
           </div>
         </template>
         <div v-else class="vb-empty">
-          <span>Select an entity from the tree to view details</span>
+          <span>从左侧树中选择实体以查看详情</span>
         </div>
       </div>
     </div>
@@ -146,12 +146,13 @@ const filter = ref('')
 const selectedId = ref<string | null>(null)
 
 const navTabs = [
-  { key: 'classes' as const, label: 'Classes', icon: '◉' },
-  { key: 'properties' as const, label: 'Properties', icon: '◆' },
-  { key: 'individuals' as const, label: 'Individuals', icon: '■' },
+  { key: 'classes' as const, label: '类', icon: '◉' },
+  { key: 'properties' as const, label: '属性', icon: '◆' },
+  { key: 'individuals' as const, label: '实例', icon: '■' },
 ]
 
 const detailTabs = ['Properties', 'Annotations', 'Lexicalizations']
+const detailTabLabels: Record<string, string> = { Properties: '属性', Annotations: '注解', Lexicalizations: '词汇化' }
 
 interface TreeNode { id: string; iri: string; localName: string; children: TreeNode[] }
 
@@ -251,7 +252,7 @@ function addSuperClass() {
   if (!selectedId.value) return
   const cls = store.ontology.classes.find(c => c.id === selectedId.value)
   if (!cls) return
-  const name = prompt('SuperClass name:')
+  const name = prompt('父类名称：')
   if (!name) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   const iri = name.includes(':') || name.includes('/') ? name : `${base}${name}`
@@ -269,7 +270,7 @@ function addDisjoint() {
   if (!selectedId.value) return
   const cls = store.ontology.classes.find(c => c.id === selectedId.value)
   if (!cls) return
-  const name = prompt('Disjoint class name:')
+  const name = prompt('互斥类名称：')
   if (!name) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   const iri = name.includes(':') || name.includes('/') ? name : `${base}${name}`
@@ -285,7 +286,7 @@ function removeDisjoint(iri: string) {
 
 function addDomain() {
   if (!selectedId.value) return
-  const name = prompt('Domain class name:')
+  const name = prompt('定义域类名：')
   if (!name) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   const iri = name.includes(':') || name.includes('/') ? name : `${base}${name}`
@@ -305,7 +306,7 @@ function removeDomain(domainIRI: string) {
 
 function addRange() {
   if (!selectedId.value) return
-  const name = prompt('Range (class name or xsd type):')
+  const name = prompt('值域（类名或 xsd 类型）：')
   if (!name) return
   const base = store.ontology.namespaces[0]?.iri || `${store.ontology.iri}#`
   const iri = name.includes(':') || name.includes('/') ? name : `${base}${name}`
@@ -325,7 +326,7 @@ function removeRange(rangeIRI: string) {
 
 function addAnnotation() {
   if (!selectedId.value) return
-  const val = prompt('Annotation value (rdfs:label):')
+  const val = prompt('注解值（rdfs:label）：')
   if (!val) return
   const entity = selectedEntity.value
   if (!entity) return
