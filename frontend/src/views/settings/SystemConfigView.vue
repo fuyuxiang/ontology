@@ -203,7 +203,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick, computed } from 'vue'
+import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
 import {
   Input as AInput, InputPassword as AInputPassword, InputNumber as AInputNumber,
   Select as ASelect, Drawer as ADrawer, Modal as AModal,
@@ -211,8 +211,10 @@ import {
 } from 'ant-design-vue'
 import { systemConfigApi, type ConfigItem, type TestResult, type AiModel, type ModelScene } from '../../api/systemConfig'
 import { useToast } from '../../composables/useToast'
+import { useLanguage } from '../../composables/useLanguage'
 
 const { success, error } = useToast()
+const { switchLanguage, t } = useLanguage()
 
 const groupList = [
   { key: 'basic', label: '基础配置', desc: '系统名称、语言、时区等基础参数', icon: '⚙️' },
