@@ -21,6 +21,11 @@ def _get_llm_client(db: Session | None = None) -> OpenAI:
     return get_llm_client(db=db, scene="ontology")
 
 
+def _get_model_name(db: Session | None = None) -> str:
+    from app.services.llm_resolver import get_model_name
+    return get_model_name(db=db, scene="ontology")
+
+
 def _extract_json(text: str) -> str:
     """从 LLM 返回中提取 JSON，处理 think 标签和 markdown 代码块。"""
     text = re.sub(r"<think>[\s\S]*?</think>", "", text).strip()
