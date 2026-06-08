@@ -8,7 +8,7 @@
           :placeholder="['开始时间', '结束时间']"
           format="YYYY-MM-DD HH:mm"
           :show-time="{ format: 'HH:mm' }"
-          style="width: 320px"
+          style="width: 300px"
           allow-clear
           @change="handleSearch"
         />
@@ -34,7 +34,7 @@
           v-model:value="filterSource"
           placeholder="全部来源"
           allow-clear
-          style="width: 150px"
+          style="width: 140px"
           :options="sourceOptions"
           @change="handleSearch"
         />
@@ -50,113 +50,122 @@
       <div class="log-tab__toolbar-right">
         <label class="log-tab__realtime-toggle">
           <a-switch v-model:checked="realtimeEnabled" size="small" />
-          <span class="log-tab__realtime-label">实时</span>
+          <span class="log-tab__realtime-label">
+            <span v-if="realtimeEnabled" class="log-tab__live-dot"></span>
+            实时
+          </span>
         </label>
       </div>
     </div>
 
     <!-- 统计条 -->
     <div class="log-tab__stats" v-if="stats.total > 0">
-      <span class="log-tab__stats-total">共 {{ stats.total.toLocaleString() }} 条</span>
-      <span class="log-tab__stats-sep">│</span>
-      <span v-for="level in levels" :key="level.value" class="log-tab__stats-item">
-        <span class="log-tab__stats-label" :style="{ color: level.color }">{{ level.label }}:</span>
-        <span class="log-tab__stats-count" :style="{ color: level.color }">{{ stats[level.value] || 0 }}</span>
-      </span>
-    </div>
-
-    <!-- 实时流指示条 -->
-    <div v-if="realtimeEnabled" class="log-tab__live-bar">
-      <span class="log-tab__live-dot"></span>
-      实时接收中...
+      <div class="log-tab__stats-left">
+        <span class="log-tab__stats-total">共 {{ stats.total.toLocaleString() }} 条</span>
+        <span class="log-tab__stats-sep">│</span>
+        <span v-for="level in levels" :key="level.value" class="log-tab__stats-item" :style="{ color: level.color }">
+          <span class="log-tab__stats-dot" :style="{ background: level.color }"></span>
+          {{ stats[level.value] || 0 }}
+        </span>
+      </div>
+      <div class="log-tab__stats-right">
+        <span class="log-tab__stats-time">更新于 {{ lastUpdate }}</span>
+      </div>
     </div>
 
     <!-- 日志列表 -->
     <div class="log-tab__list" ref="listRef">
-      <div
-        v-for="log in logs"
-        :key="log.id"
-        class="log-entry"
-        :class="[
-          `log-entry--${log.level}`,
-          { 'log-entry--expanded': expandedId === log.id }
-        ]"
-        @click="toggleExpand(log.id)"
-      >
-        <!-- 第一行：时间 + 级别 + 来源 + 消息 -->
-        <div class="log-entry__row1">
-          <span class="log-entry__time">{{ formatTime(log.timestamp) }}</span>
-          <span class="log-entry__level" :class="`log-entry__level--${log.level}`">{{ log.level }}</span>
-          <span class="log-entry__source">{{ log.source }}</span>
-          <span class="log-entry__message">{{ log.message }}</span>
-        </div>
-        <!-- 第二行：上下文标签（始终可见） -->
-        <div class="log-entry__row2" v-if="log.user || log.ip || log.duration_ms !== undefined || log.status_code">
-          <span v-if="log.user" class="log-entry__tag">
-            <span class="log-entry__tag-icon">👤</span>{{ log.user }}
-          </span>
-          <span v-if="log.ip" class="log-entry__tag">
-            <span class="log-entry__tag-icon">🌐</span>{{ log.ip }}
-          </span>
-          <span v-if="log.status_code" class="log-entry__tag" :class="log.status_code < 400 ? 'log-entry__tag--ok' : 'log-entry__tag--err'">
-            HTTP {{ log.status_code }}
-          </span>
-          <span v-if="log.duration_ms !== undefined && log.duration_ms !== null" class="log-entry__tag">
-            ⏱ {{ log.duration_ms }}ms
-          </span>
-          <span v-if="log.resolved !== undefined" class="log-entry__tag" :class="log.resolved ? 'log-entry__tag--ok' : 'log-entry__tag--err'">
-            {{ log.resolved ? '已处理' : '未处理' }}
-          </span>
-        </div>
-        <!-- 展开详情 -->
-        <div v-if="expandedId === log.id" class="log-entry__detail">
-          <div class="log-entry__detail-grid">
-            <div v-if="log.user" class="log-entry__detail-item">
-              <span class="log-entry__detail-label">操作用户</span>
-              <span class="log-entry__detail-value">{{ log.user }}</span>
-            </div>
-            <div v-if="log.ip" class="log-entry__detail-item">
-              <span class="log-entry__detail-label">来源 IP</span>
-              <span class="log-entry__detail-value log-entry__mono">{{ log.ip }}</span>
-            </div>
-            <div v-if="log.source" class="log-entry__detail-item">
-              <span class="log-entry__detail-label">来源模块</span>
-              <span class="log-entry__detail-value">{{ log.source }}</span>
-            </div>
-            <div class="log-entry__detail-item">
-              <span class="log-entry__detail-label">时间</span>
-              <span class="log-entry__detail-value log-entry__mono">{{ formatTime(log.timestamp) }}</span>
-            </div>
-            <div v-if="log.duration_ms !== undefined && log.duration_ms !== null" class="log-entry__detail-item">
-              <span class="log-entry__detail-label">耗时</span>
-              <span class="log-entry__detail-value">{{ log.duration_ms }}ms</span>
-            </div>
-            <div v-if="log.resolved !== undefined" class="log-entry__detail-item">
-              <span class="log-entry__detail-label">状态</span>
-              <span class="log-entry__detail-value">{{ log.resolved ? '已处理' : '未处理' }}</span>
-            </div>
-          </div>
-          <div v-if="log.raw" class="log-entry__raw">
-            <pre>{{ log.raw }}</pre>
-          </div>
-        </div>
+      <!-- 实时流指示条 -->
+      <div v-if="realtimeEnabled" class="log-tab__live-bar">
+        <span class="log-tab__live-dot-animated"></span>
+        实时接收中...
       </div>
 
-      <!-- 加载更多 -->
-      <div v-if="hasMore && !loading" class="log-tab__load-more">
-        <button class="log-tab__load-more-btn" @click="loadMore">加载更多</button>
-      </div>
+      <template v-if="logs.length">
+        <div
+          v-for="log in logs"
+          :key="log.id"
+          class="log-entry"
+          :class="[
+            `log-entry--${log.level}`,
+            { 'log-entry--expanded': expandedId === log.id }
+          ]"
+          @click="toggleExpand(log.id)"
+        >
+          <!-- 第一行：时间 + 级别 + 来源 + 消息 -->
+          <div class="log-entry__row1">
+            <span class="log-entry__time">{{ formatTime(log.timestamp) }}</span>
+            <span class="log-entry__level" :class="`log-entry__level--${log.level}`">
+              <span class="log-entry__level-dot" :style="{ background: getLevelColor(log.level) }"></span>
+              {{ log.level }}
+            </span>
+            <span class="log-entry__source">{{ log.source }}</span>
+            <span class="log-entry__message">{{ log.message }}</span>
+          </div>
+          <!-- 第二行：上下文标签 -->
+          <div class="log-entry__row2" v-if="log.user || log.ip || log.duration_ms !== undefined || log.status_code">
+            <span v-if="log.user" class="log-entry__tag">
+              <span class="log-entry__tag-icon">👤</span>{{ log.user }}
+            </span>
+            <span v-if="log.ip" class="log-entry__tag">
+              <span class="log-entry__tag-icon">🌐</span>{{ log.ip }}
+            </span>
+            <span v-if="log.status_code" class="log-entry__tag" :class="log.status_code < 400 ? 'log-entry__tag--ok' : 'log-entry__tag--err'">
+              HTTP {{ log.status_code }}
+            </span>
+            <span v-if="log.duration_ms !== undefined && log.duration_ms !== null" class="log-entry__tag">
+              ⏱ {{ log.duration_ms }}ms
+            </span>
+            <span v-if="log.resolved !== undefined" class="log-entry__tag" :class="log.resolved ? 'log-entry__tag--ok' : 'log-entry__tag--err'">
+              {{ log.resolved ? '✓ 已处理' : '✗ 未处理' }}
+            </span>
+          </div>
+          <!-- 展开详情 -->
+          <div v-if="expandedId === log.id" class="log-entry__detail">
+            <div class="log-entry__detail-grid">
+              <div v-if="log.user" class="log-entry__detail-item">
+                <span class="log-entry__detail-label">操作用户</span>
+                <span class="log-entry__detail-value">{{ log.user }}</span>
+              </div>
+              <div v-if="log.ip" class="log-entry__detail-item">
+                <span class="log-entry__detail-label">来源 IP</span>
+                <span class="log-entry__detail-value log-entry__mono">{{ log.ip }}</span>
+              </div>
+              <div v-if="log.source" class="log-entry__detail-item">
+                <span class="log-entry__detail-label">来源模块</span>
+                <span class="log-entry__detail-value">{{ log.source }}</span>
+              </div>
+              <div class="log-entry__detail-item">
+                <span class="log-entry__detail-label">时间</span>
+                <span class="log-entry__detail-value log-entry__mono">{{ formatTime(log.timestamp) }}</span>
+              </div>
+              <div v-if="log.duration_ms !== undefined && log.duration_ms !== null" class="log-entry__detail-item">
+                <span class="log-entry__detail-label">耗时</span>
+                <span class="log-entry__detail-value">{{ log.duration_ms }}ms</span>
+              </div>
+              <div v-if="log.resolved !== undefined" class="log-entry__detail-item">
+                <span class="log-entry__detail-label">状态</span>
+                <span class="log-entry__detail-value">{{ log.resolved ? '已处理' : '未处理' }}</span>
+              </div>
+            </div>
+            <div v-if="log.raw" class="log-entry__raw">
+              <pre>{{ log.raw }}</pre>
+            </div>
+          </div>
+        </div>
+      </template>
 
       <!-- 空状态 -->
-      <div v-if="!logs.length && !loading" class="log-tab__empty">
+      <div v-else-if="!loading" class="log-tab__empty">
         <div class="log-tab__empty-icon">🔍</div>
         <p class="log-tab__empty-title">未找到匹配日志</p>
         <p class="log-tab__empty-desc">尝试调整时间范围或筛选条件</p>
+        <button class="log-tab__empty-btn" @click="handleReset">重置筛选</button>
       </div>
 
       <!-- 骨架屏 -->
       <div v-if="loading" class="log-tab__skeleton">
-        <div v-for="i in 8" :key="i" class="skeleton-log">
+        <div v-for="i in 6" :key="i" class="skeleton-log">
           <div class="skeleton skeleton--w160"></div>
           <div class="skeleton skeleton--w50"></div>
           <div class="skeleton skeleton--w100"></div>
@@ -179,19 +188,18 @@ import type { Dayjs } from 'dayjs'
 import { monitorApi, type AlertItem } from '../../api/monitor'
 import { tracesApi, type TraceItem } from '../../api/ops'
 
-// ---- 统一日志条目 ----
 interface LogEntry {
   id: string
   timestamp: string
   level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
-  source: string   // 来源模块
+  source: string
   message: string
   user?: string
   ip?: string
   status_code?: number
   duration_ms?: number | null
   resolved?: boolean
-  raw?: string     // 展开时的原始详情
+  raw?: string
 }
 
 const levels = [
@@ -210,6 +218,7 @@ const logs = ref<LogEntry[]>([])
 const loading = ref(false)
 const expandedId = ref<string | null>(null)
 const listRef = ref<HTMLElement | null>(null)
+const lastUpdate = ref('--:--')
 
 const dateRange = ref<[Dayjs, Dayjs] | null>(null)
 const selectedLevels = ref<string[]>(['DEBUG', 'INFO', 'WARN', 'ERROR'])
@@ -218,9 +227,7 @@ const filterKeyword = ref('')
 const realtimeEnabled = ref(false)
 
 const stats = reactive({ total: 0, DEBUG: 0, INFO: 0, WARN: 0, ERROR: 0 })
-const hasMore = ref(false)
 
-let realtimeTimer: ReturnType<typeof setInterval> | null = null
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 function toggleExpand(id: string) {
@@ -231,21 +238,33 @@ function handleSearch() {
   fetchData()
 }
 
+function handleReset() {
+  dateRange.value = null
+  selectedLevels.value = ['DEBUG', 'INFO', 'WARN', 'ERROR']
+  filterSource.value = undefined
+  filterKeyword.value = ''
+  fetchData()
+}
+
 function formatTime(ts: string) {
   if (!ts) return '-'
   return ts.replace('T', ' ').slice(0, 19)
 }
 
-// ---- 数据转换 ----
+function getLevelColor(level: string) {
+  const map: Record<string, string> = {
+    DEBUG: 'var(--neutral-500, #868e96)',
+    INFO: 'var(--status-info, #339af0)',
+    WARN: 'var(--status-warning, #f59f00)',
+    ERROR: 'var(--status-error, #fa5252)',
+  }
+  return map[level] || 'var(--neutral-500)'
+}
 
 function alertToLog(a: AlertItem): LogEntry {
-  // level 映射：后端可能返回 high/medium/low/critical/warning 或 ERROR/WARN/INFO
   const levelMap: Record<string, LogEntry['level']> = {
-    critical: 'ERROR', high: 'ERROR',
-    medium: 'WARN', warning: 'WARN',
-    low: 'INFO', info: 'INFO',
-    error: 'ERROR', debug: 'DEBUG',
-    ERROR: 'ERROR', WARN: 'WARN', INFO: 'INFO', DEBUG: 'DEBUG',
+    critical: 'ERROR', high: 'ERROR', medium: 'WARN', warning: 'WARN', low: 'INFO', info: 'INFO',
+    error: 'ERROR', debug: 'DEBUG', ERROR: 'ERROR', WARN: 'WARN', INFO: 'INFO', DEBUG: 'DEBUG',
   }
   return {
     id: `alert-${a.id}`,
@@ -276,83 +295,55 @@ function truncate(str: string, len: number) {
   return str.length > len ? str.slice(0, len) + '...' : str
 }
 
-// ---- 拉取数据 ----
-
 async function fetchData() {
   loading.value = true
   try {
     const promises: Promise<unknown>[] = []
-
-    // 告警数据
     if (!filterSource.value || filterSource.value === 'alert') {
       promises.push(monitorApi.alerts(100).catch(() => [] as AlertItem[]))
     } else {
       promises.push(Promise.resolve([] as AlertItem[]))
     }
-
-    // Trace 数据
     if (!filterSource.value || filterSource.value === 'trace') {
       promises.push(tracesApi.list({ page_size: 50 }).catch(() => ({ items: [] as TraceItem[] })))
     } else {
       promises.push(Promise.resolve({ items: [] as TraceItem[] }))
     }
-
     const [alerts, traceRes] = await Promise.all(promises) as [AlertItem[], { items: TraceItem[] }]
-
-    // 转换为统一格式
     let allLogs: LogEntry[] = [
       ...alerts.map(alertToLog),
       ...(traceRes.items || []).map(traceToLog),
     ]
-
-    // 按时间倒序
     allLogs.sort((a, b) => (b.timestamp || '').localeCompare(a.timestamp || ''))
-
-    // 级别筛选
     allLogs = allLogs.filter(l => selectedLevels.value.includes(l.level))
-
-    // 关键词筛选
     if (filterKeyword.value) {
       const kw = filterKeyword.value.toLowerCase()
       allLogs = allLogs.filter(l =>
-        l.message.toLowerCase().includes(kw) ||
-        l.source.toLowerCase().includes(kw) ||
-        (l.user && l.user.toLowerCase().includes(kw))
+        l.message.toLowerCase().includes(kw) || l.source.toLowerCase().includes(kw) || (l.user && l.user.toLowerCase().includes(kw))
       )
     }
-
     logs.value = allLogs
     stats.total = allLogs.length
     stats.DEBUG = allLogs.filter(l => l.level === 'DEBUG').length
     stats.INFO = allLogs.filter(l => l.level === 'INFO').length
     stats.WARN = allLogs.filter(l => l.level === 'WARN').length
     stats.ERROR = allLogs.filter(l => l.level === 'ERROR').length
+    lastUpdate.value = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   } catch {
-    logs.value = []
-    stats.total = 0
+    logs.value = []; stats.total = 0
   } finally {
     loading.value = false
   }
 }
 
-// 实时轮询（开启实时模式时每 10 秒刷新）
 function startRealtime() {
   pollTimer = setInterval(() => {
-    if (realtimeEnabled.value) {
-      fetchData()
-    }
+    if (realtimeEnabled.value) fetchData()
   }, 10000)
 }
 
-onMounted(() => {
-  fetchData()
-  startRealtime()
-})
-
-onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
-  if (realtimeTimer) clearInterval(realtimeTimer)
-})
+onMounted(() => { fetchData(); startRealtime() })
+onUnmounted(() => { if (pollTimer) clearInterval(pollTimer) })
 </script>
 
 <style scoped>
@@ -361,13 +352,13 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 .log-tab__filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
   align-items: center;
   flex: 1;
 }
@@ -385,15 +376,19 @@ onUnmounted(() => {
 .log-tab__level-check {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 12px;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 16px;
   font-size: 12px;
   cursor: pointer;
   border: 1px solid var(--neutral-200);
   color: var(--neutral-500);
-  transition: all 0.15s;
+  transition: all 0.2s;
   user-select: none;
+}
+.log-tab__level-check:hover {
+  border-color: var(--neutral-300);
+  background: var(--neutral-50);
 }
 .log-tab__level-check--active {
   border-color: var(--neutral-300);
@@ -405,31 +400,46 @@ onUnmounted(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* 实时开关 */
 .log-tab__realtime-toggle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   cursor: pointer;
 }
 .log-tab__realtime-label {
   font-size: 13px;
   color: var(--neutral-600);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.log-tab__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--status-success, #10b981);
+  animation: pulse 1.5s infinite;
 }
 
 /* 统计条 */
 .log-tab__stats {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
+  padding: 10px 16px;
   background: var(--neutral-50);
-  border-radius: 6px;
+  border-radius: 8px;
   margin-bottom: 12px;
   font-size: 13px;
-  flex-wrap: wrap;
+}
+.log-tab__stats-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .log-tab__stats-total {
   font-weight: 600;
@@ -441,14 +451,21 @@ onUnmounted(() => {
 .log-tab__stats-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
+  font-weight: 500;
 }
-.log-tab__stats-label {
+.log-tab__stats-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.log-tab__stats-right {
+  display: flex;
+  align-items: center;
+}
+.log-tab__stats-time {
   font-size: 12px;
-}
-.log-tab__stats-count {
-  font-weight: 600;
-  font-size: 13px;
+  color: var(--neutral-400);
 }
 
 /* 实时流指示条 */
@@ -456,15 +473,14 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 16px;
-  background: rgba(32, 201, 151, 0.08);
-  border-radius: 6px;
-  margin-bottom: 12px;
+  padding: 8px 16px;
+  background: rgba(32, 201, 151, 0.06);
+  border-bottom: 1px solid rgba(32, 201, 151, 0.15);
   font-size: 13px;
   color: var(--status-success, #10b981);
   font-weight: 500;
 }
-.log-tab__live-dot {
+.log-tab__live-dot-animated {
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -472,23 +488,24 @@ onUnmounted(() => {
   animation: pulse 1.5s infinite;
 }
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
 }
 
 /* 日志列表 */
 .log-tab__list {
-  max-height: calc(100vh - 380px);
+  max-height: calc(100vh - 400px);
   min-height: 400px;
   overflow-y: auto;
   border: 1px solid var(--neutral-100);
-  border-radius: 8px;
+  border-radius: 10px;
+  background: var(--neutral-0);
 }
 .log-entry {
-  padding: 10px 16px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--neutral-100);
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.15s ease;
   border-left: 3px solid transparent;
 }
 .log-entry:hover {
@@ -516,18 +533,25 @@ onUnmounted(() => {
   color: var(--neutral-500);
 }
 .log-entry__level {
-  width: 56px;
+  width: 70px;
   flex-shrink: 0;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
-  padding: 2px 0;
-  border-radius: 4px;
   font-weight: 600;
+  text-transform: uppercase;
 }
-.log-entry__level--DEBUG { background: var(--neutral-100); color: var(--neutral-500); }
-.log-entry__level--INFO  { background: #e7f5ff; color: #339af0; }
-.log-entry__level--WARN  { background: #fff9db; color: #f59f00; }
-.log-entry__level--ERROR { background: #fff5f5; color: #fa5252; }
+.log-entry__level-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.log-entry__level--DEBUG { color: var(--neutral-500); }
+.log-entry__level--INFO  { color: #339af0; }
+.log-entry__level--WARN  { color: #f59f00; }
+.log-entry__level--ERROR { color: #fa5252; }
 .log-entry__source {
   width: 100px;
   flex-shrink: 0;
@@ -556,8 +580,8 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-top: 6px;
-  padding-left: 246px;
+  margin-top: 8px;
+  padding-left: 280px;
 }
 .log-entry__tag {
   display: inline-flex;
@@ -568,17 +592,20 @@ onUnmounted(() => {
   background: var(--neutral-50);
   padding: 2px 8px;
   border-radius: 4px;
+  border: 1px solid var(--neutral-100);
 }
 .log-entry__tag-icon {
   font-size: 11px;
 }
 .log-entry__tag--ok {
   color: var(--status-success, #10b981);
-  font-weight: 600;
+  background: rgba(16, 185, 129, 0.06);
+  border-color: rgba(16, 185, 129, 0.15);
 }
 .log-entry__tag--err {
   color: var(--status-error, #fa5252);
-  font-weight: 600;
+  background: rgba(250, 82, 82, 0.06);
+  border-color: rgba(250, 82, 82, 0.15);
 }
 
 /* 展开详情 */
@@ -587,24 +614,27 @@ onUnmounted(() => {
 }
 .log-entry__detail {
   margin-top: 12px;
-  padding: 12px 16px;
+  padding: 14px 16px;
   background: var(--neutral-50);
-  border-radius: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--neutral-100);
 }
 .log-entry__detail-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 .log-entry__detail-item {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 .log-entry__detail-label {
   font-size: 11px;
   color: var(--neutral-400);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 .log-entry__detail-value {
   font-size: 13px;
@@ -617,7 +647,7 @@ onUnmounted(() => {
 .log-entry__raw {
   background: var(--neutral-0);
   border: 1px solid var(--neutral-200);
-  padding: 12px;
+  padding: 14px;
   border-radius: 6px;
   overflow-x: auto;
 }
@@ -628,26 +658,7 @@ onUnmounted(() => {
   color: var(--neutral-700);
   white-space: pre-wrap;
   word-break: break-all;
-}
-
-/* 加载更多 */
-.log-tab__load-more {
-  text-align: center;
-  padding: 12px;
-}
-.log-tab__load-more-btn {
-  background: none;
-  border: 1px solid var(--neutral-200);
-  padding: 6px 24px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: var(--neutral-600);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.log-tab__load-more-btn:hover {
-  border-color: var(--semantic-400);
-  color: var(--semantic-600);
+  line-height: 1.5;
 }
 
 /* 空状态 */
@@ -656,25 +667,41 @@ onUnmounted(() => {
   padding: 60px 20px;
 }
 .log-tab__empty-icon {
-  font-size: 40px;
-  margin-bottom: 12px;
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.8;
 }
 .log-tab__empty-title {
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--neutral-600);
-  margin-bottom: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--neutral-700);
+  margin-bottom: 6px;
 }
 .log-tab__empty-desc {
   font-size: 13px;
   color: var(--neutral-400);
+  margin-bottom: 16px;
+}
+.log-tab__empty-btn {
+  padding: 8px 20px;
+  border: 1px solid var(--neutral-200);
+  background: var(--neutral-0);
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--neutral-600);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.log-tab__empty-btn:hover {
+  border-color: var(--semantic-400);
+  color: var(--semantic-600);
 }
 
 /* 骨架屏 */
 .log-tab__skeleton {
   display: flex;
   flex-direction: column;
-  gap: 0;
 }
 .skeleton-log {
   display: flex;
