@@ -1,57 +1,56 @@
 <template>
-  <div class="config-page">
-    <!-- 标题区 -->
-    <div class="config-page__header">
-      <div>
-        <h1 class="config-page__title">{{ t('systemConfig.title') }}</h1>
-        <p class="config-page__subtitle">{{ t('systemConfig.subtitle') }}</p>
-      </div>
-      <div class="config-page__actions">
-        <button class="config-btn" @click="showHistory = true">
-          <span style="margin-right: 6px">🕐</span> {{ t('common.changeHistory') }}
-        </button>
+  <div class="dashboard-container">
+    <!-- Header -->
+    <div class="dashboard-header">
+      <h2>{{ t('systemConfig.title') }}</h2>
+      <div class="header-right">
+        <a-button @click="showHistory = true">
+          <template #icon><HistoryOutlined /></template>
+          {{ t('common.changeHistory') }}
+        </a-button>
       </div>
     </div>
 
-    <div class="config-page__body">
+    <div class="config-body">
       <!-- 左侧导航 -->
       <nav class="config-nav">
-        <button
+        <a-button
           v-for="g in groupList"
           :key="g.key"
+          :type="activeGroup === g.key ? 'primary' : 'text'"
+          :ghost="activeGroup === g.key"
+          block
           class="config-nav__item"
-          :class="{ 'config-nav__item--active': activeGroup === g.key }"
           @click="scrollToGroup(g.key)"
         >
           <span class="config-nav__icon">{{ g.icon }}</span>
           {{ g.label }}
-        </button>
+        </a-button>
       </nav>
 
       <!-- 右侧配置区 -->
       <div class="config-content">
         <template v-for="g in groupList" :key="g.key">
           <!-- AI 配置：特殊处理为模型卡片列表 -->
-          <div v-if="g.key === 'ai'" :id="`config-group-${g.key}`" class="config-group">
-            <div class="config-group__header">
-              <div>
-                <h2 class="config-group__title">{{ g.label }}</h2>
-                <p class="config-group__desc">{{ g.desc }}</p>
+          <a-card v-if="g.key === 'ai'" :bordered="false" :id="`config-group-${g.key}`" style="margin-bottom: 16px;">
+            <template #title>
+              <div class="config-card-title">
+                <div>
+                  <span>{{ g.label }}</span>
+                  <p class="config-card-desc">{{ g.desc }}</p>
+                </div>
+                <a-button type="primary" size="small" @click="openAddModel">＋ 添加模型</a-button>
               </div>
-              <button class="config-btn config-btn--primary" @click="openAddModel">
-                ＋ 添加模型
-              </button>
-            </div>
+            </template>
 
-            <!-- 模型卡片列表 -->
             <div class="model-grid">
               <div v-for="model in aiModels" :key="model.id" class="model-card" :class="{ 'model-card--default': model.is_default }">
                 <div class="model-card__header">
                   <div class="model-card__provider">{{ model.provider }}</div>
                   <div class="model-card__actions">
                     <span v-if="model.is_default" class="model-card__default-tag">默认</span>
-                    <button class="model-card__btn" @click="openEditModel(model)">编辑</button>
-                    <button class="model-card__btn model-card__btn--danger" @click="handleDeleteModel(model.id)">删除</button>
+                    <a-button type="text" size="small" @click="openEditModel(model)">编辑</a-button>
+                    <a-button type="text" size="small" danger @click="handleDeleteModel(model.id)">删除</a-button>
                   </div>
                 </div>
                 <div class="model-card__name">{{ model.name }}</div>
@@ -64,12 +63,10 @@
                   <span v-for="s in model.scenes" :key="s" class="model-card__scene-tag">{{ sceneLabel(s) }}</span>
                 </div>
                 <div class="model-card__footer">
-                  <button class="config-btn config-btn--secondary config-btn--sm" @click="handleTestModel(model)" :disabled="testingModelId === model.id">
+                  <a-button size="small" @click="handleTestModel(model)" :loading="testingModelId === model.id">
                     {{ testingModelId === model.id ? '测试中...' : '🔗 测试连通性' }}
-                  </button>
-                  <button v-if="!model.is_default" class="config-btn config-btn--ghost config-btn--sm" @click="handleSetDefault(model.id)">
-                    设为默认
-                  </button>
+                  </a-button>
+                  <a-button v-if="!model.is_default" size="small" type="link" @click="handleSetDefault(model.id)">设为默认</a-button>
                 </div>
                 <div v-if="testResults[model.id]" class="model-card__test-result" :class="testResults[model.id]?.success ? 'model-card__test-result--ok' : 'model-card__test-result--err'">
                   {{ testResults[model.id]?.success ? '✓' : '✗' }} {{ testResults[model.id]?.message }}
@@ -77,21 +74,25 @@
               </div>
             </div>
 
-            <div v-if="!aiModels.length" class="model-empty">
-              <div class="model-empty__icon">🤖</div>
-              <p class="model-empty__title">暂无模型配置</p>
-              <p class="model-empty__desc">点击「添加模型」配置第一个 AI 模型</p>
+            <div v-if="!aiModels.length" class="empty-state">
+              <div class="empty-state__icon">🤖</div>
+              <p class="empty-state__title">暂无模型配置</p>
+              <p class="empty-state__desc">点击「添加模型」配置第一个 AI 模型</p>
             </div>
-          </div>
+          </a-card>
 
-          <!-- 其他配置组：正常渲染 -->
-          <div v-else :id="`config-group-${g.key}`" class="config-group">
-            <div class="config-group__header">
-              <h2 class="config-group__title">{{ g.label }}</h2>
-              <p class="config-group__desc">{{ g.desc }}</p>
-            </div>
+          <!-- 其他配置组 -->
+          <a-card v-else :bordered="false" :id="`config-group-${g.key}`" style="margin-bottom: 16px;">
+            <template #title>
+              <div class="config-card-title">
+                <div>
+                  <span>{{ g.label }}</span>
+                  <p class="config-card-desc">{{ g.desc }}</p>
+                </div>
+              </div>
+            </template>
 
-            <div class="config-group__fields">
+            <div class="config-fields">
               <template v-for="item in getGroupItems(g.key)" :key="item.key">
                 <div class="config-field">
                   <label class="config-field__label">{{ item.description || item.key }}</label>
@@ -114,70 +115,66 @@
               </template>
             </div>
 
-            <div class="config-group__footer">
-              <div class="config-group__footer-left">
-                <button v-if="g.key === 'notification'" class="config-btn config-btn--secondary" @click="handleTestEmail" :disabled="testing">
-                  {{ testing ? '发送中...' : '📧 发送测试邮件' }}
-                </button>
+            <div class="config-card-footer">
+              <div>
+                <a-button v-if="g.key === 'notification'" @click="handleTestEmail" :loading="testing">📧 发送测试邮件</a-button>
               </div>
-              <div class="config-group__footer-right">
-                <button class="config-btn config-btn--ghost" @click="handleReset(g.key)">恢复默认</button>
-                <button class="config-btn config-btn--primary" @click="handleSave(g.key)" :disabled="!hasChanges(g.key) || saving">
-                  {{ saving ? '保存中...' : '保存' }}
-                </button>
+              <div class="config-card-footer__right">
+                <a-button @click="handleReset(g.key)">恢复默认</a-button>
+                <a-button type="primary" @click="handleSave(g.key)" :disabled="!hasChanges(g.key)" :loading="saving">保存</a-button>
               </div>
             </div>
 
-            <div v-if="testResult && testGroup === g.key" class="config-test-result" :class="testResult.success ? 'config-test-result--ok' : 'config-test-result--err'">
-              <span class="config-test-result__icon">{{ testResult.success ? '✓' : '✗' }}</span>
+            <div v-if="testResult && testGroup === g.key" class="test-result" :class="testResult.success ? 'test-result--ok' : 'test-result--err'">
+              <span>{{ testResult.success ? '✓' : '✗' }}</span>
               {{ testResult.message }}
             </div>
-          </div>
+          </a-card>
         </template>
       </div>
     </div>
 
     <!-- 模型编辑弹窗 -->
     <a-modal v-model:open="modelModalOpen" :title="modelModalIsEdit ? '编辑模型' : '添加模型'" :width="560" @ok="handleSaveModel" @cancel="modelModalOpen = false">
-      <div class="model-form">
-        <div class="model-form__row">
-          <div class="model-form__field">
-            <label class="model-form__label">模型名称 <span class="model-form__required">*</span></label>
+      <div class="modal-form">
+        <div class="modal-form__row">
+          <div class="modal-form__field">
+            <label class="modal-form__label">模型名称 <span class="modal-form__required">*</span></label>
             <a-input v-model:value="modelForm.name" placeholder="如：Claude Sonnet 4" />
           </div>
-          <div class="model-form__field">
-            <label class="model-form__label">提供商</label>
+          <div class="modal-form__field">
+            <label class="modal-form__label">提供商</label>
             <a-select v-model:value="modelForm.provider" :options="providerOptions" style="width: 100%" />
           </div>
         </div>
-        <div class="model-form__field">
-          <label class="model-form__label">模型 ID <span class="model-form__required">*</span></label>
+        <div class="modal-form__field">
+          <label class="modal-form__label">模型 ID <span class="modal-form__required">*</span></label>
           <a-input v-model:value="modelForm.model_id" placeholder="如：claude-sonnet-4-20250514" />
         </div>
-        <div class="model-form__field">
-          <label class="model-form__label">API Key</label>
+        <div class="modal-form__field">
+          <label class="modal-form__label">API Key</label>
           <a-input-password v-model:value="modelForm.api_key" placeholder="请输入 API Key" />
         </div>
-        <div class="model-form__field">
-          <label class="model-form__label">Base URL</label>
+        <div class="modal-form__field">
+          <label class="modal-form__label">Base URL</label>
           <a-input v-model:value="modelForm.base_url" placeholder="https://api.anthropic.com" />
         </div>
-        <div class="model-form__row">
-          <div class="model-form__field">
-            <label class="model-form__label">Temperature</label>
+        <div class="modal-form__row">
+          <div class="modal-form__field">
+            <label class="modal-form__label">Temperature</label>
             <a-slider v-model:value="modelForm.temperature" :min="0" :max="2" :step="0.1" style="width: 100%" />
           </div>
-          <div class="model-form__field" style="width: 120px">
-            <label class="model-form__label">&nbsp;</label>
+          <div class="modal-form__field" style="width: 120px">
+            <label class="modal-form__label">&nbsp;</label>
             <a-input-number v-model:value="modelForm.temperature" :min="0" :max="2" :step="0.1" style="width: 100%" />
           </div>
         </div>
-        <div class="model-form__field">
-          <label class="model-form__label">最大 Token 数</label>
+        <div class="modal-form__field">
+          <label class="modal-form__label">最大 Token 数</label>
           <a-input-number v-model:value="modelForm.max_tokens" :min="256" :max="128000" :step="256" style="width: 160px" />
         </div>
-        <div class="model-form__field">
-          <label class="model-form__label">使用场景</label>
+        <div class="modal-form__field">
+          <label class="modal-form__label">使用场景</label>
           <a-checkbox-group v-model:value="modelForm.scenes" :options="sceneOptions" />
         </div>
       </div>
@@ -196,7 +193,7 @@
             <div class="history-item__desc">{{ record.desc }}</div>
           </div>
         </div>
-        <div v-if="!changeHistory.length" class="history-empty">暂无变更记录</div>
+        <div v-if="!changeHistory.length" class="empty-state">暂无变更记录</div>
       </div>
     </a-drawer>
   </div>
@@ -208,7 +205,9 @@ import {
   Input as AInput, InputPassword as AInputPassword, InputNumber as AInputNumber,
   Select as ASelect, Drawer as ADrawer, Modal as AModal,
   Slider as ASlider, CheckboxGroup as ACheckboxGroup,
+  Card as ACard, Button as AButton,
 } from 'ant-design-vue'
+import { HistoryOutlined } from '@ant-design/icons-vue'
 import { systemConfigApi, type ConfigItem, type TestResult, type AiModel, type ModelScene } from '../../api/systemConfig'
 import { useToast } from '../../composables/useToast'
 import { useLanguage } from '../../composables/useLanguage'
@@ -226,17 +225,14 @@ const groupList = computed(() => [
 
 const activeGroup = ref('basic')
 const showHistory = ref(false)
-
 const configData = ref<Record<string, ConfigItem[]>>({})
 const editingValues = reactive<Record<string, string | number | null>>({})
 const originalValues = reactive<Record<string, string | null>>({})
-
 const testing = ref(false)
 const saving = ref(false)
 const testResult = ref<TestResult | null>(null)
 const testGroup = ref<string | null>(null)
 
-// ── AI 模型管理 ──
 const aiModels = ref<AiModel[]>([])
 const modelScenes = ref<ModelScene[]>([])
 const testingModelId = ref<string | null>(null)
@@ -259,10 +255,7 @@ const providerOptions = [
 ]
 
 const sceneOptions = computed(() => modelScenes.value.map(s => ({ label: s.label, value: s.key })))
-
-function sceneLabel(key: string) {
-  return modelScenes.value.find(s => s.key === key)?.label || key
-}
+function sceneLabel(key: string) { return modelScenes.value.find(s => s.key === key)?.label || key }
 
 const changeHistory = ref([
   { user: 'admin', time: '2026-06-08 14:30', desc: '修改了「AI配置」→ 添加模型 DeepSeek V3', type: 'create' },
@@ -271,38 +264,12 @@ const changeHistory = ref([
   { user: '系统', time: '2026-06-07 09:00', desc: '系统初始化：默认配置已写入', type: 'init' },
 ])
 
-function getGroupItems(group: string): ConfigItem[] {
-  return configData.value[group] || []
-}
-
-function isTextField(key: string) {
-  return ['system_name', 'local_path', 'smtp_host', 'smtp_username', 'base_url', 'webhook_url', 'smtp_from_name', 'client_id', 'redirect_uri'].some(k => key.includes(k))
-}
-
-function isNumberField(key: string) {
-  return ['password_min_length', 'session_timeout', 'smtp_port', 'max_upload_mb', 'timeout_seconds'].some(k => key.includes(k))
-}
-
-function getMin(key: string) {
-  if (key.includes('password_min_length')) return 6
-  if (key.includes('session_timeout')) return 5
-  if (key.includes('smtp_port')) return 1
-  if (key.includes('max_upload_mb')) return 1
-  if (key.includes('timeout_seconds')) return 10
-  return 0
-}
-
-function getMax(key: string) {
-  if (key.includes('password_min_length')) return 32
-  if (key.includes('session_timeout')) return 1440
-  if (key.includes('smtp_port')) return 65535
-  if (key.includes('max_upload_mb')) return 1024
-  if (key.includes('timeout_seconds')) return 300
-  return 9999
-}
-
+function getGroupItems(group: string): ConfigItem[] { return configData.value[group] || [] }
+function isTextField(key: string) { return ['system_name', 'local_path', 'smtp_host', 'smtp_username', 'base_url', 'webhook_url', 'smtp_from_name', 'client_id', 'redirect_uri'].some(k => key.includes(k)) }
+function isNumberField(key: string) { return ['password_min_length', 'session_timeout', 'smtp_port', 'max_upload_mb', 'timeout_seconds'].some(k => key.includes(k)) }
+function getMin(key: string) { if (key.includes('password_min_length')) return 6; if (key.includes('session_timeout')) return 5; if (key.includes('smtp_port')) return 1; if (key.includes('max_upload_mb')) return 1; if (key.includes('timeout_seconds')) return 10; return 0 }
+function getMax(key: string) { if (key.includes('password_min_length')) return 32; if (key.includes('session_timeout')) return 1440; if (key.includes('smtp_port')) return 65535; if (key.includes('max_upload_mb')) return 1024; if (key.includes('timeout_seconds')) return 300; return 9999 }
 function getStep(_key: string) { return 1 }
-
 function getSelectOptions(key: string) {
   if (key === 'language') return [{ label: '简体中文', value: 'zh-CN' }, { label: 'English', value: 'en' }]
   if (key === 'timezone') return [{ label: 'Asia/Shanghai', value: 'Asia/Shanghai' }, { label: 'UTC', value: 'UTC' }]
@@ -313,14 +280,9 @@ function getSelectOptions(key: string) {
   if (key === 'sso_provider') return [{ label: 'OIDC', value: 'oidc' }, { label: 'SAML', value: 'saml' }, { label: 'LDAP', value: 'ldap' }]
   return null
 }
-
 function hasChanges(group: string) {
   const items = configData.value[group] || []
-  return items.some(item => {
-    const edited = editingValues[item.key]
-    const original = originalValues[item.key]
-    return edited !== undefined && String(edited) !== String(original ?? '')
-  })
+  return items.some(item => { const edited = editingValues[item.key]; const original = originalValues[item.key]; return edited !== undefined && String(edited) !== String(original ?? '') })
 }
 
 async function fetchConfig() {
@@ -328,45 +290,29 @@ async function fetchConfig() {
     const res = await systemConfigApi.getAll()
     configData.value = res.groups
     for (const [, items] of Object.entries(res.groups)) {
-      for (const item of items) {
-        editingValues[item.key] = item.value ?? ''
-        originalValues[item.key] = item.value ?? ''
-      }
+      for (const item of items) { editingValues[item.key] = item.value ?? ''; originalValues[item.key] = item.value ?? '' }
     }
-    // 同步语言设置到 i18n
     const savedLang = editingValues['language']
-    if (savedLang && (savedLang === 'zh-CN' || savedLang === 'en')) {
-      switchLanguage(savedLang as string)
-    }
+    if (savedLang && (savedLang === 'zh-CN' || savedLang === 'en')) { switchLanguage(savedLang as string) }
   } catch { /* ignore */ }
 }
 
-// 监听语言配置变化，实时切换界面语言
 watch(() => editingValues['language'], (newLang) => {
-  if (newLang && (newLang === 'zh-CN' || newLang === 'en')) {
-    switchLanguage(newLang as string)
-  }
+  if (newLang && (newLang === 'zh-CN' || newLang === 'en')) { switchLanguage(newLang as string) }
 })
 
 async function fetchAiModels() {
-  try {
-    const res = await systemConfigApi.getAiModels()
-    aiModels.value = res.models
-    modelScenes.value = res.scenes
-  } catch { /* ignore */ }
+  try { const res = await systemConfigApi.getAiModels(); aiModels.value = res.models; modelScenes.value = res.scenes } catch { /* ignore */ }
 }
 
 async function handleSave(group: string) {
   saving.value = true
   try {
-    const items = (configData.value[group] || []).map(item => ({
-      key: item.key,
-      value: editingValues[item.key] !== undefined ? String(editingValues[item.key]) : null,
-    }))
+    const items = (configData.value[group] || []).map(item => ({ key: item.key, value: editingValues[item.key] !== undefined ? String(editingValues[item.key]) : null }))
     await systemConfigApi.save(group, items)
     success('保存成功')
     for (const item of items) originalValues[item.key] = item.value
-    changeHistory.value.unshift({ user: 'admin', time: new Date().toLocaleString('zh-CN'), desc: `修改了「${groupList.find(g => g.key === group)?.label || group}」配置`, type: 'update' })
+    changeHistory.value.unshift({ user: 'admin', time: new Date().toLocaleString('zh-CN'), desc: `修改了「${groupList.value.find(g => g.key === group)?.label || group}」配置`, type: 'update' })
   } catch (e: any) { error(e?.response?.data?.detail || '保存失败') } finally { saving.value = false }
 }
 
@@ -388,8 +334,6 @@ function scrollToGroup(key: string) {
   nextTick(() => { document.getElementById(`config-group-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) })
 }
 
-// ── 模型管理 ──
-
 function openAddModel() {
   modelModalIsEdit.value = false; editingModelId.value = null
   Object.assign(modelForm, { id: '', name: '', provider: 'Anthropic', model_id: '', api_key: '', base_url: 'https://api.anthropic.com', temperature: 0.7, max_tokens: 4096, scenes: ['general'], is_default: false })
@@ -408,25 +352,13 @@ async function handleSaveModel() {
   if (modelModalIsEdit.value && editingModelId.value) {
     models = models.map(m => m.id === editingModelId.value ? { ...m, ...modelForm } as AiModel : m)
   } else {
-    const newModel: AiModel = {
-      id: `model-${Date.now()}`,
-      name: modelForm.name || '',
-      provider: modelForm.provider || '其他',
-      model_id: modelForm.model_id || '',
-      api_key: modelForm.api_key || '',
-      base_url: modelForm.base_url || '',
-      temperature: modelForm.temperature ?? 0.7,
-      max_tokens: modelForm.max_tokens ?? 4096,
-      scenes: modelForm.scenes || ['general'],
-      is_default: models.length === 0,
-    }
+    const newModel: AiModel = { id: `model-${Date.now()}`, name: modelForm.name || '', provider: modelForm.provider || '其他', model_id: modelForm.model_id || '', api_key: modelForm.api_key || '', base_url: modelForm.base_url || '', temperature: modelForm.temperature ?? 0.7, max_tokens: modelForm.max_tokens ?? 4096, scenes: modelForm.scenes || ['general'], is_default: models.length === 0 }
     models.push(newModel)
   }
   try {
     await systemConfigApi.saveAiModels(models)
     success(modelModalIsEdit.value ? '模型已更新' : '模型已添加')
-    modelModalOpen.value = false
-    fetchAiModels()
+    modelModalOpen.value = false; fetchAiModels()
     changeHistory.value.unshift({ user: 'admin', time: new Date().toLocaleString('zh-CN'), desc: `${modelModalIsEdit.value ? '修改' : '添加'}了AI模型「${modelForm.name}」`, type: modelModalIsEdit.value ? 'update' : 'create' })
   } catch (e: any) { error(e?.response?.data?.detail || '保存失败') }
 }
@@ -434,121 +366,91 @@ async function handleSaveModel() {
 async function handleDeleteModel(id: string) {
   if (!confirm('确定删除该模型？')) return
   const models = aiModels.value.filter(m => m.id !== id)
-  try {
-    await systemConfigApi.saveAiModels(models)
-    success('模型已删除')
-    fetchAiModels()
-  } catch { error('删除失败') }
+  try { await systemConfigApi.saveAiModels(models); success('模型已删除'); fetchAiModels() } catch { error('删除失败') }
 }
 
 async function handleSetDefault(id: string) {
   const models = aiModels.value.map(m => ({ ...m, is_default: m.id === id }))
-  try {
-    await systemConfigApi.saveAiModels(models)
-    success('已设为默认模型')
-    fetchAiModels()
-  } catch { error('设置失败') }
+  try { await systemConfigApi.saveAiModels(models); success('已设为默认模型'); fetchAiModels() } catch { error('设置失败') }
 }
 
 async function handleTestModel(model: AiModel) {
   testingModelId.value = model.id; testResults[model.id] = null
-  try {
-    testResults[model.id] = await systemConfigApi.testAiModel({ api_key: model.api_key, base_url: model.base_url, model_id: model.model_id })
-  } catch { testResults[model.id] = { success: false, message: '测试请求失败' } } finally { testingModelId.value = null }
+  try { testResults[model.id] = await systemConfigApi.testAiModel({ api_key: model.api_key, base_url: model.base_url, model_id: model.model_id }) } catch { testResults[model.id] = { success: false, message: '测试请求失败' } } finally { testingModelId.value = null }
 }
 
 onMounted(() => { fetchConfig(); fetchAiModels() })
 </script>
 
 <style scoped>
-.config-page { padding: 24px 32px; }
-.config-page__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
-.config-page__title { font-size: 28px; font-weight: 700; color: var(--neutral-900); margin: 0; }
-.config-page__subtitle { font-size: 13px; color: var(--neutral-500); margin: 6px 0 0; }
-.config-page__actions { display: flex; gap: 8px; }
-.config-page__body { display: flex; gap: 32px; }
+.dashboard-container { padding: 24px 32px; }
+.dashboard-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.dashboard-header h2 { margin: 0; font-size: 22px; font-weight: 600; }
+.header-right { display: flex; align-items: center; gap: 12px; }
 
-.config-nav { width: 160px; flex-shrink: 0; position: sticky; top: 80px; align-self: flex-start; display: flex; flex-direction: column; gap: 4px; }
-.config-nav__item { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: none; background: transparent; font-size: 14px; color: var(--neutral-600); cursor: pointer; border-radius: 8px; text-align: left; transition: all 0.2s; font-family: inherit; border-left: 3px solid transparent; }
-.config-nav__item:hover { background: var(--neutral-100); }
-.config-nav__item--active { color: var(--semantic-600); background: var(--semantic-50, #f0f4ff); font-weight: 600; border-left-color: var(--semantic-600); }
-.config-nav__icon { font-size: 16px; }
-
+.config-body { display: flex; gap: 24px; }
+.config-nav { width: 150px; flex-shrink: 0; position: sticky; top: 80px; align-self: flex-start; display: flex; flex-direction: column; gap: 4px; }
+.config-nav__item { text-align: left !important; }
+.config-nav__icon { margin-right: 6px; }
 .config-content { flex: 1; min-width: 0; }
-.config-group { background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: 14px; padding: 28px; margin-bottom: 24px; }
-.config-group__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--neutral-100); }
-.config-group__title { font-size: 18px; font-weight: 700; color: var(--neutral-900); margin: 0 0 4px; }
-.config-group__desc { font-size: 13px; color: var(--neutral-500); margin: 0; }
-.config-group__fields { display: flex; flex-direction: column; gap: 18px; }
+
+.config-card-title { display: flex; justify-content: space-between; align-items: flex-start; }
+.config-card-title span { font-size: 16px; font-weight: 600; }
+.config-card-desc { font-size: 12px; color: var(--color-text-secondary, #888); margin: 4px 0 0; font-weight: 400; }
+
+.config-fields { display: flex; flex-direction: column; gap: 18px; }
 .config-field { display: flex; flex-direction: column; gap: 8px; }
-.config-field__label { font-size: 13px; font-weight: 600; color: var(--neutral-700); }
-.config-group__footer { display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--neutral-100); }
-.config-group__footer-left { display: flex; gap: 12px; }
-.config-group__footer-right { display: flex; gap: 12px; }
+.config-field__label { font-size: 13px; font-weight: 500; }
 
-.config-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; cursor: pointer; border: 1px solid var(--neutral-200); background: var(--neutral-0); color: var(--neutral-700); transition: all 0.2s; font-family: inherit; display: flex; align-items: center; gap: 4px; }
-.config-btn:hover { border-color: var(--neutral-300); }
-.config-btn--primary { background: var(--semantic-600); color: #fff; border-color: var(--semantic-600); }
-.config-btn--primary:hover { background: var(--semantic-700, #4f46e5); }
-.config-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.config-btn--secondary { background: var(--neutral-50); }
-.config-btn--ghost { background: transparent; border-color: transparent; color: var(--neutral-500); }
-.config-btn--sm { padding: 5px 12px; font-size: 12px; }
+.config-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-bg-elevated, #f0f0f0); }
+.config-card-footer__right { display: flex; gap: 8px; }
 
-.config-test-result { margin-top: 16px; padding: 12px 16px; border-radius: 8px; font-size: 13px; display: flex; align-items: center; gap: 10px; }
-.config-test-result__icon { font-size: 18px; font-weight: 700; }
-.config-test-result--ok { background: rgba(16, 185, 129, 0.08); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.2); }
-.config-test-result--err { background: rgba(250, 82, 82, 0.08); color: #fa5252; border: 1px solid rgba(250, 82, 82, 0.2); }
+.test-result { margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.test-result--ok { background: rgba(16, 185, 129, 0.08); color: #10b981; }
+.test-result--err { background: rgba(250, 82, 82, 0.08); color: #fa5252; }
 
-/* 模型卡片 */
 .model-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-.model-card { border: 1px solid var(--neutral-200); border-radius: 12px; padding: 20px; transition: all 0.2s; background: var(--neutral-0); }
-.model-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); border-color: var(--neutral-300); }
-.model-card--default { border-color: var(--semantic-300, #a5b4fc); background: var(--semantic-50, #f0f4ff); }
-.model-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-.model-card__provider { font-size: 11px; color: var(--neutral-400); text-transform: uppercase; letter-spacing: 0.5px; }
-.model-card__actions { display: flex; align-items: center; gap: 6px; }
-.model-card__default-tag { font-size: 11px; padding: 2px 8px; background: var(--semantic-100, #e0e7ff); color: var(--semantic-600); border-radius: 4px; font-weight: 600; }
-.model-card__btn { background: none; border: none; cursor: pointer; font-size: 12px; color: var(--neutral-500); padding: 2px 6px; border-radius: 4px; transition: all 0.15s; }
-.model-card__btn:hover { background: var(--neutral-100); color: var(--neutral-700); }
-.model-card__btn--danger:hover { background: rgba(250, 82, 82, 0.1); color: #fa5252; }
-.model-card__name { font-size: 16px; font-weight: 700; color: var(--neutral-900); margin-bottom: 2px; }
-.model-card__id { font-size: 12px; font-family: var(--font-mono); color: var(--neutral-400); margin-bottom: 10px; }
-.model-card__config { display: flex; gap: 16px; font-size: 12px; color: var(--neutral-500); margin-bottom: 10px; }
-.model-card__scenes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
-.model-card__scene-tag { font-size: 11px; padding: 2px 8px; background: var(--neutral-100); color: var(--neutral-600); border-radius: 4px; }
+.model-card { border: 1px solid var(--color-bg-elevated, #f0f0f0); border-radius: 8px; padding: 16px; transition: all 0.2s; }
+.model-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.model-card--default { border-color: #a5b4fc; background: rgba(99, 102, 241, 0.04); }
+.model-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.model-card__provider { font-size: 11px; color: var(--color-text-secondary, #888); text-transform: uppercase; letter-spacing: 0.5px; }
+.model-card__actions { display: flex; align-items: center; gap: 4px; }
+.model-card__default-tag { font-size: 11px; padding: 2px 8px; background: #e0e7ff; color: #6366f1; border-radius: 4px; font-weight: 600; }
+.model-card__name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.model-card__id { font-size: 12px; font-family: var(--font-mono, monospace); color: var(--color-text-secondary, #888); margin-bottom: 8px; }
+.model-card__config { display: flex; gap: 16px; font-size: 12px; color: var(--color-text-secondary, #888); margin-bottom: 8px; }
+.model-card__scenes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.model-card__scene-tag { font-size: 11px; padding: 2px 8px; background: var(--color-bg-container, #fafafa); color: var(--color-text-secondary, #888); border-radius: 4px; }
 .model-card__footer { display: flex; gap: 8px; align-items: center; }
-.model-card__test-result { margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 12px; }
+.model-card__test-result { margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
 .model-card__test-result--ok { background: rgba(16, 185, 129, 0.08); color: #10b981; }
 .model-card__test-result--err { background: rgba(250, 82, 82, 0.08); color: #fa5252; }
 
-.model-empty { text-align: center; padding: 40px; }
-.model-empty__icon { font-size: 48px; margin-bottom: 12px; opacity: 0.8; }
-.model-empty__title { font-size: 16px; font-weight: 600; color: var(--neutral-700); margin-bottom: 4px; }
-.model-empty__desc { font-size: 13px; color: var(--neutral-400); }
+.empty-state { text-align: center; padding: 40px; }
+.empty-state__icon { font-size: 48px; margin-bottom: 12px; opacity: 0.8; }
+.empty-state__title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.empty-state__desc { font-size: 13px; color: var(--color-text-secondary, #888); }
 
-/* 模型表单 */
-.model-form { display: flex; flex-direction: column; gap: 16px; }
-.model-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.model-form__field { display: flex; flex-direction: column; gap: 6px; }
-.model-form__label { font-size: 13px; font-weight: 500; color: var(--neutral-700); }
-.model-form__required { color: var(--status-error, #fa5252); }
+.modal-form { display: flex; flex-direction: column; gap: 16px; }
+.modal-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.modal-form__field { display: flex; flex-direction: column; gap: 6px; }
+.modal-form__label { font-size: 13px; font-weight: 500; }
+.modal-form__required { color: #fa5252; }
 
-/* 变更记录 */
 .history-list { display: flex; flex-direction: column; }
-.history-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--neutral-100); }
+.history-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--color-bg-elevated, #f0f0f0); }
 .history-item:last-child { border-bottom: none; }
 .history-item__dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
-.history-item__dot--update { background: var(--semantic-500, #6366f1); }
-.history-item__dot--create { background: var(--status-success, #10b981); }
-.history-item__dot--init { background: var(--neutral-400); }
+.history-item__dot--update { background: #6366f1; }
+.history-item__dot--create { background: #10b981; }
+.history-item__dot--init { background: #999; }
 .history-item__content { flex: 1; }
 .history-item__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.history-item__user { font-size: 13px; font-weight: 600; color: var(--neutral-800); }
-.history-item__time { font-size: 12px; color: var(--neutral-400); font-family: var(--font-mono); }
-.history-item__desc { font-size: 13px; color: var(--neutral-600); }
-.history-empty { text-align: center; padding: 40px; color: var(--neutral-400); }
+.history-item__user { font-size: 13px; font-weight: 600; }
+.history-item__time { font-size: 12px; color: var(--color-text-secondary, #888); font-family: var(--font-mono, monospace); }
+.history-item__desc { font-size: 13px; color: var(--color-text-secondary, #888); }
 
 @media (max-width: 1440px) { .model-grid { grid-template-columns: 1fr; } }
-@media (max-width: 1280px) { .config-nav { display: none; } .config-page__body { flex-direction: column; } }
+@media (max-width: 1280px) { .config-nav { display: none; } .config-body { flex-direction: column; } }
 </style>
