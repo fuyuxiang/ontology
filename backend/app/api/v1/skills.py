@@ -6,6 +6,7 @@ from typing import Optional
 
 from app.database import get_db
 from app.models.skill import Skill
+from app.models.skill_tool_ref import SkillToolRef
 
 router = APIRouter(prefix="/skills", tags=["skills"])
 
@@ -135,3 +136,53 @@ def deprecate(sid: str, db: Session = Depends(get_db)):
     s.status = "deprecated"
     db.commit()
     return _skill_out(s)
+
+
+# ---------------------------------------------------------------------------
+# SkillToolRef endpoints
+# ---------------------------------------------------------------------------
+
+class SkillToolRefCreate(BaseModel):
+    version_id: str
+    ref_type: str
+    ref_id: str
+    alias: str
+    description: str = ""
+    param_override: Optional[dict] = None
+
+
+@router.get("/{skill_id}/tool-refs")
+def list_tool_refs(skill_id: str, db: Session = Depends(get_db)):
+    refs = db.query(SkillToolRef).filter(SkillToolRef.skill_id == skill_id).all()
+    return [{"id": r.id, "ref_type": r.ref_type, "ref_id": r.ref_id,
+             "alias": r.alias, "description": r.description,
+             "version_id": r.version_id, "param_override": r.param_override}
+            for r in refs]
+
+
+@router.post("/{skill_id}/tool-refs")
+def add_tool_ref(skill_id: str, req: SkillToolRefCreate, db: Session = Depends(get_db)):
+    ref = SkillToolRef(
+        skill_id=skill_id,
+        version_id=req.version_id,
+        ref_type=req.ref_type,
+        ref_id=req.ref_id,
+        alias=req.alias,
+        description=req.description,
+        param_override=req.param_override,
+    )
+    db.add(ref)
+    db.commit()
+    db.refresh(ref)
+    return {"id": ref.id, "alias": ref.alias}
+
+
+@router.delete("/{skill_id}/tool-refs/{ref_id}")
+def remove_tool_ref(skill_id: str, ref_id: str, db: Session = Depends(get_db)):
+    ref = db.query(SkillToolRef).filter(
+        SkillToolRef.id == ref_id, SkillToolRef.skill_id == skill_id
+    ).first()
+    if ref:
+        db.delete(ref)
+        db.commit()
+    return {"message": "ok"}
