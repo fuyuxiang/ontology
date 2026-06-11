@@ -290,6 +290,66 @@
         </div>
       </template>
 
+      <!-- functionCall -->
+      <template v-else-if="node.type === 'functionCall'">
+        <div class="aip-field">
+          <label>选择函数（已发布版本）</label>
+          <ResourcePicker type="versionFunction" :model-value="node.data.ref_id || ''"
+            @update:model-value="(v: string) => onPick('ref_id', v)" placeholder="选择已发布函数" />
+        </div>
+        <div class="aip-field">
+          <label>输出变量名</label>
+          <input v-model="node.data.output_var" class="aip-input" @input="touch" placeholder="result" />
+        </div>
+        <div class="aip-field" v-if="node.data.ref_id">
+          <label>参数映射</label>
+          <ParamMappingEditor
+            :params="node.data._input_schema || []"
+            :model-value="node.data.param_mapping || {}"
+            :upstream-nodes="store.nodes.filter((n: any) => n.id !== node.id)"
+            @update:model-value="(v: any) => { node.data.param_mapping = v; touch() }" />
+        </div>
+      </template>
+
+      <!-- ruleEvaluate -->
+      <template v-else-if="node.type === 'ruleEvaluate'">
+        <div class="aip-field">
+          <label>选择规则（已发布版本）</label>
+          <ResourcePicker type="versionRule" :model-value="node.data.ref_id || ''"
+            @update:model-value="(v: string) => onPick('ref_id', v)" placeholder="选择已发布规则" />
+        </div>
+        <div class="aip-field" v-if="node.data.ref_id">
+          <label>参数映射</label>
+          <ParamMappingEditor
+            :params="node.data._input_params || []"
+            :model-value="node.data.param_mapping || {}"
+            :upstream-nodes="store.nodes.filter((n: any) => n.id !== node.id)"
+            @update:model-value="(v: any) => { node.data.param_mapping = v; touch() }" />
+        </div>
+        <div class="aip-field">
+          <div class="aip-hint" style="font-size: 11px; color: #64748b;">
+            规则评估输出 true/false，分别从右侧和下方端口连出
+          </div>
+        </div>
+      </template>
+
+      <!-- actionExecute -->
+      <template v-else-if="node.type === 'actionExecute'">
+        <div class="aip-field">
+          <label>选择行动（已发布版本）</label>
+          <ResourcePicker type="versionAction" :model-value="node.data.ref_id || ''"
+            @update:model-value="(v: string) => onPick('ref_id', v)" placeholder="选择已发布行动" />
+        </div>
+        <div class="aip-field" v-if="node.data.ref_id">
+          <label>参数映射</label>
+          <ParamMappingEditor
+            :params="node.data._parameters_json || []"
+            :model-value="node.data.param_mapping || {}"
+            :upstream-nodes="store.nodes.filter((n: any) => n.id !== node.id)"
+            @update:model-value="(v: any) => { node.data.param_mapping = v; touch() }" />
+        </div>
+      </template>
+
       <div class="aip-pp__actions">
         <button class="aip-btn aip-btn--danger" @click="onDelete">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -305,6 +365,7 @@ import { computed } from 'vue'
 import { useAipStore } from '../../../store/aip'
 import { LLM_MODELS, ML_MODELS, OPERATORS, ACTION_TYPES, HTTP_METHODS, NODE_TYPES } from '../aipData'
 import ResourcePicker from '../../../components/aip/ResourcePicker.vue'
+import ParamMappingEditor from './ParamMappingEditor.vue'
 
 const store = useAipStore()
 const node = computed(() => store.selectedNode)
