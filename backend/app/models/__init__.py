@@ -35,6 +35,7 @@ from app.models.monitor import ServiceMetric, LLMCallRecord, Alert
 from app.models.skill import Skill
 from app.models.skill_version import SkillVersion
 from app.models.skill_tool import SkillTool
+from app.models.skill_tool_ref import SkillToolRef
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
@@ -55,5 +56,5 @@ __all__ = [
     "QualityRule", "HealthStatus",
     "ServiceMetric", "LLMCallRecord", "Alert",
     # Skill Generation Platform
-    "Skill", "SkillVersion", "SkillTool",
+    "Skill", "SkillVersion", "SkillTool", "SkillToolRef",
 ]
