@@ -32,6 +32,15 @@ class OntologyVersion(Base):
         back_populates="version", cascade="all, delete-orphan",
         foreign_keys="OntologyVersionRelation.version_id"
     )
+    functions: Mapped[list["OntologyVersionFunction"]] = relationship(
+        back_populates="version", cascade="all, delete-orphan"
+    )
+    rules: Mapped[list["OntologyVersionRule"]] = relationship(
+        back_populates="version", cascade="all, delete-orphan"
+    )
+    actions: Mapped[list["OntologyVersionAction"]] = relationship(
+        back_populates="version", cascade="all, delete-orphan"
+    )
 
 
 class OntologyVersionEntity(Base):
