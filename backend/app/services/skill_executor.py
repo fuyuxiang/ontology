@@ -629,3 +629,81 @@ def execute_generated_skill(skill, params: dict, db) -> dict:
         "summary": f"Executed {len(tools)} tools",
         "data": results,
     }
+
+
+def build_ontology_tools(skill_id: str, db: Session) -> list[dict]:
+    """Build LLM tool definitions from skill's ontology component refs."""
+    from app.models.skill_tool_ref import SkillToolRef
+    from app.models.version_components import (
+        OntologyVersionFunction, OntologyVersionRule, OntologyVersionAction,
+    )
+
+    refs = db.query(SkillToolRef).filter(SkillToolRef.skill_id == skill_id).all()
+    tools = []
+
+    for ref in refs:
+        if ref.ref_type == "function":
+            comp = db.query(OntologyVersionFunction).filter(
+                OntologyVersionFunction.id == ref.ref_id
+            ).first()
+            if not comp:
+                continue
+            params_list = comp.input_schema or []
+        elif ref.ref_type == "rule":
+            comp = db.query(OntologyVersionRule).filter(
+                OntologyVersionRule.id == ref.ref_id
+            ).first()
+            if not comp:
+                continue
+            params_list = comp.input_params or []
+        elif ref.ref_type == "action":
+            comp = db.query(OntologyVersionAction).filter(
+                OntologyVersionAction.id == ref.ref_id
+            ).first()
+            if not comp:
+                continue
+            params_list = comp.parameters_json or []
+        else:
+            continue
+
+        # Convert params list to JSON Schema properties
+        properties = {}
+        required = []
+        for p in params_list:
+            prop_type = _map_type(p.get("type", "string"))
+            properties[p["name"]] = {"type": prop_type}
+            if p.get("description"):
+                properties[p["name"]]["description"] = p["description"]
+            if p.get("required"):
+                required.append(p["name"])
+
+        tools.append({
+            "type": "function",
+            "function": {
+                "name": ref.alias,
+                "description": ref.description or getattr(comp, 'description', '') or comp.name,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            },
+            "_meta": {
+                "ref_type": ref.ref_type,
+                "ref_id": ref.ref_id,
+            },
+        })
+
+    return tools
+
+
+def _map_type(t: str) -> str:
+    """Map ontology types to JSON Schema types."""
+    mapping = {
+        "string": "string", "text": "string",
+        "number": "number", "integer": "integer", "int": "integer",
+        "float": "number", "decimal": "number",
+        "boolean": "boolean", "bool": "boolean",
+        "date": "string", "datetime": "string",
+    }
+    return mapping.get(t.lower(), "string")
