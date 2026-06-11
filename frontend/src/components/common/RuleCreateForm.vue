@@ -14,6 +14,10 @@
       </div>
       <div class="form-row">
         <label class="form-label">触发条件</label>
+        <!-- TODO(attribute_id binding): when this form is upgraded to structured conditions
+             (conditions_json list), each condition row should include entity_id + attribute_id
+             selectors so the field reference can be linked to a specific ontology entity attribute.
+             See FunctionBuilderDrawer.vue input_params rows for the implemented pattern. -->
         <input v-model="form.condition_expr" class="form-input form-input--code" placeholder="如 arpu >= 100 AND tenure >= 12" required />
       </div>
       <div class="form-row">

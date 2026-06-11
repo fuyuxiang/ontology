@@ -33,7 +33,7 @@ const form = ref({
   return_type: 'string',
   is_derived_property: false,
   tags: '',
-  input_params: [] as { name: string; type: string; required: boolean; description: string }[],
+  input_params: [] as { name: string; type: string; required: boolean; description: string; entity_id?: string; attribute_id?: string }[],
   logic_type: 'expression' as 'expression' | 'sql' | 'python',
   logic_body: '',
 })
@@ -52,6 +52,10 @@ async function load() {
     form.value.is_derived_property = fn.is_derived_property
     form.value.tags = Array.isArray(fn.tags) ? fn.tags.join(', ') : ''
     form.value.input_params = (fn.input_schema ?? []) as any
+    // pre-load attributes for any params that already have entity_id
+    for (const p of form.value.input_params) {
+      if ((p as any).entity_id) loadAttributesForEntity((p as any).entity_id)
+    }
     form.value.logic_type = (fn.logic_type as any) ?? 'expression'
     form.value.logic_body = fn.logic_body ?? ''
   }
@@ -73,11 +77,44 @@ function resetForm() {
   }
 }
 
+// attribute_id binding: keyed by entity_id -> list of attributes
+const entityAttributes = ref<Record<string, { id: string; name: string; name_cn: string; data_type: string }[]>>({})
+
+async function loadAttributesForEntity(entityId: string) {
+  if (!entityId || entityAttributes.value[entityId]) return
+  try {
+    const entity = await entityApi.detail(entityId)
+    entityAttributes.value[entityId] = (entity.attributes ?? []).map((a: any) => ({
+      id: a.id, name: a.name, name_cn: a.name_cn || a.name, data_type: a.data_type || 'string',
+    }))
+  } catch {
+    entityAttributes.value[entityId] = []
+  }
+}
+
+function onParamEntityChange(p: any, entityId: string) {
+  p.entity_id = entityId || undefined
+  p.attribute_id = undefined
+  if (entityId) loadAttributesForEntity(entityId)
+}
+
+function onParamAttributeChange(p: any, attributeId: string) {
+  p.attribute_id = attributeId || undefined
+  // auto-fill type from attribute data_type when available
+  if (attributeId && p.entity_id && entityAttributes.value[p.entity_id]) {
+    const attr = entityAttributes.value[p.entity_id].find(a => a.id === attributeId)
+    if (attr) {
+      const typeMap: Record<string, string> = { integer: 'number', float: 'number', double: 'number', boolean: 'boolean', date: 'date', datetime: 'date' }
+      p.type = typeMap[attr.data_type] ?? 'string'
+    }
+  }
+}
+
 watch(() => props.visible, (v) => { if (v) { resetForm(); load() } })
 onMounted(() => { if (props.visible) { resetForm(); load() } })
 
 function addParam() {
-  form.value.input_params.push({ name: '', type: 'string', required: false, description: '' })
+  form.value.input_params.push({ name: '', type: 'string', required: false, description: '', entity_id: undefined, attribute_id: undefined })
 }
 function removeParam(idx: number) {
   form.value.input_params.splice(idx, 1)
@@ -216,6 +253,15 @@ async function runTest() {
                 <option value="json">json</option>
               </select>
               <input class="form-input" style="flex:2;min-width:100px;" v-model="p.description" placeholder="说明（可选）" />
+              <!-- attribute_id binding: link this param to an ontology entity attribute for type-safety -->
+              <select class="form-input" style="flex:1.2;min-width:90px;" :value="p.entity_id || ''" @change="onParamEntityChange(p, ($event.target as HTMLSelectElement).value)" title="关联实体（可选）">
+                <option value="">— 关联实体 —</option>
+                <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
+              </select>
+              <select class="form-input" style="flex:1.5;min-width:100px;" :value="p.attribute_id || ''" @change="onParamAttributeChange(p, ($event.target as HTMLSelectElement).value)" :disabled="!p.entity_id" title="关联属性（可选）">
+                <option value="">— 关联属性 —</option>
+                <option v-for="a in (entityAttributes[p.entity_id || ''] || [])" :key="a.id" :value="a.id">{{ a.name_cn || a.name }}</option>
+              </select>
               <label style="display:flex;align-items:center;gap:4px;font-size:12px;flex-shrink:0;">
                 <input type="checkbox" v-model="p.required" /> 必填
               </label>
