@@ -94,6 +94,11 @@ const RAW_GROUPS: Array<{ label: string; color: string; nodes: NodeItem[] }> = [
     { type: 'ruleEngine', label: '规则引擎', icon: 'filter', description: '执行业务规则' },
     { type: 'llmAgent', label: '模型节点', icon: 'brain', description: 'AI 智能推理' },
   ] },
+  { label: '本体组件', color: '#0D9488', nodes: [
+    { type: 'functionCall', label: '函数调用', icon: 'tool', description: '调用已发布的本体函数，返回计算结果' },
+    { type: 'ruleEvaluate', label: '规则评估', icon: 'filter', description: '评估已发布的业务规则，输出 true/false 分支' },
+    { type: 'actionExecute', label: '行动执行', icon: 'send', description: '执行已发布的行动（API调用/通知/写回等）' },
+  ] },
   { label: 'Agent 节点', color: '#10B981', nodes: [
     { type: 'agentNode', label: 'Agent 节点', icon: 'robot', description: '挂多个 Skill / Memory / Tool 子节点' },
   ] },
