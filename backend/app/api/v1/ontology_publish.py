@@ -25,6 +25,7 @@ from app.services.ontology_impact import (
     mark_stale_dependents, compute_breaking_changes,
     find_affected_scenes, find_affected_agents,
 )
+from app.services.version_component_snapshot import snapshot_components_for_version
 
 router = APIRouter(prefix="/ontology-publish", tags=["ontology-publish"])
 
@@ -342,6 +343,7 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User |
 
     impact = mark_stale_dependents(old_active, v, db)
 
+    snapshot_components_for_version(db, v)
     db.commit()
     return {
         "message": f"版本 v{v.version_number} 已发布",
@@ -361,6 +363,44 @@ def reject_version(version_id: str, req: RejectRequest, db: Session = Depends(ge
     v.reject_reason = req.reason
     db.commit()
     return {"message": "版本已驳回", "status": "rejected"}
+
+
+# ─── 版本组件查询 ────────────────────────────────────────────────────
+
+@router.get("/versions/{version_id}/functions")
+def list_version_functions(version_id: str, db: Session = Depends(get_db)):
+    from app.models.version_components import OntologyVersionFunction
+    items = db.query(OntologyVersionFunction).filter(
+        OntologyVersionFunction.version_id == version_id
+    ).all()
+    return [{"id": f.id, "name": f.name, "description": f.description,
+             "return_type": f.return_type, "input_schema": f.input_schema,
+             "version_entity_id": f.version_entity_id, "callable_name": f.callable_name}
+            for f in items]
+
+
+@router.get("/versions/{version_id}/rules")
+def list_version_rules(version_id: str, db: Session = Depends(get_db)):
+    from app.models.version_components import OntologyVersionRule
+    items = db.query(OntologyVersionRule).filter(
+        OntologyVersionRule.version_id == version_id
+    ).all()
+    return [{"id": r.id, "name": r.name, "description": r.description,
+             "condition_expr": r.condition_expr, "priority": r.priority,
+             "input_params": r.input_params, "version_entity_id": r.version_entity_id}
+            for r in items]
+
+
+@router.get("/versions/{version_id}/actions")
+def list_version_actions(version_id: str, db: Session = Depends(get_db)):
+    from app.models.version_components import OntologyVersionAction
+    items = db.query(OntologyVersionAction).filter(
+        OntologyVersionAction.version_id == version_id
+    ).all()
+    return [{"id": a.id, "name": a.name, "description": a.description,
+             "category": a.category, "action_type": a.action_type,
+             "parameters_json": a.parameters_json, "version_entity_id": a.version_entity_id}
+            for a in items]
 
 
 # ─── 回滚 ────────────────────────────────────────────────────────────
