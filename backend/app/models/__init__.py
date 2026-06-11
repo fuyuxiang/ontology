@@ -13,6 +13,9 @@ from app.models.version import (
     OntologyVersion, OntologyVersionEntity,
     OntologyVersionAttribute, OntologyVersionRelation,
 )
+from app.models.version_components import (
+    OntologyVersionFunction, OntologyVersionRule, OntologyVersionAction,
+)
 from app.models.pipeline import Pipeline, PipelineRun
 from app.models.scene import (
     AipScene, AipSceneVersion, AipSceneExecution, AipSceneTrigger,
@@ -42,6 +45,7 @@ __all__ = [
     "AgentTrace", "EvalSuite", "EvalCase", "EvalRun", "EvalResult",
     "OntologyVersion", "OntologyVersionEntity",
     "OntologyVersionAttribute", "OntologyVersionRelation",
+    "OntologyVersionFunction", "OntologyVersionRule", "OntologyVersionAction",
     "Pipeline", "PipelineRun",
     "AipScene", "AipSceneVersion", "AipSceneExecution", "AipSceneTrigger",
     "BusinessDocument",
