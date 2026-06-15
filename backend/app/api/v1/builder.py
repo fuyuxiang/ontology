@@ -12,7 +12,7 @@ import re
 from io import BytesIO
 from typing import Any, Generator
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -680,6 +680,59 @@ def _table_name_similarity(obj_display: str, obj_name: str, table_name: str) -> 
                 scores.append(overlap / max(len(obj_tokens), len(table_tokens)) * 0.75)
 
     return max(scores) if scores else 0.0
+
+
+# ── AI 辅助：字段推荐 ────────────────────────────────────────────────
+
+class SuggestColumnsRequest(BaseModel):
+    asset_id: str
+    properties: list[dict]  # [{name, type?, description?}]
+
+
+@router.post("/suggest-columns")
+def suggest_columns(body: SuggestColumnsRequest, db: Session = Depends(get_db)):
+    """给定属性列表 + 资产 ID，返回每属性的字段推荐排序。"""
+    from app.services.data_plane.asset_service import AssetService
+    from app.services.data_plane.mapping_suggest_service import _heuristic_score
+
+    asset = AssetService(db).get(body.asset_id)
+    if not asset:
+        raise HTTPException(404, "资产不存在")
+
+    columns = asset.schema_snapshot or []
+    results = []
+
+    for prop in body.properties:
+
+        class _FakeAttr:
+            pass
+
+        attr = _FakeAttr()
+        attr.name = prop.get("name", "")
+        attr.type = prop.get("type", "")
+        attr.description = prop.get("description", "")
+
+        candidates = []
+        for col in columns:
+            score, reason = _heuristic_score(attr, col)
+            if score > 0.1:
+                tier = "high" if score >= 0.7 else "medium" if score >= 0.4 else "low"
+                candidates.append({
+                    "column": col.get("name", ""),
+                    "column_type": col.get("type"),
+                    "comment": col.get("comment"),
+                    "score": round(score, 3),
+                    "tier": tier,
+                    "reason": reason,
+                })
+
+        candidates.sort(key=lambda c: c["score"], reverse=True)
+        results.append({
+            "property_name": prop.get("name", ""),
+            "candidates": candidates[:5],
+        })
+
+    return {"suggestions": results}
 
 
 # ── 水合演练（hydrate）── 验证本体草稿与真实数据的映射 ──────────────
