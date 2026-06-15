@@ -1149,6 +1149,59 @@ Expected: `Table created`
 
 ---
 
+## Task 9.5: 集成到 ActionsView（行动管理）
+
+**Files:**
+- Modify: `frontend/src/views/logic/ActionsView.vue`
+
+- [ ] **Step 1: 在 ActionsView 中添加 import 和状态**
+
+在 `<script setup>` 中添加：
+```typescript
+import AiCodePanel from '../../components/logic/AiCodePanel.vue'
+
+const showAiPanel = ref(false)
+const editingActionId = ref<string | null>(null)
+```
+
+- [ ] **Step 2: 在 createStep === 2 的 textarea 上方添加 AI 生成按钮**
+
+当 `form.action_type === 'custom_script'` 时，在 script textarea 上方添加：
+```html
+<div class="logic-toolbar" v-if="form.action_type === 'custom_script'">
+  <button type="button" class="btn-secondary" @click="showAiPanel = true">
+    AI 生成
+  </button>
+</div>
+```
+
+- [ ] **Step 3: 在模板底部添加 AiCodePanel**
+
+```html
+<AiCodePanel
+  :visible="showAiPanel"
+  :target-type="'action'"
+  :target-id="editingActionId || selectedId || ''"
+  :context-entity-ids="form.entity_id ? [form.entity_id] : []"
+  @close="showAiPanel = false"
+  @apply="(code: string) => { typeConfigValues['script'] = code; showAiPanel = false }"
+/>
+```
+
+- [ ] **Step 4: 验证前端编译**
+
+Run: `cd frontend && npx vue-tsc --noEmit 2>&1 | head -20`
+Expected: 无类型错误
+
+- [ ] **Step 5: 提交**
+
+```bash
+git add frontend/src/views/logic/ActionsView.vue
+git commit -m "feat: integrate AI code generation into ActionsView for custom_script type"
+```
+
+---
+
 ## Task 10: 端到端验证
 
 - [ ] **Step 1: 启动后端验证 API**
