@@ -1,4 +1,3 @@
-from string import Template
 from .base import BaseActionExecutor, ExecutionResult
 
 
@@ -6,20 +5,49 @@ class SqlExecExecutor(BaseActionExecutor):
     async def execute(self, type_config: dict, params: dict, dry_run: bool = False) -> ExecutionResult:
         connection_id = type_config.get("connection_id")
         sql_template = type_config.get("sql", "")
-        sql = Template(sql_template).safe_substitute(params)
+
+        if not connection_id:
+            return ExecutionResult(success=False, message="未指定 connection_id", output={})
+
+        sql_params = {}
+        for key, value in params.items():
+            placeholder = f"${key}"
+            if placeholder in sql_template:
+                sql_template = sql_template.replace(placeholder, f":{key}")
+                sql_params[key] = value
 
         if dry_run:
             return ExecutionResult(
                 success=True,
                 message=f"[Dry Run] Would execute SQL on connection {connection_id}",
-                output={"sql": sql, "connection_id": connection_id},
+                output={"sql": sql_template, "params": sql_params, "connection_id": connection_id},
             )
 
-        return ExecutionResult(
-            success=True,
-            message=f"Executed SQL on connection {connection_id}",
-            output={"sql": sql, "rows_affected": 0},
-        )
+        from app.database import get_db
+        from app.services.data_plane.execute_service import ExecuteService
+
+        try:
+            db = next(get_db())
+            svc = ExecuteService(db)
+            result = svc.execute_on_connection(
+                connection_id=connection_id,
+                sql=sql_template,
+                params=sql_params,
+                purpose="action_sql_exec",
+                write=True,
+                timeout_ms=30000,
+            )
+            return ExecutionResult(
+                success=True,
+                message=f"SQL 执行成功，影响 {result.row_count} 行",
+                output={"rows_affected": result.row_count, "columns": result.columns, "data": result.rows[:100]},
+            )
+        except Exception as e:
+            return ExecutionResult(
+                success=False,
+                message=f"SQL 执行失败: {str(e)}",
+                output={"error": str(e)},
+            )
 
     @classmethod
     def get_config_schema(cls) -> dict:

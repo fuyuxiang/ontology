@@ -14,7 +14,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.data_plane import (
@@ -117,11 +117,11 @@ def get_asset_usage(asset_id: str, db: Session = Depends(get_db)):
 def create_asset(
     body: AssetCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     try:
         return _svc(db).register(
-            user_id=user.id if user else None, **body.model_dump(),
+            user_id=user.id, **body.model_dump(),
         )
     except ValueError as e:
         raise HTTPException(400, str(e))
@@ -202,7 +202,7 @@ async def upload_document(
     domain: str | None = Form(None),
     tags: str | None = Form(None),  # JSON 字符串或逗号分隔
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     raw = await file.read()
     tag_list = _parse_tags(tags)
@@ -210,7 +210,7 @@ async def upload_document(
         return _svc(db).register_document_file(
             file_bytes=raw, filename=file.filename or "uploaded",
             name=name, description=description, domain=domain, tags=tag_list,
-            user_id=user.id if user else None,
+            user_id=user.id,
         )
     except Exception as e:
         raise HTTPException(400, f"上传失败: {e}")
@@ -218,9 +218,9 @@ async def upload_document(
 
 @router.post("/document/oss", response_model=AssetDetail, status_code=201)
 def create_oss_doc(body: OssDocCreate, db: Session = Depends(get_db),
-                   user: User | None = Depends(get_current_user)):
+                   user: User = Depends(require_user)):
     try:
-        return _svc(db).register_document_oss(user_id=user.id if user else None,
+        return _svc(db).register_document_oss(user_id=user.id,
                                                **body.model_dump())
     except RuntimeError as e:
         raise HTTPException(400, str(e))
@@ -228,9 +228,9 @@ def create_oss_doc(body: OssDocCreate, db: Session = Depends(get_db),
 
 @router.post("/document/directory", response_model=AssetDetail, status_code=201)
 def create_dir_doc(body: DirectoryDocCreate, db: Session = Depends(get_db),
-                   user: User | None = Depends(get_current_user)):
+                   user: User = Depends(require_user)):
     try:
-        return _svc(db).register_document_directory(user_id=user.id if user else None,
+        return _svc(db).register_document_directory(user_id=user.id,
                                                      **body.model_dump())
     except RuntimeError as e:
         raise HTTPException(400, str(e))
@@ -238,15 +238,15 @@ def create_dir_doc(body: DirectoryDocCreate, db: Session = Depends(get_db),
 
 @router.post("/document/api", response_model=AssetDetail, status_code=201)
 def create_api_doc(body: ApiDocCreate, db: Session = Depends(get_db),
-                   user: User | None = Depends(get_current_user)):
-    return _svc(db).register_document_api(user_id=user.id if user else None,
+                   user: User = Depends(require_user)):
+    return _svc(db).register_document_api(user_id=user.id,
                                            **body.model_dump())
 
 
 @router.post("/document/mq", response_model=AssetDetail, status_code=201)
 def create_mq_doc(body: MqDocCreate, db: Session = Depends(get_db),
-                  user: User | None = Depends(get_current_user)):
-    return _svc(db).register_document_mq(user_id=user.id if user else None,
+                  user: User = Depends(require_user)):
+    return _svc(db).register_document_mq(user_id=user.id,
                                           **body.model_dump())
 
 

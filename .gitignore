@@ -24,6 +24,7 @@ dist-ssr/
 # Local AI/editor workspace files
 .claude/
 .workbuddy/
+.superpowers/
 CLAUDE.md
 
 # OS/editor noise

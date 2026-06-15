@@ -13,7 +13,7 @@ from app.schemas.entity import (
     FileImportResult, OntologyPreviewResult,
 )
 from app.repositories import EntityRepository
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.models.user import User
 from app.services.audit import write_audit
 
@@ -245,7 +245,7 @@ def _map_db_type(db_type: str) -> str:
 def create_from_datasource(
     body: FromDatasourceRequest,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     from app.models.asset import Asset
     from app.services.data_plane.connection_service import ConnectionService
@@ -283,7 +283,7 @@ def create_from_datasource(
             "table_name": body.table_name,
             "primary_key": primary_key,
         },
-        created_by=user.id if user else None,
+        created_by=user.id,
     )
     db.add(entity)
 
@@ -299,8 +299,8 @@ def create_from_datasource(
 
     db.flush()
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="create", target_type="entity",
         target_id=eid, target_name=table_pascal,
         snapshot_after={"source": "datasource", "datasource": asset.name, "table": body.table_name},
@@ -322,7 +322,7 @@ class FromAssetRequest(BaseModel):
 def create_from_asset(
     body: FromAssetRequest,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     """从 Asset（kind=table）创建 OntologyEntity，并自动建立 primary ObjectBinding。
 
@@ -373,7 +373,7 @@ def create_from_asset(
             "table_name": table_name,
             "primary_key": primary_key,
         },
-        created_by=user.id if user else None,
+        created_by=user.id,
     )
     db.add(entity)
     field_mappings = []
@@ -400,12 +400,12 @@ def create_from_asset(
         role="primary",
         field_mappings=field_mappings,
         id_column=primary_key,
-        user_id=user.id if user else None,
+        user_id=user.id,
     )
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="create", target_type="entity",
         target_id=eid, target_name=table_pascal,
         snapshot_after={"source": "asset", "asset_id": asset.id},
@@ -419,7 +419,7 @@ async def create_from_file(
     file_type: str = Form(...),
     namespace: str = Form(""),
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     """从文件导入本体：支持 json / owl / ttl 格式。"""
     from app.services.file_import import parse_json_ontology, parse_owl_ontology
@@ -445,8 +445,8 @@ async def create_from_file(
         raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}")
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="import", target_type="file",
         target_id=file.filename or "unknown",
         target_name=file.filename or "unknown",
@@ -541,13 +541,13 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
 def create_entity(
     data: EntityCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     entity = OntologyEntity(
         name=data.name, name_cn=data.name_cn, tier=data.tier,
         status=data.status, description=data.description,
         config_json=data.config_json,
-        created_by=user.id if user else None,
+        created_by=user.id,
     )
     for attr in data.attributes:
         entity.attributes.append(EntityAttribute(**attr.model_dump()))
@@ -555,8 +555,8 @@ def create_entity(
     db.flush()
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="create", target_type="entity",
         target_id=entity.id, target_name=entity.name,
         snapshot_after={"name": entity.name, "tier": entity.tier},
@@ -575,7 +575,7 @@ def create_entity(
 def update_entity(
     entity_id: str, data: EntityUpdate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = EntityRepository(db)
     entity = repo.get_by_id(entity_id)
@@ -592,8 +592,8 @@ def update_entity(
 
     if changes:
         write_audit(
-            db, user_id=user.id if user else None,
-            user_name=user.name if user else None,
+            db, user_id=user.id,
+            user_name=user.name,
             action="update", target_type="entity",
             target_id=entity.id, target_name=entity.name,
             changes=changes,
@@ -637,7 +637,7 @@ def delete_entity(
     entity_id: str,
     force: bool = Query(False),
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = EntityRepository(db)
     entity = repo.get_by_id(entity_id)
@@ -665,8 +665,8 @@ def delete_entity(
         })
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="delete", target_type="entity",
         target_id=entity.id, target_name=entity.name,
         snapshot_before={"name": entity.name, "tier": entity.tier},
@@ -691,7 +691,7 @@ def delete_attribute(
     attribute_id: str,
     force: bool = Query(False),
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     from app.models.object_binding import ObjectBinding
 
@@ -737,8 +737,8 @@ def delete_attribute(
                 flag_modified(binding, "field_mappings")
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="delete", target_type="attribute",
         target_id=attr.id, target_name=attr.name,
         snapshot_before={"entity_id": entity_id, "name": attr.name, "type": attr.type},

@@ -59,7 +59,7 @@ const scenes = [
     description: '基于本体实体间的流程驱动，展示携转预警从信号感知到任务分发的端到端编排',
     color: 'var(--warning-600, #f59e0b)',
     icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M12 3l7 4v6l-7 4-7-4V7l7-4z" stroke="#fff" stroke-width="2" stroke-linejoin="round"/><path d="M12 7v8" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="18" r="1" fill="#fff"/></svg>',
-    disabled: false,
+    disabled: true,
   },
 ]
 </script>

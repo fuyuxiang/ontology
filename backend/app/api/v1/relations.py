@@ -6,7 +6,7 @@ from app.models import EntityRelation
 from app.utils.identifiers import gen_uuid
 from app.schemas.relation import RelationCreate, RelationOut
 from app.repositories import RelationRepository
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.models.user import User
 from app.services.audit import write_audit
 
@@ -35,7 +35,7 @@ def list_relations(entity_id: str | None = None, db: Session = Depends(get_db)):
 def create_relation(
     data: RelationCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = RelationRepository(db)
     f_name = repo.get_entity_name(data.from_entity_id)
@@ -49,7 +49,7 @@ def create_relation(
     )
     repo.create(rel)
     write_audit(
-        db, user_id=user.id if user else None, user_name=user.name if user else None,
+        db, user_id=user.id, user_name=user.name,
         action="create", target_type="relation", target_id=rel.id, target_name=f"{f_name} -> {t_name}",
     )
     repo.commit()
@@ -64,14 +64,14 @@ def create_relation(
 def delete_relation(
     relation_id: str,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = RelationRepository(db)
     rel = repo.get_by_id(relation_id)
     if not rel:
         raise HTTPException(status_code=404, detail="关系不存在")
     write_audit(
-        db, user_id=user.id if user else None, user_name=user.name if user else None,
+        db, user_id=user.id, user_name=user.name,
         action="delete", target_type="relation", target_id=rel.id, target_name=rel.name,
     )
     repo.delete(rel)

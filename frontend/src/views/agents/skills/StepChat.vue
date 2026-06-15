@@ -11,7 +11,7 @@
       <div class="step-chat__main">
         <div class="step-chat__messages" ref="msgContainer">
           <div v-for="(msg, i) in messages" :key="i" class="step-chat__msg" :class="'step-chat__msg--' + msg.role">
-            <div class="step-chat__msg-content" v-html="msg.content"></div>
+            <div class="step-chat__msg-content" v-html="renderMarkdownSafe(msg.content)"></div>
           </div>
           <div v-if="streaming" class="step-chat__msg step-chat__msg--assistant">
             <div class="step-chat__msg-content">{{ streamBuffer }}<span class="step-chat__cursor">|</span></div>
@@ -36,6 +36,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
+import { renderMarkdownSafe } from '@/utils/sanitize'
 import { skillGenChat, generateSkill, type SkillDef } from '../../../api/skillGen'
 
 const props = defineProps<{ sessionId: string; assetsContext: string }>()

@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.data_plane import (
@@ -22,14 +22,14 @@ router = APIRouter(prefix="/execute", tags=["data-plane:execute"])
 def execute(
     body: ExecuteRequestModel,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     try:
         result = ExecuteService(db).execute(ExecuteRequest(
             asset_id=body.asset_id, sql=body.sql, params=body.params,
             purpose=body.purpose, timeout_ms=body.timeout_ms,
             bypass_cache=body.bypass_cache,
-            user_id=user.id if user else None,
+            user_id=user.id,
         ))
     except ExecuteBlocked as e:
         raise HTTPException(400, detail={"blocked": True, "reason": e.reason, "detail": e.detail})
@@ -48,14 +48,14 @@ def execute(
 def dry_run(
     body: ExecuteRequestModel,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     try:
         return ExecuteService(db).dry_run(ExecuteRequest(
             asset_id=body.asset_id, sql=body.sql, params=body.params,
             purpose=body.purpose, timeout_ms=body.timeout_ms,
             bypass_cache=True,
-            user_id=user.id if user else None,
+            user_id=user.id,
         ))
     except ExecuteBlocked as e:
         raise HTTPException(400, detail={"blocked": True, "reason": e.reason, "detail": e.detail})

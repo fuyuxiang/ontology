@@ -136,7 +136,7 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted } from 'vue'
-import { marked } from 'marked'
+import { renderMarkdownSafe } from '@/utils/sanitize'
 import { aiOntologyApi, type AiOntologyEvent } from '../../api/aiOntology'
 
 const emit = defineEmits<{ complete: [result: { entities: any[]; relations: any[] }] }>()
@@ -188,7 +188,7 @@ const inputPlaceholder = computed(() => {
 })
 
 function renderMarkdown(text: string): string {
-  return marked.parse(text, { async: false }) as string
+  return renderMarkdownSafe(text)
 }
 
 function scrollToBottom() {

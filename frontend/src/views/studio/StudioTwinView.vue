@@ -341,27 +341,9 @@ function onNodeClick(id: string) {
 }
 
 // ── 实时事件流 ──
-const eventBank = [
-  { type: 'state_change', icon: '●', desc: 'Customer.U2026001 状态变更 active → renewing' },
-  { type: 'touchpoint',  icon: '▸', desc: 'TouchEvent TC-8823 → 短信触达' },
-  { type: 'order',       icon: '◆', desc: 'Order O20260520 已签约 ¥3,576/年' },
-  { type: 'skill',       icon: '✦', desc: 'Skill broadband_audit 完成,产出归因结论' },
-  { type: 'rule',        icon: '◇', desc: 'BR-INPOOL-003 命中:单宽带+IPTV → 入池续约' },
-  { type: 'state_change',icon: '●', desc: 'InstallChurn IC-0520-09 触发归因:工程师未达约' },
-  { type: 'alert',       icon: '▲', desc: '指标 KPI-OPS-007 触发预警:KPI 完成率 78% < 90%' },
-  { type: 'ml',          icon: '∿', desc: 'KPI 营收YTD 异常:某地市同比 -12.3%' },
-  { type: 'segment',     icon: '◈', desc: 'Segment SEG_004 新增成员 12 人' },
-  { type: 'touchpoint',  icon: '▸', desc: 'EngineerCall EC-8830 → 客户已确认上门时间' },
-] as const
-
 interface EventItem { id: string; ts: string; type: string; icon: string; desc: string }
 const events = ref<EventItem[]>([])
-const useRealEvents = ref(false)  // 后端有数据时切换到实时模式
-
-function genMockEvent(): EventItem {
-  const sample = eventBank[Math.floor(Math.random() * eventBank.length)]
-  return { id: `${Date.now()}-${Math.random()}`, ts: nowTime(), ...sample }
-}
+const useRealEvents = ref(false)
 function nowTime(): string {
   const d = new Date()
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
@@ -380,7 +362,7 @@ async function fetchRealEvents() {
       return true
     }
   } catch (e) {
-    console.warn('events api failed, falling back to mock', e)
+    console.warn('events api failed', e)
   }
   return false
 }
@@ -429,22 +411,13 @@ let eventTimer: number | undefined
 let heartbeatTimer: number | undefined
 
 onMounted(async () => {
-  // 优先尝试拉真实事件；后端没数据时回落到 mock
-  const hasReal = await fetchRealEvents()
-  if (!hasReal) {
-    events.value = Array.from({ length: 18 }, () => genMockEvent())
-  }
+  await fetchRealEvents()
 
   eventTimer = window.setInterval(async () => {
     if (useRealEvents.value) {
-      // 真实模式：每 5s 重新拉
       await fetchRealEvents()
-    } else {
-      // mock 模式：1.5s 添加一条
-      events.value = [genMockEvent(), ...events.value].slice(0, 30)
     }
-    aboxLive.value += Math.floor(Math.random() * 3)
-  }, useRealEvents.value ? 5000 : 1500)
+  }, 5000)
 
   heartbeatTimer = window.setInterval(() => {
     decisionPerMin.value = Math.max(60, Math.min(220, decisionPerMin.value + Math.floor((Math.random() - 0.45) * 24)))

@@ -206,15 +206,17 @@ def update_role_permissions(role_key: str, data: RolePermUpdate, _admin: User = 
 
 
 def seed_admin(db: Session):
-    """初始化管理员账号"""
+    """初始化管理员账号（仅首次创建，不重置已有密码）"""
+    from app.config import settings
     existing = db.query(User).filter(User.username == "admin").first()
     if existing:
-        existing.password_hash = hash_password("bonc")
-        db.commit()
         return
+    initial_pw = settings.ADMIN_INITIAL_PASSWORD
+    if not initial_pw:
+        initial_pw = "admin"
     admin = User(
         username="admin",
-        password_hash=hash_password("bonc"),
+        password_hash=hash_password(initial_pw),
         name="系统管理员",
         role="admin",
     )

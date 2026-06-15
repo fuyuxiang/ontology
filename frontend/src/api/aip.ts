@@ -225,7 +225,7 @@ export const listActionsAsResources = () => get<any[]>('/actions')
 export const listFunctionsAsResources = () => get<any[]>('/functions')
 export const listEntitiesAsResources = () => get<any[]>('/entities')
 export const listModelsAsResources = () => get<any[]>('/models')
-export const listDatasourcesAsResources = () => get<any[]>('/datasources')
+export const listDatasourcesAsResources = () => get<any[]>('/connections')
 
 // ── 本体发布影响预览 & 陈旧确认 ────────────────────────────
 

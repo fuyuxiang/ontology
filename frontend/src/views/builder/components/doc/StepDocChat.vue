@@ -50,7 +50,7 @@
 
 <script setup lang="ts">
 import { ref, nextTick, onMounted } from 'vue'
-import { marked } from 'marked'
+import { renderMarkdownSafe } from '@/utils/sanitize'
 import { docBuilderChat } from '../../../../api/docBuilder'
 
 interface OntologyData {
@@ -77,7 +77,7 @@ const messagesEl = ref<HTMLElement>()
 
 function renderMarkdown(text: string): string {
   const cleaned = text.replace(/```json[\s\S]*?```/g, '')
-  return marked.parse(cleaned, { async: false }) as string
+  return renderMarkdownSafe(cleaned)
 }
 
 function scrollToBottom() {

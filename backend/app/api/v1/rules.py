@@ -10,7 +10,7 @@ from app.schemas.rule import (
     RuleEvaluateRequest, RuleEvaluateResult,
 )
 from app.repositories import RuleRepository
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.models.user import User
 from app.services.audit import write_audit
 
@@ -56,7 +56,7 @@ def get_rule(rule_id: str, db: Session = Depends(get_db)):
 def create_rule(
     data: RuleCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = RuleRepository(db)
     entity = db.get(OntologyEntity, data.entity_id)
@@ -75,8 +75,8 @@ def create_rule(
     repo.create(rule)
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="create", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )
@@ -88,7 +88,7 @@ def create_rule(
 def update_rule(
     rule_id: str, data: RuleUpdate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = RuleRepository(db)
     rule = repo.get_by_id(rule_id)
@@ -117,7 +117,7 @@ def update_rule(
 def delete_rule(
     rule_id: str,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = RuleRepository(db)
     rule = repo.get_by_id(rule_id)
@@ -125,8 +125,8 @@ def delete_rule(
         raise HTTPException(status_code=404, detail="规则不存在")
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="delete", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )
@@ -138,7 +138,7 @@ def delete_rule(
 def execute_rule(
     rule_id: str,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = RuleRepository(db)
     rule = repo.get_by_id(rule_id)
@@ -149,8 +149,8 @@ def execute_rule(
     rule.last_triggered = datetime.utcnow()
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="execute", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )
@@ -168,7 +168,7 @@ def evaluate_rule(
     rule_id: str,
     data: RuleEvaluateRequest,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     """对指定用户评估规则，返回结构化判断结果"""
     repo = RuleRepository(db)
@@ -183,8 +183,8 @@ def evaluate_rule(
     result = evaluator.evaluate(rule, data.user_id)
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="evaluate", target_type="rule",
         target_id=rule.id, target_name=rule.name,
     )

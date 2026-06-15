@@ -2,57 +2,57 @@ import { get, post, put, del } from './client'
 import type { DataSource, DataSourceCreate, DataSourceUpdate, TestConnectionResult } from '../types/datasource'
 
 export function listDataSources(params?: { type?: string; status?: string; q?: string }) {
-  return get<DataSource[]>('/datasources', { params })
+  return get<DataSource[]>('/connections', { params })
 }
 
 export function getDataSource(id: string) {
-  return get<DataSource>(`/datasources/${id}`)
+  return get<DataSource>(`/connections/${id}`)
 }
 
 export function createDataSource(data: DataSourceCreate) {
-  return post<DataSource[]>('/datasources', data)
+  return post<DataSource[]>('/connections', data)
 }
 
 export function updateDataSource(id: string, data: DataSourceUpdate) {
-  return put<DataSource>(`/datasources/${id}`, data)
+  return put<DataSource>(`/connections/${id}`, data)
 }
 
 export function deleteDataSource(id: string) {
-  return del<void>(`/datasources/${id}`)
+  return del<void>(`/connections/${id}`)
 }
 
 export function testConnection(id: string) {
-  return post<TestConnectionResult>(`/datasources/${id}/test`)
+  return post<TestConnectionResult>(`/connections/${id}/test`)
 }
 
 export function testConnectionInline(data: DataSourceCreate) {
-  return post<TestConnectionResult>('/datasources/test', data)
+  return post<TestConnectionResult>('/connections/test', data)
 }
 
 export function fetchTablesInline(data: DataSourceCreate) {
-  return post<{ tables: string[] }>('/datasources/fetch-tables', data)
+  return post<{ tables: string[] }>('/connections/fetch-tables', data)
 }
 
 export function toggleDataSource(id: string) {
-  return post<DataSource>(`/datasources/${id}/toggle`)
+  return post<DataSource>(`/connections/${id}/toggle`)
 }
 
 export function refreshTables(id: string) {
-  return post<DataSource>(`/datasources/${id}/refresh-tables`)
+  return post<DataSource>(`/connections/${id}/refresh-tables`)
 }
 
 export function previewDatasource(id: string) {
-  return get<{ table: string; columns: string[]; rows: unknown[][] }>(`/datasources/${id}/preview`)
+  return get<{ table: string; columns: string[]; rows: unknown[][] }>(`/connections/${id}/preview`)
 }
 
 export function getTableList(id: string) {
-  return get<{ tables: string[] }>(`/datasources/${id}/tables`)
+  return get<{ tables: string[] }>(`/connections/${id}/tables`)
 }
 
 export function getTablePreview(id: string, tableName: string) {
-  return get<{ table: string; columns: string[]; rows: unknown[][] }>(`/datasources/${id}/tables/${encodeURIComponent(tableName)}/preview`)
+  return get<{ table: string; columns: string[]; rows: unknown[][] }>(`/connections/${id}/tables/${encodeURIComponent(tableName)}/preview`)
 }
 
 export function getTableSchema(id: string, tableName: string) {
-  return get<{ table: string; columns: { name: string; type: string; nullable: boolean; is_pk: boolean; comment: string }[] }>(`/datasources/${id}/tables/${encodeURIComponent(tableName)}/schema`)
+  return get<{ table: string; columns: { name: string; type: string; nullable: boolean; is_pk: boolean; comment: string }[] }>(`/connections/${id}/tables/${encodeURIComponent(tableName)}/schema`)
 }

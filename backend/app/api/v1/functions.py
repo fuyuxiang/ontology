@@ -10,7 +10,7 @@ from app.schemas.function import (
     FunctionTestRequest, FunctionTestResult,
 )
 from app.repositories.function_repo import FunctionRepository
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.models.user import User
 from app.services.audit import write_audit
 
@@ -57,7 +57,7 @@ def get_function(func_id: str, db: Session = Depends(get_db)):
 def create_function(
     data: FunctionCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = FunctionRepository(db)
     if data.entity_id:
@@ -77,8 +77,8 @@ def create_function(
     repo.create(func)
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="create", target_type="function",
         target_id=func.id, target_name=func.name,
     )
@@ -90,7 +90,7 @@ def create_function(
 def update_function(
     func_id: str, data: FunctionUpdate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = FunctionRepository(db)
     func = repo.get_by_id(func_id)
@@ -119,7 +119,7 @@ def update_function(
 def delete_function(
     func_id: str,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = FunctionRepository(db)
     func = repo.get_by_id(func_id)
@@ -127,8 +127,8 @@ def delete_function(
         raise HTTPException(status_code=404, detail="函数不存在")
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="delete", target_type="function",
         target_id=func.id, target_name=func.name,
     )
@@ -141,7 +141,7 @@ def test_function(
     func_id: str,
     data: FunctionTestRequest | None = None,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = FunctionRepository(db)
     func = repo.get_by_id(func_id)

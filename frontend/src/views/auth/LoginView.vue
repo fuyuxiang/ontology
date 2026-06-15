@@ -35,8 +35,8 @@ import { useAuthStore } from '../../store/auth'
 const router = useRouter()
 const authStore = useAuthStore()
 
-const username = ref('admin')
-const password = ref('bonc')
+const username = ref('')
+const password = ref('')
 const error = ref('')
 const loading = ref(false)
 
