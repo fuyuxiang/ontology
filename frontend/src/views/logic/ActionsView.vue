@@ -168,6 +168,11 @@
 
                 <template v-if="createStep === 2">
                   <p class="text-caption" style="margin-bottom: 12px;">配置「{{ getTypeLabel(form.action_type) }}」的执行参数：</p>
+                  <div v-if="form.action_type === 'custom_script'" class="form-row" style="justify-content: flex-start;">
+                    <button type="button" class="btn-secondary" @click="showAiPanel = true">
+                      AI 生成
+                    </button>
+                  </div>
                   <div v-for="(field, key) in currentConfigSchema" :key="key" class="form-row">
                     <label class="form-label">{{ field.description || key }}</label>
                     <textarea v-if="field.type === 'object' || key === 'script' || key === 'sql'" v-model="typeConfigValues[key as string]" class="form-input form-textarea" rows="3"></textarea>
@@ -189,6 +194,15 @@
         </div>
       </div>
     </Transition>
+
+    <AiCodePanel
+      :visible="showAiPanel"
+      :target-type="'action'"
+      :target-id="selectedId || ''"
+      :context-entity-ids="form.entity_id ? [form.entity_id] : []"
+      @close="showAiPanel = false"
+      @apply="(code: string) => { typeConfigValues['script'] = code; showAiPanel = false }"
+    />
   </div>
 </template>
 
@@ -198,6 +212,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { actionApi, type ActionItem, type ActionTypeInfo } from '../../api/actions'
 import { get } from '../../api/client'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
+import AiCodePanel from '../../components/logic/AiCodePanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -209,6 +224,7 @@ const search = ref('')
 const activeFilter = ref('all')
 const selectedId = ref<string | null>(null)
 const showAdd = ref(false)
+const showAiPanel = ref(false)
 const createStep = ref(0)
 
 const form = ref({
