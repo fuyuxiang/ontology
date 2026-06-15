@@ -195,14 +195,16 @@
       </div>
     </Transition>
 
-    <AiCodePanel
-      :visible="showAiPanel"
-      :target-type="'action'"
-      :target-id="selectedId || ''"
-      :context-entity-ids="form.entity_id ? [form.entity_id] : []"
-      @close="showAiPanel = false"
-      @apply="(code: string) => { typeConfigValues['script'] = code; showAiPanel = false }"
-    />
+    <Teleport to="body">
+      <AiCodePanel
+        :visible="showAiPanel"
+        :target-type="'action'"
+        :target-id="selectedId || ''"
+        :context-entity-ids="form.entity_id ? [form.entity_id] : []"
+        @close="showAiPanel = false"
+        @apply="(code: string) => { typeConfigValues['script'] = code; showAiPanel = false }"
+      />
+    </Teleport>
   </div>
 </template>
 
