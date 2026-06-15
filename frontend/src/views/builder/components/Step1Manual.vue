@@ -3,7 +3,7 @@
     <header class="manual-topbar">
       <div class="manual-topbar-title">
         <span>手工建模</span>
-        <small>逐项录入对象、属性、关系</small>
+        <small>定义对象、属性、关系</small>
       </div>
       <div class="manual-topbar-stats">
         <span>{{ objects.length }} 对象</span>
@@ -38,7 +38,7 @@
             <span class="obj-icon" :style="{ background: tierBg(o.tier), color: tierColor(o.tier) }">{{ o.icon || '🔷' }}</span>
             <div class="obj-meta">
               <div class="obj-name">{{ o.displayName || '(未命名)' }}</div>
-              <div class="obj-en">{{ o.name }} · T{{ o.tier }} · {{ o.properties.length }} 属性</div>
+              <div class="obj-en">{{ o.name }} · {{ o.properties.length }} 属性</div>
             </div>
             <button class="iconbtn iconbtn-danger" title="删除 (Del)" @click.stop="removeObject(o.id)">×</button>
           </div>
@@ -58,18 +58,6 @@
               <label>中文名 <span class="req">*</span>
                 <input v-model="selected.displayName" @blur="syncBlur" />
               </label>
-              <label>层级
-                <select v-model.number="selected.tier" @change="syncBlur">
-                  <option :value="1">Tier 1 核心</option>
-                  <option :value="2">Tier 2 领域</option>
-                  <option :value="3">Tier 3 场景</option>
-                </select>
-              </label>
-              <label>主键属性
-                <select v-model="selected.primaryKey" @change="syncBlur">
-                  <option v-for="p in selected.properties" :key="p.id" :value="p.name">{{ p.name }}</option>
-                </select>
-              </label>
               <label class="form-grid-full">描述
                 <textarea v-model="selected.description" rows="2" @blur="syncBlur"></textarea>
               </label>
@@ -84,10 +72,11 @@
             </div>
             <div class="prop-table">
               <div class="prop-row prop-head">
-                <div>名称</div><div>类型</div><div>必填</div><div>描述</div><div></div>
+                <div>中文名</div><div>英文名</div><div>类型</div><div></div>
               </div>
               <div v-for="p in selected.properties" :key="p.id" class="prop-row">
-                <input v-model="p.name" @blur="syncBlur" />
+                <input v-model="p.displayName" placeholder="例如：客户姓名" @blur="syncBlur" />
+                <input v-model="p.name" placeholder="snake_case" @blur="syncBlur" />
                 <select v-model="p.type" @change="syncBlur">
                   <option value="string">string</option>
                   <option value="number">number</option>
@@ -95,37 +84,12 @@
                   <option value="boolean">boolean</option>
                   <option value="enum">enum</option>
                 </select>
-                <input type="checkbox" v-model="p.required" @change="syncBlur" />
-                <input v-model="p.displayName" placeholder="（可选）中文/描述" @blur="syncBlur" />
                 <button class="iconbtn iconbtn-danger" @click="removeProp(p.id)">×</button>
               </div>
               <div v-if="!selected.properties.length" class="empty-tip">至少需要 1 个属性</div>
             </div>
           </div>
 
-          <div class="detail-section">
-            <div class="section-head">
-              <div class="section-title">派生属性（Function）</div>
-              <a class="link" :href="addFnHref" target="_blank">＋ 新建函数 ↗</a>
-            </div>
-            <ResourcePickerMulti type="function" v-model="selected.derivedProperties" @update:modelValue="syncBlur" />
-          </div>
-
-          <div class="detail-section">
-            <div class="section-head">
-              <div class="section-title">规则（轻量挂载，可选）</div>
-              <a class="link" :href="addRuleHref" target="_blank">＋ 新建规则 ↗</a>
-            </div>
-            <ResourcePickerMulti type="rule" v-model="selected.rules" @update:modelValue="syncBlur" />
-          </div>
-
-          <div class="detail-section">
-            <div class="section-head">
-              <div class="section-title">动作（轻量挂载，可选）</div>
-              <a class="link" :href="addActionHref" target="_blank">＋ 新建动作 ↗</a>
-            </div>
-            <ResourcePickerMulti type="action" v-model="selected.actions" @update:modelValue="syncBlur" />
-          </div>
         </div>
         <div v-else class="detail-empty">
           <div>左侧选一个对象进行编辑</div>
@@ -152,32 +116,21 @@
               <option v-for="o in objects" :key="o.id" :value="o.id">{{ o.displayName }}（{{ o.name }}）</option>
             </select>
           </label>
-          <label>关系名
-            <input v-model="relForm.label" placeholder="例如：持有合约" />
+          <label>正向关系名
+            <input v-model="relForm.label" placeholder="例如：下单、持有、负责" />
+          </label>
+          <label>反向关系名
+            <input v-model="relForm.inverseLabel" placeholder="例如：被下单、归属于、被负责" />
           </label>
           <label>基数
             <select v-model="relForm.cardinality">
-              <option value="1:1">1:1</option>
-              <option value="1:N">1:N</option>
-              <option value="N:N">N:N</option>
+              <option value="1:1">一对一</option>
+              <option value="1:N">一对多</option>
+              <option value="N:N">多对多</option>
             </select>
           </label>
-          <label>关系类型
-            <select v-model="relForm.relationType">
-              <option value="ObjectProperty">ObjectProperty</option>
-              <option value="SymmetricProperty">SymmetricProperty</option>
-              <option value="TransitiveProperty">TransitiveProperty</option>
-              <option value="FunctionalProperty">FunctionalProperty</option>
-            </select>
-          </label>
-          <label>语义类型
-            <select v-model="relForm.semanticType">
-              <option value="association">关联</option>
-              <option value="composition">组合</option>
-              <option value="event">事件</option>
-              <option value="inheritance">继承</option>
-              <option value="dependency">依赖</option>
-            </select>
+          <label>描述（可选）
+            <input v-model="relForm.description" placeholder="补充说明这条关系的业务含义" />
           </label>
           <div class="rel-form-actions">
             <button class="btn btn-ghost" @click="relForm.open = false">取消</button>
@@ -186,12 +139,17 @@
         </div>
         <div class="rel-list">
           <div v-for="r in relations" :key="r.id" class="rel-item">
-            <span class="rel-from">{{ nameOf(r.source) }}</span>
-            <span class="rel-arrow">→</span>
-            <span class="rel-to">{{ nameOf(r.target) }}</span>
-            <span class="rel-label">{{ r.displayName }}</span>
-            <span class="rel-card">{{ r.cardinality }}</span>
-            <button class="iconbtn iconbtn-danger" @click="removeRelation(r.id)">×</button>
+            <div class="rel-main">
+              <span class="rel-from">{{ nameOf(r.source) }}</span>
+              <span class="rel-arrow">→</span>
+              <span class="rel-to">{{ nameOf(r.target) }}</span>
+              <span class="rel-card">{{ r.cardinality }}</span>
+              <button class="iconbtn iconbtn-danger" @click="removeRelation(r.id)">×</button>
+            </div>
+            <div class="rel-labels">
+              <span class="rel-label">{{ r.displayName }}</span>
+              <span v-if="r.inverseDisplayName" class="rel-label rel-inverse">← {{ r.inverseDisplayName }}</span>
+            </div>
           </div>
           <div v-if="!relations.length" class="empty-tip">还没有关系 — 点 ＋ 或按 R 创建</div>
         </div>
@@ -240,7 +198,6 @@ import type {
   OntologyRelationDraft,
 } from '../../../types/builder'
 import SemanticCanvas from './graph/SemanticCanvas.vue'
-import ResourcePickerMulti from './manual/ResourcePickerMulti.vue'
 
 const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'next'): void }>()
@@ -260,6 +217,8 @@ const relForm = reactive({
   from: '',
   to: '',
   label: '',
+  inverseLabel: '',
+  description: '',
   cardinality: '1:N' as '1:1' | '1:N' | 'N:N',
   relationType: 'ObjectProperty' as OntologyRelationDraft['relationType'],
   semanticType: 'association' as OntologyRelationDraft['semanticType'],
@@ -283,16 +242,12 @@ const canSubmit = computed(() => {
   if (!objects.value.length) return false
   for (const o of objects.value) {
     if (!o.name || !o.displayName) return false
-    const hasPk = o.properties.some(p => p.required)
-    if (!hasPk) return false
+    if (!o.properties.length) return false
   }
   return true
 })
 
 // session_id 透传给跳转链接，便于回流
-const addRuleHref   = computed(() => `/logic/rules?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=rule`)
-const addActionHref = computed(() => `/logic/actions?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=action`)
-const addFnHref     = computed(() => `/logic/functions?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=function`)
 
 function tierBg(t: 1 | 2 | 3) { return t === 1 ? 'rgba(46,91,255,0.12)' : t === 2 ? 'rgba(0,199,177,0.12)' : 'rgba(255,107,53,0.12)' }
 function tierColor(t: 1 | 2 | 3) { return t === 1 ? '#2E5BFF' : t === 2 ? '#00C7B1' : '#FF6B35' }
@@ -348,13 +303,13 @@ function addObject(seed?: Partial<OntologyObjectDraft>) {
     id: uid('obj'),
     name: seed?.name || `NewObject${objects.value.length + 1}`,
     displayName: seed?.displayName || '新对象',
-    tier: (seed?.tier ?? 2) as 1 | 2 | 3,
+    tier: (seed?.tier ?? 3) as 1 | 2 | 3,
     namespace: seed?.namespace,
     description: seed?.description || '',
     primaryKey: 'id',
     icon: seed?.icon || '🔷',
     instanceCount: 0,
-    properties: seed?.properties || [{ id: uid('prop'), name: 'id', displayName: '主键', type: 'string', required: true }],
+    properties: seed?.properties || [{ id: uid('prop'), name: 'name', displayName: '名称', type: 'string', required: true }],
     derivedProperties: [], rules: [], actions: [], approved: false,
   }
   objects.value.push(o)
@@ -390,14 +345,15 @@ function saveRelation() {
     id: uid('rel'),
     name: relForm.label.trim().replace(/\s+/g, '_'),
     displayName: relForm.label.trim(),
+    inverseDisplayName: relForm.inverseLabel.trim(),
     source: relForm.from,
     target: relForm.to,
     cardinality: relForm.cardinality,
-    description: relForm.label.trim(),
+    description: relForm.description.trim() || relForm.label.trim(),
     relationType: relForm.relationType,
     semanticType: relForm.semanticType,
   })
-  Object.assign(relForm, { open: false, from: '', to: '', label: '', cardinality: '1:N', relationType: 'ObjectProperty', semanticType: 'association' })
+  Object.assign(relForm, { open: false, from: '', to: '', label: '', inverseLabel: '', description: '', cardinality: '1:N', relationType: 'ObjectProperty', semanticType: 'association' })
   syncStore()
 }
 function removeRelation(id: string) {
@@ -411,7 +367,7 @@ function commitCsv() {
   let added = 0
   for (const line of lines) {
     const cols = line.split(',').map(c => c.trim())
-    const [name, displayName, tier, description] = [cols[0], cols[1] || cols[0], cols[2] || '2', cols[3] || '']
+    const [name, displayName, tier, description] = [cols[0], cols[1] || cols[0], cols[2] || '3', cols[3] || '']
     if (!name) continue
     const t = Math.max(1, Math.min(3, parseInt(tier) || 2)) as 1 | 2 | 3
     addObject({ name, displayName, tier: t, description })
@@ -424,8 +380,13 @@ function commitCsv() {
 
 function confirmAll() {
   if (!canSubmit.value) {
-    message.warning('每个对象至少需要 1 个必填属性作为主键候选')
+    message.warning('每个对象至少需要 1 个属性')
     return
+  }
+  const connectedIds = new Set(relations.value.flatMap(r => [r.source, r.target]))
+  const isolated = objects.value.filter(o => !connectedIds.has(o.id))
+  if (isolated.length && objects.value.length > 1) {
+    message.warning(`以下对象没有任何关系连接：${isolated.map(o => o.displayName).join('、')}`)
   }
   store.patchActive({
     ontologyObjects: [...objects.value],
@@ -547,7 +508,7 @@ watch(() => props.session.sessionId, () => {
 
 .prop-table { display: flex; flex-direction: column; gap: 4px; }
 .prop-row {
-  display: grid; grid-template-columns: 1fr 100px 50px 1fr 28px;
+  display: grid; grid-template-columns: 1fr 1fr 120px 28px;
   gap: 6px; align-items: center;
 }
 .prop-row.prop-head { font-size: 10px; color: #94a3b8; text-transform: uppercase; padding: 0 4px; }
@@ -558,16 +519,22 @@ watch(() => props.session.sessionId, () => {
 
 .rel-form {
   padding: 10px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px;
+  display: flex; flex-direction: column; gap: 8px;
 }
 .rel-form label { display: flex; flex-direction: column; gap: 3px; font-size: 11px; color: #64748b; }
-.rel-form-actions { grid-column: 1 / -1; display: flex; gap: 8px; justify-content: flex-end; }
+.rel-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
 
 .rel-list { flex: 1; overflow-y: auto; padding: 6px; }
 .rel-item {
-  display: grid; grid-template-columns: 1fr 14px 1fr 1.4fr 50px 24px; gap: 6px;
-  align-items: center; padding: 6px 10px; border-radius: 8px;
-  font-size: 11px; margin-bottom: 4px; background: #f8fafc;
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px; border-radius: 8px;
+  font-size: 11px; margin-bottom: 6px; background: #f8fafc;
+}
+.rel-main {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.rel-labels {
+  display: flex; gap: 8px; font-size: 10px; color: #64748b; padding-left: 2px;
 }
 .rel-from, .rel-to { color: #1e293b; font-weight: 500; }
 .rel-arrow { color: #94a3b8; text-align: center; }

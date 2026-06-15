@@ -93,7 +93,6 @@ export function buildPresetClasses(scenarioId: string): OntologyObjectDraft[] {
     icon: p.icon || '🔷',
     instanceCount: p.instanceCount ?? 0,
     properties: [
-      { id: uid('prop'), name: p.primaryKey || 'id', displayName: '主键', type: 'string', required: true },
       { id: uid('prop'), name: 'name', displayName: '名称', type: 'string', required: true },
       { id: uid('prop'), name: 'updated_at', displayName: '更新时间', type: 'date', required: false },
     ],

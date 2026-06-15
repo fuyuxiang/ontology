@@ -84,7 +84,7 @@ export const DEFAULT_PUBLISH_GATES: PublishGate[] = [
   { key: 'version_ready', label: '版本就绪', desc: '版本号自动生成', pass: true },
 ]
 
-// ── 资产清单（mock，按场景） ──
+// ── 资产清单（按场景） ──
 export const SCENARIO_ASSETS: Record<string, DataAsset[]> = {
   'refund-root-cause': [
     {
