@@ -36,6 +36,7 @@ from app.models.skill import Skill
 from app.models.skill_version import SkillVersion
 from app.models.skill_tool import SkillTool
 from app.models.skill_tool_ref import SkillToolRef
+from app.models.ai_code_conversation import AiCodeConversation  # noqa: F401
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
@@ -57,4 +58,6 @@ __all__ = [
     "ServiceMetric", "LLMCallRecord", "Alert",
     # Skill Generation Platform
     "Skill", "SkillVersion", "SkillTool", "SkillToolRef",
+    # AI Code Conversation
+    "AiCodeConversation",
 ]
