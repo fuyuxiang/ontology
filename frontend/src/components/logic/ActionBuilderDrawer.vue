@@ -29,6 +29,9 @@ const testResult = ref<string | null>(null)
 const testSuccess = ref<boolean | null>(null)
 const savedId = ref<string | null>(null)
 const showAiPanel = ref(false)
+const tempSessionId = ref(crypto.randomUUID())
+
+const aiTargetId = computed(() => savedId.value || props.editId || `tmp_${tempSessionId.value}`)
 
 const form = ref({
   name: '',
@@ -345,7 +348,7 @@ async function runTest() {
     <AiCodePanel
       :visible="showAiPanel"
       :target-type="'action'"
-      :target-id="savedId || editId || ''"
+      :target-id="aiTargetId"
       :context-entity-ids="form.entity_id ? [form.entity_id] : []"
       @close="showAiPanel = false"
       @apply="(code: string) => { typeConfigValues['script'] = code; showAiPanel = false }"
