@@ -139,7 +139,7 @@
                 </div>
                 <div v-if="expandedTables.has(tbl.asset_id)" class="mapping-tree-cols">
                   <div v-for="col in tbl.columns" :key="col.name" class="mapping-tree-col">
-                    <span class="mapping-tree-col-name" :class="{ pk: col.is_pk }">{{ col.name }}</span>
+                    <span class="mapping-tree-col-name" :class="{ pk: col.is_pk }">{{ col.comment || col.name }}</span>
                     <span class="mapping-tree-col-type">{{ col.type }}</span>
                   </div>
                 </div>

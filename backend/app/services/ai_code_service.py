@@ -82,17 +82,19 @@ class AiCodeService:
         return conv
 
     def _build_context(self, target_type: str, target_id: str, extra_entity_ids: list[str]) -> str:
+        if target_id.startswith("tmp_"):
+            return self._build_entity_only_context(extra_entity_ids)
         if target_type == "function":
             func = self.db.query(OntologyFunction).get(target_id)
             if not func:
-                return ""
+                return self._build_entity_only_context(extra_entity_ids)
             return self._build_function_context(func, extra_entity_ids)
         else:
             from app.repositories.action_repo import ActionRepository
             repo = ActionRepository(self.db)
             action = repo.get(target_id)
             if not action:
-                return ""
+                return self._build_entity_only_context(extra_entity_ids)
             return self._build_action_context(action, extra_entity_ids)
 
     def _build_function_context(self, func: OntologyFunction, extra_entity_ids: list[str]) -> str:
@@ -138,6 +140,21 @@ class AiCodeService:
                     for attr in entity.attributes:
                         lines.append(f"  - {attr.name}: {attr.type} — {attr.description or ''}")
 
+        return "\n".join(lines)
+
+    def _build_entity_only_context(self, extra_entity_ids: list[str]) -> str:
+        if not extra_entity_ids:
+            return ""
+        lines = ["## 关联实体信息"]
+        for eid in extra_entity_ids:
+            entity = self._load_entity(eid)
+            if entity:
+                lines.append(f"\n### 实体：{entity.name_cn}({entity.name})")
+                if entity.description:
+                    lines.append(f"描述：{entity.description}")
+                lines.append("属性：")
+                for attr in entity.attributes:
+                    lines.append(f"  - {attr.name}: {attr.type} — {attr.description or ''}")
         return "\n".join(lines)
 
     def _build_action_context(self, action, extra_entity_ids: list[str]) -> str:
