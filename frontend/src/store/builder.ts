@@ -12,7 +12,6 @@ import type {
 import {
   SCENARIO_CLASS_PRESETS,
   SCENARIO_RELATION_PRESETS,
-  DEMO_UPLOAD_RECORDS,
 } from '../data/builderPresets'
 
 const SESSIONS_KEY = 'builder-sessions'
@@ -75,7 +74,7 @@ function loadUploads(): UploadRecord[] {
     const raw = localStorage.getItem(UPLOADS_KEY)
     if (raw) return JSON.parse(raw)
   } catch { /* noop */ }
-  return [...DEMO_UPLOAD_RECORDS]
+  return []
 }
 
 function persist<T>(key: string, val: T) {

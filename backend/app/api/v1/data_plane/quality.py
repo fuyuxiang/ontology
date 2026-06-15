@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.services.data_plane.quality_rule_service import QualityRuleService, RULE_DEFAULTS
@@ -99,9 +99,9 @@ def list_rules(asset_id: str | None = None, db: Session = Depends(get_db)):
 
 @router.post("/rules", response_model=RuleOut, status_code=201)
 def create_rule(body: RuleCreate, db: Session = Depends(get_db),
-                user: User | None = Depends(get_current_user)):
+                user: User = Depends(require_user)):
     try:
-        return _svc(db).create_rule(user_id=user.id if user else None, **body.model_dump())
+        return _svc(db).create_rule(user_id=user.id, **body.model_dump())
     except LookupError as e:
         raise HTTPException(404, str(e))
     except ValueError as e:

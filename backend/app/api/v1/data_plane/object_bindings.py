@@ -4,7 +4,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.data_plane import (
@@ -42,7 +42,7 @@ def get_binding(binding_id: str, db: Session = Depends(get_db)):
 def create_binding(
     body: BindingCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     try:
         return ObjectBindingService(db).create(
@@ -52,7 +52,7 @@ def create_binding(
             field_mappings=[fm.model_dump() for fm in body.field_mappings],
             id_column=body.id_column,
             filter_expr=body.filter_expr,
-            user_id=user.id if user else None,
+            user_id=user.id,
         )
     except ValueError as e:
         raise HTTPException(409, str(e))
