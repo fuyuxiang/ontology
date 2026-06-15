@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ruleApi } from '../../api/rules'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
 import ConditionBuilder from './ConditionBuilder.vue'
-import type { EntityListItem } from '../../types'
+import type { EntityListItem, EntityAttribute, EntityRelationDetail } from '../../types'
 
 const props = defineProps<{
   visible: boolean
@@ -20,6 +20,9 @@ const emit = defineEmits<{
 const toast = useToast()
 
 const entities = ref<EntityListItem[]>([])
+const entityAttrsCache = ref<Record<string, EntityAttribute[]>>({})
+const entityNameCache = ref<Record<string, string>>({})
+const relatedEntityIds = ref<string[]>([])
 const saving = ref(false)
 
 const form = ref({
@@ -28,17 +31,91 @@ const form = ref({
   entity_id: '',
   priority: 'medium' as 'high' | 'medium' | 'low',
   tags: '',
-  condition_mode: 'structured' as 'structured' | 'expression',
   conditions_json: [] as any[],
-  condition_expression: '',
-  action_id: '',
-  action_desc: '',
-  input_params: [] as { name: string; type: string; required: boolean }[],
+})
+
+function normalizeAttrType(type: string): string {
+  if (type === 'enum') return 'string'
+  if (type === 'computed' || type === 'json' || type === 'ref') return 'string'
+  return type
+}
+
+const attributeGroups = computed(() => {
+  const mainId = form.value.entity_id
+  if (!mainId) return []
+  const groups: { entityName: string; entityLabel: string; attrs: { field: string; label: string; type: string }[] }[] = []
+  const mainAttrs = entityAttrsCache.value[mainId]
+  const mainName = entityNameCache.value[mainId] ?? ''
+  if (mainAttrs?.length) {
+    groups.push({
+      entityName: mainName,
+      entityLabel: `${mainName}（主实体）`,
+      attrs: mainAttrs.map(a => ({
+        field: `${mainName}.${a.name}`,
+        label: a.description || a.name,
+        type: normalizeAttrType(a.type),
+      })),
+    })
+  }
+  for (const relId of relatedEntityIds.value) {
+    const relAttrs = entityAttrsCache.value[relId]
+    const relName = entityNameCache.value[relId] ?? ''
+    if (relAttrs?.length) {
+      groups.push({
+        entityName: relName,
+        entityLabel: relName,
+        attrs: relAttrs.map(a => ({
+          field: `${relName}.${a.name}`,
+          label: a.description || a.name,
+          type: normalizeAttrType(a.type),
+        })),
+      })
+    }
+  }
+  return groups
+})
+
+async function loadEntityAttributes(entityId: string) {
+  if (!entityId || entityAttrsCache.value[entityId]) return
+  try {
+    const entity = await entityApi.detail(entityId)
+    entityAttrsCache.value[entityId] = entity.attributes ?? []
+    entityNameCache.value[entityId] = entity.name
+  } catch { /* ignore */ }
+}
+
+async function loadRelatedEntities(entityId: string) {
+  if (!entityId) { relatedEntityIds.value = []; return }
+  try {
+    const rels = await entityApi.relations(entityId)
+    const ids = new Set<string>()
+    for (const r of rels) {
+      if (r.from_entity_id === entityId) ids.add(r.to_entity_id)
+      else ids.add(r.from_entity_id)
+    }
+    relatedEntityIds.value = [...ids]
+    await Promise.all(relatedEntityIds.value.map(id => loadEntityAttributes(id)))
+  } catch {
+    relatedEntityIds.value = []
+  }
+}
+
+watch(() => form.value.entity_id, async (id) => {
+  if (id) {
+    await loadEntityAttributes(id)
+    await loadRelatedEntities(id)
+  } else {
+    relatedEntityIds.value = []
+  }
 })
 
 async function load() {
   entities.value = await entityApi.list()
   if (props.lockedEntityId) form.value.entity_id = props.lockedEntityId
+  if (form.value.entity_id) {
+    await loadEntityAttributes(form.value.entity_id)
+    await loadRelatedEntities(form.value.entity_id)
+  }
   if (props.editId) {
     const rule = await ruleApi.detail(props.editId)
     form.value.name = rule.name
@@ -46,16 +123,16 @@ async function load() {
     form.value.entity_id = rule.entityId
     form.value.priority = rule.priority
     form.value.tags = Array.isArray((rule as any).tags) ? (rule as any).tags.join(', ') : ''
-    form.value.condition_expression = rule.condition ?? ''
-    form.value.action_id = (rule as any).action_id ?? ''
-    form.value.action_desc = (rule as any).action_desc ?? ''
-    form.value.input_params = (rule as any).input_params ?? []
     const cj = (rule as any).conditions_json
     if (cj && cj.length) {
-      form.value.condition_mode = 'structured'
-      form.value.conditions_json = cj
-    } else {
-      form.value.condition_mode = 'expression'
+      form.value.conditions_json = cj.map((c: any) => ({
+        ...c,
+        source: c.source ?? c.field ?? '',
+      }))
+    }
+    if (form.value.entity_id) {
+      await loadEntityAttributes(form.value.entity_id)
+      await loadRelatedEntities(form.value.entity_id)
     }
   }
 }
@@ -66,12 +143,9 @@ function resetForm() {
     entity_id: props.lockedEntityId ?? '',
     priority: 'medium',
     tags: '',
-    condition_mode: 'structured',
     conditions_json: [],
-    condition_expression: '',
-    action_id: '', action_desc: '',
-    input_params: [],
   }
+  relatedEntityIds.value = []
 }
 
 watch(() => props.visible, (v) => {
@@ -80,31 +154,23 @@ watch(() => props.visible, (v) => {
 
 onMounted(() => { if (props.visible) { resetForm(); load() } })
 
-function addParam() {
-  form.value.input_params.push({ name: '', type: 'string', required: false })
-}
-function removeParam(idx: number) {
-  form.value.input_params.splice(idx, 1)
-}
-
 async function save() {
   if (!form.value.name.trim()) { toast.error('请填写规则名称'); return }
+  if (!form.value.entity_id) { toast.error('请选择关联实体'); return }
+  if (!form.value.conditions_json.length) { toast.error('请至少添加一条触发条件'); return }
   saving.value = true
   try {
+    const conditions = form.value.conditions_json.map((c: any) => ({
+      ...c,
+      field: c.source,
+    }))
     const payload: any = {
       name: form.value.name.trim(),
       description: form.value.description,
-      entity_id: form.value.entity_id || null,
+      entity_id: form.value.entity_id,
       priority: form.value.priority,
       tags: form.value.tags.split(',').map(t => t.trim()).filter(Boolean),
-      action_id: form.value.action_id || null,
-      action_desc: form.value.action_desc,
-      input_params: form.value.input_params,
-    }
-    if (form.value.condition_mode === 'structured') {
-      payload.conditions_json = form.value.conditions_json
-    } else {
-      payload.condition = form.value.condition_expression
+      conditions_json: conditions,
     }
     let result: any
     if (props.editId) {
@@ -132,7 +198,6 @@ async function save() {
         </div>
 
         <div class="drawer-panel__body">
-          <!-- Basic info -->
           <div class="form-section">
             <div class="form-section__title">基本信息</div>
             <div class="rule-form">
@@ -146,9 +211,9 @@ async function save() {
               </div>
               <div class="form-row-inline">
                 <div class="form-row" style="flex:1;">
-                  <label class="form-label">关联实体</label>
+                  <label class="form-label">关联实体 *</label>
                   <select class="form-input" v-model="form.entity_id" :disabled="!!lockedEntityId">
-                    <option value="">— 不绑定实体 —</option>
+                    <option value="" disabled>— 请选择实体 —</option>
                     <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
                   </select>
                 </div>
@@ -171,64 +236,17 @@ async function save() {
             </div>
           </div>
 
-          <!-- Trigger conditions -->
           <div class="form-section">
             <div class="form-section__title">触发条件</div>
-            <div class="mode-switch">
-              <button :class="{ active: form.condition_mode === 'structured' }" @click="form.condition_mode = 'structured'">结构化</button>
-              <button :class="{ active: form.condition_mode === 'expression' }" @click="form.condition_mode = 'expression'">表达式</button>
-            </div>
+            <div v-if="!form.entity_id" class="form-hint">请先选择关联实体，以加载可用属性</div>
             <ConditionBuilder
-              v-if="form.condition_mode === 'structured'"
+              v-else
               v-model="form.conditions_json"
               :entity-id="form.entity_id"
               :entity-attributes="[]"
               :available-functions="[]"
+              :attribute-groups="attributeGroups"
             />
-            <textarea
-              v-else
-              class="form-input form-input--code"
-              v-model="form.condition_expression"
-              rows="4"
-              placeholder="例如：entity.age > 18 AND entity.status == 'active'"
-            />
-          </div>
-
-          <!-- Action reference -->
-          <div class="form-section">
-            <div class="form-section__title">动作引用</div>
-            <div class="rule-form">
-              <div class="form-row-inline">
-                <div class="form-row" style="flex:1;">
-                  <label class="form-label">动作 ID</label>
-                  <input class="form-input" v-model="form.action_id" placeholder="action_id（可选）" />
-                </div>
-                <div class="form-row" style="flex:1.5;">
-                  <label class="form-label">动作说明</label>
-                  <input class="form-input" v-model="form.action_desc" placeholder="简述触发后执行的动作" />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Input params -->
-          <div class="form-section">
-            <div class="form-section__title">输入参数</div>
-            <div v-for="(p, idx) in form.input_params" :key="idx" class="condition-row">
-              <input class="form-input" style="flex:2;" v-model="p.name" placeholder="参数名" />
-              <select class="form-input" style="flex:1.5;" v-model="p.type">
-                <option value="string">string</option>
-                <option value="number">number</option>
-                <option value="boolean">boolean</option>
-                <option value="date">date</option>
-                <option value="json">json</option>
-              </select>
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;flex-shrink:0;">
-                <input type="checkbox" v-model="p.required" /> 必填
-              </label>
-              <button class="btn-sm-del" @click="removeParam(idx)">✕</button>
-            </div>
-            <button class="btn-sm-exec" style="margin-top:4px;" @click="addParam">+ 添加参数</button>
           </div>
         </div>
 

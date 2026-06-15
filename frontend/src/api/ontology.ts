@@ -1,5 +1,5 @@
 import { get, post, put, del } from './client'
-import type { OntologyEntity, EntityListItem, GraphData, Tier, EntityStatus, FileImportResult } from '../types'
+import type { OntologyEntity, EntityListItem, EntityRelationDetail, GraphData, Tier, EntityStatus, FileImportResult } from '../types'
 
 export interface EntityQuery {
   tier?: Tier
@@ -92,6 +92,10 @@ export const entityApi = {
 
   graphAll() {
     return get<GraphData>('/entities/graph')
+  },
+
+  relations(entityId: string) {
+    return get<EntityRelationDetail[]>('/relations', { params: { entity_id: entityId } })
   },
 
   search(keyword: string) {

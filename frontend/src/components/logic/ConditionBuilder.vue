@@ -7,6 +7,12 @@ interface EntityAttr {
   type: string
 }
 
+interface AttrGroup {
+  entityName: string
+  entityLabel: string
+  attrs: EntityAttr[]
+}
+
 interface AvailableFunction {
   callable_name: string
   name: string
@@ -23,6 +29,7 @@ const props = defineProps<{
   entityId: string
   entityAttributes: EntityAttr[]
   availableFunctions: AvailableFunction[]
+  attributeGroups?: AttrGroup[]
 }>()
 
 const emit = defineEmits<{
@@ -31,6 +38,13 @@ const emit = defineEmits<{
 
 const matchMode = ref<'all' | 'at_least_1' | 'at_least_2'>('all')
 const rows = ref<ConditionRow[]>([{ source: '', operator: '==', value: '' }])
+
+const allAttrs = computed<EntityAttr[]>(() => {
+  if (props.attributeGroups?.length) {
+    return props.attributeGroups.flatMap(g => g.attrs)
+  }
+  return props.entityAttributes
+})
 
 const OPERATORS_BY_TYPE: Record<string, { value: string; label: string }[]> = {
   string: [
@@ -74,7 +88,7 @@ const OPERATORS_BY_TYPE: Record<string, { value: string; label: string }[]> = {
 
 function getSourceType(source: string): string {
   if (source.startsWith('$fn.')) return 'default'
-  const attr = props.entityAttributes.find(a => a.field === source)
+  const attr = allAttrs.value.find(a => a.field === source)
   return attr?.type ?? 'default'
 }
 
@@ -122,7 +136,6 @@ function emitUpdate() {
 
 watch(matchMode, emitUpdate)
 
-// Initialise from modelValue
 watch(() => props.modelValue, (val) => {
   if (!val || val.length === 0) return
   if (val[0]?.match_mode) matchMode.value = val[0].match_mode
@@ -151,7 +164,14 @@ watch(() => props.modelValue, (val) => {
       <select class="form-input" style="flex:2;min-width:0;" :value="row.source"
         @change="row.source = ($event.target as HTMLSelectElement).value; onSourceChange(idx)">
         <option value="">— 选择字段或函数 —</option>
-        <optgroup v-if="entityAttributes.length" label="实体属性">
+        <template v-if="attributeGroups?.length">
+          <optgroup v-for="group in attributeGroups" :key="group.entityName" :label="group.entityLabel">
+            <option v-for="attr in group.attrs" :key="attr.field" :value="attr.field">
+              {{ attr.label }}（{{ attr.type }}）
+            </option>
+          </optgroup>
+        </template>
+        <optgroup v-else-if="entityAttributes.length" label="实体属性">
           <option v-for="attr in entityAttributes" :key="attr.field" :value="attr.field">
             {{ attr.label }}（{{ attr.type }}）
           </option>

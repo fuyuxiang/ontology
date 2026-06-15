@@ -145,3 +145,5 @@
 .drawer-enter-active .drawer-panel, .drawer-leave-active .drawer-panel { transition: transform 0.25s ease; }
 .drawer-enter-from, .drawer-leave-to { opacity: 0; }
 .drawer-enter-from .drawer-panel, .drawer-leave-to .drawer-panel { transform: translateX(100%); }
+
+.form-hint { font-size: 12px; color: var(--neutral-500, #6b7280); padding: 8px 0; }
