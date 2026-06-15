@@ -11,7 +11,6 @@ from app.database import get_db
 from app.models import OntologyEntity, Agent, BusinessRule
 from app.models.asset import Asset
 from app.models.skill import Skill
-from app.models.pipeline import Pipeline
 from app.repositories.monitor_repo import MonitorRepository
 from app.schemas.monitor import (
     ResourceMetrics, ServiceStatus, ResponseHistoryPoint,
@@ -132,11 +131,9 @@ def get_platform_stats(db: Session = Depends(get_db)):
         select(func.count(Asset.id)).where(Asset.status == "active")
     ) or 0
     total_rules = db.scalar(select(func.count(BusinessRule.id))) or 0
-    total_pipelines = db.scalar(select(func.count(Pipeline.id))) or 0
     return PlatformStatsResponse(
         total_datasources=total_datasources,
         total_rules=total_rules,
-        total_pipelines=total_pipelines,
     )
 
 

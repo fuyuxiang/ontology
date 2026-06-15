@@ -6,7 +6,6 @@
 与计划对齐：
 - /datasources*        → Sunset: 2026-12-31（M4 删除）
 - /business-documents* → Sunset: 2026-12-31
-- /pipelines*          → Sunset: 2026-09-30（M2 起返回空 + 410）
 """
 from __future__ import annotations
 
@@ -20,7 +19,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 DEPRECATED_PREFIXES: list[tuple[str, str]] = [
     ("/api/v1/datasources", "2026-12-31"),
     ("/api/v1/business-documents", "2026-12-31"),
-    ("/api/v1/pipelines", "2026-09-30"),
 ]
 
 
