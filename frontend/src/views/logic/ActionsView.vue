@@ -107,6 +107,7 @@
           </div>
 
           <div class="detail-panel__actions">
+            <button class="btn-sm-exec" @click="openEdit(selectedAction.id)">编辑</button>
             <button class="btn-sm-exec" @click="handleExecute(selectedAction)">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor"/></svg>
               执行
@@ -123,122 +124,31 @@
       </div>
     </div>
 
-    <Transition name="drawer">
-      <div v-if="showAdd" class="drawer-overlay" @click.self="closeCreate">
-        <div class="drawer-panel">
-          <div class="drawer-panel__header">
-            <h2>新建行动</h2>
-            <button class="btn-icon" @click="closeCreate">✕</button>
-          </div>
-
-          <div class="drawer-panel__body">
-            <div class="create-steps">
-              <div class="create-steps__indicators">
-                <span v-for="(s, i) in stepLabels" :key="i" class="step-dot" :class="{ 'step-dot--active': createStep === i, 'step-dot--done': createStep > i }">{{ i + 1 }}. {{ s }}</span>
-              </div>
-
-              <form class="rule-form" @submit.prevent="handleStepNext">
-                <template v-if="createStep === 0">
-                  <div class="form-row"><label class="form-label">行动名称</label><input v-model="form.name" class="form-input" required /></div>
-                  <div class="form-row"><label class="form-label">描述</label><input v-model="form.description" class="form-input" /></div>
-                  <div class="form-row"><label class="form-label">分类</label>
-                    <select v-model="form.category" class="form-input" required>
-                      <option value="domain">领域行动（绑定实体）</option>
-                      <option value="system">系统行动（不绑定实体）</option>
-                    </select>
-                  </div>
-                </template>
-
-                <template v-if="createStep === 1">
-                  <div v-if="form.category === 'domain'" class="form-row">
-                    <label class="form-label">关联实体</label>
-                    <select v-model="form.entity_id" class="form-input" required>
-                      <option value="" disabled>选择实体</option>
-                      <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name_cn || e.name }} ({{ e.name }})</option>
-                    </select>
-                  </div>
-                  <div class="form-row">
-                    <label class="form-label">行动类型</label>
-                    <select v-model="form.action_type" class="form-input" required>
-                      <option value="" disabled>选择类型</option>
-                      <option v-for="t in actionTypes" :key="t.type_key" :value="t.type_key">{{ t.label }} - {{ t.description }}</option>
-                    </select>
-                  </div>
-                </template>
-
-                <template v-if="createStep === 2">
-                  <p class="text-caption" style="margin-bottom: 12px;">配置「{{ getTypeLabel(form.action_type) }}」的执行参数：</p>
-                  <div v-if="form.action_type === 'custom_script'" class="form-row" style="justify-content: flex-start;">
-                    <button type="button" class="btn-secondary" @click="showAiPanel = true">
-                      AI 生成
-                    </button>
-                  </div>
-                  <div v-for="(field, key) in currentConfigSchema" :key="key" class="form-row">
-                    <label class="form-label">{{ field.description || key }}</label>
-                    <textarea v-if="field.type === 'object' || key === 'script' || key === 'sql'" v-model="typeConfigValues[key as string]" class="form-input form-textarea" rows="3"></textarea>
-                    <select v-else-if="field.enum" v-model="typeConfigValues[key as string]" class="form-input">
-                      <option v-for="opt in field.enum" :key="opt" :value="opt">{{ opt }}</option>
-                    </select>
-                    <input v-else v-model="typeConfigValues[key as string]" class="form-input" :required="field.required" />
-                  </div>
-                </template>
-
-                <div class="form-row" style="justify-content: flex-end; gap: 8px;">
-                  <button v-if="createStep > 0" type="button" class="btn-secondary" @click="createStep--">上一步</button>
-                  <button v-if="createStep < 2" type="submit" class="btn-primary">下一步</button>
-                  <button v-else type="button" class="btn-primary" @click="handleCreate">创建</button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Transition>
-
-    <Teleport to="body">
-      <AiCodePanel
-        :visible="showAiPanel"
-        :target-type="'action'"
-        :target-id="selectedId || ''"
-        :context-entity-ids="form.entity_id ? [form.entity_id] : []"
-        @close="showAiPanel = false"
-        @apply="(code: string) => { typeConfigValues['script'] = code; showAiPanel = false }"
-      />
-    </Teleport>
+    <ActionBuilderDrawer
+      :visible="drawerVisible"
+      :edit-id="drawerEditId"
+      @close="drawerVisible = false"
+      @saved="onDrawerSaved"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { actionApi, type ActionItem, type ActionTypeInfo } from '../../api/actions'
-import { get } from '../../api/client'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
-import AiCodePanel from '../../components/logic/AiCodePanel.vue'
+import ActionBuilderDrawer from '../../components/logic/ActionBuilderDrawer.vue'
 
 const route = useRoute()
-const router = useRouter()
 
 const actions = ref<ActionItem[]>([])
-const entities = ref<any[]>([])
 const actionTypes = ref<ActionTypeInfo[]>([])
 const search = ref('')
 const activeFilter = ref('all')
 const selectedId = ref<string | null>(null)
-const showAdd = ref(false)
-const showAiPanel = ref(false)
-const createStep = ref(0)
-
-const form = ref({
-  name: '',
-  description: '',
-  category: 'domain' as 'domain' | 'system',
-  entity_id: '',
-  action_type: '',
-})
-const typeConfigValues = ref<Record<string, string>>({})
-
-const stepLabels = ['基本信息', '类型选择', '类型配置']
+const drawerVisible = ref(false)
+const drawerEditId = ref<string | undefined>(undefined)
 
 const filterOptions = [
   { label: '全部', value: 'all' },
@@ -271,11 +181,6 @@ const filteredActions = computed(() => {
   return list
 })
 
-const currentConfigSchema = computed(() => {
-  const t = actionTypes.value.find(at => at.type_key === form.value.action_type)
-  return t?.config_schema || {}
-})
-
 function getTypeLabel(typeKey: string): string {
   const t = actionTypes.value.find(at => at.type_key === typeKey)
   return t?.label || typeKey
@@ -286,18 +191,18 @@ function setFilter(value: string) {
 }
 
 function openCreate() {
-  createStep.value = 0
-  form.value = { name: '', description: '', category: 'domain', entity_id: '', action_type: '' }
-  typeConfigValues.value = {}
-  showAdd.value = true
+  drawerEditId.value = undefined
+  drawerVisible.value = true
 }
 
-function closeCreate() {
-  showAdd.value = false
+function openEdit(id: string) {
+  drawerEditId.value = id
+  drawerVisible.value = true
 }
 
-function handleStepNext() {
-  if (createStep.value < 2) createStep.value++
+function onDrawerSaved() {
+  drawerVisible.value = false
+  fetchActions()
 }
 
 async function fetchActions() {
@@ -306,53 +211,8 @@ async function fetchActions() {
   actions.value = await actionApi.list(params)
 }
 
-async function fetchEntities() {
-  entities.value = await get<any[]>('/entities')
-}
-
 async function fetchActionTypes() {
   actionTypes.value = await actionApi.types()
-}
-
-async function handleCreate() {
-  const typeConfig: Record<string, any> = {}
-  for (const [key, val] of Object.entries(typeConfigValues.value)) {
-    if (!val) continue
-    const schema = currentConfigSchema.value[key]
-    if (schema?.type === 'object') {
-      try { typeConfig[key] = JSON.parse(val) } catch { typeConfig[key] = val }
-    } else {
-      typeConfig[key] = val
-    }
-  }
-
-  const payload: any = {
-    name: form.value.name,
-    description: form.value.description || undefined,
-    category: form.value.category,
-    action_type: form.value.action_type,
-    type_config: Object.keys(typeConfig).length > 0 ? typeConfig : undefined,
-  }
-  if (form.value.category === 'domain') {
-    payload.entity_id = form.value.entity_id
-  }
-
-  try {
-    const created = await actionApi.create(payload)
-    closeCreate()
-    await fetchActions()
-
-    if (route.query.from === 'builder') {
-      const sid = route.query.session_id as string
-      const oid = route.query.object_id as string
-      if (sid && oid && (created as any)?.id) {
-        router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: (created as any).id, kind: 'action' } })
-      }
-    }
-  } catch (e: any) {
-    const msg = e?.response?.data?.detail || e?.message || '创建失败'
-    alert(`创建行动失败: ${msg}`)
-  }
 }
 
 async function handleExecute(action: ActionItem) {
@@ -369,17 +229,9 @@ async function handleDelete(action: ActionItem) {
 
 onMounted(() => {
   fetchActions()
-  fetchEntities()
   fetchActionTypes()
   if (route.query.from === 'builder') {
-    form.value = {
-      name: (route.query.prefill_name || '') as string,
-      description: '',
-      category: 'domain',
-      entity_id: (route.query.object_id || '') as string,
-      action_type: '',
-    }
-    showAdd.value = true
+    drawerVisible.value = true
   }
 })
 </script>
@@ -575,33 +427,5 @@ onMounted(() => {
   justify-content: center;
   height: 100%;
   color: var(--neutral-400, #aaa);
-}
-
-.create-steps__indicators {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--neutral-100, #f0f0f0);
-}
-
-.step-dot {
-  font-size: 12px;
-  color: var(--neutral-500, #999);
-}
-
-.step-dot--active {
-  color: var(--semantic-600, #4c6ef5);
-  font-weight: 600;
-}
-
-.step-dot--done {
-  color: var(--status-success, #22c55e);
-}
-
-.form-textarea {
-  min-height: 72px;
-  resize: vertical;
-  font-family: monospace;
 }
 </style>
