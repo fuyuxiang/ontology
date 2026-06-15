@@ -13,7 +13,6 @@ const router = createRouter({
     // 数据集成
     { path: '/data/connections', name: 'data-connections', component: () => import('../views/datasource/ConnectionsPage.vue'), meta: { title: '数据接入' } },
     { path: '/data/assets', name: 'data-assets', component: () => import('../views/datasource/AssetsPage.vue'), meta: { title: '资产目录' } },
-    { path: '/data/pipeline', name: 'data-pipeline', component: () => import('../views/datasource/pages/DataPipelinePage.vue'), meta: { title: '数据管道' } },
     { path: '/data/lineage', name: 'data-lineage', component: () => import('../views/datasource/pages/DataLineagePage.vue'), meta: { title: '数据血缘' } },
     { path: '/data/quality', name: 'data-quality', component: () => import('../views/datasource/pages/DataQualityPage.vue'), meta: { title: '数据质量' } },
 
