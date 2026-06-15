@@ -4,7 +4,7 @@
       <OntologyBreadcrumb :items="breadcrumbs" />
     </div>
     <div class="topbar__right">
-      <button class="topbar__icon-btn" title="我的待办" @click="router.push('/todo')">
+      <button class="topbar__icon-btn" title="我的待办（即将上线）" disabled>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 2a4 4 0 00-4 4v3l-1 1.5h10L12 9V6a4 4 0 00-4-4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
           <path d="M6.5 13a1.5 1.5 0 003 0" stroke="currentColor" stroke-width="1.5"/>

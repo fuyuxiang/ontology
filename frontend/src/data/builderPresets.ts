@@ -1,7 +1,6 @@
 import type {
   ScenarioCard,
   PublishGate,
-  UploadRecord,
   DataAsset,
   OntologyObjectDraft,
 } from '../types/builder'
@@ -83,50 +82,6 @@ export const DEFAULT_PUBLISH_GATES: PublishGate[] = [
   { key: 'structure', label: '本体结构完整', desc: '本体 0 个', pass: false },
   { key: 'drill', label: '水合演练通过', desc: '未演练', pass: false },
   { key: 'version_ready', label: '版本就绪', desc: '版本号自动生成', pass: true },
-]
-
-// ── 演示上传记录（builder-upload-records） ──
-export const DEMO_UPLOAD_RECORDS: UploadRecord[] = [
-  {
-    id: 'demo-upload-1', fileName: 'FTTR续约SOP_v3.pdf', fileType: 'PDF', fileSize: '2.3 MB',
-    sourceOntology: 'FTTR续约策略策划 v2.0', scenarioName: 'FTTR续约策划',
-    uploadedAt: '2026-04-20T09:12:00.000Z',
-    status: 'completed', statusText: '已提取规则（24条）',
-    extractedSummary: '续约策略、触达约束与产品匹配规则已提取',
-    extractedRules: 24, extractedFields: 0, mimeCategory: 'unstructured',
-  },
-  {
-    id: 'demo-upload-2', fileName: '用户ARPU分层标准.xlsx', fileType: 'XLSX', fileSize: '156 KB',
-    sourceOntology: 'FTTR续约策略策划 v2.0', scenarioName: 'FTTR续约策划',
-    uploadedAt: '2026-04-20T09:18:00.000Z',
-    status: 'completed', statusText: '已提取结构（8字段）',
-    extractedSummary: 'ARPU分层口径、字段结构与示例值已提取',
-    extractedRules: 0, extractedFields: 8, mimeCategory: 'structured',
-  },
-  {
-    id: 'demo-upload-3', fileName: '政企问数实体关系图.png', fileType: 'PNG', fileSize: '1.8 MB',
-    sourceOntology: '政企智能问数本体', scenarioName: '政企智能问数',
-    uploadedAt: '2026-04-20T09:26:00.000Z',
-    status: 'parsing', statusText: 'AI 解析中...',
-    extractedSummary: '图片关系抽取正在进行',
-    extractedRules: 0, extractedFields: 0, mimeCategory: 'image',
-  },
-  {
-    id: 'demo-upload-4', fileName: '退单归因分析SOP.pdf', fileType: 'PDF', fileSize: '3.1 MB',
-    sourceOntology: '退单根因分析本体', scenarioName: '退单根因分析',
-    uploadedAt: '2026-04-20T09:42:00.000Z',
-    status: 'completed', statusText: '已提取规则（18条）',
-    extractedSummary: '退单原因分层、派单路径与闭环规则已提取',
-    extractedRules: 18, extractedFields: 0, mimeCategory: 'unstructured',
-  },
-  {
-    id: 'demo-upload-5', fileName: '退单分类对照表.xlsx', fileType: 'XLSX', fileSize: '89 KB',
-    sourceOntology: '退单根因分析本体', scenarioName: '退单根因分析',
-    uploadedAt: '2026-04-20T09:48:00.000Z',
-    status: 'failed', statusText: '解析失败',
-    extractedSummary: '文件存在合并单元格，需重新解析或上传规范模板',
-    extractedRules: 0, extractedFields: 0, mimeCategory: 'structured',
-  },
 ]
 
 // ── 资产清单（mock，按场景） ──

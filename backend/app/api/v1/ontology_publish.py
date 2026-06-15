@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.models.entity import OntologyEntity, EntityAttribute
 from app.models.relation import EntityRelation
 from app.models.version import (
@@ -78,14 +78,14 @@ def get_version(version_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/versions")
-def create_version(req: CreateVersionRequest, db: Session = Depends(get_db), user: User | None = Depends(get_current_user)):
+def create_version(req: CreateVersionRequest, db: Session = Depends(get_db), user: User = Depends(require_user)):
     max_num = db.query(func.max(OntologyVersion.version_number)).scalar() or 0
     version = OntologyVersion(
         version_number=max_num + 1,
         name=req.name,
         description=req.description,
         status="draft",
-        created_by=user.id if user else None,
+        created_by=user.id,
     )
     db.add(version)
     db.commit()
@@ -317,7 +317,7 @@ def submit_for_approval(version_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/versions/{version_id}/approve")
-def approve_version(version_id: str, db: Session = Depends(get_db), user: User | None = Depends(get_current_user)):
+def approve_version(version_id: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
     v = _get_version(version_id, db)
     if v.status != "pending_approval":
         raise HTTPException(400, "只有待审批状态可以通过")
@@ -330,7 +330,7 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User |
     v.status = "published"
     v.is_active = True
     v.published_at = datetime.utcnow()
-    v.approved_by = user.id if user else None
+    v.approved_by = user.id
 
     published_entity_ids = [ve.source_entity_id for ve in v.entities]
     if published_entity_ids:
@@ -406,7 +406,7 @@ def list_version_actions(version_id: str, db: Session = Depends(get_db)):
 # ─── 回滚 ────────────────────────────────────────────────────────────
 
 @router.post("/versions/{version_id}/rollback")
-def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: User | None = Depends(get_current_user)):
+def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
     target = _get_version(version_id, db)
     if target.status != "published":
         raise HTTPException(400, "只能回滚到已发布的版本")
@@ -417,7 +417,7 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
         name=f"回滚自 v{target.version_number}",
         description=f"从版本 v{target.version_number} ({target.name}) 回滚",
         status="pending_approval",
-        created_by=user.id if user else None,
+        created_by=user.id,
         submitted_at=datetime.utcnow(),
         rollback_from=target.version_number,
     )

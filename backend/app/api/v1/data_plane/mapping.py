@@ -8,7 +8,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.services.data_plane.mapping_suggest_service import MappingSuggestService
@@ -89,7 +89,7 @@ def suggest(body: SuggestRequest, db: Session = Depends(get_db)):
 
 @router.post("/apply")
 def apply(body: ApplyRequest, db: Session = Depends(get_db),
-          user: User | None = Depends(get_current_user)):
+          user: User = Depends(require_user)):
     """提交确认结果：写 / 更新 ObjectBinding（role=primary），同时反写 EntityAttribute。"""
     svc = ObjectBindingService(db)
     fm_payload = [m.model_dump() for m in body.field_mappings]
@@ -113,7 +113,7 @@ def apply(body: ApplyRequest, db: Session = Depends(get_db),
                 field_mappings=fm_payload,
                 id_column=body.id_column,
                 filter_expr=body.filter_expr,
-                user_id=user.id if user else None,
+                user_id=user.id,
             )
             action = "created"
         return {

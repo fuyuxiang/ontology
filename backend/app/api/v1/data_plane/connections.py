@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.connectors import ConnectorRegistry
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.data_plane import (
@@ -61,11 +61,11 @@ def get_credential_mask(conn_id: str, db: Session = Depends(get_db)):
 def create_connection(
     body: ConnectionCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     try:
         return _svc(db).create(
-            user_id=user.id if user else None, **body.model_dump(),
+            user_id=user.id, **body.model_dump(),
         )
     except ValueError as e:
         raise HTTPException(400, str(e))

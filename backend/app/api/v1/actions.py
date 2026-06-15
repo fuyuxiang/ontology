@@ -9,7 +9,7 @@ from app.schemas.action import (
     ActionExecuteRequest, ActionExecuteResult, ActionTypeInfo,
 )
 from app.repositories.action_repo import ActionRepository
-from app.core.deps import get_current_user
+from app.core.deps import require_user
 from app.models.user import User
 from app.services.audit import write_audit
 from app.services.action_executors import get_executor, get_all_type_info
@@ -61,7 +61,7 @@ def get_action(action_id: str, db: Session = Depends(get_db)):
 def create_action(
     data: ActionCreate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     if data.category == "domain" and not data.entity_id:
         raise HTTPException(status_code=400, detail="领域行动必须绑定实体")
@@ -78,8 +78,8 @@ def create_action(
     repo.create(action)
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="create", target_type="action",
         target_id=action.id, target_name=action.name,
     )
@@ -95,7 +95,7 @@ def create_action(
 def update_action(
     action_id: str, data: ActionUpdate,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = ActionRepository(db)
     action = repo.get_by_id(action_id)
@@ -128,7 +128,7 @@ def update_action(
 def delete_action(
     action_id: str,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = ActionRepository(db)
     action = repo.get_by_id(action_id)
@@ -136,8 +136,8 @@ def delete_action(
         raise HTTPException(status_code=404, detail="动作不存在")
 
     write_audit(
-        db, user_id=user.id if user else None,
-        user_name=user.name if user else None,
+        db, user_id=user.id,
+        user_name=user.name,
         action="delete", target_type="action",
         target_id=action.id, target_name=action.name,
     )
@@ -150,7 +150,7 @@ async def execute_action(
     action_id: str,
     data: ActionExecuteRequest | None = None,
     db: Session = Depends(get_db),
-    user: User | None = Depends(get_current_user),
+    user: User = Depends(require_user),
 ):
     repo = ActionRepository(db)
     action = repo.get_by_id(action_id)
