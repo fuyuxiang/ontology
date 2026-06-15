@@ -18,7 +18,7 @@
         :class="{ active: allMapped }"
         :disabled="!allMapped"
         @click="finishMapping"
-      >进入水合演练 →</button>
+      >开始数据验证 →</button>
     </header>
 
     <div class="mapping-body">
