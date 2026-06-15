@@ -79,11 +79,11 @@ const sortedSessions = computed(() =>
 
 function stageInfo(status: SessionStatus) {
   return ({
-    drafting: { label: '构建中', tone: 'orange' },
-    pending_review: { label: '走测中', tone: 'purple' },
-    reviewing: { label: '走测中', tone: 'purple' },
-    pending_hydration: { label: '水合演练', tone: 'teal' },
-    hydrating: { label: '水合演练', tone: 'teal' },
+    drafting: { label: '建模中', tone: 'orange' },
+    pending_review: { label: '审批中', tone: 'purple' },
+    reviewing: { label: '审批中', tone: 'purple' },
+    pending_hydration: { label: '验证中', tone: 'teal' },
+    hydrating: { label: '验证中', tone: 'teal' },
     pending_publish: { label: '发布中', tone: 'green' },
     publishing: { label: '发布中', tone: 'green' },
     published: { label: '已发布', tone: 'green' },

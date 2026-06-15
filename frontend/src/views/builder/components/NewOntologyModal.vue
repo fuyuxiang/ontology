@@ -113,7 +113,7 @@ interface MethodCard {
   tone: string
 }
 const METHOD_CARDS: MethodCard[] = [
-  { id: 'manual',  short: '手工', title: '手工建模', subtitle: '逐项定义对象、属性、关系',          audience: '适合本体工程师',  tone: 'manual'  },
+  { id: 'manual',  short: '手工', title: '手工建模', subtitle: '定义对象、属性、关系',          audience: '适合本体工程师',  tone: 'manual'  },
   { id: 'import',  short: '导入', title: '文件导入', subtitle: 'OWL / RDF / JSON 标准本体文件',     audience: '适合本体工程师',  tone: 'import'  },
   { id: 'extract', short: '抽取', title: '文档抽取', subtitle: 'Word / Excel / PDF 业务文档 LLM 抽取', audience: '适合业务专家',    tone: 'extract' },
   { id: 'chat',    short: '对话', title: '对话生成', subtitle: '对话式联动数据资产与文档生成',        audience: '适合业务分析师',  tone: 'chat'    },

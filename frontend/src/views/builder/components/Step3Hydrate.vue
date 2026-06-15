@@ -2,7 +2,7 @@
   <div class="step3-root">
     <header class="step3-topbar">
       <button class="step3-back-btn" @click="$emit('prev')">← 返回</button>
-      <div class="step3-topbar-title">水合演练 · 本体发布</div>
+      <div class="step3-topbar-title">验证发布</div>
       <div class="step3-topbar-progress" v-if="drillStarted && !drillResult">
         <span class="step3-progress-label">演练进行中</span>
         <div class="step3-progress-track">
@@ -51,7 +51,7 @@
         <!-- 演练前：数据源选择 -->
         <div v-if="!drillStarted" class="step3-panel">
           <div class="step3-panel__title">数据源选择</div>
-          <div class="step3-panel__sub">选择参与水合演练的数据资产，验证本体属性与真实数据列的映射关系</div>
+          <div class="step3-panel__sub">选择参与验证的数据资产，验证本体属性与真实数据列的映射关系</div>
 
           <div v-if="assetLoading" class="step3-loading">加载资产信息中...</div>
           <div v-else-if="assetList.length > 0" class="step3-ds-list">
@@ -460,7 +460,7 @@ async function startDrill() {
   if (drillTimer) clearInterval(drillTimer)
   drillTimer = window.setInterval(() => drillElapsed.value++, 1000)
 
-  pushLog('RUN', '启动水合演练...')
+  pushLog('RUN', '启动数据验证...')
 
   try {
     const payload = {
@@ -586,7 +586,7 @@ function handleHydrationEvent(ev: any, phaseData: Record<string, DrillPhase>) {
         selectedSampleSourceIds: selectedSourceIds.value,
         status: 'pending_publish',
       })
-      message.success('水合演练完成')
+      message.success('验证完成')
       break
     }
     case 'error':

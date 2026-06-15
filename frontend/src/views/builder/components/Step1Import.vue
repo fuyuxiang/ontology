@@ -130,7 +130,7 @@ async function parseFile(file: File) {
           id,
           name: o.name,
           displayName: o.display_name || o.name,
-          tier: (o.tier || 2) as 1 | 2 | 3,
+          tier: (o.tier || 3) as 1 | 2 | 3,
           namespace: o.namespace || undefined,
           description: o.description || '',
           primaryKey: o.primary_key || 'id',
