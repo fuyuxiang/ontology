@@ -319,15 +319,15 @@ async function runTest() {
         </div>
       </div>
     </div>
-    <AiCodePanel
-      :visible="showAiPanel"
-      :target-type="'function'"
-      :target-id="savedId || editId || ''"
-      :context-entity-ids="form.entity_id ? [form.entity_id] : []"
-      @close="showAiPanel = false"
-      @apply="onAiApply"
-    />
   </Transition>
+  <AiCodePanel
+    :visible="showAiPanel"
+    :target-type="'function'"
+    :target-id="savedId || editId || ''"
+    :context-entity-ids="form.entity_id ? [form.entity_id] : []"
+    @close="showAiPanel = false"
+    @apply="onAiApply"
+  />
 </template>
 
 <style scoped>
