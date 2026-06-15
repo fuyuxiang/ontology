@@ -78,8 +78,8 @@ export const entityApi = {
     return put<OntologyEntity>(`/entities/${id}`, data)
   },
 
-  remove(id: string) {
-    return del<void>(`/entities/${id}`)
+  remove(id: string, force = false) {
+    return del<void>(`/entities/${id}${force ? '?force=true' : ''}`)
   },
 
   graph(id: string, depth = 2, direction: 'both' | 'outgoing' | 'incoming' = 'both') {
