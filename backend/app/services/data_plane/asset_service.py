@@ -80,6 +80,43 @@ class AssetService:
         self.vault = get_vault()
         self.bus = get_event_bus()
 
+    # ── 树形结构 ──────────────────────────────────────
+    def get_tree(self, connection_id: str | None = None) -> list[dict]:
+        """返回 connection → table → columns 的树形结构。"""
+        from app.models.connection import Connection
+
+        assets = self.repo.list_active_structured()
+        if connection_id:
+            assets = [a for a in assets if a.connection_id == connection_id]
+
+        conn_map: dict[str, dict] = {}
+        for a in assets:
+            cid = a.connection_id or "__none__"
+            if cid not in conn_map:
+                conn = self.db.query(Connection).get(cid) if cid != "__none__" else None
+                conn_map[cid] = {
+                    "connection_id": cid if cid != "__none__" else None,
+                    "connection_name": conn.name if conn else "未关联连接",
+                    "db_type": conn.type if conn else None,
+                    "database": conn.database if conn else None,
+                    "tables": [],
+                }
+            columns = []
+            for col in (a.schema_snapshot or []):
+                columns.append({
+                    "name": col.get("name", ""),
+                    "type": col.get("type", ""),
+                    "comment": col.get("comment", ""),
+                    "is_pk": col.get("is_pk", False),
+                })
+            conn_map[cid]["tables"].append({
+                "asset_id": a.id,
+                "table_name": a.locator.get("table", a.name) if isinstance(a.locator, dict) else a.name,
+                "columns": columns,
+            })
+
+        return list(conn_map.values())
+
     # ── 通用 CRUD ──────────────────────────────────────
     def list(self, **filters) -> list[Asset]:
         return self.repo.list(**filters)

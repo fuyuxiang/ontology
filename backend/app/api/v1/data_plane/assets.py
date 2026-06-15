@@ -86,6 +86,15 @@ def list_scopes(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/tree")
+def get_asset_tree(
+    connection_id: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """返回 connection→table→columns 树形结构，供映射页面使用。"""
+    return {"tree": _svc(db).get_tree(connection_id=connection_id)}
+
+
 @router.get("/{asset_id}", response_model=AssetDetail)
 def get_asset(asset_id: str, db: Session = Depends(get_db)):
     a = _svc(db).get(asset_id)

@@ -75,5 +75,15 @@ class AssetRepository(BaseRepository[Asset]):
             .first()
         )
 
+    def list_active_structured(self) -> list[Asset]:
+        """返回所有 active 且有 schema_snapshot 的结构化资产。"""
+        return (
+            self.db.query(Asset)
+            .filter(Asset.kind.in_(["table", "sql_view"]))
+            .filter(Asset.status == "active")
+            .filter(Asset.schema_snapshot.isnot(None))
+            .all()
+        )
+
     def count_by_connection(self, connection_id: str) -> int:
         return self.db.query(Asset).filter(Asset.connection_id == connection_id).count()
