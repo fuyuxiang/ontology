@@ -2,7 +2,7 @@
   <div class="step2-root">
     <header class="step2-topbar">
       <button class="step2-back-btn" @click="$emit('prev')">← 返回</button>
-      <div class="step2-topbar-title">本体走测 · 专家审批</div>
+      <div class="step2-topbar-title">专家审批</div>
       <div class="step2-topbar-progress">
         <span class="step2-progress-label">已通过 {{ approvedCount }} / {{ objects.length }}</span>
         <div class="step2-progress-track">
@@ -15,7 +15,7 @@
         :class="['step2-complete-btn', { active: approvedCount === objects.length && objects.length > 0 }]"
         :disabled="approvedCount < objects.length"
         @click="finishReview"
-      >完成走测</button>
+      >完成审批</button>
     </header>
 
     <!-- 数据源绑定面板（仅文档抽取/导入路径显示，手工建模在独立步骤处理） -->
@@ -51,42 +51,6 @@
       </div>
     </div>
 
-    <!-- 顶部 LLM 建议区 -->
-    <div v-if="hasHints" class="step2-hints">
-      <div class="step2-hints-head">💡 LLM 建议（来自文档抽取/对话生成）</div>
-      <div class="step2-hints-body">
-        <div v-for="r in hints.suggested_rules" :key="r.id" class="step2-hint-card step2-hint-card--rule">
-          <div class="step2-hint-head">
-            <span class="step2-hint-tag step2-hint-tag--rule">规则建议</span>
-            <strong>{{ r.name }}</strong>
-            <span v-if="r.targetObjectId" class="step2-hint-target">建议挂到：{{ objectName(r.targetObjectId) }}</span>
-          </div>
-          <div class="step2-hint-desc">{{ r.description }}</div>
-          <div v-if="r.conditionHint || r.actionHint" class="step2-hint-meta">
-            <span v-if="r.conditionHint">条件提示：{{ r.conditionHint }}</span>
-            <span v-if="r.actionHint">动作提示：{{ r.actionHint }}</span>
-          </div>
-          <div class="step2-hint-actions">
-            <button class="btn-mini" :disabled="hintCreating" @click="createFromHint(r, 'rule')">一键创建</button>
-            <button class="btn-mini" @click="attachExisting(r, 'rule')">挂到已有规则</button>
-            <button class="btn-mini btn-ghost" @click="ignoreHint(r.id, 'rule')">忽略</button>
-          </div>
-        </div>
-        <div v-for="a in hints.suggested_actions" :key="a.id" class="step2-hint-card step2-hint-card--action">
-          <div class="step2-hint-head">
-            <span class="step2-hint-tag step2-hint-tag--action">动作建议</span>
-            <strong>{{ a.name }}</strong>
-            <span v-if="a.targetObjectId" class="step2-hint-target">建议挂到：{{ objectName(a.targetObjectId) }}</span>
-          </div>
-          <div class="step2-hint-desc">{{ a.description }}</div>
-          <div class="step2-hint-actions">
-            <button class="btn-mini" :disabled="hintCreating" @click="createFromHint(a, 'action')">一键创建</button>
-            <button class="btn-mini" @click="attachExisting(a, 'action')">挂到已有动作</button>
-            <button class="btn-mini btn-ghost" @click="ignoreHint(a.id, 'action')">忽略</button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <div class="step2-body">
       <!-- 左：对象列表 -->
@@ -162,23 +126,6 @@
             </div>
           </div>
 
-          <div class="step2-editor-section-head">
-            <span>派生属性（Function）</span>
-            <a class="step2-editor-link" :href="addFnHref" target="_blank">＋ 新建 ↗</a>
-          </div>
-          <ResourcePickerMulti type="function" v-model="selected.derivedProperties" @update:modelValue="syncStore" />
-
-          <div class="step2-editor-section-head">
-            <span>规则</span>
-            <a class="step2-editor-link" :href="addRuleHref" target="_blank">＋ 新建 ↗</a>
-          </div>
-          <ResourcePickerMulti type="rule" v-model="selected.rules" @update:modelValue="syncStore" />
-
-          <div class="step2-editor-section-head">
-            <span>动作</span>
-            <a class="step2-editor-link" :href="addActionHref" target="_blank">＋ 新建 ↗</a>
-          </div>
-          <ResourcePickerMulti type="action" v-model="selected.actions" @update:modelValue="syncStore" />
 
           <button
             class="step2-editor-approve"
@@ -204,52 +151,20 @@
           <div v-if="!relations.length" class="step2-rel-empty">尚无关系</div>
         </div>
 
-        <div v-if="hints.suggested_rules.length || hints.suggested_actions.length" class="step2-attach-tip">
-          顶部还有 {{ hints.suggested_rules.length + hints.suggested_actions.length }} 条 LLM 建议待处理
-        </div>
       </aside>
-    </div>
-
-    <!-- 挂载已有规则/动作的弹窗 -->
-    <div v-if="attachModal.open" class="step2-modal-mask" @click.self="attachModal.open = false">
-      <div class="step2-modal">
-        <div class="step2-modal-head">挂载到 {{ attachModal.kind === 'rule' ? '已有规则' : '已有动作' }}</div>
-        <div class="step2-modal-body">
-          <div class="step2-form-row">
-            <label>挂到对象</label>
-            <select v-model="attachModal.objectId">
-              <option v-for="o in objects" :key="o.id" :value="o.id">{{ o.displayName }}（{{ o.name }}）</option>
-            </select>
-          </div>
-          <div class="step2-form-row">
-            <label>{{ attachModal.kind === 'rule' ? '规则' : '动作' }}</label>
-            <ResourcePickerMulti :type="attachModal.kind" v-model="attachModal.picked" />
-          </div>
-        </div>
-        <div class="step2-modal-actions">
-          <button class="btn-mini btn-ghost" @click="attachModal.open = false">取消</button>
-          <button class="btn-mini" :disabled="!attachModal.picked.length || !attachModal.objectId" @click="confirmAttach">确认挂载</button>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
 import { useBuilderStore } from '../../../store/builder'
-import { ruleApi } from '../../../api/rules'
-import { actionApi } from '../../../api/actions'
 import type {
   BuilderSession,
-  OntologyHints,
-  SuggestedRule,
-  SuggestedAction,
 } from '../../../types/builder'
 import SemanticCanvas from './graph/SemanticCanvas.vue'
-import ResourcePickerMulti from './manual/ResourcePickerMulti.vue'
 
 const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void }>()
@@ -261,11 +176,6 @@ const objects = ref([...props.session.ontologyObjects])
 const relations = ref([...props.session.ontologyRelations])
 const aiSuggesting = ref(false)
 const aiRelSuggesting = ref(false)
-const hintCreating = ref(false)
-const hints = ref<OntologyHints>({
-  suggested_rules: [...(props.session.hints?.suggested_rules || [])],
-  suggested_actions: [...(props.session.hints?.suggested_actions || [])],
-})
 
 // ── 数据源绑定 ──
 const bindingOpen = ref(false)
@@ -291,11 +201,6 @@ const typeOptions = [
 const selected = computed(() => objects.value.find(c => c.id === selectedId.value))
 const approvedCount = computed(() => objects.value.filter(c => c.approved).length)
 const progressPct = computed(() => objects.value.length ? (approvedCount.value / objects.value.length) * 100 : 0)
-const hasHints = computed(() => hints.value.suggested_rules.length || hints.value.suggested_actions.length)
-
-const addRuleHref   = computed(() => `/logic/rules?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=rule`)
-const addActionHref = computed(() => `/logic/actions?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=action`)
-const addFnHref     = computed(() => `/logic/functions?from=builder&session_id=${props.session.sessionId}&object_id=${selected.value?.id || ''}&kind=function`)
 
 function objectName(id: string) { return objects.value.find(o => o.id === id)?.displayName || id }
 function relationCountFor(id: string) { return relations.value.filter(r => r.source === id || r.target === id).length }
@@ -306,7 +211,6 @@ function syncStore() {
   store.patchActive({
     ontologyObjects: [...objects.value],
     ontologyRelations: [...relations.value],
-    hints: { ...hints.value },
     selectedAssetIds: [...selectedAssetIds.value],
   })
 }
@@ -451,76 +355,6 @@ function removeRelation(id: string) {
   syncStore()
 }
 
-// ── LLM 建议卡片三种处理 ──
-function ignoreHint(id: string, kind: 'rule' | 'action') {
-  if (kind === 'rule') hints.value.suggested_rules = hints.value.suggested_rules.filter(r => r.id !== id)
-  else hints.value.suggested_actions = hints.value.suggested_actions.filter(a => a.id !== id)
-  syncStore()
-}
-async function createFromHint(h: SuggestedRule | SuggestedAction, kind: 'rule' | 'action') {
-  const objectId = h.targetObjectId || selected.value?.id || objects.value[0]?.id || ''
-  if (!objectId) { message.warning('没有可挂载的对象'); return }
-  hintCreating.value = true
-  try {
-    if (kind === 'rule') {
-      const rh = h as SuggestedRule
-      const created = await ruleApi.create({
-        entity_id: objectId,
-        name: rh.name,
-        condition_expr: rh.conditionHint || rh.description || '',
-        action_desc: rh.actionHint || '',
-        status: 'active',
-        priority: 'medium',
-      })
-      const obj = objects.value.find(o => o.id === objectId)
-      if (obj && created?.id) {
-        obj.rules = [...new Set([...obj.rules, created.id])]
-      }
-      message.success(`规则「${rh.name}」已创建`)
-    } else {
-      const ah = h as SuggestedAction
-      const created = await actionApi.create({
-        entity_id: objectId,
-        name: ah.name,
-        type: 'manual',
-        status: 'active',
-      })
-      const obj = objects.value.find(o => o.id === objectId)
-      if (obj && created?.id) {
-        obj.actions = [...new Set([...obj.actions, created.id])]
-      }
-      message.success(`动作「${ah.name}」已创建`)
-    }
-    ignoreHint(h.id, kind)
-    syncStore()
-  } catch (e: any) {
-    message.error('创建失败：' + (e.message || e))
-  } finally {
-    hintCreating.value = false
-  }
-}
-
-const attachModal = reactive<{ open: boolean; kind: 'rule' | 'action'; objectId: string; picked: string[]; hintId: string }>({
-  open: false, kind: 'rule', objectId: '', picked: [], hintId: '',
-})
-function attachExisting(h: SuggestedRule | SuggestedAction, kind: 'rule' | 'action') {
-  attachModal.open = true
-  attachModal.kind = kind
-  attachModal.objectId = h.targetObjectId || selected.value?.id || objects.value[0]?.id || ''
-  attachModal.picked = []
-  attachModal.hintId = h.id
-}
-function confirmAttach() {
-  const obj = objects.value.find(o => o.id === attachModal.objectId)
-  if (!obj) return
-  if (attachModal.kind === 'rule') obj.rules = [...new Set([...obj.rules, ...attachModal.picked])]
-  else obj.actions = [...new Set([...obj.actions, ...attachModal.picked])]
-  ignoreHint(attachModal.hintId, attachModal.kind)
-  attachModal.open = false
-  syncStore()
-  message.success('已挂载')
-}
-
 async function onAssetDropdownOpen(open: boolean) {
   if (!open || assetOptions.value.length) return
   assetLoading.value = true
@@ -606,7 +440,6 @@ function finishReview() {
   store.patchActive({
     ontologyObjects: objects.value,
     ontologyRelations: relations.value,
-    hints: { ...hints.value },
     status: 'pending_hydration',
     approvedScenarios: objects.value.map(c => c.id),
     reviewLog: [
@@ -620,17 +453,13 @@ function finishReview() {
       },
     ],
   })
-  message.success('走测完成，进入水合演练')
+  message.success('审批完成，进入验证发布')
   emit('next')
 }
 
 watch(() => props.session.sessionId, () => {
   objects.value = [...props.session.ontologyObjects]
   relations.value = [...props.session.ontologyRelations]
-  hints.value = {
-    suggested_rules: [...(props.session.hints?.suggested_rules || [])],
-    suggested_actions: [...(props.session.hints?.suggested_actions || [])],
-  }
   selectedId.value = objects.value[0]?.id || null
 })
 

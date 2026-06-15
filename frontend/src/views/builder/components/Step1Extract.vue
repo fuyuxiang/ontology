@@ -78,7 +78,7 @@
             <div class="ext-card-head">
               <input type="checkbox" v-model="o.checked" />
               <input class="ext-card-name" v-model="o.displayName" />
-              <span class="ext-card-tier">T{{ o.tier }}</span>
+              <span class="ext-card-tier">{{ o.name }}</span>
             </div>
             <div class="ext-card-en">{{ o.name }}</div>
             <div v-if="o.properties.length" class="ext-prop-list">
@@ -245,7 +245,7 @@ function handleEvent(ev: any) {
       id: uid('obj'),
       name: ev.name,
       displayName: ev.display_name || ev.name,
-      tier: ev.tier || 2,
+      tier: ev.tier || 3,
       description: ev.description || '',
       primaryKey: ev.primary_key || 'id',
       icon: ev.icon || '🔷',
