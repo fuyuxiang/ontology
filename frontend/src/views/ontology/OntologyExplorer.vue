@@ -109,6 +109,12 @@
                 </svg>
                 编辑
               </button>
+              <button class="explorer__delete-btn" @click="handleDeleteEntity">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path d="M2 4h10M5 4V3a1 1 0 011-1h2a1 1 0 011 1v1m1.5 0l-.5 7.5a1 1 0 01-1 .5h-5a1 1 0 01-1-.5L4.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                删除
+              </button>
             </div>
           </div>
 
@@ -564,6 +570,36 @@ function onEntityDeleted() {
   store.fetchEntities()
 }
 
+async function handleDeleteEntity() {
+  if (!selectedId.value || !selected.value) return
+  const name = selected.value.nameCn || selected.value.name
+  if (!confirm(`确定删除对象「${name}」？此操作不可撤销，关联的属性、关系和数据映射将一并删除。`)) return
+  try {
+    await entityApi.remove(selectedId.value)
+    toast.success('对象已删除')
+    onEntityDeleted()
+  } catch (e: any) {
+    const resp = e?.response
+    if (resp?.status === 403) {
+      toast.error(resp.data?.detail || '已发布的对象不可删除')
+    } else if (resp?.status === 409) {
+      const d = resp.data?.detail
+      const msg = `该对象关联了 ${d?.bindings || 0} 个数据映射、${d?.relations || 0} 个关系、${d?.attributes || 0} 个属性，确认强制删除？`
+      if (confirm(msg)) {
+        try {
+          await entityApi.remove(selectedId.value!, true)
+          toast.success('对象已删除')
+          onEntityDeleted()
+        } catch (e2: any) {
+          toast.error(`删除失败: ${e2?.response?.data?.detail || (e2 as Error).message}`)
+        }
+      }
+    } else {
+      toast.error(`删除失败: ${(e as Error).message}`)
+    }
+  }
+}
+
 async function handleCreateRelation() {
   if (!selectedId.value || !relForm.name || !relForm.to_entity_id) return
   try {
@@ -723,6 +759,26 @@ async function handleDeleteAttribute(id: string, name: string) {
   border-color: var(--semantic-400);
   color: var(--semantic-600);
   background: var(--semantic-50);
+}
+
+.explorer__delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-300);
+  background: var(--neutral-0);
+  color: var(--neutral-600);
+  font-size: var(--text-code-size);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.explorer__delete-btn:hover {
+  border-color: var(--red-400, #f87171);
+  color: var(--red-600, #dc2626);
+  background: var(--red-50, #fef2f2);
 }
 
 .explorer__summary-list {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
 import { functionApi } from '../../api/functions'
 import AiCodePanel from './AiCodePanel.vue'
 import { entityApi } from '../../api/ontology'
@@ -25,7 +25,10 @@ const testInput = ref('{}')
 const testResult = ref<string | null>(null)
 const testSuccess = ref<boolean | null>(null)
 const savedId = ref<string | null>(null)
+const tempSessionId = ref(crypto.randomUUID())
 const showAiPanel = ref(false)
+
+const aiTargetId = computed(() => savedId.value || props.editId || `tmp_${tempSessionId.value}`)
 
 function onAiApply(code: string) {
   form.value.logic_body = code
@@ -37,6 +40,7 @@ const form = ref({
   callable_name: '',
   description: '',
   entity_id: '',
+  entity_ids: [] as string[],
   return_type: 'string',
   is_derived_property: false,
   tags: '',
@@ -47,7 +51,7 @@ const form = ref({
 
 async function load() {
   entities.value = await entityApi.list()
-  if (props.lockedEntityId) form.value.entity_id = props.lockedEntityId
+  if (props.lockedEntityId) form.value.entity_ids = [props.lockedEntityId]
   if (props.editId) {
     const fn = await functionApi.detail(props.editId)
     savedId.value = fn.id
@@ -55,6 +59,7 @@ async function load() {
     form.value.callable_name = fn.callable_name
     form.value.description = fn.description
     form.value.entity_id = fn.entity_id ?? ''
+    form.value.entity_ids = fn.entity_ids ?? (fn.entity_id ? [fn.entity_id] : [])
     form.value.return_type = fn.return_type
     form.value.is_derived_property = fn.is_derived_property
     form.value.tags = Array.isArray(fn.tags) ? fn.tags.join(', ') : ''
@@ -70,11 +75,13 @@ async function load() {
 
 function resetForm() {
   savedId.value = null
+  tempSessionId.value = crypto.randomUUID()
   testResult.value = null
   testSuccess.value = null
   form.value = {
     name: '', callable_name: '', description: '',
     entity_id: props.lockedEntityId ?? '',
+    entity_ids: props.lockedEntityId ? [props.lockedEntityId] : [],
     return_type: 'string',
     is_derived_property: false,
     tags: '',
@@ -136,7 +143,8 @@ async function save() {
       name: form.value.name.trim(),
       callable_name: form.value.callable_name.trim(),
       description: form.value.description,
-      entity_id: form.value.entity_id || null,
+      entity_id: form.value.entity_ids[0] || null,
+      entity_ids: form.value.entity_ids,
       return_type: form.value.return_type,
       is_derived_property: form.value.is_derived_property,
       tags: form.value.tags.split(',').map(t => t.trim()).filter(Boolean),
@@ -216,9 +224,8 @@ async function runTest() {
               </div>
               <div class="form-row-inline">
                 <div class="form-row" style="flex:1;">
-                  <label class="form-label">关联实体（可选）</label>
-                  <select class="form-input" v-model="form.entity_id" :disabled="!!lockedEntityId">
-                    <option value="">— 不绑定实体 —</option>
+                  <label class="form-label">关联实体（可多选）</label>
+                  <select class="form-input" v-model="form.entity_ids" multiple :disabled="!!lockedEntityId" style="min-height: 80px;">
                     <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name }}</option>
                   </select>
                 </div>
@@ -286,7 +293,7 @@ async function runTest() {
               <button :class="{ active: form.logic_type === 'python' }" @click="form.logic_type = 'python'">Python</button>
             </div>
             <div class="logic-toolbar" style="margin-bottom: 8px;">
-              <button type="button" class="btn-secondary" @click="showAiPanel = true" :disabled="!savedId && !editId">
+              <button type="button" class="btn-secondary" @click="showAiPanel = true">
                 AI 生成
               </button>
             </div>
@@ -324,8 +331,8 @@ async function runTest() {
     <AiCodePanel
       :visible="showAiPanel"
       :target-type="'function'"
-      :target-id="savedId || editId || ''"
-      :context-entity-ids="form.entity_id ? [form.entity_id] : []"
+      :target-id="aiTargetId"
+      :context-entity-ids="form.entity_ids"
       @close="showAiPanel = false"
       @apply="onAiApply"
     />

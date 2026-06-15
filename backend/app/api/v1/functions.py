@@ -19,7 +19,8 @@ router = APIRouter(prefix="/functions", tags=["functions"])
 
 def _func_to_out(f: OntologyFunction, entity_name: str) -> FunctionOut:
     return FunctionOut(
-        id=f.id, entity_id=f.entity_id, entity_name=entity_name,
+        id=f.id, entity_id=f.entity_id, entity_ids=f.entity_ids or [],
+        entity_name=entity_name,
         name=f.name, callable_name=f.callable_name or "",
         description=f.description, return_type=f.return_type,
         input_schema=f.input_schema, logic_type=f.logic_type,
@@ -65,7 +66,8 @@ def create_function(
             raise HTTPException(status_code=400, detail="关联实体不存在")
 
     func = OntologyFunction(
-        entity_id=data.entity_id, name=data.name,
+        entity_id=data.entity_id, entity_ids=data.entity_ids or [],
+        name=data.name,
         callable_name=data.callable_name,
         description=data.description, return_type=data.return_type,
         input_schema=data.input_schema, logic_type=data.logic_type,

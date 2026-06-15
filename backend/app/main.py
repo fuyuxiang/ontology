@@ -575,6 +575,8 @@ async def lifespan(app: FastAPI):
                 conn.execute(text("ALTER TABLE ontology_functions ADD COLUMN callable_name VARCHAR(100)"))
             if "tags" not in cols:
                 conn.execute(text("ALTER TABLE ontology_functions ADD COLUMN tags JSON"))
+            if "entity_ids" not in cols:
+                conn.execute(text("ALTER TABLE ontology_functions ADD COLUMN entity_ids JSON"))
             conn.commit()
 
     db = SessionLocal()

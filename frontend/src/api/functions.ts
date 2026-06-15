@@ -3,6 +3,7 @@ import { get, post, put, del } from './client'
 export interface FunctionItem {
   id: string
   entity_id: string | null
+  entity_ids: string[] | null
   entity_name: string
   name: string
   callable_name: string

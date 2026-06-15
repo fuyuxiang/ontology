@@ -635,6 +635,7 @@ def update_attribute_mappings(
 @router.delete("/{entity_id}", status_code=204)
 def delete_entity(
     entity_id: str,
+    force: bool = Query(False),
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
@@ -642,6 +643,26 @@ def delete_entity(
     entity = repo.get_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
+
+    if entity.status == "published":
+        raise HTTPException(status_code=403, detail="已发布的对象不可删除，请先取消发布")
+
+    from app.models.object_binding import ObjectBinding
+    bindings = db.query(ObjectBinding).filter(ObjectBinding.object_type_id == entity_id).all()
+    relations = db.query(EntityRelation).filter(
+        (EntityRelation.from_entity_id == entity_id) | (EntityRelation.to_entity_id == entity_id)
+    ).all()
+    attr_count = db.query(func.count(EntityAttribute.id)).filter(
+        EntityAttribute.entity_id == entity_id
+    ).scalar() or 0
+
+    if not force and (bindings or relations):
+        raise HTTPException(status_code=409, detail={
+            "message": "该对象存在关联引用，确认删除将同时清除以下关联",
+            "bindings": len(bindings),
+            "relations": len(relations),
+            "attributes": attr_count,
+        })
 
     write_audit(
         db, user_id=user.id if user else None,

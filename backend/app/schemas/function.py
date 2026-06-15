@@ -27,6 +27,7 @@ class FunctionInputParam(BaseModel):
 
 class FunctionCreate(BaseModel):
     entity_id: str | None = None
+    entity_ids: list[str] | None = None
     name: str
     callable_name: str = ""
     description: str = ""
@@ -43,6 +44,7 @@ class FunctionUpdate(BaseModel):
     name: str | None = None
     callable_name: str | None = None
     entity_id: str | None = None
+    entity_ids: list[str] | None = None
     description: str | None = None
     return_type: str | None = None
     input_schema: list | None = None
@@ -56,6 +58,7 @@ class FunctionUpdate(BaseModel):
 class FunctionOut(BaseModel):
     id: str
     entity_id: str | None = None
+    entity_ids: list[str] | None = None
     entity_name: str = ""
     name: str
     callable_name: str = ""
