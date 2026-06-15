@@ -336,6 +336,7 @@ from app.api.v1.doc_builder import router as doc_builder_router
 from app.api.v1.ontology_mapping import router as ontology_mapping_router
 from app.api.v1.system_config import router as system_config_router
 from app.api.v1.impact_analysis import router as impact_analysis_router
+from app.api.v1.ai_code import router as ai_code_router
 
 # ── Data Plane（M1 新增 7 个 router）──
 from app.api.v1.data_plane.connections import router as dp_connections_router
@@ -718,6 +719,7 @@ app.include_router(skill_gen_router, prefix="/api/v1")
 app.include_router(registry_router, prefix="/api/v1")
 app.include_router(system_config_router, prefix="/api/v1")
 app.include_router(impact_analysis_router, prefix="/api/v1")
+app.include_router(ai_code_router, prefix="/api/v1")
 
 
 @app.get("/api/health")
