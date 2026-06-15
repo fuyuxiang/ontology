@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { functionApi } from '../../api/functions'
+import AiCodePanel from './AiCodePanel.vue'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
 import type { EntityListItem } from '../../types'
@@ -24,6 +25,12 @@ const testInput = ref('{}')
 const testResult = ref<string | null>(null)
 const testSuccess = ref<boolean | null>(null)
 const savedId = ref<string | null>(null)
+const showAiPanel = ref(false)
+
+function onAiApply(code: string) {
+  form.value.logic_body = code
+  showAiPanel.value = false
+}
 
 const form = ref({
   name: '',
@@ -278,6 +285,11 @@ async function runTest() {
               <button :class="{ active: form.logic_type === 'sql' }" @click="form.logic_type = 'sql'">SQL</button>
               <button :class="{ active: form.logic_type === 'python' }" @click="form.logic_type = 'python'">Python</button>
             </div>
+            <div class="logic-toolbar" style="margin-bottom: 8px;">
+              <button type="button" class="btn-secondary" @click="showAiPanel = true" :disabled="!savedId && !editId">
+                AI 生成
+              </button>
+            </div>
             <textarea class="form-input form-input--code" v-model="form.logic_body" rows="8"
               :placeholder="form.logic_type === 'expression' ? '例如：entity.score * 0.8 + bonus' : form.logic_type === 'sql' ? 'SELECT ...' : 'def run(params):\n    return ...'" />
           </div>
@@ -307,6 +319,14 @@ async function runTest() {
         </div>
       </div>
     </div>
+    <AiCodePanel
+      :visible="showAiPanel"
+      :target-type="'function'"
+      :target-id="savedId || editId || ''"
+      :context-entity-ids="form.entity_id ? [form.entity_id] : []"
+      @close="showAiPanel = false"
+      @apply="onAiApply"
+    />
   </Transition>
 </template>
 
