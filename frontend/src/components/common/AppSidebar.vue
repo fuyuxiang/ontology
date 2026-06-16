@@ -105,7 +105,7 @@ const ico = {
 }
 
 const navGroups: NavGroup[] = [
-  { label: '工作台', items: [
+  { label: '看板', items: [
     { path: '/workspace/business', label: '业务总览', icon: ico.dashboard },
     { path: '/dashboard', label: '系统看板', icon: ico.sysBoard, exact: true },
   ]},
@@ -133,7 +133,7 @@ const navGroups: NavGroup[] = [
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
     { path: '/service/api', label: '本体服务', icon: ico.api },
   ]},
-  { label: '智能体应用中心', items: [
+  { label: '本体应用', items: [
     { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
     { path: '/agent/toolbox', label: '技能管理', icon: ico.tool },
     { path: '/aip', label: '流程编排', icon: ico.orchestrate },
