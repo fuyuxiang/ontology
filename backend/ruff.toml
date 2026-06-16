@@ -1,0 +1,24 @@
+# ruff 配置 —— 温和起步，先抓真问题，避免噪音淹没报告
+target-version = "py311"
+line-length = 100
+extend-exclude = [
+    ".venv", "venv", "__pycache__", "migrations",
+    "uploads", "static", "ontology.db",
+]
+
+[lint]
+select = [
+    "F",   # pyflakes：未用导入/变量、未定义名称（死代码核心）
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "I",   # isort：导入排序
+    "UP",  # pyupgrade：过时写法
+    "B",   # flake8-bugbear：裸 except、可变默认参数等
+]
+ignore = [
+    "E501",  # 行宽由 line-length 控制，单独的长行不作硬错误，仅观察
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # __init__ 里的重导出不算未用
+"tests/*" = ["F401", "F811"]
