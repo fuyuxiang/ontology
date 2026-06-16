@@ -112,7 +112,7 @@ async function reload() {
     if (!assetMap.value[b.asset_id]) {
       try {
         assetMap.value[b.asset_id] = await getAsset(b.asset_id)
-      } catch {}
+      } catch (e) { console.warn(`加载关联资产 ${b.asset_id} 失败`, e) }
     }
   }
 }

@@ -58,6 +58,9 @@ import { ref, computed, onMounted } from 'vue'
 import { getDocuments } from '../../../../api/aiBuilderV2'
 import { uploadDocuments } from '../../../../api/docBuilder'
 import type { DocInfo } from '../../../../api/aiBuilderV2'
+import { useToast } from '../../../../composables/useToast'
+
+const toast = useToast()
 
 interface UploadedDoc {
   key: string
@@ -135,8 +138,9 @@ onMounted(async () => {
   try {
     const resp = await getDocuments()
     docs.value = resp.data.documents
-  } catch (e) {
+  } catch (e: any) {
     console.error(e)
+    toast.error(e?.response?.data?.detail || e?.message || '加载文档列表失败，请稍后重试')
   } finally {
     loading.value = false
   }
