@@ -106,6 +106,7 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { agentsApi, type AgentItem } from '../../api/agents'
 import { entityApi } from '../../api/ontology'
+import { authHeaders } from '../../utils/authHeaders'
 
 const route = useRoute()
 const router = useRouter()
@@ -214,7 +215,7 @@ async function sendMessage() {
   try {
     const response = await fetch(`/api/v1/agents/${current.value.id}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ question: text }),
     })
     const reader = response.body!.getReader()

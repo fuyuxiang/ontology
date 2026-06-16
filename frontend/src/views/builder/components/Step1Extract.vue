@@ -118,6 +118,7 @@
 import { computed, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
+import { authHeaders } from '../../../utils/authHeaders'
 import type {
   BuilderSession,
   OntologyObjectDraft,
@@ -204,7 +205,7 @@ async function startExtract() {
   }
 
   try {
-    const resp = await fetch('/api/v1/builder/extract', { method: 'POST', body: fd })
+    const resp = await fetch('/api/v1/builder/extract', { method: 'POST', headers: authHeaders(), body: fd })
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
     const reader = resp.body.getReader()
     const decoder = new TextDecoder('utf-8')
