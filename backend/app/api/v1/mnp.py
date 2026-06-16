@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.services.data_plane.execute_service import (
-    ExecuteBlocked, ExecuteService,
+    ExecuteBlocked,
+    ExecuteService,
 )
 
 logger = logging.getLogger(__name__)

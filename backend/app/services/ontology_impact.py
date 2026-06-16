@@ -7,9 +7,9 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from app.models.scene import AipScene
 from app.models.agent import Agent
-from app.models.version import OntologyVersion, OntologyVersionEntity
+from app.models.scene import AipScene
+from app.models.version import OntologyVersion
 
 
 def compute_breaking_changes(

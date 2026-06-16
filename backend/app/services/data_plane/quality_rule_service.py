@@ -7,14 +7,15 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
-from app.models.asset import Asset
 from app.models.quality_rule import (
-    HealthStatus, QualityRule, RULE_KINDS, STATUS_RANK,
+    RULE_KINDS,
+    STATUS_RANK,
+    HealthStatus,
+    QualityRule,
 )
 from app.repositories.asset_repo import AssetRepository
 from app.services.data_plane.probe_service import ProbeService

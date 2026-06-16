@@ -1,7 +1,9 @@
 """Prompt 模板模型"""
 from datetime import datetime
-from sqlalchemy import String, Text, JSON, DateTime
+
+from sqlalchemy import JSON, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.database import Base
 from app.utils.identifiers import gen_uuid
 

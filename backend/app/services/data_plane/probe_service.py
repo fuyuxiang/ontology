@@ -17,7 +17,7 @@ from app.models.asset import Asset
 from app.models.quality_metric import QualityMetric
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.quality_metric_repo import QualityMetricRepository
-from app.services.data_plane.execute_service import ExecuteService, ExecuteRequest
+from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
 
 logger = logging.getLogger(__name__)
 

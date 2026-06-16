@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction
+from app.models import BusinessRule, EntityAction, EntityAttribute, EntityRelation, OntologyEntity
 from app.repositories.base import BaseRepository
 
 

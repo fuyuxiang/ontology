@@ -6,7 +6,8 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -15,12 +16,14 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import get_db
-from app.models.entity import OntologyEntity, EntityAttribute
+from app.models.entity import OntologyEntity
+from app.models.function import OntologyFunction
 from app.models.relation import EntityRelation
 from app.models.rule import BusinessRule, EntityAction
-from app.models.function import OntologyFunction
 
 router = APIRouter(prefix="/studio", tags=["studio"])
+
+logger = logging.getLogger(__name__)
 
 
 _TIER_LABEL = {1: "核心", 2: "领域", 3: "场景"}
@@ -415,9 +418,9 @@ def get_stats(db: Session = Depends(get_db)) -> dict[str, Any]:
 @router.get("/events")
 def get_events(limit: int = 30, db: Session = Depends(get_db)) -> dict[str, Any]:
     """聚合本体平台的实时事件，供数字孪生视图的事件流卡片消费"""
-    from app.models.trace import AgentTrace
-    from app.models.audit import AuditLog
     from app.models.agent import Agent
+    from app.models.audit import AuditLog
+    from app.models.trace import AgentTrace
 
     events: list[dict[str, Any]] = []
 
@@ -540,7 +543,7 @@ def narrator_explain(req: NarratorRequest) -> dict[str, Any]:
         if content:
             return {"source": "llm", "content": content}
     except Exception as e:
-        print(f"narrator LLM failed: {e}")
+        logger.warning("narrator LLM failed: %s", e)
 
     # Fallback 到 hardcoded 模板
     fallback = _NARRATOR_FALLBACK.get(
@@ -589,7 +592,7 @@ def refresh_counts(db: Session = Depends(get_db)) -> dict[str, Any]:
 # ─── 内部辅助 ────────────────────────────────────────────────────────
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _scenario_of(e: OntologyEntity | None) -> str:

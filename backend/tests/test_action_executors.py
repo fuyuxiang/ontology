@@ -1,5 +1,6 @@
 import pytest
-from app.services.action_executors import get_executor, get_all_type_info
+
+from app.services.action_executors import get_all_type_info, get_executor
 from app.services.action_executors.base import ExecutionResult
 
 

@@ -1,12 +1,11 @@
-import json
 import logging
-from datetime import datetime, timezone
-from typing import Generator
+from collections.abc import Generator
+from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
 from app.models.ai_code_conversation import AiCodeConversation
-from app.models.entity import OntologyEntity, EntityAttribute
+from app.models.entity import OntologyEntity
 from app.models.function import OntologyFunction
 from app.services.llm_resolver import get_llm_client
 
@@ -34,7 +33,7 @@ class AiCodeService:
         conversation = self._get_or_create_conversation(target_type, target_id, extra_entity_ids)
 
         history = conversation.messages[-MAX_HISTORY_ROUNDS * 2:] if conversation.messages else []
-        history.append({"role": "user", "content": message, "timestamp": datetime.now(timezone.utc).isoformat()})
+        history.append({"role": "user", "content": message, "timestamp": datetime.now(UTC).isoformat()})
 
         llm_messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context}]
         for msg in history:
@@ -55,9 +54,9 @@ class AiCodeService:
                 full_response += token
                 yield token
 
-        history.append({"role": "assistant", "content": full_response, "timestamp": datetime.now(timezone.utc).isoformat()})
+        history.append({"role": "assistant", "content": full_response, "timestamp": datetime.now(UTC).isoformat()})
         conversation.messages = history
-        conversation.updated_at = datetime.now(timezone.utc)
+        conversation.updated_at = datetime.now(UTC)
         self.db.commit()
 
         return full_response

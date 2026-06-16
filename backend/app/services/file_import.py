@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
-from app.models.entity import OntologyEntity, EntityAttribute, gen_uuid
+from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.relation import EntityRelation
 from app.models.rule import BusinessRule, EntityAction
 
@@ -505,7 +505,7 @@ def _local_name(uri: str) -> str:
 
 def parse_owl_ontology(content: bytes, fmt: str, db: Session) -> ImportResult:
     """解析 OWL/XML 或 TTL 文件。"""
-    from rdflib import Graph, RDF, RDFS, OWL, URIRef
+    from rdflib import OWL, RDF, RDFS, Graph
 
     result = ImportResult()
     g = Graph()

@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Generator
 from io import BytesIO
-from typing import Any, Generator
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
@@ -543,7 +543,6 @@ async def auto_map(body: AutoMapRequest, db: Session = Depends(get_db)):
     2. 对象名 → 表名 匹配，为每个对象找出最相关的表
     3. 属性 → 列 匹配，在匹配到的表内做列级映射
     """
-    from difflib import SequenceMatcher
     from app.models.asset import Asset
     from app.services.data_plane.mapping_suggest_service import _heuristic_score
 
@@ -653,8 +652,8 @@ async def auto_map(body: AutoMapRequest, db: Session = Depends(get_db)):
 
 def _table_name_similarity(obj_display: str, obj_name: str, table_name: str) -> float:
     """计算对象名与表名的相似度。综合中文名匹配和英文名匹配。"""
-    from difflib import SequenceMatcher
     import re
+    from difflib import SequenceMatcher
 
     table_lower = table_name.lower().replace("_", "").replace("-", "")
     scores: list[float] = []

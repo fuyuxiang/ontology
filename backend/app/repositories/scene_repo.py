@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
+
 from app.models.scene import (
-    AipScene, AipSceneVersion, AipSceneExecution, AipSceneTrigger,
+    AipScene,
+    AipSceneExecution,
+    AipSceneTrigger,
+    AipSceneVersion,
 )
 from app.repositories.base import BaseRepository
 

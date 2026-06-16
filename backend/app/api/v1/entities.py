@@ -1,20 +1,31 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction
-from app.schemas.entity import (
-    EntityCreate, EntityUpdate, EntityDetail, EntityListItem,
-    AttributeOut, AttributeMappingUpdate, RelationOut, RuleOut, ActionOut,
-    FunctionBriefOut,
-    GraphData, GraphNode, GraphEdge, FromDatasourceRequest,
-    FileImportResult, OntologyPreviewResult,
-)
-from app.repositories import EntityRepository
 from app.core.deps import require_user
+from app.database import get_db
+from app.models import EntityAttribute, EntityRelation, OntologyEntity
 from app.models.user import User
+from app.repositories import EntityRepository
+from app.schemas.entity import (
+    ActionOut,
+    AttributeMappingUpdate,
+    AttributeOut,
+    EntityCreate,
+    EntityDetail,
+    EntityListItem,
+    EntityUpdate,
+    FileImportResult,
+    FromDatasourceRequest,
+    FunctionBriefOut,
+    GraphData,
+    GraphEdge,
+    GraphNode,
+    OntologyPreviewResult,
+    RelationOut,
+    RuleOut,
+)
 from app.services.audit import write_audit
 
 router = APIRouter(prefix="/entities", tags=["entities"])
@@ -89,8 +100,8 @@ def get_scene_layer_stats(
 
 @router.get("/data-layer")
 def get_data_layer(db: Session = Depends(get_db)):
+
     from app.models.asset import Asset
-    from sqlalchemy import distinct
     rows = (
         db.query(
             EntityAttribute.entity_id,
@@ -750,10 +761,12 @@ def delete_attribute(
 
 # ── AI 智能提取本体 ──────────────────────────────────────────
 
-from pydantic import BaseModel
-from app.services.copilot import get_llm_client
-from app.config import settings
 import json as _json
+
+from pydantic import BaseModel
+
+from app.config import settings
+from app.services.copilot import get_llm_client
 
 
 class _ExtractedAttr(BaseModel):

@@ -187,7 +187,7 @@ def _redact_params(params: dict) -> dict:
 def _hash_request(asset_id: str, sql: str, params: dict) -> str:
     canon = sql.strip()
     p = json.dumps({k: params[k] for k in sorted(params)}, default=str, ensure_ascii=False)
-    h = hashlib.sha256(f"{asset_id}|{canon}|{p}".encode("utf-8")).hexdigest()
+    h = hashlib.sha256(f"{asset_id}|{canon}|{p}".encode()).hexdigest()
     return h
 
 

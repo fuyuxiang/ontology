@@ -1,8 +1,7 @@
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
-import httpx
 
 from app.database import get_db
 from app.models.agent import ModelRegistry
@@ -14,21 +13,21 @@ class ModelCreate(BaseModel):
     name: str
     provider: str
     model_name: str
-    api_base: Optional[str] = None
-    api_key: Optional[str] = None
-    capabilities: Optional[list] = None
-    config_json: Optional[dict] = None
+    api_base: str | None = None
+    api_key: str | None = None
+    capabilities: list | None = None
+    config_json: dict | None = None
 
 
 class ModelUpdate(BaseModel):
-    name: Optional[str] = None
-    provider: Optional[str] = None
-    model_name: Optional[str] = None
-    api_base: Optional[str] = None
-    api_key: Optional[str] = None
-    capabilities: Optional[list] = None
-    config_json: Optional[dict] = None
-    status: Optional[str] = None
+    name: str | None = None
+    provider: str | None = None
+    model_name: str | None = None
+    api_base: str | None = None
+    api_key: str | None = None
+    capabilities: list | None = None
+    config_json: dict | None = None
+    status: str | None = None
 
 
 def _model_out(m: ModelRegistry) -> dict:

@@ -1,17 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from datetime import datetime
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.core.deps import require_user
 from app.database import get_db
 from app.models import BusinessRule, OntologyEntity
-from app.schemas.rule import (
-    RuleOut,
-    RuleCreate, RuleUpdate, RuleExecuteResult,
-    RuleEvaluateRequest, RuleEvaluateResult,
-)
-from app.repositories import RuleRepository
-from app.core.deps import require_user
 from app.models.user import User
+from app.repositories import RuleRepository
+from app.schemas.rule import (
+    RuleCreate,
+    RuleEvaluateRequest,
+    RuleEvaluateResult,
+    RuleExecuteResult,
+    RuleOut,
+    RuleUpdate,
+)
 from app.services.audit import write_audit
 
 router = APIRouter(prefix="/rules", tags=["rules"])

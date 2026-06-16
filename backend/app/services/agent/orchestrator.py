@@ -4,16 +4,17 @@ LLM 规划工具调用 → 执行工具 → 收集推理链 → 返回答案
 """
 import json
 import logging
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import OntologyEntity, BusinessRule
-from app.services.agent_tools import agent_tool_definitions, AGENT_TOOL_SPECS
-from app.services.copilot import get_llm_client
+from app.models import BusinessRule, OntologyEntity
 from app.services.agent.prompt_builder import build_system_prompt
 from app.services.agent.tool_router import ToolRouter
+from app.services.agent_tools import agent_tool_definitions
+from app.services.copilot import get_llm_client
 from app.services.data_plane.entity_data_service import EntityDataService
 
 logger = logging.getLogger(__name__)

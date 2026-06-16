@@ -12,8 +12,8 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import Generator
 from enum import Enum
-from typing import Any, Generator
 
 from sqlalchemy.orm import Session
 

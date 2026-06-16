@@ -1,5 +1,6 @@
 """Test impact analysis endpoints exist and return correct structure"""
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 client = TestClient(app)

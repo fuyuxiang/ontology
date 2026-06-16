@@ -1,18 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
+from app.core.deps import require_user
 from app.database import get_db
 from app.models import OntologyEntity
 from app.models.rule import EntityAction
-from app.schemas.action import (
-    ActionCreate, ActionUpdate, ActionOut,
-    ActionExecuteRequest, ActionExecuteResult, ActionTypeInfo,
-)
-from app.repositories.action_repo import ActionRepository
-from app.core.deps import require_user
 from app.models.user import User
+from app.repositories.action_repo import ActionRepository
+from app.schemas.action import (
+    ActionCreate,
+    ActionExecuteRequest,
+    ActionExecuteResult,
+    ActionOut,
+    ActionTypeInfo,
+    ActionUpdate,
+)
+from app.services.action_executors import get_all_type_info, get_executor
 from app.services.audit import write_audit
-from app.services.action_executors import get_executor, get_all_type_info
 
 router = APIRouter(prefix="/actions", tags=["actions"])
 

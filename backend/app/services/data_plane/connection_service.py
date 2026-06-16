@@ -17,16 +17,20 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Iterator
+from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.connectors import ConnectorRegistry, DATABASE_TYPES
+from app.connectors import DATABASE_TYPES, ConnectorRegistry
 from app.models.connection import (
-    Connection, CATEGORY_DATABASE, CATEGORY_OBJECT_STORAGE,
-    CATEGORY_FILE_TRANSFER, CATEGORY_MESSAGE_QUEUE, CATEGORY_API,
+    CATEGORY_DATABASE,
+    CATEGORY_FILE_TRANSFER,
+    CATEGORY_MESSAGE_QUEUE,
+    CATEGORY_OBJECT_STORAGE,
+    Connection,
 )
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.connection_repo import ConnectionRepository

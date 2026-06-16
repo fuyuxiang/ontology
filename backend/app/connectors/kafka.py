@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import socket
 import struct
-from typing import Any
 
 
 def _read_n(sock: socket.socket, n: int) -> bytes:

@@ -2,17 +2,33 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
 
+from app.core.deps import require_admin, require_user
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+    hash_password,
+    verify_password,
+)
 from app.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
-    LoginRequest, TokenResponse, UserOut, ROLE_PERMISSIONS, ROLE_META, PERMISSION_MODULES,
-    UserListItem, UserListResponse, UserCreate, UserUpdate, ResetPasswordRequest, RoleOut,
+    PERMISSION_MODULES,
+    ROLE_META,
+    ROLE_PERMISSIONS,
+    LoginRequest,
+    ResetPasswordRequest,
+    RoleOut,
+    TokenResponse,
+    UserCreate,
+    UserListItem,
+    UserListResponse,
+    UserOut,
+    UserUpdate,
 )
-from app.core.security import verify_password, create_access_token, create_refresh_token, decode_refresh_token, hash_password
-from app.core.deps import require_user, require_admin
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

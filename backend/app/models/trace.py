@@ -1,6 +1,8 @@
 from datetime import datetime
-from sqlalchemy import String, Text, Integer, DateTime, ForeignKey
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.database import Base
 from app.models.agent import gen_uuid
 

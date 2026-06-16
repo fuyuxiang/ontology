@@ -1,13 +1,12 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
 class ExecutionResult:
     success: bool
     message: str
-    output: Optional[dict] = None
+    output: dict | None = None
 
 
 class BaseActionExecutor(ABC):

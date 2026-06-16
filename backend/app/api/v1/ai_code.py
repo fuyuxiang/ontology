@@ -1,4 +1,5 @@
 import json
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
@@ -8,9 +9,9 @@ from app.schemas.ai_code import (
     AiCodeGenerateRequest,
     AiCodeValidateRequest,
     AiCodeValidateResponse,
-    ViolationOut,
-    ConversationOut,
     ConversationMessageOut,
+    ConversationOut,
+    ViolationOut,
 )
 from app.services.ai_code_service import AiCodeService
 from app.services.code_validator import validate_code

@@ -1,8 +1,9 @@
 from datetime import datetime, timedelta
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
 
-from app.models.monitor import ServiceMetric, LLMCallRecord, Alert
+from sqlalchemy import desc, func
+from sqlalchemy.orm import Session
+
+from app.models.monitor import Alert, LLMCallRecord, ServiceMetric
 
 
 class MonitorRepository:

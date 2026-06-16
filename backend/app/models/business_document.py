@@ -1,7 +1,7 @@
 """业务文档库 — /logic/documents 页面背后的存储模型。"""
 from datetime import datetime
 
-from sqlalchemy import String, Integer, Text, DateTime, JSON
+from sqlalchemy import JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base

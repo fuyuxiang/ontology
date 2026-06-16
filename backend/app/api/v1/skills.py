@@ -1,8 +1,8 @@
 """Skills CRUD API"""
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from app.database import get_db
 from app.models.skill import Skill
@@ -13,18 +13,18 @@ router = APIRouter(prefix="/skills", tags=["skills"])
 
 class SkillCreate(BaseModel):
     name: str
-    description: Optional[str] = ""
-    skill_type: Optional[str] = "custom"
-    config_json: Optional[dict] = None
-    code_ref: Optional[str] = ""
+    description: str | None = ""
+    skill_type: str | None = "custom"
+    config_json: dict | None = None
+    code_ref: str | None = ""
 
 
 class SkillUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    config_json: Optional[dict] = None
-    code_ref: Optional[str] = None
-    status: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    config_json: dict | None = None
+    code_ref: str | None = None
+    status: str | None = None
 
 
 def _skill_out(s: Skill) -> dict:
@@ -51,7 +51,7 @@ def _skill_out(s: Skill) -> dict:
 
 
 @router.get("")
-def list_skills(status: Optional[str] = None, db: Session = Depends(get_db)):
+def list_skills(status: str | None = None, db: Session = Depends(get_db)):
     q = db.query(Skill)
     if status:
         q = q.filter(Skill.status == status)
@@ -100,7 +100,8 @@ def delete_skill(sid: str, db: Session = Depends(get_db)):
 
 
 from app.services.skill_version_service import (
-    list_versions, rollback_skill,
+    list_versions,
+    rollback_skill,
 )
 
 
@@ -148,7 +149,7 @@ class SkillToolRefCreate(BaseModel):
     ref_id: str
     alias: str
     description: str = ""
-    param_override: Optional[dict] = None
+    param_override: dict | None = None
 
 
 @router.get("/{skill_id}/tool-refs")

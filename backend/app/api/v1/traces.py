@@ -1,20 +1,20 @@
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from app.database import get_db
-from app.models.trace import AgentTrace
 from app.models.agent import Agent
+from app.models.trace import AgentTrace
 
 router = APIRouter(prefix="/traces", tags=["traces"])
 
 
 @router.get("")
 def list_traces(
-    agent_id: Optional[str] = Query(None),
-    status: Optional[str] = Query(None),
-    date_from: Optional[str] = Query(None),
-    date_to: Optional[str] = Query(None),
+    agent_id: str | None = Query(None),
+    status: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),

@@ -13,8 +13,6 @@ import logging
 import re
 from typing import Any
 
-from sqlalchemy.orm import Session as _Session
-
 from app.connectors import ConnectorRegistry
 from app.models.datasource import DataSource
 
@@ -133,7 +131,8 @@ def _try_forward_to_execute_service(ds: DataSource, sql: str) -> dict | None:
         from app.database import SessionLocal
         from app.repositories.connection_repo import ConnectionRepository
         from app.services.data_plane.execute_service import (
-            ExecuteBlocked, ExecuteService,
+            ExecuteBlocked,
+            ExecuteService,
         )
     except Exception:
         return None

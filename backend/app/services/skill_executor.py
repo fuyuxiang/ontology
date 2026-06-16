@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, BusinessRule
+from app.models import BusinessRule, OntologyEntity
 from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.rule_engine import RuleEvaluator
 
@@ -129,7 +129,8 @@ def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: 
 
 
 def _serialize(val: Any) -> Any:
-    from datetime import date, datetime as dt
+    from datetime import date
+    from datetime import datetime as dt
     from decimal import Decimal
     if isinstance(val, (date, dt)):
         return val.isoformat()
@@ -311,11 +312,14 @@ def _bb_query_named(
     走 ExecuteService.execute_on_connection（统一闸口：AST 校验 / 限流 / 审计 / 脱敏）。
     Connection 必须由用户在「数据接入·连接」页提前创建（默认名：bb_audit_db）。
     """
-    from datetime import date as _date, datetime as _dt
+    from datetime import date as _date
+    from datetime import datetime as _dt
     from decimal import Decimal
+
     from app.repositories.connection_repo import ConnectionRepository
     from app.services.data_plane.execute_service import (
-        ExecuteBlocked, ExecuteService,
+        ExecuteBlocked,
+        ExecuteService,
     )
 
     conn = ConnectionRepository(db).find_by_name(_BB_CONN_NAME)
@@ -635,7 +639,9 @@ def build_ontology_tools(skill_id: str, db: Session) -> list[dict]:
     """Build LLM tool definitions from skill's ontology component refs."""
     from app.models.skill_tool_ref import SkillToolRef
     from app.models.version_components import (
-        OntologyVersionFunction, OntologyVersionRule, OntologyVersionAction,
+        OntologyVersionAction,
+        OntologyVersionFunction,
+        OntologyVersionRule,
     )
 
     refs = db.query(SkillToolRef).filter(SkillToolRef.skill_id == skill_id).all()

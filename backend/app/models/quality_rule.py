@@ -8,12 +8,11 @@ HealthStatus：每次评估留痕，最新一条 = 当前状态；按 (rule_id, 
 """
 from datetime import datetime
 
-from sqlalchemy import String, Float, Boolean, Text, DateTime, JSON, ForeignKey, Index
+from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Index, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 from app.utils.identifiers import gen_uuid
-
 
 # 规则种类（Palantir 风格的契约）
 RULE_KINDS = (
