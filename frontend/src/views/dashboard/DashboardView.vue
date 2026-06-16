@@ -143,7 +143,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { useRouter } from 'vue-router'
 import CapabilityCard from '../../components/dashboard/panels/CapabilityCard.vue'
 import NodeDetailPanel from '../../components/dashboard/panels/NodeDetailPanel.vue'
 import DashboardConfigDrawer from '../../components/dashboard/panels/DashboardConfigDrawer.vue'
@@ -153,8 +152,6 @@ import { entityApi } from '../../api/ontology'
 import { relationApi } from '../../api/relations'
 import type { EntityListItem } from '../../types'
 import type { RelationData } from '../../api/relations'
-
-const router = useRouter()
 
 /* ── Data ── */
 const stats = ref<DashboardStatsEx | null>(null)
@@ -709,15 +706,6 @@ const allCards = computed(() => {
   const cards = dashConfig.value?.cards_config
   if (!cards) {
     // fallback to hardcoded defaults
-    const dsList = (stats.value as any)?.datasources ?? []
-    const bb = dsList.filter((d: any) => d.name.startsWith('bb_'))
-    const other = dsList.filter((d: any) => !d.name.startsWith('bb_'))
-    const dsItems = [
-      ...(bb.length ? [`宽带退单(${bb.length}表)`, ...bb.slice(0, 4).map((d: any) => d.name.replace('bb_', ''))] : []),
-      ...(other.length ? [`携号转网(${other.length}表)`, ...other.slice(0, 3).map((d: any) => d.name)] : []),
-      ...(!dsList.length ? ['暂无数据源'] : []),
-    ]
-    const activeRules = stats.value ? stats.value.top_rules.slice(0, 4).map((r: any) => r.name) : []
     return [
       { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: [], iconItems: WORKFLOW_CARD_ITEMS },
       { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: [], iconItems: AUTOMATION_ICON_ITEMS },

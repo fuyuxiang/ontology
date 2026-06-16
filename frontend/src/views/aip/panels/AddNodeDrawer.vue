@@ -66,7 +66,6 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { NODE_TYPES, type NodeTypeMeta } from '../aipData'
 import { useAipStore } from '../../../store/aip'
 
 interface NodeItem {
@@ -76,7 +75,7 @@ interface NodeItem {
   icon: string
 }
 
-const props = defineProps<{ open: boolean }>()
+defineProps<{ open: boolean }>()
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'pick', n: NodeItem): void

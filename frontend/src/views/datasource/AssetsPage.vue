@@ -171,9 +171,8 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import {
-  Button as AButton, Card as ACard, Col as ACol, Dropdown as ADropdown,
-  Empty as AEmpty, InputSearch as AInputSearch, Menu as AMenu,
-  MenuItem as AMenuItem, MenuDivider as AMenuDivider,
+  Button as AButton, Card as ACard, Col as ACol,
+  Empty as AEmpty, InputSearch as AInputSearch,
   Popconfirm as APopconfirm, Row as ARow, Segmented as ASegmented,
   Select as ASelect, Space as ASpace, Statistic as AStatistic,
   TabPane as ATabPane, Tabs as ATabs, Table as ATable, Tag as ATag,
@@ -188,7 +187,6 @@ import CreateDocumentAssetDrawer from './components/CreateDocumentAssetDrawer.vu
 
 const ATypographyText = Typography.Text
 const ATypographyParagraph = Typography.Paragraph
-const AMenuItemGroup = AMenu.ItemGroup
 
 const store = useAssetStore()
 const connStore = useConnectionStore()
@@ -263,9 +261,6 @@ function openDetail(record: Asset) {
   detail.visible = true
 }
 
-function openCreate(_kind: string) { createTable.open = true }
-function openDoc(kind: DocumentSourceType) { createDoc.kind = kind; createDoc.open = true }
-
 async function syncOne(record: Asset) {
   try {
     const r = await store.syncSchema(record.id)
@@ -296,7 +291,7 @@ async function del(record: Asset) {
   }
 }
 
-function onNavigateToBinding(assetId: string) {
+function onNavigateToBinding(_assetId: string) {
   // 跳转到本体建模 BindingTab。由调用方实现路由跳转；这里做兜底提示。
   message.info('请前往本体建模模块的 ObjectType 编辑器进行绑定')
 }

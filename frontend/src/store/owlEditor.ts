@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { OwlOntology, OwlClass, OwlObjectProperty, OwlDataProperty, OwlIndividual, OwlAnnotation, ObjectPropertyCharacteristic } from '../types/owl'
+import type { OwlOntology, OwlClass, OwlObjectProperty, OwlDataProperty, OwlIndividual } from '../types/owl'
 import { uid } from '../utils/owl/iri'
 import { serializeToOwlXml, downloadOwlFile } from '../utils/owl/serializer'
 import { parseOwlXml } from '../utils/owl/parser'

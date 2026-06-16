@@ -67,7 +67,7 @@ import { useAipStore } from '../../../store/aip'
 import type { AipSceneBrief } from '../../../api/aip'
 
 const store = useAipStore()
-const emit = defineEmits<{ (e: 'open-import'): void }>()
+defineEmits<{ (e: 'open-import'): void }>()
 
 const keyword = ref('')
 const expanded = reactive<Record<string, boolean>>({})

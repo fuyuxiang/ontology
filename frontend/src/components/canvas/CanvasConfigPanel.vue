@@ -55,12 +55,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-
 interface NodeData { id: string; name: string; nameCn: string; tier: 1|2|3; status: string; relCount: number }
 interface EdgeInfo { id: string; sourceName: string; targetName: string; label: string; cardinality: string }
 
-const props = defineProps<{
+defineProps<{
   node: NodeData | null
   inEdges: EdgeInfo[]
   outEdges: EdgeInfo[]

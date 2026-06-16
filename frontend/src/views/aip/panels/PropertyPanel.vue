@@ -363,7 +363,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useAipStore } from '../../../store/aip'
-import { LLM_MODELS, ML_MODELS, OPERATORS, ACTION_TYPES, HTTP_METHODS, NODE_TYPES } from '../aipData'
+import { ML_MODELS, OPERATORS, HTTP_METHODS, NODE_TYPES } from '../aipData'
 import ResourcePicker from '../../../components/aip/ResourcePicker.vue'
 import ParamMappingEditor from './ParamMappingEditor.vue'
 
@@ -407,12 +407,6 @@ function addBranch() {
 function removeBranch(index: number) {
   if (!node.value) return
   node.value.data.branches.splice(index, 1)
-  touch()
-}
-function setExpr(key: string, e: Event) {
-  if (!node.value) return
-  if (!node.value.data.expression) node.value.data.expression = { field: '', operator: 'switch', value: '' }
-  node.value.data.expression[key] = (e.target as HTMLInputElement).value
   touch()
 }
 function onDelete() {

@@ -115,7 +115,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RangePicker as ARangePicker, Select as ASelect, InputSearch as AInputSearch, Pagination as APagination } from 'ant-design-vue'
-import dayjs, { type Dayjs } from 'dayjs'
+import { type Dayjs } from 'dayjs'
 import { governanceApi, type AuditLogItem } from '../../api/governance'
 import AuditDetailDrawer from './AuditDetailDrawer.vue'
 

@@ -85,7 +85,7 @@ const props = defineProps<{
   graphPhaseLabel?: string
   editable?: boolean
 }>()
-const emit = defineEmits<{
+defineEmits<{
   (e: 'add'): void
   (e: 'delete', id: string): void
   (e: 'drop', ev: DragEvent): void

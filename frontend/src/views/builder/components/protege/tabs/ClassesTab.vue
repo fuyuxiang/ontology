@@ -56,7 +56,6 @@ interface TreeNode {
 }
 
 const thingNode = computed<TreeNode>(() => {
-  const classIRIs = new Set(store.ontology.classes.map(c => c.iri))
   const childMap = new Map<string, string[]>()
   const hasParent = new Set<string>()
 
