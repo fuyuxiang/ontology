@@ -1,10 +1,20 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
 from app.utils.identifiers import gen_uuid
+
+if TYPE_CHECKING:
+    # 仅供类型检查/静态分析识别字符串 relationship 的目标类;
+    # 运行时由 SQLAlchemy registry 解析前向引用,不在此处 import(避免与 version_components 循环导入)。
+    from app.models.version_components import (
+        OntologyVersionAction,
+        OntologyVersionFunction,
+        OntologyVersionRule,
+    )
 
 
 class OntologyVersion(Base):
