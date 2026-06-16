@@ -159,7 +159,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { useRouter } from 'vue-router'
 import { useBuilderStore } from '../../../store/builder'
 import type {
   BuilderSession,
@@ -169,7 +168,6 @@ import SemanticCanvas from './graph/SemanticCanvas.vue'
 const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void }>()
 const store = useBuilderStore()
-const router = useRouter()
 
 const selectedId = ref<string | null>(props.session.ontologyObjects[0]?.id || null)
 const objects = ref([...props.session.ontologyObjects])

@@ -57,11 +57,10 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { skillsApi, type SkillItem, type VersionItem } from '../../../api/skills'
 
 const route = useRoute()
-const router = useRouter()
 const skill = ref<SkillItem | null>(null)
 const versions = ref<VersionItem[]>([])
 

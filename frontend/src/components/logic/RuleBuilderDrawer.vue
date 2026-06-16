@@ -4,7 +4,7 @@ import { ruleApi } from '../../api/rules'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
 import ConditionBuilder from './ConditionBuilder.vue'
-import type { EntityListItem, EntityAttribute, EntityRelationDetail } from '../../types'
+import type { EntityListItem, EntityAttribute } from '../../types'
 
 const props = defineProps<{
   visible: boolean

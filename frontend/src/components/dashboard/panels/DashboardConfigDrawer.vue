@@ -20,7 +20,7 @@
           </div>
 
           <div class="dc-section__label" style="margin-bottom:8px">卡片配置</div>
-          <div v-for="(card, i) in localConfig.cards_config" :key="card.key" class="dc-card">
+          <div v-for="card in localConfig.cards_config" :key="card.key" class="dc-card">
             <div class="dc-card__header">
               <label class="dc-toggle">
                 <input type="checkbox" v-model="card.enabled" />
