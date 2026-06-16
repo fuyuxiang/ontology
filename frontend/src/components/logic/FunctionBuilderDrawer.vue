@@ -164,6 +164,17 @@ async function save() {
   }
 }
 
+function fillTestTemplate() {
+  // 根据已定义的输入参数生成 JSON 模板，按类型给默认占位值
+  const tmpl: Record<string, any> = {}
+  for (const p of form.value.input_params) {
+    if (!p.name) continue
+    const defaults: Record<string, any> = { number: 0, boolean: false, json: {}, date: '2026-01-01', string: '' }
+    tmpl[p.name] = defaults[p.type] ?? ''
+  }
+  testInput.value = JSON.stringify(tmpl, null, 2)
+}
+
 async function runTest() {
   if (!savedId.value && !props.editId) {
     toast.info('请先保存函数后再测试')
@@ -247,6 +258,9 @@ async function runTest() {
           <!-- Input params -->
           <div class="form-section">
             <div class="form-section__title">输入参数</div>
+            <p class="text-caption" style="margin:-4px 0 8px;color:#888;font-size:12px;">
+              声明逻辑体需要的外部变量。在逻辑体中通过 <code>params['参数名']</code>（SQL 用 <code>:参数名</code>）引用；勾选「必填」后，执行时缺少该参数会直接报错。
+            </p>
             <div v-for="(p, idx) in form.input_params" :key="idx" class="condition-row" style="flex-wrap:wrap;gap:6px;">
               <input class="form-input" style="flex:1.5;min-width:80px;" v-model="p.name" placeholder="参数名" />
               <select class="form-input" style="flex:1;min-width:80px;" v-model="p.type">
@@ -288,15 +302,21 @@ async function runTest() {
               </button>
             </div>
             <textarea class="form-input form-input--code" v-model="form.logic_body" rows="8"
-              :placeholder="form.logic_type === 'expression' ? '例如：entity.score * 0.8 + bonus' : form.logic_type === 'sql' ? 'SELECT ...' : 'def run(params):\n    return ...'" />
+              :placeholder="form.logic_type === 'expression' ? `表达式，用 params['参数名'] 取输入参数\n例如：params['score'] * 0.8 + params['bonus']` : form.logic_type === 'sql' ? `SQL，用 :参数名 绑定输入参数\n例如：SELECT AVG(amount) FROM orders WHERE user_id = :user_id` : `Python，从 params 取参数，把结果赋给 result\n例如：\ndef calc(p):\n    return p['a'] + p['b']\nresult = calc(params)`" />
           </div>
 
           <!-- Test panel -->
           <div class="form-section">
             <div class="form-section__title">测试面板</div>
+            <p class="text-caption" style="margin:-4px 0 8px;color:#888;font-size:12px;">
+              保存后可试跑函数。下方 JSON 的键应与上面定义的参数名一致，运行时会作为 <code>params</code> 传入逻辑体。
+            </p>
             <div class="form-row">
-              <label class="form-label">输入参数（JSON）</label>
-              <textarea class="form-input form-input--code" v-model="testInput" rows="3" placeholder='{"param1": "value1"}' />
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <label class="form-label">输入参数（JSON）</label>
+                <button type="button" class="btn-secondary" style="font-size:12px;padding:2px 8px;" @click="fillTestTemplate">按定义生成</button>
+              </div>
+              <textarea class="form-input form-input--code" v-model="testInput" rows="3" placeholder='{"参数名": "值"}' />
             </div>
             <button class="btn-sm-exec" :disabled="testing" style="margin-top:8px;" @click="runTest">
               {{ testing ? '执行中…' : '▶ 运行测试' }}
