@@ -524,12 +524,12 @@ class AIOntologyBuilder:
             text = text.split("\n", 1)[-1].rsplit("```", 1)[0]
         try:
             return json.loads(text)
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
             start = text.find("{")
             end = text.rfind("}") + 1
             if start >= 0 and end > start:
                 return json.loads(text[start:end])
-            raise ValueError(f"Cannot parse JSON from: {text[:200]}")
+            raise ValueError(f"Cannot parse JSON from: {text[:200]}") from e
 
     def _get_existing_entity_names(self, existing_context: str | None) -> list[str] | None:
         if not existing_context or existing_context == "（暂无已有本体）":
