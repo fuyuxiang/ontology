@@ -1,15 +1,16 @@
 """
 实体解析 API — 将映射后的源数据解析为可用的本体实体实例
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from sqlalchemy import func, distinct
-from pydantic import BaseModel
-from typing import Any
 import logging
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OntologyEntity, EntityAttribute, EntityRelation
+from app.models import EntityAttribute, OntologyEntity
 from app.models.asset import Asset
 from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
 
@@ -238,7 +239,6 @@ def get_resolution_stats(
 
     # 统计已映射字段的完整度
     mapped_field_names = [a.source_field for a in mapped_attrs]
-    non_null_count = 0
     distinct_id_rows = None
     null_id_rows = None
 

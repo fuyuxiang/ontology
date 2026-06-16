@@ -2,8 +2,9 @@
 Tests for OntologyVersionFunction, OntologyVersionRule, OntologyVersionAction snapshot models.
 Verifies that models can be instantiated with correct fields and defaults.
 """
-import pytest
 from datetime import datetime
+
+import pytest
 
 
 class TestOntologyVersionFunction:
@@ -25,8 +26,9 @@ class TestOntologyVersionFunction:
         assert obj.version_entity_id == "ve-001"
 
     def test_default_fields(self):
-        from app.models.version_components import OntologyVersionFunction
         from sqlalchemy import inspect as sa_inspect
+
+        from app.models.version_components import OntologyVersionFunction
         mapper = sa_inspect(OntologyVersionFunction)
         col_defaults = {c.key: c.columns[0].default for c in mapper.mapper.column_attrs}
         # SQLAlchemy column defaults fire on INSERT, not on Python instantiation;
@@ -38,8 +40,9 @@ class TestOntologyVersionFunction:
         assert col_defaults["callable_name"].arg == ""
 
     def test_id_auto_generated(self):
-        from app.models.version_components import OntologyVersionFunction
         from sqlalchemy import inspect as sa_inspect
+
+        from app.models.version_components import OntologyVersionFunction
         mapper = sa_inspect(OntologyVersionFunction)
         col_defaults = {c.key: c.columns[0].default for c in mapper.mapper.column_attrs}
         # id default should be the gen_uuid callable
@@ -70,8 +73,9 @@ class TestOntologyVersionRule:
         assert obj.version_entity_id == "ve-001"
 
     def test_default_fields(self):
-        from app.models.version_components import OntologyVersionRule
         from sqlalchemy import inspect as sa_inspect
+
+        from app.models.version_components import OntologyVersionRule
         mapper = sa_inspect(OntologyVersionRule)
         col_defaults = {c.key: c.columns[0].default for c in mapper.mapper.column_attrs}
         assert col_defaults["description"].arg == ""
@@ -79,8 +83,9 @@ class TestOntologyVersionRule:
         assert col_defaults["priority"].arg == "medium"
 
     def test_id_auto_generated(self):
-        from app.models.version_components import OntologyVersionRule
         from sqlalchemy import inspect as sa_inspect
+
+        from app.models.version_components import OntologyVersionRule
         mapper = sa_inspect(OntologyVersionRule)
         col_defaults = {c.key: c.columns[0].default for c in mapper.mapper.column_attrs}
         assert col_defaults["id"] is not None
@@ -110,8 +115,9 @@ class TestOntologyVersionAction:
         assert obj.action_type == "http"
 
     def test_default_fields(self):
-        from app.models.version_components import OntologyVersionAction
         from sqlalchemy import inspect as sa_inspect
+
+        from app.models.version_components import OntologyVersionAction
         mapper = sa_inspect(OntologyVersionAction)
         col_defaults = {c.key: c.columns[0].default for c in mapper.mapper.column_attrs}
         assert col_defaults["category"].arg == "domain"
@@ -130,8 +136,9 @@ class TestOntologyVersionAction:
         assert obj.category == "system"
 
     def test_id_auto_generated(self):
-        from app.models.version_components import OntologyVersionAction
         from sqlalchemy import inspect as sa_inspect
+
+        from app.models.version_components import OntologyVersionAction
         mapper = sa_inspect(OntologyVersionAction)
         col_defaults = {c.key: c.columns[0].default for c in mapper.mapper.column_attrs}
         assert col_defaults["id"] is not None
@@ -145,9 +152,9 @@ class TestOntologyVersionAction:
 class TestRegistration:
     def test_models_in_init(self):
         from app.models import (
+            OntologyVersionAction,
             OntologyVersionFunction,
             OntologyVersionRule,
-            OntologyVersionAction,
         )
         assert OntologyVersionFunction is not None
         assert OntologyVersionRule is not None
@@ -246,6 +253,7 @@ class TestSnapshotService:
         that runs after the per-entity loop.
         """
         from unittest.mock import MagicMock
+
         from app.models.function import OntologyFunction
         from app.models.rule import BusinessRule, EntityAction
 
@@ -324,8 +332,9 @@ class TestSnapshotService:
 
     def test_function_snapshot_with_attr_remapping(self):
         from unittest.mock import MagicMock, patch
-        from app.services.version_component_snapshot import snapshot_components_for_version
+
         from app.models.version_components import OntologyVersionFunction
+        from app.services.version_component_snapshot import snapshot_components_for_version
 
         attr = _Attr(source_attribute_id="src-attr-1", id="ver-attr-1")
         ve = _VersionEntity(id="ve-1", source_entity_id="ent-1", attributes=[attr])
@@ -358,8 +367,8 @@ class TestSnapshotService:
         assert snap.input_schema[0]["version_attribute_id"] == "ver-attr-1"
 
     def test_function_unknown_attr_becomes_none(self):
-        from app.services.version_component_snapshot import snapshot_components_for_version
         from app.models.version_components import OntologyVersionFunction
+        from app.services.version_component_snapshot import snapshot_components_for_version
 
         attr = _Attr(source_attribute_id="src-attr-1", id="ver-attr-1")
         ve = _VersionEntity(id="ve-1", source_entity_id="ent-1", attributes=[attr])
@@ -378,8 +387,8 @@ class TestSnapshotService:
         assert snap.input_schema[0]["version_attribute_id"] is None
 
     def test_rule_snapshot_with_conditions_and_params_remapping(self):
-        from app.services.version_component_snapshot import snapshot_components_for_version
         from app.models.version_components import OntologyVersionRule
+        from app.services.version_component_snapshot import snapshot_components_for_version
 
         attr = _Attr(source_attribute_id="src-attr-2", id="ver-attr-2")
         ve = _VersionEntity(id="ve-1", source_entity_id="ent-1", attributes=[attr])
@@ -403,8 +412,8 @@ class TestSnapshotService:
         assert snap.input_params[0]["version_attribute_id"] == "ver-attr-2"
 
     def test_action_snapshot_with_params_remapping(self):
-        from app.services.version_component_snapshot import snapshot_components_for_version
         from app.models.version_components import OntologyVersionAction
+        from app.services.version_component_snapshot import snapshot_components_for_version
 
         attr = _Attr(source_attribute_id="src-attr-3", id="ver-attr-3")
         ve = _VersionEntity(id="ve-1", source_entity_id="ent-1", attributes=[attr])
@@ -428,9 +437,10 @@ class TestSnapshotService:
 
     def test_system_actions_are_snapshotted(self):
         from unittest.mock import MagicMock
-        from app.services.version_component_snapshot import snapshot_components_for_version
-        from app.models.version_components import OntologyVersionAction
+
         from app.models.rule import EntityAction
+        from app.models.version_components import OntologyVersionAction
+        from app.services.version_component_snapshot import snapshot_components_for_version
 
         version = _Version(id="v1", entities=[])
 
@@ -477,8 +487,8 @@ class TestSnapshotService:
         assert added_acts[0].category == "system"
 
     def test_null_json_fields_are_preserved(self):
-        from app.services.version_component_snapshot import snapshot_components_for_version
         from app.models.version_components import OntologyVersionFunction
+        from app.services.version_component_snapshot import snapshot_components_for_version
 
         ve = _VersionEntity(id="ve-1", source_entity_id="ent-1", attributes=[])
         version = _Version(id="v1", entities=[ve])

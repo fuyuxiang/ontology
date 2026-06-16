@@ -22,7 +22,7 @@ import threading
 import time
 import uuid
 from collections import defaultdict
-from typing import Any, Callable
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 

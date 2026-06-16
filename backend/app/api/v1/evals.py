@@ -1,13 +1,13 @@
 import time
 from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from app.database import get_db
-from app.models.agent import Agent, ModelRegistry, gen_uuid
-from app.models.eval import EvalSuite, EvalCase, EvalRun, EvalResult
+from app.models.agent import Agent, ModelRegistry
+from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSuite
 
 router = APIRouter(prefix="/evals", tags=["evals"])
 
@@ -18,21 +18,21 @@ class SuiteCreate(BaseModel):
 
 
 class SuiteUpdate(BaseModel):
-    name: Optional[str] = None
+    name: str | None = None
 
 
 class CaseCreate(BaseModel):
     input_prompt: str
-    expected_keywords: Optional[list] = None
+    expected_keywords: list | None = None
 
 
 class CaseUpdate(BaseModel):
-    input_prompt: Optional[str] = None
-    expected_keywords: Optional[list] = None
+    input_prompt: str | None = None
+    expected_keywords: list | None = None
 
 
 @router.get("/suites")
-def list_suites(agent_id: Optional[str] = Query(None), db: Session = Depends(get_db)):
+def list_suites(agent_id: str | None = Query(None), db: Session = Depends(get_db)):
     q = db.query(EvalSuite).order_by(EvalSuite.created_at.desc())
     if agent_id:
         q = q.filter(EvalSuite.agent_id == agent_id)
@@ -166,8 +166,8 @@ def run_suite(sid: str, db: Session = Depends(get_db)):
     if not a:
         raise HTTPException(404, "Agent not found")
 
-    from app.services.agent.orchestrator import AgentService
     from app.services.agent.graph_engine import GraphEngine
+    from app.services.agent.orchestrator import AgentService
 
     model_name = None
     model_config: dict = {}

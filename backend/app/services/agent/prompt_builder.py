@@ -2,14 +2,12 @@
 Agent system prompt 构建
 """
 import json
-from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity
 from app.models.asset import Asset
-from app.services.copilot import build_ontology_context
 from app.services.agent_tools import agent_tool_catalog
+from app.services.copilot import build_ontology_context
 
 
 def build_system_prompt(

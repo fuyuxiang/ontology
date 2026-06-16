@@ -9,11 +9,8 @@
 """
 from __future__ import annotations
 
-from typing import Iterable
-
 from fastapi import FastAPI, Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-
 
 # (path_prefix, sunset_date)
 DEPRECATED_PREFIXES: list[tuple[str, str]] = [

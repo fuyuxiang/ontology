@@ -6,10 +6,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, EntityRelation, BusinessRule
+from app.models import BusinessRule, EntityRelation, OntologyEntity
+from app.services.action_executors import run_executor_sync
 from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.rule_engine import RuleEvaluator, RuleScreener
-from app.services.action_executors import run_executor_sync
 
 logger = logging.getLogger(__name__)
 
@@ -388,11 +388,11 @@ class ToolRouter:
         - 输出强制带 backing_asset_ids（每个 entity）+ source_asset_id / source_column（每个 property），
           让前端 Step1Build.confirmAll 能直接落地，省掉一次手工映射。
         """
-        from app.config import settings as _settings
-        from app.models.asset import Asset
-        from app.services.copilot import get_llm_client
         import json as _json
         import re as _re
+
+        from app.config import settings as _settings
+        from app.services.copilot import get_llm_client
 
         ds_ids = args.get("datasource_ids") or []
         doc_ids = args.get("document_ids") or []
@@ -518,7 +518,6 @@ class ToolRouter:
         简单规则：name 与 alias / table 名 / 资产名 normalize 后字符串相似度最高的。
         无明显匹配返回 None（让前端用 candidates 第一个或人工选）。
         """
-        from app.models.asset import Asset
         ent_n = self._normalize_name(entity.get("name", ""))
         if not ent_n or not candidates:
             return None
@@ -526,7 +525,7 @@ class ToolRouter:
         best_score = 0.0
         for a in candidates:
             target = self._normalize_name(
-                ((a.locator or {}).get("table") or a.alias or a.name or "")
+                (a.locator or {}).get("table") or a.alias or a.name or ""
             )
             if not target:
                 continue

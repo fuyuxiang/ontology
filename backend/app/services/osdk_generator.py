@@ -5,8 +5,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.models import OntologyEntity, EntityRelation
-
+from app.models import EntityRelation, OntologyEntity
 
 ATTR_TYPE_MAP_TS = {
     "string": "string",

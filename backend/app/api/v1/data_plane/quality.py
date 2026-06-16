@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -14,9 +13,9 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
 from app.database import get_db
-from app.models.user import User
-from app.services.data_plane.quality_rule_service import QualityRuleService, RULE_DEFAULTS
 from app.models.quality_rule import RULE_KINDS, STATUS_RANK
+from app.models.user import User
+from app.services.data_plane.quality_rule_service import RULE_DEFAULTS, QualityRuleService
 
 router = APIRouter(prefix="/quality", tags=["data-plane:quality"])
 
@@ -231,8 +230,8 @@ class DashboardResponse(BaseModel):
 # ── Dashboard helpers ────────────────────────────────
 def _get_entity_quality_data(db: Session, entity_id: str, svc: QualityRuleService) -> dict | None:
     """Aggregate quality data for one entity across all its bound assets."""
-    from app.models.object_binding import ObjectBinding
     from app.models.entity import OntologyEntity
+    from app.models.object_binding import ObjectBinding
 
     entity = db.get(OntologyEntity, entity_id)
     if not entity:
@@ -307,10 +306,11 @@ def quality_dashboard(db: Session = Depends(get_db)):
     entities.sort(key=lambda e: e["score"])
 
     # Recent issues
-    from app.models.quality_rule import HealthStatus as HS, QualityRule as QR
     from app.models.asset import Asset as A
-    from app.models.object_binding import ObjectBinding as OB
     from app.models.entity import OntologyEntity
+    from app.models.object_binding import ObjectBinding as OB
+    from app.models.quality_rule import HealthStatus as HS
+    from app.models.quality_rule import QualityRule as QR
 
     issues_raw = (
         db.query(HS, QR, A)

@@ -1,6 +1,11 @@
 """Test workflow executor for component nodes"""
 from unittest.mock import MagicMock, patch
-from app.services.workflow_executor_components import execute_component_node, _resolve_params, _eval_expression
+
+from app.services.workflow_executor_components import (
+    _eval_expression,
+    _resolve_params,
+    execute_component_node,
+)
 
 
 def test_resolve_params_variable():

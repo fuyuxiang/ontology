@@ -1,12 +1,12 @@
 """
 Prompt 模板管理 API
 """
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import desc
-from pydantic import BaseModel
-from typing import Any
 from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import desc
+from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.prompt_template import PromptTemplate

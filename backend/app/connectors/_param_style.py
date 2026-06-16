@@ -10,19 +10,18 @@
 from __future__ import annotations
 
 import re
-from typing import Tuple
 
 # 匹配独立的 :name 占位符；前面不是冒号（防止 PG `col::int` 被误改）
 _NAMED_PATTERN = re.compile(r"(?<!:):([A-Za-z_][A-Za-z0-9_]*)")
 
 
-def to_pyformat(sql: str, params: dict) -> Tuple[str, dict]:
+def to_pyformat(sql: str, params: dict) -> tuple[str, dict]:
     """:name → %(name)s；参数字典原样返回。"""
     new_sql = _replace_outside_strings(sql, lambda n: f"%({n})s")
     return new_sql, dict(params or {})
 
 
-def to_named(sql: str, params: dict) -> Tuple[str, dict]:
+def to_named(sql: str, params: dict) -> tuple[str, dict]:
     """oracledb 等支持原生 :name 的驱动：sql 不动，参数 dict 直接用。"""
     return sql, dict(params or {})
 

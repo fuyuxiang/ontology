@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Iterable
 
 from sqlalchemy.orm import Session
 
@@ -148,11 +147,11 @@ def seed(db: Session | None = None) -> dict:
         for alias, table in _bb_tables():
             existing_table = _find_table_asset(asset_repo, conn.id, table)
             if not existing_table:
-                a = asset_svc.register(
+                asset_svc.register(
                     name=table, alias=alias,
                     kind="table", connection_id=conn.id,
                     locator={"table": table},
-                    description=f"业务表（自动注册）",
+                    description="业务表（自动注册）",
                 )
                 stats["table_assets_created"] += 1
                 logger.info("注册 table Asset: %s", alias)

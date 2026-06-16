@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.services import dwd_catalog, minio_docs, ai_builder_v2
+from app.services import ai_builder_v2, dwd_catalog, minio_docs
 
 router = APIRouter(prefix="/ai-builder", tags=["AI Builder V2"])
 

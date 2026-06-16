@@ -3,20 +3,21 @@
 按拓扑排序执行节点，yield SSE 事件（与 orchestrator 格式兼容）
 """
 import json
-import time
 import logging
-from typing import Any, Generator
+import time
 from collections import deque
+from collections.abc import Generator
+from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.services.copilot import get_llm_client
-from app.services.agent.tool_router import ToolRouter
-from app.services.skill_executor import execute_skill, has_skill_stream, execute_skill_stream
-from app.models.skill import Skill
-from app.models.rule import BusinessRule, EntityAction
 from app.models.function import OntologyFunction
+from app.models.rule import BusinessRule, EntityAction
+from app.models.skill import Skill
+from app.services.agent.tool_router import ToolRouter
+from app.services.copilot import get_llm_client
+from app.services.skill_executor import execute_skill, execute_skill_stream, has_skill_stream
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +106,6 @@ class GraphEngine:
                     last_summary = ""
                     for step_event in execute_skill_stream(skill.code_ref, params, self.db):
                         step = step_event.get("step", "")
-                        status = step_event.get("status", "")
                         step_label = step_event.get("label", label)
                         step_summary = step_event.get("summary", "")
                         step_data = step_event.get("data")
@@ -217,8 +217,8 @@ class GraphEngine:
 
     def run_for_scene(self, input_params: dict | None = None) -> Generator[dict, None, None]:
         """AIP 场景模式入口：就绪队列执行，支持条件分支路由、并行、数据映射。"""
-        from app.services.aip.data_mapper import resolve_node_input, get_incoming_edges
-        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        from app.services.aip.data_mapper import get_incoming_edges, resolve_node_input
 
         self.emit_node_io = True
         if not self.nodes:
@@ -870,8 +870,8 @@ class GraphEngine:
         target = data.get("target") or data.get("targetObjectType") or ""
         msg = data.get("message", "")
         msg = self._resolve_template(msg, context) if msg else ""
-        from app.services.action_executors import run_executor_sync
         from app.models.rule import EntityAction
+        from app.services.action_executors import run_executor_sync
         act = (
             self.db.query(EntityAction)
             .filter(EntityAction.action_type.in_([notify_type, "notify", "notification"]))
@@ -1025,9 +1025,9 @@ class GraphEngine:
             row = {k: v for k, v in src_payload.items() if not isinstance(v, (dict, list))}
 
         # 落到本体对应数据源
+        from app.connectors.factory import get_connector  # noqa: F401  仅校验
         from app.models.entity import OntologyEntity
         from app.services.data_plane.entity_data_service import EntityDataService
-        from app.connectors.factory import get_connector  # noqa: F401  仅校验
         ent = self.db.query(OntologyEntity).filter(OntologyEntity.name == target).first()
         if not ent:
             return {"error": f"本体 {target} 不存在"}, "本体不存在"

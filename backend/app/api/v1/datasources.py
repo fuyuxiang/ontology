@@ -1,21 +1,33 @@
-import socket
 import logging
+import socket
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.datasource import DataSource
-from app.schemas.datasource import (
-    DataSourceCreate, DataSourceUpdate, DataSourceDetail,
-    DataSourceListItem, TestConnectionResult,
-    TableListResult, TablePreviewResult, TableSchemaResult,
-)
 from app.repositories import DataSourceRepository
+from app.schemas.datasource import (
+    DataSourceCreate,
+    DataSourceDetail,
+    DataSourceListItem,
+    DataSourceUpdate,
+    TableListResult,
+    TablePreviewResult,
+    TableSchemaResult,
+    TestConnectionResult,
+)
 from app.services.datasource_utils import (
     get_connection as _get_connection,
-    list_tables as _list_tables,
-    preview_table as _preview_table,
+)
+from app.services.datasource_utils import (
     get_table_schema as _get_table_schema,
+)
+from app.services.datasource_utils import (
+    list_tables as _list_tables,
+)
+from app.services.datasource_utils import (
+    preview_table as _preview_table,
 )
 
 logger = logging.getLogger(__name__)
@@ -229,10 +241,11 @@ def get_table_schema(ds_id: str, table_name: str, db: Session = Depends(get_db))
 
 # ── 多模态数据源 ──────────────────────────────────────────────
 
-import os, uuid as _uuid
-from fastapi import UploadFile, File, Form
+import os
+import uuid as _uuid
+
+from fastapi import File, Form, UploadFile
 from pydantic import BaseModel as _BM
-from typing import Any as _Any
 
 UPLOAD_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)

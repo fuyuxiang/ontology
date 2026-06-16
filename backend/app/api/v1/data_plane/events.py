@@ -4,11 +4,10 @@
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import queue
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Request
 from sse_starlette.sse import EventSourceResponse

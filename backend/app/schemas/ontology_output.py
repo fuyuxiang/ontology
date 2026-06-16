@@ -1,7 +1,7 @@
 import re
-from pydantic import BaseModel, field_validator, model_validator
 from typing import Literal
 
+from pydantic import BaseModel, field_validator, model_validator
 
 PASCAL_CASE_RE = re.compile(r"^[A-Z][a-zA-Z0-9]{1,}$")
 SNAKE_CASE_RE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")

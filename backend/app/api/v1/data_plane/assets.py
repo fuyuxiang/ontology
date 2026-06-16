@@ -18,9 +18,17 @@ from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.data_plane import (
-    ApiDocCreate, AssetCreate, AssetDetail, AssetUpdate,
-    AssetWithUsageOut, DirectoryDocCreate, MqDocCreate,
-    OssDocCreate, PreviewOut, QualityMetricOut, SchemaSyncOut,
+    ApiDocCreate,
+    AssetCreate,
+    AssetDetail,
+    AssetUpdate,
+    AssetWithUsageOut,
+    DirectoryDocCreate,
+    MqDocCreate,
+    OssDocCreate,
+    PreviewOut,
+    QualityMetricOut,
+    SchemaSyncOut,
 )
 from app.services.data_plane.asset_service import AssetService
 from app.services.data_plane.probe_service import ProbeService
@@ -55,8 +63,8 @@ def list_assets(
 @router.get("/scopes", response_model=None)
 def list_scopes(db: Session = Depends(get_db)):
     """返回可选的数据范围（数据库连接）列表，仅包含有结构化资产的连接。"""
-    from app.models.connection import Connection
     from app.models.asset import Asset
+    from app.models.connection import Connection
 
     conns = (
         db.query(Connection)

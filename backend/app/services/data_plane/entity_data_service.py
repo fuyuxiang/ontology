@@ -9,19 +9,19 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Any
 
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
-from app.models.entity import OntologyEntity
 from app.models.object_binding import ObjectBinding
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.object_binding_repo import ObjectBindingRepository
 from app.services.data_plane.connection_service import ConnectionService
 from app.services.data_plane.execute_service import (
-    ExecuteBlocked, ExecuteRequest, ExecuteResult, ExecuteService,
+    ExecuteBlocked,
+    ExecuteRequest,
+    ExecuteService,
 )
 
 logger = logging.getLogger(__name__)

@@ -3,23 +3,25 @@
 数据源：通过 Data Plane Connection（默认名 bb_audit_db）走 ExecuteService 执行；
 DB 配置 / 凭据 / 限流 / 缓存 / 审计 / 列级脱敏全部由数据集成模块统一管理。
 """
-from datetime import datetime as _dt, date as _date
-from decimal import Decimal
 import hashlib
 import json
 import logging
 import re
 import uuid
+from datetime import date as _date
+from datetime import datetime as _dt
+from decimal import Decimal
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal, get_db
+from app.database import SessionLocal
 from app.repositories.connection_repo import ConnectionRepository
 from app.services.data_plane.execute_service import (
-    ExecuteBlocked, ExecuteService,
+    ExecuteBlocked,
+    ExecuteService,
 )
 
 logger = logging.getLogger(__name__)
@@ -684,9 +686,6 @@ def re_attribute(churn_id: str):
     if not completed_actions:
         raise HTTPException(400, "暂无已完成的动作反馈，无法触发二次归因")
 
-    evidence = _query("SELECT * FROM bb_evidence WHERE churn_id=%s", (churn_id,))
-    ev_map = {e["evidence_code"]: e for e in evidence}
-
     updated_evidences = []
     for act in completed_actions:
         feedback = json.loads(act["params_json"]) if act.get("params_json") else {}
@@ -858,8 +857,9 @@ def get_audit_trail(churn_id: str):
 
 # ── 接口 17: SSE 实时分析 ──────────────────────────────
 
-from fastapi.responses import StreamingResponse
 import time
+
+from fastapi.responses import StreamingResponse
 
 
 def _sse_event(step: str, status: str, message: str = "", data: Any = None) -> str:
@@ -1389,6 +1389,7 @@ class VoiceAuditReq(BaseModel):
 @router.post("/detail/{churn_id}/voice-audit")
 def voice_audit(churn_id: str, req: VoiceAuditReq):
     from openai import OpenAI
+
     from app.config import settings
 
     client = OpenAI(api_key=settings.LLM_API_KEY, base_url=settings.LLM_BASE_URL)

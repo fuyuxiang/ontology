@@ -1,7 +1,14 @@
-import pytest
 import json
+
+import pytest
 from pydantic import ValidationError
-from app.schemas.ontology_output import OntologyOutput, OntologyEntity, OntologyAttribute, OntologyRelation
+
+from app.schemas.ontology_output import (
+    OntologyAttribute,
+    OntologyEntity,
+    OntologyOutput,
+    OntologyRelation,
+)
 
 
 class TestOntologyAttribute:
@@ -137,7 +144,13 @@ class TestOntologyOutput:
 
 
 from unittest.mock import MagicMock
-from app.services.ontology_constraints import build_constraint_prompt, validate_ontology_output, validate_and_retry, format_validation_errors
+
+from app.services.ontology_constraints import (
+    build_constraint_prompt,
+    format_validation_errors,
+    validate_and_retry,
+    validate_ontology_output,
+)
 
 
 class TestBuildConstraintPrompt:
@@ -204,6 +217,7 @@ class TestValidateOntologyOutput:
 class TestFormatValidationErrors:
     def test_formats_pydantic_errors(self):
         from pydantic import ValidationError as PydanticValidationError
+
         from app.schemas.ontology_output import OntologyOutput
         try:
             OntologyOutput(entities=[], relations=[])

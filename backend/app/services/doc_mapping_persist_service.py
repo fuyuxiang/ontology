@@ -3,8 +3,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
-from app.models.entity import OntologyEntity, EntityAttribute
-from app.models.object_binding import ObjectBinding
+from app.models.entity import EntityAttribute, OntologyEntity
 from app.repositories.asset_repo import AssetRepository
 from app.repositories.object_binding_repo import ObjectBindingRepository
 from app.services.data_plane.object_binding_service import ObjectBindingService

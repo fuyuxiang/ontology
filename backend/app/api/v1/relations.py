@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.core.deps import require_user
 from app.database import get_db
 from app.models import EntityRelation
-from app.utils.identifiers import gen_uuid
-from app.schemas.relation import RelationCreate, RelationOut
-from app.repositories import RelationRepository
-from app.core.deps import require_user
 from app.models.user import User
+from app.repositories import RelationRepository
+from app.schemas.relation import RelationCreate, RelationOut
 from app.services.audit import write_audit
+from app.utils.identifiers import gen_uuid
 
 router = APIRouter(prefix="/relations", tags=["relations"])
 

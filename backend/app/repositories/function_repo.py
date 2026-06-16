@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from app.models.function import OntologyFunction
 from app.models import OntologyEntity
+from app.models.function import OntologyFunction
 from app.repositories.base import BaseRepository
 
 

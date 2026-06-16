@@ -1,16 +1,16 @@
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.auth import router as auth_router
+from app.api.v1.auth import seed_admin
+from app.api.v1.entities import router as entities_router
 from app.config import settings
-from app.database import engine, SessionLocal
+from app.database import Base, SessionLocal, engine
 from app.db_compat import ensure_legacy_schema_compat
 from app.models import *  # noqa: F401,F403 — 确保所有模型注册
-from app.database import Base
-from app.api.v1.entities import router as entities_router
-from app.api.v1.auth import router as auth_router, seed_admin
 from app.models.agent import Agent
 from app.models.skill import Skill
 
@@ -18,8 +18,8 @@ from app.models.skill import Skill
 def _seed_agents(db):
     if db.query(Agent).count() > 0:
         return
-    import uuid, secrets
-    from datetime import datetime
+    import secrets
+    import uuid
     presets = [
         {
             "name": "宽带退单稽核智能体",
@@ -103,12 +103,13 @@ def _seed_aip_scenes(db):
         return
     import json as _json
     import os as _os
+
     from app.utils.identifiers import gen_uuid as _gen
     seed_path = _os.path.join(_os.path.dirname(__file__), "data", "aip_scenes_seed.json")
     if not _os.path.exists(seed_path):
         return
     try:
-        with open(seed_path, "r", encoding="utf-8") as f:
+        with open(seed_path, encoding="utf-8") as f:
             data = _json.load(f)
     except Exception:
         return
@@ -299,56 +300,58 @@ def _seed_system_config(db):
         db.commit()
         logger.info(f"系统配置初始化完成：新增 {added} 项")
 
-from app.api.v1.rules import router as rules_router
-from app.api.v1.dashboard import router as dashboard_router
-from app.api.v1.copilot import router as copilot_router
-from app.api.v1.relations import router as relations_router
-# datasources_router 已废弃，数据接入统一走 data_plane/connections + assets
-from app.api.v1.mnp import router as mnp_router
-from app.api.v1.scenes import router as scenes_router
-from app.api.v1.broadband import router as broadband_router
-from app.api.v1.models import router as models_router
-from app.api.v1.agents import router as agents_router, open_router as agents_open_router
-from app.api.v1.skills import router as skills_router
-from app.api.v1.skill_gen import router as skill_gen_router
-from app.api.v1.registry import router as registry_router
-from app.api.v1.resolution import router as resolution_router
-from app.api.v1.governance import router as governance_router
-from app.api.v1.prompt_templates import router as prompt_templates_router
+from app.api.v1.actions import router as actions_router
+from app.api.v1.agents import open_router as agents_open_router
+from app.api.v1.agents import router as agents_router
+from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
+from app.api.v1.ai_code import router as ai_code_router
 from app.api.v1.ai_ontology import router as ai_ontology_router
+from app.api.v1.aip_executions import router as aip_executions_router
+from app.api.v1.aip_scenes import router as aip_scenes_router
+from app.api.v1.aip_webhooks import router as aip_webhooks_router
+from app.api.v1.broadband import router as broadband_router
 from app.api.v1.builder import router as builder_router
 from app.api.v1.business_documents import router as business_documents_router
-from app.api.v1.ontology_api import router as ontology_api_router
-from app.api.v1.osdk import router as osdk_router
-from app.api.v1.ontology_publish import router as ontology_publish_router
-from app.api.v1.traces import router as traces_router
-from app.api.v1.evals import router as evals_router
-from app.api.v1.actions import router as actions_router
-from app.api.v1.functions import router as functions_router
-from app.api.v1.monitor import router as monitor_router
-from app.api.v1.studio import router as studio_router
-from app.api.v1.aip_scenes import router as aip_scenes_router
-from app.api.v1.aip_executions import router as aip_executions_router
-from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
-from app.api.v1.aip_webhooks import router as aip_webhooks_router
-from app.api.v1.doc_builder import router as doc_builder_router
-from app.api.v1.ontology_mapping import router as ontology_mapping_router
-from app.api.v1.system_config import router as system_config_router
-from app.api.v1.impact_analysis import router as impact_analysis_router
-from app.api.v1.ai_code import router as ai_code_router
+from app.api.v1.copilot import router as copilot_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.data_plane.assets import router as dp_assets_router
+from app.api.v1.data_plane.audit import router as dp_audit_router
+from app.api.v1.data_plane.compat import install as install_compat_middleware
 
 # ── Data Plane（M1 新增 7 个 router）──
 from app.api.v1.data_plane.connections import router as dp_connections_router
-from app.api.v1.data_plane.assets import router as dp_assets_router
-from app.api.v1.data_plane.execute import router as dp_execute_router
-from app.api.v1.data_plane.probes import router as dp_probes_router
-from app.api.v1.data_plane.lineage import router as dp_lineage_router
 from app.api.v1.data_plane.events import router as dp_events_router
-from app.api.v1.data_plane.audit import router as dp_audit_router
-from app.api.v1.data_plane.object_bindings import router as dp_bindings_router
-from app.api.v1.data_plane.quality import router as dp_quality_router
+from app.api.v1.data_plane.execute import router as dp_execute_router
+from app.api.v1.data_plane.lineage import router as dp_lineage_router
 from app.api.v1.data_plane.mapping import router as dp_mapping_router
-from app.api.v1.data_plane.compat import install as install_compat_middleware
+from app.api.v1.data_plane.object_bindings import router as dp_bindings_router
+from app.api.v1.data_plane.probes import router as dp_probes_router
+from app.api.v1.data_plane.quality import router as dp_quality_router
+from app.api.v1.doc_builder import router as doc_builder_router
+from app.api.v1.evals import router as evals_router
+from app.api.v1.functions import router as functions_router
+from app.api.v1.governance import router as governance_router
+from app.api.v1.impact_analysis import router as impact_analysis_router
+
+# datasources_router 已废弃，数据接入统一走 data_plane/connections + assets
+from app.api.v1.mnp import router as mnp_router
+from app.api.v1.models import router as models_router
+from app.api.v1.monitor import router as monitor_router
+from app.api.v1.ontology_api import router as ontology_api_router
+from app.api.v1.ontology_mapping import router as ontology_mapping_router
+from app.api.v1.ontology_publish import router as ontology_publish_router
+from app.api.v1.osdk import router as osdk_router
+from app.api.v1.prompt_templates import router as prompt_templates_router
+from app.api.v1.registry import router as registry_router
+from app.api.v1.relations import router as relations_router
+from app.api.v1.resolution import router as resolution_router
+from app.api.v1.rules import router as rules_router
+from app.api.v1.scenes import router as scenes_router
+from app.api.v1.skill_gen import router as skill_gen_router
+from app.api.v1.skills import router as skills_router
+from app.api.v1.studio import router as studio_router
+from app.api.v1.system_config import router as system_config_router
+from app.api.v1.traces import router as traces_router
 
 logger = logging.getLogger(__name__)
 
@@ -404,7 +407,7 @@ async def lifespan(app: FastAPI):
 
     def _preheat_sync():
         try:
-            from app.api.v1.scenes import list_mnp_case_users, execute_mnp_flow
+            from app.api.v1.scenes import execute_mnp_flow, list_mnp_case_users
             db = SessionLocal()
             try:
                 case_users = list_mnp_case_users(db)

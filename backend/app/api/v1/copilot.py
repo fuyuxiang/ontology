@@ -1,12 +1,13 @@
 import json
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.services.copilot import chat_stream, chat_sync
 from app.services.agent_service import AgentService
+from app.services.copilot import chat_stream, chat_sync
 
 router = APIRouter(prefix="/copilot", tags=["copilot"])
 

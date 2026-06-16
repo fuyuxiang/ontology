@@ -10,7 +10,7 @@
 """
 from datetime import datetime
 
-from sqlalchemy import String, Text, DateTime, JSON, ForeignKey, UniqueConstraint, Index
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base

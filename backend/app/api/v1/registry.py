@@ -1,14 +1,12 @@
 """Registry API — unified view of active rules and functions for skill integration."""
 from __future__ import annotations
 
-from typing import Optional
-
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OntologyEntity, BusinessRule
+from app.models import BusinessRule, OntologyEntity
 from app.models.function import OntologyFunction
 from app.models.skill import Skill
 
@@ -25,7 +23,7 @@ class RegistryItem(BaseModel):
     name: str
     callable_name: str = ""
     description: str = ""
-    entity_id: Optional[str] = None
+    entity_id: str | None = None
     entity_name: str = ""
     tags: list[str] = []
     input_params: list[dict] = []
@@ -34,7 +32,7 @@ class RegistryItem(BaseModel):
 
 
 class RegistryGroup(BaseModel):
-    entity_id: Optional[str]
+    entity_id: str | None
     entity_name: str
     items: list[RegistryItem]
 
@@ -128,9 +126,9 @@ def _func_to_item(func: OntologyFunction, entity_name: str, ref_count: int) -> R
 
 @router.get("/items", response_model=list[RegistryItem])
 def list_registry_items(
-    type: Optional[str] = Query(None, description="Filter by type: 'rule' or 'function'"),
-    entity_id: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
+    type: str | None = Query(None, description="Filter by type: 'rule' or 'function'"),
+    entity_id: str | None = Query(None),
+    search: str | None = Query(None),
     tags: list[str] = Query(default=[]),
     db: Session = Depends(get_db),
 ):
@@ -175,16 +173,16 @@ def list_registry_items(
 
 @router.get("/grouped", response_model=list[RegistryGroup])
 def list_registry_grouped(
-    search: Optional[str] = Query(None),
+    search: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     """List active rules and functions grouped by entity."""
     rule_refs, func_refs = _build_ref_counts(db)
     emap = _entity_map(db)
 
-    groups: dict[Optional[str], RegistryGroup] = {}
+    groups: dict[str | None, RegistryGroup] = {}
 
-    def _get_or_create_group(eid: Optional[str], ename: str) -> RegistryGroup:
+    def _get_or_create_group(eid: str | None, ename: str) -> RegistryGroup:
         if eid not in groups:
             groups[eid] = RegistryGroup(entity_id=eid, entity_name=ename, items=[])
         return groups[eid]
