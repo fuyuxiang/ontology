@@ -1,9 +1,10 @@
+import logging
 import platform
 import shutil
 from datetime import datetime
 
 import psutil
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -27,9 +28,25 @@ from app.services.monitor.ws_manager import ws_manager
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
 
+logger = logging.getLogger(__name__)
 
-@router.get("/resources", response_model=ResourceMetrics)
-def get_resources():
+
+def _to_alert_item(a) -> AlertItem:
+    """ORM Alert → AlertItem schema 的统一映射。"""
+    return AlertItem(
+        id=a.id, level=a.level, service_name=a.service_name, message=a.message,
+        resolved=a.resolved, created_at=a.created_at.isoformat(),
+        resolved_at=a.resolved_at.isoformat() if a.resolved_at else None,
+    )
+
+
+def _to_service_status(m) -> ServiceStatus:
+    """ORM 指标 → ServiceStatus schema 的统一映射。"""
+    return ServiceStatus(name=m.service_name, status=m.status, response_ms=m.response_ms)
+
+
+def _resource_metrics() -> ResourceMetrics:
+    """采集当前主机资源指标。"""
     mem = psutil.virtual_memory()
     disk = shutil.disk_usage("/")
     disk_pct = round(disk.used / disk.total * 100, 1) if disk.total else 0
@@ -44,14 +61,40 @@ def get_resources():
     )
 
 
+def _ontology_stats(db: Session) -> OntologyStatsResponse:
+    """本体实体统计(总数 + 按类型分组),供单项端点与概览复用。"""
+    total = db.query(OntologyEntity).count()
+    by_type = {}
+    try:
+        rows = (
+            db.query(OntologyEntity.entity_type, func.count(OntologyEntity.id))
+            .group_by(OntologyEntity.entity_type)
+            .all()
+        )
+        by_type = {r[0] or "unknown": r[1] for r in rows}
+    except Exception:
+        logger.warning("本体类型分组统计失败,by_type 回退为空", exc_info=True)
+    return OntologyStatsResponse(total_entities=total, by_type=by_type)
+
+
+def _agent_activity(db: Session) -> AgentActivityResponse:
+    """智能体活跃度统计,供单项端点与概览复用。"""
+    return AgentActivityResponse(
+        total_agents=db.query(Agent).count(),
+        published_agents=db.query(Agent).filter(Agent.status == "published").count(),
+        total_skills=db.query(Skill).count(),
+    )
+
+
+@router.get("/resources", response_model=ResourceMetrics)
+def get_resources():
+    return _resource_metrics()
+
+
 @router.get("/services", response_model=list[ServiceStatus])
 def get_services(db: Session = Depends(get_db)):
     repo = MonitorRepository(db)
-    metrics = repo.get_latest_metrics()
-    return [
-        ServiceStatus(name=m.service_name, status=m.status, response_ms=m.response_ms)
-        for m in metrics
-    ]
+    return [_to_service_status(m) for m in repo.get_latest_metrics()]
 
 
 @router.get("/response-history", response_model=list[ResponseHistoryPoint])
@@ -74,14 +117,7 @@ def get_alerts(limit: int = 20, resolved: bool | None = None, level: str | None 
                db: Session = Depends(get_db)):
     repo = MonitorRepository(db)
     alerts = repo.get_alerts(limit=limit, resolved=resolved, level=level)
-    return [
-        AlertItem(
-            id=a.id, level=a.level, service_name=a.service_name, message=a.message,
-            resolved=a.resolved, created_at=a.created_at.isoformat(),
-            resolved_at=a.resolved_at.isoformat() if a.resolved_at else None,
-        )
-        for a in alerts
-    ]
+    return [_to_alert_item(a) for a in alerts]
 
 
 @router.post("/alerts/{alert_id}/resolve", response_model=AlertItem)
@@ -89,13 +125,8 @@ def resolve_alert(alert_id: int, db: Session = Depends(get_db)):
     repo = MonitorRepository(db)
     a = repo.resolve_alert(alert_id)
     if not a:
-        from fastapi import HTTPException
         raise HTTPException(404, "Alert not found")
-    return AlertItem(
-        id=a.id, level=a.level, service_name=a.service_name, message=a.message,
-        resolved=a.resolved, created_at=a.created_at.isoformat(),
-        resolved_at=a.resolved_at.isoformat() if a.resolved_at else None,
-    )
+    return _to_alert_item(a)
 
 
 @router.get("/llm-stats", response_model=LLMStatsResponse)
@@ -106,29 +137,12 @@ def get_llm_stats(db: Session = Depends(get_db)):
 
 @router.get("/ontology-stats", response_model=OntologyStatsResponse)
 def get_ontology_stats(db: Session = Depends(get_db)):
-    total = db.query(OntologyEntity).count()
-    by_type = {}
-    try:
-        from sqlalchemy import func
-        rows = (
-            db.query(OntologyEntity.entity_type, func.count(OntologyEntity.id))
-            .group_by(OntologyEntity.entity_type)
-            .all()
-        )
-        by_type = {r[0] or "unknown": r[1] for r in rows}
-    except Exception:
-        pass
-    return OntologyStatsResponse(total_entities=total, by_type=by_type)
+    return _ontology_stats(db)
 
 
 @router.get("/agent-activity", response_model=AgentActivityResponse)
 def get_agent_activity(db: Session = Depends(get_db)):
-    total_agents = db.query(Agent).count()
-    published = db.query(Agent).filter(Agent.status == "published").count()
-    total_skills = db.query(Skill).count()
-    return AgentActivityResponse(
-        total_agents=total_agents, published_agents=published, total_skills=total_skills,
-    )
+    return _agent_activity(db)
 
 
 @router.get("/platform-stats", response_model=PlatformStatsResponse)
@@ -147,28 +161,12 @@ def get_platform_stats(db: Session = Depends(get_db)):
 def get_overview(db: Session = Depends(get_db)):
     repo = MonitorRepository(db)
     return DashboardOverview(
-        resources=get_resources(),
-        services=[
-            ServiceStatus(name=m.service_name, status=m.status, response_ms=m.response_ms)
-            for m in repo.get_latest_metrics()
-        ],
-        alerts=[
-            AlertItem(
-                id=a.id, level=a.level, service_name=a.service_name, message=a.message,
-                resolved=a.resolved, created_at=a.created_at.isoformat(),
-                resolved_at=a.resolved_at.isoformat() if a.resolved_at else None,
-            )
-            for a in repo.get_alerts(limit=10)
-        ],
+        resources=_resource_metrics(),
+        services=[_to_service_status(m) for m in repo.get_latest_metrics()],
+        alerts=[_to_alert_item(a) for a in repo.get_alerts(limit=10)],
         llm_stats=LLMStatsResponse(**repo.get_llm_stats_24h()),
-        ontology_stats=OntologyStatsResponse(
-            total_entities=db.query(OntologyEntity).count(), by_type={},
-        ),
-        agent_activity=AgentActivityResponse(
-            total_agents=db.query(Agent).count(),
-            published_agents=db.query(Agent).filter(Agent.status == "published").count(),
-            total_skills=db.query(Skill).count(),
-        ),
+        ontology_stats=_ontology_stats(db),
+        agent_activity=_agent_activity(db),
     )
 
 
