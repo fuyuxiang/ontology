@@ -6,7 +6,11 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint . --max-warnings -1",
+    "lint:report": "eslint . -f json -o eslint-report.json || true",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,js,json,css}\"",
+    "knip": "knip"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
@@ -32,12 +36,19 @@
     "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.2",
     "@types/three": "^0.183.1",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/tsconfig": "^0.9.1",
+    "eslint": "^10.5.0",
+    "eslint-plugin-vue": "^10.9.2",
+    "knip": "^6.17.1",
+    "prettier": "^3.8.4",
     "typescript": "~6.0.2",
+    "typescript-eslint": "^8.61.1",
     "vite": "^8.0.4",
+    "vue-eslint-parser": "^10.4.1",
     "vue-tsc": "^3.2.6"
   }
 }
