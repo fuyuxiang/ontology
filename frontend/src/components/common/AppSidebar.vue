@@ -55,10 +55,23 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, computed } from 'vue'
+import { reactive } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
+
+interface NavItem {
+  path: string
+  label: string
+  icon?: string
+  exact?: boolean
+  children?: NavItem[]
+}
+
+interface NavGroup {
+  label: string
+  items: NavItem[]
+}
 
 function isActive(path: string, exact?: boolean) {
   return exact ? route.path === path : route.path.startsWith(path)
@@ -85,14 +98,13 @@ const ico = {
   agent: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="5" width="10" height="8" rx="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="6" cy="9" r="1" fill="currentColor"/><circle cx="10" cy="9" r="1" fill="currentColor"/><path d="M8 2v3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="1.5" r="1" stroke="currentColor" stroke-width="1.2"/></svg>`,
   tool: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 1.5L4 9h4l-1 5.5L12 7H8l1-5.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`,
   orchestrate: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="2.5" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="3.5" cy="13" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="13" r="1.8" stroke="currentColor" stroke-width="1.4"/><rect x="5.5" y="7" width="5" height="3" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.3V7M6.5 10l-3 1.2M9.5 10l3 1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
-  scene: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 2h7l3 3v9a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M10 2v3h3" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="7.5" cy="9.5" r="2" stroke="currentColor" stroke-width="1.4"/><path d="M9 11l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
   monitor: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M4 8.5h2l1-2.5 1.5 5L10 6l1 2.5h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   audit: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 3h8M2 6h6M2 9h5M2 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="11.5" cy="10.5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M11.5 9v1.5l1.2 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   permissions: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5.5" cy="6.5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M8 8.5l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M11 11.5l1.5 1.5M12 10.5l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/></svg>`,
   config: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4h4M10 4h4M2 8h7M12 8h2M2 12h2M7 12h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="10.5" cy="8" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.8" stroke="currentColor" stroke-width="1.4"/></svg>`,
 }
 
-const navGroups = [
+const navGroups: NavGroup[] = [
   { label: '工作台', items: [
     { path: '/workspace/business', label: '业务总览', icon: ico.dashboard },
     { path: '/dashboard', label: '系统看板', icon: ico.sysBoard, exact: true },
@@ -117,7 +129,7 @@ const navGroups = [
       { path: '/logic/functions', label: '函数管理' },
       { path: '/logic/actions', label: '行动管理' },
     ]},
-    { path: '/studio', label: '图谱探索', icon: ico.graph },
+    { path: '/studio', label: '本体探索', icon: ico.graph },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
     { path: '/service/api', label: '本体服务', icon: ico.api },
   ]},
@@ -125,9 +137,6 @@ const navGroups = [
     { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
     { path: '/agent/toolbox', label: '技能管理', icon: ico.tool },
     { path: '/aip', label: '流程编排', icon: ico.orchestrate },
-  ]},
-  { label: '场景中心', items: [
-    { path: '/scene/broadband', label: '宽带退单稽核', icon: ico.scene },
   ]},
   { label: '运维与安全中心', items: [
     { path: '/ops/log-audit', label: '日志与审计', icon: ico.audit },
