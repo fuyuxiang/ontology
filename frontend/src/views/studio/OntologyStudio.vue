@@ -218,8 +218,8 @@
           <div v-for="f in entityDetail?.functions ?? []" :key="f.id" class="studio__detail-row">
             <div class="studio__detail-row-main">
               <span class="studio__detail-row-name">{{ f.name }}</span>
-              <span class="studio__detail-row-tag" :class="f.is_derived_property ? 'studio__detail-row-tag--green' : 'studio__detail-row-tag--blue'">
-                {{ f.is_derived_property ? '派生属性' : '函数' }}
+              <span class="studio__detail-row-tag studio__detail-row-tag--blue">
+                函数
               </span>
             </div>
             <div v-if="f.description" class="studio__detail-row-sub">{{ f.description }}</div>

@@ -104,7 +104,6 @@ class FunctionBriefOut(BaseModel):
     description: str = ""
     return_type: str
     logic_type: str
-    is_derived_property: bool = False
     status: str
     execution_count: int = 0
     model_config = {"from_attributes": True}

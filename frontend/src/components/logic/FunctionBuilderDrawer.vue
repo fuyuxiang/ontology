@@ -42,7 +42,6 @@ const form = ref({
   entity_id: '',
   entity_ids: [] as string[],
   return_type: 'string',
-  is_derived_property: false,
   tags: '',
   input_params: [] as { name: string; type: string; required: boolean; description: string; entity_id?: string; attribute_id?: string }[],
   logic_type: 'expression' as 'expression' | 'sql' | 'python',
@@ -61,7 +60,6 @@ async function load() {
     form.value.entity_id = fn.entity_id ?? ''
     form.value.entity_ids = fn.entity_ids ?? (fn.entity_id ? [fn.entity_id] : [])
     form.value.return_type = fn.return_type
-    form.value.is_derived_property = fn.is_derived_property
     form.value.tags = Array.isArray(fn.tags) ? fn.tags.join(', ') : ''
     form.value.input_params = (fn.input_schema ?? []) as any
     // pre-load attributes for any params that already have entity_id
@@ -83,7 +81,6 @@ function resetForm() {
     entity_id: props.lockedEntityId ?? '',
     entity_ids: props.lockedEntityId ? [props.lockedEntityId] : [],
     return_type: 'string',
-    is_derived_property: false,
     tags: '',
     input_params: [],
     logic_type: 'expression',
@@ -146,7 +143,6 @@ async function save() {
       entity_id: form.value.entity_ids[0] || null,
       entity_ids: form.value.entity_ids,
       return_type: form.value.return_type,
-      is_derived_property: form.value.is_derived_property,
       tags: form.value.tags.split(',').map(t => t.trim()).filter(Boolean),
       input_schema: form.value.input_params,
       logic_type: form.value.logic_type,
@@ -240,12 +236,6 @@ async function runTest() {
                     <option value="array">array</option>
                   </select>
                 </div>
-              </div>
-              <div class="form-row">
-                <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;">
-                  <input type="checkbox" v-model="form.is_derived_property" />
-                  作为派生属性使用
-                </label>
               </div>
               <div class="form-row">
                 <label class="form-label">标签（逗号分隔）</label>

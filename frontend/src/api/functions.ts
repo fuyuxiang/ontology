@@ -12,7 +12,6 @@ export interface FunctionItem {
   input_schema: any[] | null
   logic_type: string
   logic_body: string
-  is_derived_property: boolean
   status: string
   execution_count: number
   last_executed: string | null
@@ -25,7 +24,6 @@ export interface FunctionItem {
 export interface FunctionQuery {
   entity_id?: string
   status?: string
-  is_derived?: boolean
   search?: string
 }
 

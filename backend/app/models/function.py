@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import String, Integer, Boolean, Text, DateTime, ForeignKey, JSON
+from sqlalchemy import String, Integer, Text, DateTime, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -19,7 +19,6 @@ class OntologyFunction(Base):
     input_schema: Mapped[list | None] = mapped_column(JSON)
     logic_type: Mapped[str] = mapped_column(String(30), default="expression")
     logic_body: Mapped[str] = mapped_column(Text, default="")
-    is_derived_property: Mapped[bool] = mapped_column(Boolean, default=False)
     status: Mapped[str] = mapped_column(String(20), default="active")
     tags: Mapped[list | None] = mapped_column(JSON)
     callable_name: Mapped[str] = mapped_column(String(100), default="")

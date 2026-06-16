@@ -138,7 +138,6 @@ export interface FunctionDetail {
   description: string
   return_type: string
   logic_type: string
-  is_derived_property: boolean
   status: string
   execution_count: number
 }

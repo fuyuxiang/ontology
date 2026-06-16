@@ -214,14 +214,13 @@
       <template v-else-if="activeTab === '函数'">
         <table class="data-table" v-if="functions.length">
           <thead>
-            <tr><th>函数名称</th><th>返回类型</th><th>逻辑类型</th><th>类别</th><th>调用次数</th><th>状态</th></tr>
+            <tr><th>函数名称</th><th>返回类型</th><th>逻辑类型</th><th>调用次数</th><th>状态</th></tr>
           </thead>
           <tbody>
             <tr v-for="fn in functions" :key="fn.id">
               <td><code class="text-code">{{ fn.name }}</code></td>
               <td><span class="type-tag">{{ fn.return_type }}</span></td>
               <td class="text-caption">{{ fn.logic_type }}</td>
-              <td><span class="type-tag" :class="fn.is_derived_property ? 'type-tag--derived' : ''">{{ fn.is_derived_property ? '派生属性' : '独立函数' }}</span></td>
               <td class="text-caption">{{ fn.execution_count }}</td>
               <td><span class="status-dot" :class="fn.status === 'active' ? 'status-dot--success' : 'status-dot--warning'"></span></td>
             </tr>
@@ -598,7 +597,7 @@ const functions = computed(() =>
   detail.value?.functions?.map(f => ({
     id: f.id, name: f.name, description: f.description,
     return_type: f.return_type, logic_type: f.logic_type,
-    is_derived_property: f.is_derived_property, status: f.status,
+    status: f.status,
     execution_count: f.execution_count,
   })) ?? []
 )

@@ -24,7 +24,7 @@ def _func_to_out(f: OntologyFunction, entity_name: str) -> FunctionOut:
         name=f.name, callable_name=f.callable_name or "",
         description=f.description, return_type=f.return_type,
         input_schema=f.input_schema, logic_type=f.logic_type,
-        logic_body=f.logic_body, is_derived_property=f.is_derived_property,
+        logic_body=f.logic_body,
         status=f.status, execution_count=f.execution_count,
         last_executed=f.last_executed, tags=f.tags,
         created_at=f.created_at, updated_at=f.updated_at,
@@ -35,12 +35,11 @@ def _func_to_out(f: OntologyFunction, entity_name: str) -> FunctionOut:
 def list_functions(
     entity_id: str | None = None,
     status: str | None = None,
-    is_derived: bool | None = None,
     search: str | None = None,
     db: Session = Depends(get_db),
 ):
     repo = FunctionRepository(db)
-    funcs = repo.list_with_filters(entity_id=entity_id, status=status, is_derived=is_derived, search=search)
+    funcs = repo.list_with_filters(entity_id=entity_id, status=status, search=search)
     return [_func_to_out(f, repo.get_entity_name(f.entity_id)) for f in funcs]
 
 
@@ -71,7 +70,7 @@ def create_function(
         callable_name=data.callable_name,
         description=data.description, return_type=data.return_type,
         input_schema=data.input_schema, logic_type=data.logic_type,
-        logic_body=data.logic_body, is_derived_property=data.is_derived_property,
+        logic_body=data.logic_body,
         status=data.status, tags=data.tags,
     )
     repo.create(func)
