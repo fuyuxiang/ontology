@@ -62,7 +62,7 @@ export function skillGenChat(
         if (line.startsWith('data: ')) {
           const data = line.slice(6)
           if (data === '[DONE]') onDone()
-          else { try { onEvent(JSON.parse(data)) } catch {} }
+          else { try { onEvent(JSON.parse(data)) } catch (e) { console.warn('SSE 事件解析失败,已跳过', e) } }
         }
       }
     }

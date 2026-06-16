@@ -74,17 +74,17 @@ const draft = ref<SkillDef>({ ...props.initialDraft })
 
 const inputSchemaStr = computed({
   get: () => JSON.stringify(draft.value.input_schema || {}, null, 2),
-  set: (v) => { try { draft.value.input_schema = JSON.parse(v) } catch {} }
+  set: (v) => { try { draft.value.input_schema = JSON.parse(v) } catch { /* 输入中间态非法 JSON,忽略直到合法 */ } }
 })
 
 const outputSchemaStr = computed({
   get: () => JSON.stringify(draft.value.output_schema || {}, null, 2),
-  set: (v) => { try { draft.value.output_schema = JSON.parse(v) } catch {} }
+  set: (v) => { try { draft.value.output_schema = JSON.parse(v) } catch { /* 输入中间态非法 JSON,忽略直到合法 */ } }
 })
 
 const testCasesStr = computed({
   get: () => JSON.stringify(draft.value.test_cases || [], null, 2),
-  set: (v) => { try { draft.value.test_cases = JSON.parse(v) } catch {} }
+  set: (v) => { try { draft.value.test_cases = JSON.parse(v) } catch { /* 输入中间态非法 JSON,忽略直到合法 */ } }
 })
 
 async function regen(section: string) {
