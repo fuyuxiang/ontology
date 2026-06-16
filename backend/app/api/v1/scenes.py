@@ -23,10 +23,11 @@ def _asset_table(asset: Asset) -> str:
     return (asset.locator or {}).get("table", "")
 
 
-def _execute_asset_sql(db: Session, asset: Asset, sql: str, limit: int = 200) -> dict:
-    """通过 EntityDataService 执行 SQL"""
+def _execute_asset_sql(db: Session, asset: Asset, sql: str, limit: int = 200,
+                       params: dict | None = None) -> dict:
+    """通过 EntityDataService 执行 SQL（支持参数化绑定）"""
     svc = EntityDataService(db)
-    return svc.execute_sql_on_asset(asset.name, sql, purpose="scenes")
+    return svc.execute_sql_on_asset(asset.name, sql, params=params, purpose="scenes")
 
 
 # ── 响应模型 ──────────────────────────────────────────
@@ -145,7 +146,7 @@ def _query_user_row(db: Session, entity_name: str, user_id: str, device_number: 
         return {}
 
     sql = f"SELECT * FROM {table_name} WHERE {where_col} = :v LIMIT 1"
-    result = _execute_asset_sql(db, ds, sql, limit=1)
+    result = _execute_asset_sql(db, ds, sql, limit=1, params={"v": where_val})
     if result.get("error") or not result.get("rows"):
         return {}
 
