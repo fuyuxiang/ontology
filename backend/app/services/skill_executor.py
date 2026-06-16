@@ -241,7 +241,8 @@ def mnp_risk_evaluate(params: dict, db: Session) -> dict:
     try:
         eval_result = evaluator.evaluate_all(user_id)
     except Exception as e:
-        eval_result = {"overall_risk": "none", "results": [], "triggered_count": 0, "evaluated_count": 0}
+        logger.exception("规则评估失败 user_id=%s", user_id)
+        return {"success": False, "summary": f"风险评估失败: {e}", "data": {}}
 
     _REVERSE_ALIAS = {v: k for k, v in _ENTITY_ALIAS.items()}
     rule_results = []
