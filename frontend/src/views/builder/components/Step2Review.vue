@@ -160,6 +160,7 @@
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
+import { authHeaders } from '../../../utils/authHeaders'
 import type {
   BuilderSession,
 } from '../../../types/builder'
@@ -249,7 +250,7 @@ async function suggestAttributes() {
   try {
     const resp = await fetch('/api/v1/builder/suggest-attributes', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         object_name: selected.value.name,
         display_name: selected.value.displayName,
@@ -297,7 +298,7 @@ async function suggestRelations() {
   try {
     const resp = await fetch('/api/v1/builder/suggest-relations', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         objects: objects.value.map(o => ({
           name: o.name, displayName: o.displayName, tier: o.tier,
@@ -357,7 +358,7 @@ async function onAssetDropdownOpen(open: boolean) {
   if (!open || assetOptions.value.length) return
   assetLoading.value = true
   try {
-    const resp = await fetch('/api/v1/assets?page=1&page_size=200')
+    const resp = await fetch('/api/v1/assets?page=1&page_size=200', { headers: authHeaders() })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const data = await resp.json()
     const items = data.items || data || []
@@ -379,7 +380,7 @@ async function runAutoMap() {
   try {
     const resp = await fetch('/api/v1/builder/auto-map', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         objects: objects.value.map(o => ({
           id: o.id,

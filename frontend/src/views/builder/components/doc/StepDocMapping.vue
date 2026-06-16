@@ -118,6 +118,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, reactive } from 'vue'
+import { authHeaders } from '../../../../utils/authHeaders'
 
 const props = defineProps<{
   sessionId: string
@@ -160,7 +161,7 @@ async function fetchTableFields(tableNames: string[]) {
   for (const tn of tableNames) {
     if (tableFields[tn]) continue
     try {
-      const resp = await fetch(`/api/v1/ai-builder/tables/${tn}/schema`)
+      const resp = await fetch(`/api/v1/ai-builder/tables/${tn}/schema`, { headers: authHeaders() })
       if (resp.ok) {
         tableFields[tn] = await resp.json()
       }
@@ -176,7 +177,7 @@ async function startMapping() {
   try {
     const resp = await fetch('/api/v1/doc-builder/mapping', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ session_id: props.sessionId, ontology: props.ontology }),
     })
 

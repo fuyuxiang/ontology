@@ -1,4 +1,5 @@
 import client from './client'
+import { authHeaders } from '../utils/authHeaders'
 
 export interface AiOntologySession {
   id: string
@@ -61,9 +62,7 @@ export const aiOntologyApi = {
           formData.append('files', file)
         }
 
-        const token = localStorage.getItem('token')
-        const headers: Record<string, string> = {}
-        if (token) headers['Authorization'] = `Bearer ${token}`
+        const headers = authHeaders()
 
         const res = await fetch(`${baseURL}/ai-ontology/sessions/${sessionId}/message`, {
           method: 'POST',
@@ -117,9 +116,7 @@ export const aiOntologyApi = {
 
     ;(async () => {
       try {
-        const token = localStorage.getItem('token')
-        const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-        if (token) headers['Authorization'] = `Bearer ${token}`
+        const headers = authHeaders({ 'Content-Type': 'application/json' })
 
         const res = await fetch(`${baseURL}/ai-ontology/sessions/${sessionId}/build`, {
           method: 'POST',

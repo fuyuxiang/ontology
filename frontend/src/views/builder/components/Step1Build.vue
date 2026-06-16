@@ -105,6 +105,7 @@
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
+import { authHeaders } from '../../../utils/authHeaders'
 import type {
   BuilderSession,
   OntologyObjectDraft,
@@ -227,7 +228,7 @@ async function callChat(userText: string) {
   fd.append('message', userText)
   let pendingThinking: ChatMessage | null = null
   try {
-    const resp = await fetch('/api/v1/builder/chat', { method: 'POST', body: fd })
+    const resp = await fetch('/api/v1/builder/chat', { method: 'POST', headers: authHeaders(), body: fd })
     if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
     const reader = resp.body.getReader()
     const decoder = new TextDecoder('utf-8')
