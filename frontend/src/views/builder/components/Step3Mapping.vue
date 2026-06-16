@@ -156,6 +156,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
+import { authHeaders } from '../../../utils/authHeaders'
 import { fetchAssetTree, suggestColumns } from '../../../api/builder'
 import type { BuilderSession } from '../../../types/builder'
 import type { AssetTreeNode, AssetTreeTable } from '../../../api/builder'
@@ -324,7 +325,7 @@ async function runAutoMap() {
   try {
     const resp = await fetch('/api/v1/builder/auto-map', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         objects: objects.value.map(o => ({
           id: o.id, name: o.name, displayName: o.displayName,

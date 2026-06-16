@@ -1,4 +1,5 @@
 import { get, post } from './client'
+import { authHeaders } from '../utils/authHeaders'
 
 export interface AiCodeGenerateRequest {
   target_type: 'function' | 'action'
@@ -36,7 +37,7 @@ export const aiCodeApi = {
   async generatePost(req: AiCodeGenerateRequest): Promise<Response> {
     const resp = await fetch('/api/v1/ai-code/generate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(req),
     })
     return resp

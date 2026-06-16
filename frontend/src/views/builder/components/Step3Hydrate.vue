@@ -246,6 +246,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
+import { authHeaders } from '../../../utils/authHeaders'
 import { HYDRATION_PHASES, DEFAULT_PUBLISH_GATES } from '../../../data/builderPresets'
 import type { BuilderSession, DrillLogLine, DrillPhase, DrillResult, PublishGate } from '../../../types/builder'
 
@@ -498,7 +499,7 @@ async function startDrill() {
 
     const resp = await fetch('/api/v1/builder/hydrate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
     })
     if (!resp.ok || !resp.body) {
