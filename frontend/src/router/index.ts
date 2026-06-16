@@ -36,8 +36,8 @@ const router = createRouter({
     { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/FunctionsView.vue'), meta: { title: '函数管理' } },
     { path: '/logic/actions', name: 'logic-actions', component: () => import('../views/logic/ActionsView.vue'), meta: { title: '行动管理' } },
 
-    // 本体中心 — 图谱探索
-    { path: '/studio', name: 'studio', component: () => import('../views/studio/OntologyStudio.vue'), meta: { title: '图谱探索' } },
+    // 本体中心 — 本体探索
+    { path: '/studio', name: 'studio', component: () => import('../views/studio/OntologyStudio.vue'), meta: { title: '本体探索' } },
 
     // 本体中心 — 本体发布
     { path: '/ontology/publish', name: 'ontology-publish', component: () => import('../views/ontology/OntologyPublishView.vue'), meta: { title: '本体发布' } },
@@ -59,13 +59,6 @@ const router = createRouter({
     { path: '/agent/toolbox/create', name: 'skill-create', component: () => import('../views/agents/skills/SkillWizard.vue'), meta: { title: '创建技能' } },
     { path: '/agent/toolbox/:id', name: 'skill-detail', component: () => import('../views/agents/skills/SkillDetailView.vue'), meta: { title: '技能详情' } },
     { path: '/aip', name: 'aip-platform', component: () => import('../views/aip/AipPlatformView.vue'), meta: { title: '流程编排' } },
-
-    // 场景中心
-    { path: '/scene', name: 'scene-hub', component: () => import('../views/scene/SceneHub.vue'), meta: { title: '场景中心' } },
-    { path: '/scene/broadband', name: 'scene-broadband', component: () => import('../views/scene/BroadbandScene.vue'), meta: { title: '宽带退单稽核' } },
-    { path: '/scene/broadband/stats', name: 'scene-broadband-stats', component: () => import('../views/scene/BroadbandStats.vue'), meta: { title: '退单稽核统计' } },
-    { path: '/scene/broadband/inbox', name: 'scene-broadband-inbox', component: () => import('../views/scene/BroadbandInbox.vue'), meta: { title: '智能收件箱' } },
-    { path: '/scene/broadband/:id', name: 'scene-broadband-detail', component: () => import('../views/scene/BroadbandDetail.vue'), meta: { title: '退单详情' } },
 
     // 运维与安全中心
     { path: '/ops/monitor', name: 'ops-monitor', component: () => import('../views/settings/MonitorView.vue'), meta: { title: '运维监控' } },
