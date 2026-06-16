@@ -30,6 +30,7 @@ router = APIRouter(prefix="/scenes/broadband", tags=["broadband-audit"])
 
 # 业务连接由 seed_business_assets 自动注册。
 _BB_CONN_NAME = "bb_audit_db"
+_BB_CONN_ID_CACHE: str | None = None
 
 
 # ── 工具：%s 参数 → :p0/:p1/... + dict ───────────────────────────
@@ -77,11 +78,17 @@ def _ser(row: dict) -> dict:
 # ── 通过 Data Plane 走的等价 helper ───────────────────────────────
 
 def _resolve_connection_id(db: Session) -> str:
+    # 业务连接(bb_audit_db)注册后 id 稳定不变,缓存成功结果避免每次请求重复查库。
+    # 仅缓存成功值；未就绪时不缓存,以便连接注册后能正常解析。
+    global _BB_CONN_ID_CACHE
+    if _BB_CONN_ID_CACHE is not None:
+        return _BB_CONN_ID_CACHE
     repo = ConnectionRepository(db)
     conn = repo.find_by_name(_BB_CONN_NAME)
     if not conn:
         raise HTTPException(503, f"业务连接未就绪：{_BB_CONN_NAME}")
-    return conn.id
+    _BB_CONN_ID_CACHE = conn.id
+    return _BB_CONN_ID_CACHE
 
 
 def _query(sql: str, args=None, *, write: bool = False, purpose: str = "scene.bb") -> list[dict]:
