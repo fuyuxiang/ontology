@@ -1,6 +1,8 @@
 """/execute — 唯一执行闸口 API。"""
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -21,6 +23,8 @@ from app.services.data_plane.execute_service import (
 
 router = APIRouter(prefix="/execute", tags=["data-plane:execute"])
 
+logger = logging.getLogger(__name__)
+
 
 @router.post("", response_model=ExecuteResultModel,
              responses={400: {"model": ExecuteBlockedModel}})
@@ -37,11 +41,12 @@ def execute(
             user_id=user.id,
         ))
     except ExecuteBlocked as e:
-        raise HTTPException(400, detail={"blocked": True, "reason": e.reason, "detail": e.detail})
+        raise HTTPException(400, detail={"blocked": True, "reason": e.reason, "detail": e.detail}) from e
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except Exception as e:
-        raise HTTPException(500, f"execute failed: {e}")
+        logger.exception("execute failed")
+        raise HTTPException(500, f"execute failed: {e}") from e
     return ExecuteResultModel(
         columns=result.columns, rows=result.rows,
         rows_returned=result.rows_returned, duration_ms=result.duration_ms,
@@ -63,6 +68,6 @@ def dry_run(
             user_id=user.id,
         ))
     except ExecuteBlocked as e:
-        raise HTTPException(400, detail={"blocked": True, "reason": e.reason, "detail": e.detail})
+        raise HTTPException(400, detail={"blocked": True, "reason": e.reason, "detail": e.detail}) from e
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e

@@ -102,9 +102,9 @@ def create_rule(body: RuleCreate, db: Session = Depends(get_db),
     try:
         return _svc(db).create_rule(user_id=user.id, **body.model_dump())
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.put("/rules/{rule_id}", response_model=RuleOut)
@@ -112,9 +112,9 @@ def update_rule(rule_id: str, body: RuleUpdate, db: Session = Depends(get_db)):
     try:
         return _svc(db).update_rule(rule_id, **body.model_dump(exclude_unset=True))
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.delete("/rules/{rule_id}", status_code=204)
@@ -122,7 +122,7 @@ def delete_rule(rule_id: str, db: Session = Depends(get_db)):
     try:
         _svc(db).delete_rule(rule_id)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 # ── 评估 ────────────────────────────────────────────
@@ -131,7 +131,7 @@ def evaluate_rule(rule_id: str, db: Session = Depends(get_db)):
     try:
         return _svc(db).evaluate(rule_id)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.post("/assets/{asset_id}/evaluate", response_model=list[HealthStatusOut])

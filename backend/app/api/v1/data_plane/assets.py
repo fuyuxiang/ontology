@@ -132,7 +132,7 @@ def create_asset(
             user_id=user.id, **body.model_dump(),
         )
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.put("/{asset_id}", response_model=AssetDetail)
@@ -140,7 +140,7 @@ def update_asset(asset_id: str, body: AssetUpdate, db: Session = Depends(get_db)
     try:
         return _svc(db).update(asset_id, **body.model_dump(exclude_unset=True))
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.delete("/{asset_id}", status_code=204)
@@ -148,9 +148,9 @@ def delete_asset(asset_id: str, db: Session = Depends(get_db)):
     try:
         _svc(db).delete(asset_id)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(409, str(e))
+        raise HTTPException(409, str(e)) from e
 
 
 @router.post("/{asset_id}/deprecate", response_model=AssetDetail)
@@ -158,7 +158,7 @@ def deprecate_asset(asset_id: str, reason: str | None = None, db: Session = Depe
     try:
         return _svc(db).deprecate(asset_id, reason)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 # ── 元数据探测 ────────────────────────────────────────
@@ -168,9 +168,9 @@ def sync_schema(asset_id: str, db: Session = Depends(get_db)):
     try:
         return _svc(db).sync_schema(asset_id)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/{asset_id}/profile")
@@ -178,9 +178,9 @@ def profile_asset(asset_id: str, db: Session = Depends(get_db)):
     try:
         return _svc(db).profile(asset_id)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/{asset_id}/preview", response_model=PreviewOut)
@@ -188,9 +188,9 @@ def preview_asset(asset_id: str, limit: int = 20, db: Session = Depends(get_db))
     try:
         return _svc(db).preview(asset_id, limit=limit)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except Exception as e:
-        raise HTTPException(400, f"预览失败: {e}")
+        raise HTTPException(400, f"预览失败: {e}") from e
 
 
 @router.get("/{asset_id}/quality", response_model=list[QualityMetricOut])
@@ -221,7 +221,7 @@ async def upload_document(
             user_id=user.id,
         )
     except Exception as e:
-        raise HTTPException(400, f"上传失败: {e}")
+        raise HTTPException(400, f"上传失败: {e}") from e
 
 
 @router.post("/document/oss", response_model=AssetDetail, status_code=201)
@@ -231,7 +231,7 @@ def create_oss_doc(body: OssDocCreate, db: Session = Depends(get_db),
         return _svc(db).register_document_oss(user_id=user.id,
                                                **body.model_dump())
     except RuntimeError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/document/directory", response_model=AssetDetail, status_code=201)
@@ -241,7 +241,7 @@ def create_dir_doc(body: DirectoryDocCreate, db: Session = Depends(get_db),
         return _svc(db).register_document_directory(user_id=user.id,
                                                      **body.model_dump())
     except RuntimeError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/document/api", response_model=AssetDetail, status_code=201)

@@ -77,7 +77,7 @@ def generate(req: GenerateRequest):
         skill_def = skill_generator.generate_skill(req.session_id)
         return {"skill_def": skill_def}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 @router.get("/draft/{session_id}")
@@ -106,7 +106,7 @@ def regenerate_section(session_id: str, body: RegenerateRequest):
         result = skill_generator.regenerate_section(body.session_id, body.section, body.current_draft)
         return {"section": body.section, "result": result}
     except Exception as e:
-        raise HTTPException(500, str(e))
+        raise HTTPException(500, str(e)) from e
 
 
 @router.post("/test")

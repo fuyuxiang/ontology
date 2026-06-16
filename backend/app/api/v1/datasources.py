@@ -63,7 +63,7 @@ def create_datasource(body: DataSourceCreate, db: Session = Depends(get_db)):
     try:
         tables = _list_tables(tmp_ds)
     except Exception as e:
-        raise HTTPException(400, f"连接数据库失败: {e}")
+        raise HTTPException(400, f"连接数据库失败: {e}") from e
     if not tables:
         raise HTTPException(400, "未获取到任何表，请检查连接信息和权限")
 
@@ -129,7 +129,7 @@ def fetch_tables_inline(body: DataSourceCreate):
         tables = _list_tables(ds)
         return {"tables": tables}
     except Exception as e:
-        raise HTTPException(400, f"获取表列表失败: {e}")
+        raise HTTPException(400, f"获取表列表失败: {e}") from e
 
 
 def _test_conn(host: str, port: int) -> dict:
@@ -205,7 +205,7 @@ def preview_datasource(ds_id: str, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(400, f"查询失败: {e}")
+        raise HTTPException(400, f"查询失败: {e}") from e
 
 
 @router.get("/{ds_id}/tables/{table_name}/preview", response_model=TablePreviewResult)
@@ -221,7 +221,7 @@ def preview_table(ds_id: str, table_name: str, db: Session = Depends(get_db)):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(400, f"查询失败: {e}")
+        raise HTTPException(400, f"查询失败: {e}") from e
 
 
 @router.get("/{ds_id}/tables/{table_name}/schema", response_model=TableSchemaResult)
@@ -236,7 +236,7 @@ def get_table_schema(ds_id: str, table_name: str, db: Session = Depends(get_db))
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(400, f"获取表结构失败: {e}")
+        raise HTTPException(400, f"获取表结构失败: {e}") from e
 
 
 # ── 多模态数据源 ──────────────────────────────────────────────
@@ -426,7 +426,7 @@ def create_oss_source(body: OssSourceBody, db: Session = Depends(get_db)):
         )
         s3.head_bucket(Bucket=body.bucket)
     except Exception as e:
-        raise HTTPException(400, f"OSS 连接失败: {e}")
+        raise HTTPException(400, f"OSS 连接失败: {e}") from e
 
     ds = DataSource(
         name=body.name,

@@ -126,7 +126,7 @@ def rollback(sid: str, body: RollbackRequest, db: Session = Depends(get_db)):
         rollback_skill(s, body.target_version, db)
         return _skill_out(s)
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/{sid}/deprecate")

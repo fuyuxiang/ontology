@@ -97,7 +97,7 @@ def _query(sql: str, args=None, *, write: bool = False, purpose: str = "scene.bb
                 purpose=purpose, write=write,
             )
         except ExecuteBlocked as e:
-            raise HTTPException(400, f"SQL 被拒绝：{e.reason} {e.detail}")
+            raise HTTPException(400, f"SQL 被拒绝：{e.reason} {e.detail}") from e
         cols = r.columns
         return [{cols[i]: row[i] for i in range(len(cols))} for row in r.rows]
     finally:
@@ -129,7 +129,7 @@ def _execute(sql: str, args=None) -> int:
                 purpose="scene.bb.write", write=True,
             )
         except ExecuteBlocked as e:
-            raise HTTPException(400, f"写入被拒绝：{e.reason} {e.detail}")
+            raise HTTPException(400, f"写入被拒绝：{e.reason} {e.detail}") from e
         return r.rows_returned
     finally:
         db.close()
