@@ -54,3 +54,4 @@ tmp/
 # AI workspace
 docs/superpowers/
 .legacy-vue-snapshot/
+frontend/eslint-report.json
