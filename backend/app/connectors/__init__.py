@@ -5,12 +5,11 @@ from typing import Any
 from app.connectors.base import (
     BaseConnector,
     DataSourceConnector,
-    ObjectStorageConnector,
     FileTransferConnector,
-    MessageQueueConnector,
     HTTPApiConnector,
+    MessageQueueConnector,
+    ObjectStorageConnector,
 )
-
 
 # DB 类 type 集合（保留旧 ConnectorRegistry.get(type) 单参签名兼容）
 DATABASE_TYPES = {"mysql", "postgresql", "oracle", "sqlserver", "hive", "clickhouse"}
@@ -61,14 +60,14 @@ class ConnectorRegistry:
 
 
 # Import connectors to trigger registration
-from app.connectors.mysql import MySQLConnector  # noqa: F401,E402
-from app.connectors.postgresql import PostgreSQLConnector  # noqa: F401,E402
-from app.connectors.oracle import OracleConnector  # noqa: F401,E402
-from app.connectors.sqlserver import SQLServerConnector  # noqa: F401,E402
-from app.connectors.s3 import S3Connector  # noqa: F401,E402
 from app.connectors.ftp import FTPConnector, SFTPConnector  # noqa: F401,E402
-from app.connectors.kafka import KafkaConnector  # noqa: F401,E402
 from app.connectors.http_api import HTTPApiConnector as _HTTPApiConn  # noqa: F401,E402
+from app.connectors.kafka import KafkaConnector  # noqa: F401,E402
+from app.connectors.mysql import MySQLConnector  # noqa: F401,E402
+from app.connectors.oracle import OracleConnector  # noqa: F401,E402
+from app.connectors.postgresql import PostgreSQLConnector  # noqa: F401,E402
+from app.connectors.s3 import S3Connector  # noqa: F401,E402
+from app.connectors.sqlserver import SQLServerConnector  # noqa: F401,E402
 
 # 手动注册 — DB connector 内部用 @ConnectorRegistry.register 装饰器
 ConnectorRegistry._by_kt[("object_storage", "s3")] = S3Connector

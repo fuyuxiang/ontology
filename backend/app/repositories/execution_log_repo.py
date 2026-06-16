@@ -35,8 +35,9 @@ class ExecutionLogRepository(BaseRepository[ExecutionLog]):
         return q.order_by(ExecutionLog.started_at.desc()).offset(offset).limit(limit).all()
 
     def stats_24h(self) -> dict:
-        from sqlalchemy import func
         from datetime import timedelta
+
+        from sqlalchemy import func
         since = datetime.utcnow() - timedelta(hours=24)
         rows = self.db.query(
             func.count(ExecutionLog.id),

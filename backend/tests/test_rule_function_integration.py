@@ -1,5 +1,6 @@
 """Integration test: rule with function_call condition"""
 from unittest.mock import MagicMock
+
 from app.services.rule_engine import RuleEvaluator
 
 

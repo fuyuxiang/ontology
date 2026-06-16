@@ -1,7 +1,8 @@
-import io
 import ast
 import contextlib
+import io
 import signal
+
 from .base import BaseActionExecutor, ExecutionResult
 
 SAFE_BUILTINS = {

@@ -3,13 +3,15 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.models.scene import AipScene
+from app.models.skill import Skill
+from app.models.skill_tool_ref import SkillToolRef
 from app.models.version import OntologyVersion
 from app.models.version_components import (
-    OntologyVersionFunction, OntologyVersionRule, OntologyVersionAction,
+    OntologyVersionAction,
+    OntologyVersionFunction,
+    OntologyVersionRule,
 )
-from app.models.scene import AipScene
-from app.models.skill_tool_ref import SkillToolRef
-from app.models.skill import Skill
 
 router = APIRouter(prefix="/impact-analysis", tags=["impact-analysis"])
 

@@ -8,7 +8,6 @@ credential: {username, password}
 from __future__ import annotations
 
 from ftplib import FTP, FTP_TLS, error_perm
-from typing import Any
 
 try:
     import paramiko

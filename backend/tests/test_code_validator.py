@@ -1,5 +1,6 @@
 import pytest
-from app.services.code_validator import validate_code, ValidationResult
+
+from app.services.code_validator import ValidationResult, validate_code
 
 
 class TestCodeValidator:

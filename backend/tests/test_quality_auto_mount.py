@@ -1,5 +1,6 @@
 """Test: binding creation auto-mounts quality rules."""
 from unittest.mock import MagicMock, patch
+
 from app.services.data_plane.object_binding_service import _auto_mount_quality_rules
 
 _PATCH_TARGET = "app.services.data_plane.quality_rule_service.QualityRuleService"

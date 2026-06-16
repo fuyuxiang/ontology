@@ -1,7 +1,9 @@
 """SkillTool 模型 — 技能中的可执行工具（Python代码）"""
 from datetime import datetime
-from sqlalchemy import String, Text, JSON, DateTime, ForeignKey
+
+from sqlalchemy import JSON, DateTime, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.database import Base
 from app.utils.identifiers import gen_uuid
 

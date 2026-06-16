@@ -2,9 +2,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -58,7 +57,7 @@ def suggest_assets(body: SuggestAssetsRequest, db: Session = Depends(get_db)):
 @router.get("/coverage")
 def list_coverage(db: Session = Depends(get_db)):
     """列出所有 ObjectType 的属性映射覆盖率（侧栏徽章用）。"""
-    from app.models.entity import OntologyEntity, EntityAttribute
+    from app.models.entity import OntologyEntity
     rows = []
     entities = db.query(OntologyEntity).all()
     for e in entities:

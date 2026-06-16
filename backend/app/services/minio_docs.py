@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import Any
 
 import boto3
 from botocore.config import Config

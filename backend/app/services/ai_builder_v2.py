@@ -4,12 +4,11 @@ from __future__ import annotations
 import json
 import logging
 import re
-from typing import Generator
+from collections.abc import Generator
 
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models.asset import Asset
 from app.services import dwd_catalog, minio_docs
 

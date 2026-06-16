@@ -5,16 +5,14 @@ import json
 import logging
 import re
 import uuid
-from typing import Generator
+from collections.abc import Generator
 
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.models.entity import OntologyEntity, EntityAttribute
-from app.models.relation import EntityRelation
-from app.models.rule import BusinessRule, EntityAction
+from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.function import OntologyFunction
+from app.models.rule import BusinessRule, EntityAction
 from app.services.skill_sandbox import validate_code
 
 logger = logging.getLogger(__name__)

@@ -1,9 +1,8 @@
 """ontology_mapping_service 单元测试"""
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 
 SAMPLE_ONTOLOGY = {
     "entities": [
@@ -32,8 +31,9 @@ def test_build_ontology_summary():
 
 
 def test_merge_mapping_into_ontology():
-    from app.services.ontology_mapping_service import _merge_mapping_into_ontology
     import copy
+
+    from app.services.ontology_mapping_service import _merge_mapping_into_ontology
 
     ontology = copy.deepcopy(SAMPLE_ONTOLOGY)
     mapping = {
@@ -74,8 +74,9 @@ def test_merge_mapping_into_ontology():
 
 
 def test_merge_mapping_missing_entity():
-    from app.services.ontology_mapping_service import _merge_mapping_into_ontology
     import copy
+
+    from app.services.ontology_mapping_service import _merge_mapping_into_ontology
 
     ontology = copy.deepcopy(SAMPLE_ONTOLOGY)
     mapping = {"entities": [], "relations": []}

@@ -12,7 +12,10 @@ from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.data_plane import (
-    ConnectionCreate, ConnectionDetail, ConnectionUpdate, TestResult,
+    ConnectionCreate,
+    ConnectionDetail,
+    ConnectionUpdate,
+    TestResult,
 )
 from app.services.data_plane.connection_service import ConnectionService
 

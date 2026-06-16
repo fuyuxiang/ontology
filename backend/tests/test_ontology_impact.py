@@ -1,5 +1,10 @@
 import pytest
-from app.services.ontology_impact import compute_breaking_changes, find_affected_scenes, find_affected_agents
+
+from app.services.ontology_impact import (
+    compute_breaking_changes,
+    find_affected_agents,
+    find_affected_scenes,
+)
 
 
 class TestComputeBreakingChanges:

@@ -9,16 +9,15 @@ AIP 场景执行包装器
 from __future__ import annotations
 
 import json
-import time
 import logging
+import time
+from collections.abc import Generator
 from datetime import datetime
-from typing import Any, Generator
 
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.models.scene import AipScene, AipSceneExecution, AipSceneTrigger
 from app.models.agent import ModelRegistry
+from app.models.scene import AipScene, AipSceneExecution
 from app.services.agent.graph_engine import GraphEngine
 from app.utils.identifiers import gen_uuid
 

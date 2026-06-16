@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
 from app.models.asset_usage import AssetUsage
-from app.models.business_document import BusinessDocument
 from app.models.execution_log import ExecutionLog
 from app.models.quality_metric import QualityMetric
 from app.models.quality_rule import HealthStatus, QualityRule
@@ -303,7 +302,7 @@ class AssetService:
             )
         else:
             # sql_view：跑 SELECT * FROM (sql) WHERE 1=0 取列描述
-            from app.services.data_plane.execute_service import ExecuteService, ExecuteRequest
+            from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
             base_id = (asset.locator or {}).get("base_asset_id")
             base = self.repo.get_by_id(base_id) if base_id else None
             if not base or base.kind != "table":
@@ -331,7 +330,7 @@ class AssetService:
 
     def profile(self, asset_id: str) -> dict:
         """跑 row_count + 抽样 + 列空值率。统一通过 ExecuteService。"""
-        from app.services.data_plane.execute_service import ExecuteService, ExecuteRequest
+        from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
         asset = self._must_get(asset_id)
         if asset.kind not in ("table", "sql_view"):
             raise ValueError("仅 table / sql_view 资产支持 profile")
@@ -372,7 +371,7 @@ class AssetService:
         return profile
 
     def preview(self, asset_id: str, limit: int = 20) -> dict:
-        from app.services.data_plane.execute_service import ExecuteService, ExecuteRequest
+        from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
         asset = self._must_get(asset_id)
         if asset.kind == "document":
             return self._preview_document(asset, limit)

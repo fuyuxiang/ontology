@@ -1,17 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from datetime import datetime
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.core.deps import require_user
 from app.database import get_db
 from app.models import OntologyEntity
 from app.models.function import OntologyFunction
-from app.schemas.function import (
-    FunctionCreate, FunctionUpdate, FunctionOut,
-    FunctionTestRequest, FunctionTestResult,
-)
-from app.repositories.function_repo import FunctionRepository
-from app.core.deps import require_user
 from app.models.user import User
+from app.repositories.function_repo import FunctionRepository
+from app.schemas.function import (
+    FunctionCreate,
+    FunctionOut,
+    FunctionTestRequest,
+    FunctionTestResult,
+    FunctionUpdate,
+)
 from app.services.audit import write_audit
 
 router = APIRouter(prefix="/functions", tags=["functions"])

@@ -8,21 +8,27 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
-from app.database import get_db, SessionLocal
+from app.database import SessionLocal, get_db
 from app.models.scene import (
-    AipScene, AipSceneVersion, AipSceneExecution, AipSceneTrigger,
+    AipScene,
+    AipSceneExecution,
+    AipSceneTrigger,
+    AipSceneVersion,
 )
 from app.repositories import (
-    AipSceneRepository, AipSceneVersionRepository,
-    AipSceneExecutionRepository, AipSceneTriggerRepository,
+    AipSceneRepository,
+    AipSceneTriggerRepository,
+    AipSceneVersionRepository,
+)
+from app.services.aip.scene_runner import (
+    create_execution_row,
+    run_scene_stream,
+    sse_format,
 )
 from app.utils.identifiers import gen_uuid
-from app.services.aip.scene_runner import (
-    create_execution_row, run_scene_stream, sse_format,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -140,11 +146,11 @@ def _validate_scene_payload(s: AipScene) -> dict:
         errors.append("画布存在循环依赖")
 
     # 3. 节点引用校验
+    from app.models.agent import Agent
     from app.models.entity import OntologyEntity
+    from app.models.function import OntologyFunction
     from app.models.rule import BusinessRule, EntityAction
     from app.models.skill import Skill
-    from app.models.agent import Agent
-    from app.models.function import OntologyFunction
 
     db = SessionLocal()
     try:
@@ -456,7 +462,7 @@ def test_node(
     if not target_node:
         raise HTTPException(404, "节点不存在")
 
-    from app.services.agent.graph_engine import GraphEngine, _safe_jsonable
+    from app.services.agent.graph_engine import GraphEngine
     from app.services.aip.scene_runner import _resolve_model_config
 
     model_name, model_config = _resolve_model_config(db)
@@ -533,6 +539,7 @@ def test_fire_trigger(sid: str, db: Session = Depends(get_db)):
     if not s:
         raise HTTPException(404, "场景不存在")
     import threading
+
     from app.services.aip.scene_runner import run_scene_in_thread
     eid_holder = {"id": ""}
 

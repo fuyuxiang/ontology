@@ -6,12 +6,15 @@ import json
 import logging
 import re
 import uuid
-from typing import Generator
+from collections.abc import Generator
 
 from openai import OpenAI
 
-from app.config import settings
-from app.services.ontology_constraints import build_constraint_prompt, validate_ontology_output, validate_and_retry
+from app.services.ontology_constraints import (
+    build_constraint_prompt,
+    validate_and_retry,
+    validate_ontology_output,
+)
 
 logger = logging.getLogger(__name__)
 

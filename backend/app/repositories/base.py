@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TypeVar, Generic, Type
+from typing import Generic, TypeVar
 
 from sqlalchemy.orm import Session
 
@@ -10,7 +10,7 @@ T = TypeVar("T", bound=Base)
 
 
 class BaseRepository(Generic[T]):
-    model: Type[T]
+    model: type[T]
 
     def __init__(self, db: Session):
         self.db = db

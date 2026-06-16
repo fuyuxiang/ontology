@@ -1,5 +1,7 @@
-import httpx
 from string import Template
+
+import httpx
+
 from .base import BaseActionExecutor, ExecutionResult
 
 

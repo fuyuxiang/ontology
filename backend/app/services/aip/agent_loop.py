@@ -11,19 +11,19 @@ Agent 节点在流程编排中的执行逻辑：
 from __future__ import annotations
 
 import json
-import time
 import logging
-from typing import Any, Generator
+import time
+from collections.abc import Generator
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models.entity import OntologyEntity, EntityAttribute
-from app.models.rule import BusinessRule, EntityAction
+from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.function import OntologyFunction
+from app.models.rule import BusinessRule, EntityAction
 from app.models.skill import Skill
-from app.services.copilot import get_llm_client
 from app.services.agent.tool_router import ToolRouter
+from app.services.copilot import get_llm_client
 from app.services.skill_executor import execute_skill
 
 logger = logging.getLogger(__name__)

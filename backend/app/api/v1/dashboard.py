@@ -1,16 +1,23 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-from sqlalchemy import func
-from pydantic import BaseModel
+from datetime import datetime
 from typing import Any
-from datetime import datetime, timedelta
+
+from fastapi import APIRouter, Depends
+from pydantic import BaseModel
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OntologyEntity, EntityAttribute, EntityRelation, BusinessRule, EntityAction, AuditLog
-from app.models.function import OntologyFunction
+from app.models import (
+    AuditLog,
+    BusinessRule,
+    EntityAction,
+    EntityRelation,
+    OntologyEntity,
+)
+from app.models.agent import Agent
 from app.models.asset import Asset
 from app.models.dashboard_config import DashboardConfig
-from app.models.agent import Agent
+from app.models.function import OntologyFunction
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 

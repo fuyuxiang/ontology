@@ -1,9 +1,9 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException, Header
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from app.database import get_db
 from app.models.agent import Agent, ModelRegistry
@@ -15,38 +15,38 @@ open_router = APIRouter(prefix="/open/agents", tags=["open-api"])
 
 class AgentCreate(BaseModel):
     name: str
-    description: Optional[str] = ""
-    tags: Optional[list] = None
-    model_id: Optional[str] = None
-    system_prompt: Optional[str] = ""
-    kb_ids: Optional[list] = None
-    entity_ids: Optional[list] = None
-    tools_config: Optional[dict] = None
-    nodes_json: Optional[list] = None
-    edges_json: Optional[list] = None
+    description: str | None = ""
+    tags: list | None = None
+    model_id: str | None = None
+    system_prompt: str | None = ""
+    kb_ids: list | None = None
+    entity_ids: list | None = None
+    tools_config: dict | None = None
+    nodes_json: list | None = None
+    edges_json: list | None = None
 
 
 class AgentUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    tags: Optional[list] = None
-    model_id: Optional[str] = None
-    system_prompt: Optional[str] = None
-    kb_ids: Optional[list] = None
-    entity_ids: Optional[list] = None
-    tools_config: Optional[dict] = None
-    nodes_json: Optional[list] = None
-    edges_json: Optional[list] = None
-    status: Optional[str] = None
+    name: str | None = None
+    description: str | None = None
+    tags: list | None = None
+    model_id: str | None = None
+    system_prompt: str | None = None
+    kb_ids: list | None = None
+    entity_ids: list | None = None
+    tools_config: dict | None = None
+    nodes_json: list | None = None
+    edges_json: list | None = None
+    status: str | None = None
 
 
 class ChatRequest(BaseModel):
-    messages: Optional[list] = None
-    question: Optional[str] = None
-    stream: Optional[bool] = True
+    messages: list | None = None
+    question: str | None = None
+    stream: bool | None = True
 
 
-def _agent_out(a: Agent, db: Session, referenced_scenes: Optional[list] = None) -> dict:
+def _agent_out(a: Agent, db: Session, referenced_scenes: list | None = None) -> dict:
     model_name = None
     if a.model_id:
         m = db.get(ModelRegistry, a.model_id)
@@ -169,9 +169,10 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
 
     import json as _json
     import time as _time
-    from app.services.agent.orchestrator import AgentService
-    from app.services.agent.graph_engine import GraphEngine
+
     from app.models.trace import AgentTrace
+    from app.services.agent.graph_engine import GraphEngine
+    from app.services.agent.orchestrator import AgentService
 
     # Extract question from messages or direct field
     question = body.question or ""
@@ -287,7 +288,7 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
 async def open_chat(
     aid: str,
     body: ChatRequest,
-    x_agent_key: Optional[str] = Header(None, alias="X-Agent-Key"),
+    x_agent_key: str | None = Header(None, alias="X-Agent-Key"),
     db: Session = Depends(get_db),
 ):
     a = db.get(Agent, aid)
@@ -305,7 +306,7 @@ async def open_chat(
 @open_router.get("/{aid}/info")
 def open_agent_info(
     aid: str,
-    x_agent_key: Optional[str] = Header(None, alias="X-Agent-Key"),
+    x_agent_key: str | None = Header(None, alias="X-Agent-Key"),
     db: Session = Depends(get_db),
 ):
     a = db.get(Agent, aid)

@@ -9,12 +9,11 @@
 """
 from datetime import datetime
 
-from sqlalchemy import String, Integer, Boolean, Text, DateTime, JSON, Index
+from sqlalchemy import JSON, Boolean, DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 from app.utils.identifiers import gen_uuid
-
 
 # 五大类 + 一个本地上传（无 Connection）
 # database         | mysql/postgresql/oracle/sqlserver/hive/clickhouse

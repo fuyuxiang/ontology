@@ -11,7 +11,7 @@ kind 三种：
 """
 from datetime import datetime
 
-from sqlalchemy import String, Integer, Text, DateTime, JSON, ForeignKey, Index
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base

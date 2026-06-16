@@ -3,14 +3,14 @@
 复用本体数据源查询和规则引擎，为前端提供真实实例数据
 """
 import re
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
 from typing import Any
 
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.models import OntologyEntity, BusinessRule, EntityAction
+from app.models import EntityAction, OntologyEntity
 from app.models.asset import Asset
 from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.rule_engine import RuleEvaluator
@@ -410,7 +410,8 @@ def execute_mnp_flow(
 
 def _serialize(val: Any) -> Any:
     """将数据库值转为 JSON 可序列化格式"""
-    from datetime import date, datetime as dt
+    from datetime import date
+    from datetime import datetime as dt
     from decimal import Decimal
     if isinstance(val, (date, dt)):
         return val.isoformat()

@@ -5,12 +5,11 @@ import copy
 import json
 import logging
 import re
-from typing import Generator
+from collections.abc import Generator
 
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.services import dwd_catalog
 
 logger = logging.getLogger(__name__)
@@ -64,7 +63,7 @@ def _filter_tables_prompt(ontology_summary: str, tables_text: str) -> str:
 
 
 def get_all_tables_summary(db: Session | None = None) -> list[dict]:
-    from app.services.dwd_catalog import _find_asset, _execute, _TABLE_LIST_ASSET_NAME
+    from app.services.dwd_catalog import _TABLE_LIST_ASSET_NAME, _execute, _find_asset
     if not db:
         return []
     asset = _find_asset(db, _TABLE_LIST_ASSET_NAME)

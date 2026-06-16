@@ -3,12 +3,12 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OntologyEntity, EntityRelation
+from app.models import EntityRelation, OntologyEntity
 
 router = APIRouter(prefix="/ontology-api", tags=["ontology-api"])
 

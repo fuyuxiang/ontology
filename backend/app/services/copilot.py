@@ -6,12 +6,10 @@ AI Copilot 服务 — 本体感知的智能对话
 """
 import logging
 
-import httpx
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.models import OntologyEntity, EntityRelation, BusinessRule
+from app.models import BusinessRule, EntityRelation, OntologyEntity
 from app.models.rule import EntityAction
 from app.services.data_plane.entity_data_service import EntityDataService
 

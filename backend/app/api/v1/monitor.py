@@ -8,14 +8,20 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import OntologyEntity, Agent, BusinessRule
+from app.models import Agent, BusinessRule, OntologyEntity
 from app.models.asset import Asset
 from app.models.skill import Skill
 from app.repositories.monitor_repo import MonitorRepository
 from app.schemas.monitor import (
-    ResourceMetrics, ServiceStatus, ResponseHistoryPoint,
-    AlertItem, LLMStatsResponse, OntologyStatsResponse,
-    AgentActivityResponse, PlatformStatsResponse, DashboardOverview,
+    AgentActivityResponse,
+    AlertItem,
+    DashboardOverview,
+    LLMStatsResponse,
+    OntologyStatsResponse,
+    PlatformStatsResponse,
+    ResourceMetrics,
+    ResponseHistoryPoint,
+    ServiceStatus,
 )
 from app.services.monitor.ws_manager import ws_manager
 

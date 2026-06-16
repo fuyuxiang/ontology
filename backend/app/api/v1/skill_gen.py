@@ -5,13 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from typing import Optional
 
 from app.database import get_db
 from app.models.skill import Skill
 from app.models.skill_tool import SkillTool
 from app.services import skill_generator
-from app.services.skill_sandbox import validate_code, execute_in_sandbox
+from app.services.skill_sandbox import execute_in_sandbox, validate_code
 from app.services.skill_version_service import publish_skill
 
 router = APIRouter(prefix="/skill-gen", tags=["skill-gen"])
@@ -31,13 +30,13 @@ class GenerateRequest(BaseModel):
 
 
 class DraftUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    input_schema: Optional[dict] = None
-    output_schema: Optional[dict] = None
-    prompt_template: Optional[str] = None
-    tools: Optional[list] = None
-    test_cases: Optional[list] = None
+    name: str | None = None
+    description: str | None = None
+    input_schema: dict | None = None
+    output_schema: dict | None = None
+    prompt_template: str | None = None
+    tools: list | None = None
+    test_cases: list | None = None
 
 
 class RegenerateRequest(BaseModel):

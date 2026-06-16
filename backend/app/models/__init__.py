@@ -1,41 +1,48 @@
-from app.models.entity import OntologyEntity, EntityAttribute
-from app.models.relation import EntityRelation
-from app.models.rule import BusinessRule, EntityAction
-from app.models.function import OntologyFunction
+from app.models.agent import Agent, ModelRegistry
+from app.models.ai_code_conversation import AiCodeConversation  # noqa: F401
+from app.models.asset import Asset
+from app.models.asset_usage import AssetUsage
 from app.models.audit import AuditLog
-from app.models.user import User
-from app.models.dashboard_config import DashboardConfig
-from app.models.agent import ModelRegistry, Agent
-from app.models.prompt_template import PromptTemplate
-from app.models.trace import AgentTrace
-from app.models.eval import EvalSuite, EvalCase, EvalRun, EvalResult
-from app.models.version import (
-    OntologyVersion, OntologyVersionEntity,
-    OntologyVersionAttribute, OntologyVersionRelation,
-)
-from app.models.version_components import (
-    OntologyVersionFunction, OntologyVersionRule, OntologyVersionAction,
-)
-from app.models.scene import (
-    AipScene, AipSceneVersion, AipSceneExecution, AipSceneTrigger,
-)
 from app.models.business_document import BusinessDocument
 
 # ── Data Plane（M1 新增 7 张表）──
 from app.models.connection import Connection
-from app.models.asset import Asset
-from app.models.asset_usage import AssetUsage
+from app.models.dashboard_config import DashboardConfig
+from app.models.entity import EntityAttribute, OntologyEntity
+from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSuite
 from app.models.execution_log import ExecutionLog
+from app.models.function import OntologyFunction
 from app.models.lineage_edge import LineageEdge
+from app.models.monitor import Alert, LLMCallRecord, ServiceMetric
 from app.models.object_binding import ObjectBinding
+from app.models.prompt_template import PromptTemplate
 from app.models.quality_metric import QualityMetric
-from app.models.quality_rule import QualityRule, HealthStatus
-from app.models.monitor import ServiceMetric, LLMCallRecord, Alert
+from app.models.quality_rule import HealthStatus, QualityRule
+from app.models.relation import EntityRelation
+from app.models.rule import BusinessRule, EntityAction
+from app.models.scene import (
+    AipScene,
+    AipSceneExecution,
+    AipSceneTrigger,
+    AipSceneVersion,
+)
 from app.models.skill import Skill
-from app.models.skill_version import SkillVersion
 from app.models.skill_tool import SkillTool
 from app.models.skill_tool_ref import SkillToolRef
-from app.models.ai_code_conversation import AiCodeConversation  # noqa: F401
+from app.models.skill_version import SkillVersion
+from app.models.trace import AgentTrace
+from app.models.user import User
+from app.models.version import (
+    OntologyVersion,
+    OntologyVersionAttribute,
+    OntologyVersionEntity,
+    OntologyVersionRelation,
+)
+from app.models.version_components import (
+    OntologyVersionAction,
+    OntologyVersionFunction,
+    OntologyVersionRule,
+)
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",

@@ -1,7 +1,6 @@
 import ast
 from dataclasses import dataclass, field
 
-
 ALLOWED_MODULES = {"math", "datetime", "json", "re", "decimal", "collections"}
 FORBIDDEN_CALLS = {"open", "eval", "exec", "__import__", "compile", "globals", "locals", "getattr", "setattr", "delattr"}
 

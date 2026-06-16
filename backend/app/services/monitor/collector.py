@@ -58,8 +58,9 @@ async def _check_db() -> tuple[str, float | None]:
 
 async def _check_neo4j() -> tuple[str, float | None]:
     try:
-        from app.config import settings
         from neo4j import GraphDatabase
+
+        from app.config import settings
         driver = GraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD))
         start = time.monotonic()
         with driver.session() as session:
@@ -74,6 +75,7 @@ async def _check_neo4j() -> tuple[str, float | None]:
 async def _check_minio() -> tuple[str, float | None]:
     try:
         import boto3
+
         from app.config import settings
         client = boto3.client(
             "s3",
@@ -92,6 +94,7 @@ async def _check_minio() -> tuple[str, float | None]:
 async def _check_redis() -> tuple[str, float | None]:
     try:
         import redis
+
         from app.config import settings
         r = redis.from_url(settings.REDIS_URL, socket_timeout=3)
         start = time.monotonic()

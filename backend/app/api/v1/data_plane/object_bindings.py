@@ -8,7 +8,9 @@ from app.core.deps import require_user
 from app.database import get_db
 from app.models.user import User
 from app.schemas.data_plane import (
-    BindingCreate, BindingDetail, BindingUpdate, ExecuteRequestModel,
+    BindingCreate,
+    BindingDetail,
+    BindingUpdate,
 )
 from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
 from app.services.data_plane.object_binding_service import ObjectBindingService

@@ -11,7 +11,6 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-from typing import Optional
 
 from app.database import SessionLocal
 from app.models.scene import AipSceneTrigger
@@ -72,7 +71,7 @@ def cron_match(cron_expr: str, now: datetime) -> bool:
 class SceneScheduler:
     def __init__(self):
         self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._pool = ThreadPoolExecutor(max_workers=8, thread_name_prefix="aip-job-")
         # 防同一分钟内重复触发
         self._last_fired: dict[str, str] = {}
@@ -110,7 +109,6 @@ class SceneScheduler:
             for trg in triggers:
                 if not trg.cron_expr:
                     continue
-                key = f"{trg.id}:{now_key}"
                 if self._last_fired.get(trg.id) == now_key:
                     continue
                 if cron_match(trg.cron_expr, now):

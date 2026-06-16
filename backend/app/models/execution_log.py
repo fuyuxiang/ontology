@@ -6,7 +6,7 @@ params 中 sensitivity_tags 命中的字段值在 params_redacted 里遮罩。
 """
 from datetime import datetime
 
-from sqlalchemy import String, Integer, Boolean, Text, DateTime, JSON, ForeignKey, Index
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Generator
+from collections.abc import Generator
 
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -73,7 +73,6 @@ class HydrationService:
 
     def run(self, req: HydrationRequest) -> Generator[dict, None, None]:
         """编排 4 阶段水合验证，逐事件 yield。"""
-        t0 = time.time()
         phase_results: list[dict] = []
         total_rows = 0
         total_cols = 0
@@ -106,7 +105,6 @@ class HydrationService:
         yield {"type": "phase_progress", "phase": "ingest", "progress": 0}
         ingest_start = time.time()
         ingest_status = "pass"
-        ingest_logs: list[dict] = []
 
         for aid in req.asset_ids:
             asset = self.asset_svc.get(aid)
@@ -361,7 +359,6 @@ class HydrationService:
 
             matched_props += obj_matched
             obj_status = "pass" if obj_matched == obj_total else ("warn" if obj_matched > obj_total * 0.5 else "error")
-            high_count = sum(1 for _ in [])  # placeholder
             yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
                    "msg": f"{obj.displayName or obj.name}: {obj_matched}/{obj_total} 属性映射命中"}
 
@@ -392,7 +389,6 @@ class HydrationService:
 
         # ── Phase 3: 关系映射验证 ─────────────────────────
         yield {"type": "phase_progress", "phase": "match", "progress": 0.55}
-        match_start = time.time()
         match_status = "pass"
         matched_relations = 0
         total_relations = len(req.relations)
@@ -488,7 +484,6 @@ class HydrationService:
                 matched_relations += 1
 
         relation_accuracy = f"{matched_relations / total_relations * 100:.1f}%" if total_relations else "N/A"
-        match_elapsed = round(time.time() - match_start, 1)
         relation_count = total_rows * max(1, total_relations)  # 估算关系实例数
         yield {"type": "phase_progress", "phase": "match", "progress": 0.75}
         yield {

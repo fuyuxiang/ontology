@@ -1,6 +1,8 @@
 """tests/test_asset_tree.py"""
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from app.services.data_plane.asset_service import AssetService
 
 

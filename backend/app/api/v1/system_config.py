@@ -4,14 +4,13 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.deps import require_admin
 from app.database import get_db
 from app.models.system_config import SystemConfig
 from app.models.user import User
-from app.core.deps import require_admin
-from app.schemas.system_config import ConfigSaveRequest, ConfigResponse, TestResult
+from app.schemas.system_config import ConfigResponse, ConfigSaveRequest, TestResult
 
 router = APIRouter(prefix="/system-config", tags=["system-config"])
 

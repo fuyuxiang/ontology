@@ -6,7 +6,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.models.version_components import (
-    OntologyVersionFunction, OntologyVersionRule, OntologyVersionAction,
+    OntologyVersionAction,
+    OntologyVersionFunction,
+    OntologyVersionRule,
 )
 from app.services.function_executor import FunctionExecutor
 

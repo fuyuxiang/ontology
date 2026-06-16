@@ -25,7 +25,7 @@ class _DocOut(BaseModel):
     uploaded_at: str
 
     @classmethod
-    def from_db(cls, d: BusinessDocument) -> "_DocOut":
+    def from_db(cls, d: BusinessDocument) -> _DocOut:
         return cls(
             id=d.id, name=d.name, file_type=d.file_type or "",
             size_bytes=d.size_bytes or 0,

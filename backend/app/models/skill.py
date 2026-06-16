@@ -1,7 +1,9 @@
 """Skill 模型 — 可复用的业务技能"""
 from datetime import datetime
-from sqlalchemy import String, Text, JSON, DateTime, Integer
+
+from sqlalchemy import JSON, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
+
 from app.database import Base
 from app.utils.identifiers import gen_uuid
 

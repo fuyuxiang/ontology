@@ -10,20 +10,24 @@ from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from app.database import get_db
 from app.core.deps import require_user
-from app.models.entity import OntologyEntity, EntityAttribute
-from app.models.relation import EntityRelation
-from app.models.version import (
-    OntologyVersion, OntologyVersionEntity,
-    OntologyVersionAttribute, OntologyVersionRelation,
-)
-from app.models.user import User
-from app.models.scene import AipScene
+from app.database import get_db
 from app.models.agent import Agent
+from app.models.entity import OntologyEntity
+from app.models.relation import EntityRelation
+from app.models.scene import AipScene
+from app.models.user import User
+from app.models.version import (
+    OntologyVersion,
+    OntologyVersionAttribute,
+    OntologyVersionEntity,
+    OntologyVersionRelation,
+)
 from app.services.ontology_impact import (
-    mark_stale_dependents, compute_breaking_changes,
-    find_affected_scenes, find_affected_agents,
+    compute_breaking_changes,
+    find_affected_agents,
+    find_affected_scenes,
+    mark_stale_dependents,
 )
 from app.services.version_component_snapshot import snapshot_components_for_version
 

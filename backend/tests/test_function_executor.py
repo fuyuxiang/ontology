@@ -1,5 +1,7 @@
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
+
 from app.services.function_executor import FunctionExecutor, FunctionResult
 
 

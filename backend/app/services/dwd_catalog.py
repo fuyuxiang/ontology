@@ -11,7 +11,8 @@ from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
 from app.services.data_plane.execute_service import (
-    ExecuteRequest, ExecuteResult, ExecuteService,
+    ExecuteRequest,
+    ExecuteService,
 )
 
 logger = logging.getLogger(__name__)
