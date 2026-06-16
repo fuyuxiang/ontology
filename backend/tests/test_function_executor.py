@@ -94,6 +94,33 @@ class TestSqlExecution:
         assert result.success is False
 
 
+class TestRequiredParams:
+    def test_missing_required_param_fails(self):
+        fn = _make_function("expression", "params['a'] + params['b']",
+                            input_schema=[{"name": "a", "required": True}, {"name": "b", "required": True}])
+        executor = FunctionExecutor(MagicMock())
+        result = executor.execute(fn, {"a": 1})
+        assert result.success is False
+        assert "缺少必填参数" in result.error
+        assert "b" in result.error
+
+    def test_all_required_present_runs(self):
+        fn = _make_function("expression", "params['a'] + params['b']",
+                            input_schema=[{"name": "a", "required": True}, {"name": "b", "required": True}])
+        executor = FunctionExecutor(MagicMock())
+        result = executor.execute(fn, {"a": 1, "b": 2})
+        assert result.success is True
+        assert result.value == 3
+
+    def test_optional_param_not_blocking(self):
+        fn = _make_function("expression", "params['a']",
+                            input_schema=[{"name": "a", "required": True}, {"name": "b", "required": False}])
+        executor = FunctionExecutor(MagicMock())
+        result = executor.execute(fn, {"a": 9})
+        assert result.success is True
+        assert result.value == 9
+
+
 class TestCallableNameLookup:
     def test_execute_by_callable_name_found(self):
         fn = _make_function("expression", "params['x'] + 1")
