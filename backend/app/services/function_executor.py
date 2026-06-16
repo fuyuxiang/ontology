@@ -27,6 +27,13 @@ class FunctionExecutor:
     def execute(self, func: OntologyFunction, params: dict) -> FunctionResult:
         start = time.time()
         try:
+            missing = self._check_required(func, params)
+            if missing:
+                return FunctionResult(
+                    success=False,
+                    error=f"缺少必填参数：{', '.join(missing)}",
+                    execution_ms=(time.time() - start) * 1000,
+                )
             if func.logic_type == "expression":
                 result = self._execute_expression(func, params)
             elif func.logic_type == "sql":
@@ -42,6 +49,18 @@ class FunctionExecutor:
             elapsed = (time.time() - start) * 1000
             logger.warning(f"Function {func.name} execution failed: {e}")
             return FunctionResult(success=False, error=str(e), execution_ms=elapsed)
+
+    @staticmethod
+    def _check_required(func: OntologyFunction, params: dict) -> list[str]:
+        """返回缺失的必填参数名列表。input_schema 中 required=True 的参数必须在 params 中出现。"""
+        missing = []
+        for p in func.input_schema or []:
+            if not isinstance(p, dict):
+                continue
+            name = p.get("name")
+            if name and p.get("required") and name not in params:
+                missing.append(name)
+        return missing
 
     def execute_by_callable_name(self, callable_name: str, params: dict) -> FunctionResult:
         func = self.db.query(OntologyFunction).filter(
