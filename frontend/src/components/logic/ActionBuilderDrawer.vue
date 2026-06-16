@@ -124,7 +124,7 @@ async function load() {
       for (const p of form.value.parameters) {
         if (p.entity_id) loadAttributesForEntity(p.entity_id)
       }
-    } catch {}
+    } catch (e) { console.warn('回填动作表单失败', e) }
   }
 }
 

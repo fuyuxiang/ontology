@@ -97,7 +97,7 @@ async function send() {
               timestamp: new Date().toISOString(),
             })
           }
-        } catch {}
+        } catch (e) { console.warn('AI 响应解析失败,已跳过', e) }
       }
       await nextTick()
       scrollToBottom()

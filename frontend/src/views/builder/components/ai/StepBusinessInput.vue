@@ -30,6 +30,9 @@
 import { ref } from 'vue'
 import { matchDomain } from '../../../../api/aiBuilderV2'
 import type { DomainMatchResult } from '../../../../api/aiBuilderV2'
+import { useToast } from '../../../../composables/useToast'
+
+const toast = useToast()
 
 const emit = defineEmits<{ (e: 'next', payload: { domains: string[]; businessDesc: string }): void }>()
 
@@ -54,8 +57,9 @@ async function analyze() {
     const resp = await matchDomain(desc.value)
     result.value = resp.data
     if (resp.data.domains.length) selectedDomains.value = [...resp.data.domains]
-  } catch (e) {
+  } catch (e: any) {
     console.error(e)
+    toast.error(e?.response?.data?.detail || e?.message || '业务领域匹配失败，请稍后重试')
   } finally {
     loading.value = false
   }
