@@ -139,7 +139,7 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import { renderMarkdownSafe } from '@/utils/sanitize'
 import { aiOntologyApi, type AiOntologyEvent } from '../../api/aiOntology'
 
-const emit = defineEmits<{ complete: [result: { entities: any[]; relations: any[] }] }>()
+defineEmits<{ complete: [result: { entities: any[]; relations: any[] }] }>()
 
 interface ChatMessage {
   role: 'ai' | 'user'
@@ -222,7 +222,7 @@ async function initSession() {
       { label: '客户价值分析', value: '客户价值分析' },
       { label: '网络质量优化', value: '网络质量优化' },
     ]
-  } catch (err) {
+  } catch {
     messages.value.push({ role: 'ai', content: '会话初始化失败，请刷新重试。' })
   }
 }

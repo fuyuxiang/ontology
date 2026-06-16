@@ -72,10 +72,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useAipStore } from '../../../store/aip'
-import { NODE_TYPES } from '../aipData'
 
 const props = defineProps<{ edgeId: string | null }>()
-const emit = defineEmits<{ close: [] }>()
+defineEmits<{ close: [] }>()
 
 const store = useAipStore()
 

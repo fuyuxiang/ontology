@@ -321,7 +321,7 @@ function handleToolResult(ev: any) {
   }
 }
 
-function onPickerSubmit(payload: { kind: string; ids: string[]; names: string[] }, msgId: string) {
+function onPickerSubmit(payload: { kind: string; ids: string[]; names: string[] }, _msgId: string) {
   if (payload.kind === 'datasource') {
     selectedDsIds.value = payload.ids
     pushMessage({ role: 'user', content: `已选好 ${payload.ids.length} 个数据源：${payload.names.join('、')}（ids=${payload.ids.join(',')}）` })

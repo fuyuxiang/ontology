@@ -83,7 +83,7 @@ function serializeClassExpression(expr: OwlClassExpression): string {
   }
 }
 
-function serializeClass(c: OwlClass, ontology: OwlOntology): string {
+function serializeClass(c: OwlClass, _ontology: OwlOntology): string {
   const lines: string[] = []
   lines.push(`    <Declaration><Class ${iri(c.iri)}/></Declaration>`)
 

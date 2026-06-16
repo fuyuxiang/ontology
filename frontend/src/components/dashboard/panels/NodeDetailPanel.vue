@@ -158,7 +158,7 @@ const createForm = ref({ name: '', name_cn: '', tier: 2, namespace: '', descript
 function goDetail() { router.push(`/ontology/${props.node.id}`) }
 
 function startEdit() {
-  const [name, tierStr] = props.node.desc.split(' · Tier ')
+  const [name] = props.node.desc.split(' · Tier ')
   editForm.value = {
     name,
     name_cn: props.node.label,

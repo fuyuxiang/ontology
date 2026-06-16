@@ -98,7 +98,7 @@ async function handleStart() {
   try {
     const resp = await uploadDocuments(files.value)
     emit('next', { sessionId: resp.data.session_id, businessDesc: desc.value })
-  } catch (e) {
+  } catch {
     alert('上传失败，请重试')
   } finally {
     uploading.value = false

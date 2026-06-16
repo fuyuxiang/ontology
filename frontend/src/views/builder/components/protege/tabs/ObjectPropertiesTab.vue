@@ -42,7 +42,7 @@ const filter = ref('')
 const rootProperties = computed(() => {
   const hasParent = new Set<string>()
   for (const p of store.ontology.objectProperties) {
-    for (const sup of p.superProperties) hasParent.add(p.iri)
+    if (p.superProperties.length > 0) hasParent.add(p.iri)
   }
   return store.ontology.objectProperties.filter(p => !hasParent.has(p.iri)).map(p => ({
     id: p.id, iri: p.iri, localName: p.localName,

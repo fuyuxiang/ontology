@@ -24,14 +24,13 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
 import OntologyBreadcrumb from './OntologyBreadcrumb.vue'
 import SettingsDialog from './SettingsDialog.vue'
 
 
 const route = useRoute()
-const router = useRouter()
 const authStore = useAuthStore()
 const showSettings = ref(false)
 

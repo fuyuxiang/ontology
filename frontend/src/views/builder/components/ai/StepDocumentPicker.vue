@@ -67,7 +67,7 @@ interface UploadedDoc {
   error: boolean
 }
 
-const props = defineProps<{ businessDesc: string }>()
+defineProps<{ businessDesc: string }>()
 const emit = defineEmits<{ (e: 'next', keys: string[]): void }>()
 
 const docs = ref<DocInfo[]>([])

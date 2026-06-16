@@ -228,7 +228,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { get, post, put, del } from '../../api/client'
+import { get, post, del } from '../../api/client'
 import { ontologyPublishApi } from '../../api/aip'
 
 interface VersionSummary {
@@ -387,7 +387,7 @@ async function previewImpact() {
   try {
     const res = await ontologyPublishApi.previewImpact(detail.value.id)
     impactData.value = res
-  } catch (e) {
+  } catch {
     impactData.value = null
   } finally {
     impactLoading.value = false

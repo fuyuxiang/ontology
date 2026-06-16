@@ -38,13 +38,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import {
   InputSearch as AInputSearch, Modal as AModal, Segmented as ASegmented,
   Table as ATable, Tag as ATag,
 } from 'ant-design-vue'
 import { useAssetStore } from '../../store/asset'
-import type { Asset, AssetKind, DocumentSourceType } from '../../types/asset'
+import type { Asset, AssetKind } from '../../types/asset'
 
 const props = withDefaults(defineProps<{
   visible: boolean

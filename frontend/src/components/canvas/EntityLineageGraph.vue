@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, markRaw, watch } from 'vue'
-import { VueFlow, useVueFlow, MarkerType } from '@vue-flow/core'
+import { VueFlow, useVueFlow } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { entityApi } from '../../api/ontology'
