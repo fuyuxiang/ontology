@@ -106,6 +106,7 @@ import LineageOntologyNode from '../../../components/lineage/LineageOntologyNode
 import LineageAppNode from '../../../components/lineage/LineageAppNode.vue'
 
 import { lineageApi, type LineageGraph, type LineageNode as LNode, type LineageNodeKind } from '../../../api/lineage'
+import { getErrorMessage } from '../../../utils/error'
 
 const nodeTypes = {
   lineageLayer: markRaw(LineageLayerNode),
@@ -270,13 +271,6 @@ function extraLabel(k: string) {
     connection_id: '连接 ID', connection_name: '所属连接', status: '状态',
     name_cn: '中文名', tier: '层级', entity_id: '所属实体', type: '类型',
   } as Record<string, string>)[k] || k
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'message' in error) {
-    return (error as { message: string }).message
-  }
-  return String(error)
 }
 </script>
 

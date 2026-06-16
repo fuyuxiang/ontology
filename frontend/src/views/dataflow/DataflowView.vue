@@ -78,6 +78,7 @@ import OntologyNode from '../../components/canvas/OntologyNode.vue'
 import DataNode from '../../components/canvas/DataNode.vue'
 import CanvasEdgeLabel from '../../components/canvas/CanvasEdgeLabel.vue'
 import { entityApi } from '../../api/ontology'
+import { getErrorMessage } from '../../utils/error'
 import type { Node, Edge } from '@vue-flow/core'
 
 const store = useOntologyStore()
@@ -238,11 +239,6 @@ function onDrop(event: DragEvent) {
 }
 
 function goDetail(id: string) { router.push(`/ontology/${id}`) }
-
-function getErrorMessage(error: unknown): string {
-  if (error && typeof error === 'object' && 'message' in error) return (error as { message: string }).message
-  return String(error)
-}
 </script>
 
 <style scoped>
