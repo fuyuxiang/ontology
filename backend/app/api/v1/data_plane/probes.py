@@ -19,9 +19,9 @@ def _run(db: Session, kind: str, body: ProbeRequest) -> QualityMetricOut:
                                   threshold=body.threshold)
         return m
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/row_count", response_model=QualityMetricOut)

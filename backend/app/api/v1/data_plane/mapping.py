@@ -51,7 +51,7 @@ def suggest_assets(body: SuggestAssetsRequest, db: Session = Depends(get_db)):
     try:
         return MappingSuggestService(db).suggest_assets(object_type_id=body.object_type_id)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.get("/coverage")
@@ -81,9 +81,9 @@ def suggest(body: SuggestRequest, db: Session = Depends(get_db)):
             use_llm=body.use_llm, top_k=body.top_k,
         )
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.post("/apply")
@@ -121,6 +121,6 @@ def apply(body: ApplyRequest, db: Session = Depends(get_db),
             "field_mappings_count": len(fm_payload),
         }
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e

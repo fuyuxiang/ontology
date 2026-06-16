@@ -57,9 +57,9 @@ def create_binding(
             user_id=user.id,
         )
     except ValueError as e:
-        raise HTTPException(409, str(e))
+        raise HTTPException(409, str(e)) from e
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.put("/{binding_id}", response_model=BindingDetail)
@@ -71,7 +71,7 @@ def update_binding(binding_id: str, body: BindingUpdate, db: Session = Depends(g
                                           for fm in (payload["field_mappings"] or [])]
         return ObjectBindingService(db).update(binding_id, **payload)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.delete("/{binding_id}", status_code=204)
@@ -79,7 +79,7 @@ def delete_binding(binding_id: str, db: Session = Depends(get_db)):
     try:
         ObjectBindingService(db).delete(binding_id)
     except LookupError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.post("/{binding_id}/test-resolve")
@@ -97,4 +97,4 @@ def test_resolve(binding_id: str, db: Session = Depends(get_db)):
         ))
         return {"columns": r.columns, "rows": r.rows, "field_mappings": b.field_mappings}
     except Exception as e:
-        raise HTTPException(400, f"取样失败: {e}")
+        raise HTTPException(400, f"取样失败: {e}") from e

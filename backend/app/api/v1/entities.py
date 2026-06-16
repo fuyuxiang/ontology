@@ -453,7 +453,7 @@ async def create_from_file(
             result = parse_owl_ontology(content, "turtle", db)
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}") from e
 
     write_audit(
         db, user_id=user.id,
@@ -501,7 +501,7 @@ async def preview_from_file(
         data = _json.loads(content.decode("utf-8"))
         preview = preview_json_ontology(data, namespace)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}") from e
 
     return OntologyPreviewResult(**preview)
 
@@ -844,7 +844,7 @@ async def ai_extract_entities(
 
     try:
         data = _json.loads(raw_text)
-    except _json.JSONDecodeError:
-        raise HTTPException(500, "AI 返回格式异常，请重试")
+    except _json.JSONDecodeError as e:
+        raise HTTPException(500, "AI 返回格式异常，请重试") from e
 
     return _ExtractResult(**data)

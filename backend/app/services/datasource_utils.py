@@ -56,8 +56,8 @@ def preview_table(ds: DataSource, table_name: str) -> dict:
     """查询指定表前 20 条数据"""
     try:
         connector = ConnectorRegistry.get(ds.type)
-    except ValueError:
-        raise RuntimeError(f"不支持的数据源类型: {ds.type}")
+    except ValueError as e:
+        raise RuntimeError(f"不支持的数据源类型: {ds.type}") from e
     conn = connector.connect(
         host=ds.host, port=ds.port, username=ds.username,
         password=ds.password, database=ds.database,
@@ -72,8 +72,8 @@ def get_table_schema(ds: DataSource, table_name: str) -> list[dict]:
     """查询表的列元数据"""
     try:
         connector = ConnectorRegistry.get(ds.type)
-    except ValueError:
-        raise RuntimeError(f"不支持的数据源类型: {ds.type}")
+    except ValueError as e:
+        raise RuntimeError(f"不支持的数据源类型: {ds.type}") from e
     conn = connector.connect(
         host=ds.host, port=ds.port, username=ds.username,
         password=ds.password, database=ds.database,

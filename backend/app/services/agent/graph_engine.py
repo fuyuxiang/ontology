@@ -719,6 +719,7 @@ class GraphEngine:
             parsed = json.loads(raw.strip())
             return parsed, f"意图识别完成: {json.dumps(parsed, ensure_ascii=False)}"
         except Exception as e:
+            logger.warning("意图识别失败,使用回退: %s", e)
             # Fallback: treat entire question as the first field value
             fields = [f.strip() for f in extract_fields.split(",")]
             fallback = {fields[0]: question} if fields else {"input": question}

@@ -30,7 +30,7 @@ def _scalar(svc: ExecuteService, alias: str, params: dict, *, purpose: str = "mn
     except ExecuteBlocked:
         raise
     except LookupError as e:
-        raise HTTPException(503, f"业务资产未就绪：{e}")
+        raise HTTPException(503, f"业务资产未就绪：{e}") from e
     return r.rows[0][0] if r.rows else 0
 
 
@@ -38,7 +38,7 @@ def _rows_as_dicts(svc: ExecuteService, alias: str, params: dict, *, purpose: st
     try:
         r = svc.execute_alias(alias, params, purpose=purpose)
     except LookupError as e:
-        raise HTTPException(503, f"业务资产未就绪：{e}")
+        raise HTTPException(503, f"业务资产未就绪：{e}") from e
     cols = r.columns
     return [{cols[i]: row[i] for i in range(len(cols))} for row in r.rows]
 
@@ -80,7 +80,7 @@ def get_risk_users(db: Session = Depends(get_db)):
     try:
         r = svc.execute_alias("mnp.risk_users", {}, purpose="mnp.risk_users")
     except LookupError as e:
-        raise HTTPException(503, f"业务资产未就绪：{e}")
+        raise HTTPException(503, f"业务资产未就绪：{e}") from e
     cols = r.columns
     return {
         "columns": cols,

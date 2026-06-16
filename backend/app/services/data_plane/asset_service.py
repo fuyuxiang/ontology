@@ -428,7 +428,7 @@ class AssetService:
             )
             s3.head_bucket(Bucket=bucket)
         except Exception as e:
-            raise RuntimeError(f"OSS 连接失败: {e}")
+            raise RuntimeError(f"OSS 连接失败: {e}") from e
         cred_ref = self.vault.store({"access_key": access_key, "secret_key": secret_key})
         return self._register_document(
             name=name,
