@@ -17,6 +17,7 @@ select = [
 ]
 ignore = [
     "E501",  # 行宽由 line-length 控制，单独的长行不作硬错误，仅观察
+    "B008",  # FastAPI 的 Depends()/Query()/File() 默认参数是框架标准用法，非真实缺陷
 ]
 
 [lint.per-file-ignores]
