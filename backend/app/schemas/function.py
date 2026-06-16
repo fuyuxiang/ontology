@@ -35,7 +35,6 @@ class FunctionCreate(BaseModel):
     input_schema: list | None = None
     logic_type: str = "expression"
     logic_body: str = ""
-    is_derived_property: bool = False
     status: str = "active"
     tags: list[str] | None = None
 
@@ -50,7 +49,6 @@ class FunctionUpdate(BaseModel):
     input_schema: list | None = None
     logic_type: str | None = None
     logic_body: str | None = None
-    is_derived_property: bool | None = None
     status: str | None = None
     tags: list[str] | None = None
 
@@ -67,7 +65,6 @@ class FunctionOut(BaseModel):
     input_schema: list | None = None
     logic_type: str
     logic_body: str = ""
-    is_derived_property: bool = False
     status: str
     execution_count: int = 0
     last_executed: datetime | None = None
