@@ -370,11 +370,10 @@ const lastRefreshAt = ref<string | null>(null)
 async function refreshCounts() {
   refreshing.value = true
   try {
-    const result = await studioApi.refreshCounts()
+    await studioApi.refreshCounts()
     lastRefreshAt.value = new Date().toLocaleTimeString('zh-CN')
     // 重新拉取所有数据
     await reload()
-    console.log('刷新完成:', result)
   } catch (e) {
     console.error('刷新失败', e)
   } finally {
