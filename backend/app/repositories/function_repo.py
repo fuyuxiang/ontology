@@ -12,7 +12,6 @@ class FunctionRepository(BaseRepository[OntologyFunction]):
         self,
         entity_id: str | None = None,
         status: str | None = None,
-        is_derived: bool | None = None,
         search: str | None = None,
     ) -> list[OntologyFunction]:
         q = self.db.query(OntologyFunction)
@@ -20,8 +19,6 @@ class FunctionRepository(BaseRepository[OntologyFunction]):
             q = q.filter(OntologyFunction.entity_id == entity_id)
         if status:
             q = q.filter(OntologyFunction.status == status)
-        if is_derived is not None:
-            q = q.filter(OntologyFunction.is_derived_property == is_derived)
         if search:
             pattern = f"%{search}%"
             q = q.filter(OntologyFunction.name.ilike(pattern) | OntologyFunction.description.ilike(pattern))

@@ -4,7 +4,7 @@
     <div class="logic-page__header">
       <div>
         <h1 class="text-display">函数管理</h1>
-        <p class="text-caption" style="margin-top: 4px;">计算逻辑与派生属性管理</p>
+        <p class="text-caption" style="margin-top: 4px;">计算逻辑管理</p>
       </div>
       <div class="logic-page__actions">
         <button class="btn-primary" @click="showAdd = true">
@@ -24,10 +24,6 @@
       <div class="stat-card stat-card--dynamic">
         <div class="stat-card__value">{{ stats.active }}</div>
         <div class="stat-card__label">已激活</div>
-      </div>
-      <div class="stat-card stat-card--kinetic">
-        <div class="stat-card__value">{{ stats.derived }}</div>
-        <div class="stat-card__label">派生属性</div>
       </div>
       <div class="stat-card stat-card--error">
         <div class="stat-card__value">{{ stats.standalone }}</div>
@@ -58,7 +54,7 @@
           >
             <span class="list-item__status" :class="`list-item__status--${fn.status}`"></span>
             <span class="list-item__name">{{ fn.name }}</span>
-            <span class="list-item__badge" :class="fn.is_derived_property ? 'priority--high' : 'priority--medium'">{{ fn.is_derived_property ? '派生' : fn.logic_type }}</span>
+            <span class="list-item__badge priority--medium">{{ fn.logic_type }}</span>
             <span class="list-item__meta">{{ fn.entity_name || '独立' }}</span>
           </div>
           <div v-if="filteredFunctions.length === 0" class="logic-empty">
@@ -71,7 +67,7 @@
         <template v-if="selectedFn">
           <div class="detail-panel__header">
             <h2 class="detail-panel__title">{{ selectedFn.name }}</h2>
-            <span class="list-item__badge" :class="selectedFn.is_derived_property ? 'priority--high' : 'priority--medium'">{{ selectedFn.is_derived_property ? '派生属性' : selectedFn.logic_type }}</span>
+            <span class="list-item__badge priority--medium">{{ selectedFn.logic_type }}</span>
           </div>
 
           <div class="detail-panel__meta">
@@ -154,7 +150,6 @@ const selectedFn = computed(() => filteredFunctions.value.find(f => f.id === sel
 const filters = [
   { label: '全部', value: 'all' },
   { label: '已激活', value: 'active' },
-  { label: '派生属性', value: 'derived' },
   { label: '独立函数', value: 'standalone' },
 ]
 
@@ -163,7 +158,6 @@ const stats = computed(() => {
   return {
     total: all.length,
     active: all.filter(f => f.status === 'active').length,
-    derived: all.filter(f => f.is_derived_property).length,
     standalone: all.filter(f => !f.entity_id).length,
   }
 })
@@ -171,7 +165,6 @@ const stats = computed(() => {
 const filteredFunctions = computed(() => {
   let list = functions.value
   if (activeFilter.value === 'active') list = list.filter(f => f.status === 'active')
-  else if (activeFilter.value === 'derived') list = list.filter(f => f.is_derived_property)
   else if (activeFilter.value === 'standalone') list = list.filter(f => !f.entity_id)
   if (search.value) {
     const s = search.value.toLowerCase()

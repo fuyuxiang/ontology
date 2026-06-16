@@ -302,7 +302,6 @@ def get_capability(db: Session = Depends(get_db)) -> dict[str, Any]:
             "scenarioCode": _scenario_of(ent) if ent else "core",
             "kind": "FUNCTION",
             "returnType": f.return_type or "string",
-            "isDerived": f.is_derived_property,
             "logicType": f.logic_type,
             "description": f.description or "",
         })
