@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,24 @@ router = APIRouter(prefix="/connections", tags=["data-plane:connections"])
 
 def _svc(db: Session) -> ConnectionService:
     return ConnectionService(db)
+
+
+@contextmanager
+def _map_errors(action: str):
+    """统一把 service 层异常映射为 HTTP 错误：
+
+    - LookupError → 404（资源不存在）
+    - ValueError → 400（参数/状态非法）
+    - 其他异常 → 400，附带操作名便于定位（如「列库失败」）
+    """
+    try:
+        yield
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except Exception as e:
+        raise HTTPException(400, f"{action}失败: {e}") from e
 
 
 @router.get("", response_model=list[ConnectionDetail])
@@ -112,72 +132,42 @@ def toggle_connection(conn_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{conn_id}/databases", response_model=list[str])
 def list_databases(conn_id: str, db: Session = Depends(get_db)):
-    try:
+    with _map_errors("列库"):
         return _svc(db).list_databases(conn_id)
-    except LookupError as e:
-        raise HTTPException(404, str(e)) from e
-    except Exception as e:
-        raise HTTPException(400, f"列库失败: {e}") from e
 
 
 @router.get("/{conn_id}/tables", response_model=list[str])
 def list_tables(conn_id: str, database: str | None = None, db: Session = Depends(get_db)):
-    try:
+    with _map_errors("列表"):
         return _svc(db).list_tables(conn_id, database)
-    except LookupError as e:
-        raise HTTPException(404, str(e)) from e
-    except Exception as e:
-        raise HTTPException(400, f"列表失败: {e}") from e
 
 
 @router.get("/{conn_id}/tables/{table_name}/schema")
 def get_table_schema(conn_id: str, table_name: str, database: str | None = None,
                     db: Session = Depends(get_db)):
-    try:
+    with _map_errors("获取表结构"):
         cols = _svc(db).get_table_schema(conn_id, table_name, database)
         return {"table": table_name, "columns": cols}
-    except LookupError as e:
-        raise HTTPException(404, str(e)) from e
-    except Exception as e:
-        raise HTTPException(400, f"获取表结构失败: {e}") from e
 
 
 @router.get("/{conn_id}/objects")
 def list_objects(conn_id: str, prefix: str = "", limit: int = Query(200, ge=1, le=2000),
                  db: Session = Depends(get_db)):
     """对象存储 (S3/OSS/...) 列对象。"""
-    try:
+    with _map_errors("列对象"):
         return _svc(db).list_objects(conn_id, prefix=prefix, limit=limit)
-    except LookupError as e:
-        raise HTTPException(404, str(e)) from e
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
-    except Exception as e:
-        raise HTTPException(400, f"列对象失败: {e}") from e
 
 
 @router.get("/{conn_id}/paths")
 def list_paths(conn_id: str, path: str = "/", limit: int = Query(200, ge=1, le=2000),
                db: Session = Depends(get_db)):
     """文件传输 (FTP/SFTP/...) 列目录。"""
-    try:
+    with _map_errors("列目录"):
         return _svc(db).list_paths(conn_id, path=path, limit=limit)
-    except LookupError as e:
-        raise HTTPException(404, str(e)) from e
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
-    except Exception as e:
-        raise HTTPException(400, f"列目录失败: {e}") from e
 
 
 @router.get("/{conn_id}/topics", response_model=list[str])
 def list_topics(conn_id: str, db: Session = Depends(get_db)):
     """消息队列 (Kafka/...) 列 topic。"""
-    try:
+    with _map_errors("列 topic"):
         return _svc(db).list_topics(conn_id)
-    except LookupError as e:
-        raise HTTPException(404, str(e)) from e
-    except ValueError as e:
-        raise HTTPException(400, str(e)) from e
-    except Exception as e:
-        raise HTTPException(400, f"列 topic 失败: {e}") from e
