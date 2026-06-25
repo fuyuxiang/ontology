@@ -90,7 +90,7 @@
               <div class="agent-detail__bubble" :class="`agent-detail__bubble--${msg.role}`">
                 <span v-if="msg.status && !msg.content" class="agent-detail__thinking">
                   <span class="agent-detail__thinking-dots"><i></i><i></i><i></i></span>
-                  {{ msg.status }}
+                  <span class="agent-detail__thinking-text">{{ msg.status }}</span>
                 </span>
                 <div
                   v-else-if="msg.role === 'assistant'"
@@ -522,6 +522,7 @@ onMounted(async () => {
   align-items: center;
   gap: 8px;
   color: var(--neutral-500, #6b7280);
+  white-space: normal;  /* 覆盖气泡的 pre-wrap，避免模板换行被当成真实换行 */
 }
 .agent-detail__thinking-dots {
   display: inline-flex;
