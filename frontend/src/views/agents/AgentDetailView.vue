@@ -103,7 +103,7 @@
           </div>
           <div class="agent-detail__dirty-hint" v-if="isDirty">配置已修改，保存后测试最新配置</div>
           <div class="agent-detail__chat-input">
-            <textarea class="agent-detail__textarea" v-model="chatInput" rows="2" placeholder="输入消息..." @keydown.enter.ctrl="sendMessage"></textarea>
+            <textarea class="agent-detail__textarea" v-model="chatInput" rows="2" placeholder="输入消息...（回车发送，Shift+Enter 换行）" @keydown.enter.exact.prevent="sendMessage"></textarea>
             <button class="agent-detail__btn agent-detail__btn--primary" @click="sendMessage" :disabled="!chatInput.trim() || streaming">发送</button>
           </div>
         </div>
