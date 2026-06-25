@@ -56,7 +56,7 @@
             v-if="preview && preview.columns && preview.rows"
             size="small"
             :columns="(preview.columns || []).map(c => ({ title: c, dataIndex: c, key: c }))"
-            :data-source="(preview.rows || []).map((row, i) => Object.fromEntries((preview!.columns || []).map((c, j) => [c, row[j]])).valueOf() as any)"
+            :data-source="(preview.rows || []).map((row) => Object.fromEntries((preview!.columns || []).map((c, j) => [c, row[j]])).valueOf() as any)"
             :pagination="false"
             :scroll="{ x: 'max-content' }"
             row-key="$rowIdx"

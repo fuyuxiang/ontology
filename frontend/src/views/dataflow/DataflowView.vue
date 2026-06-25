@@ -79,7 +79,7 @@ import DataNode from '../../components/canvas/DataNode.vue'
 import CanvasEdgeLabel from '../../components/canvas/CanvasEdgeLabel.vue'
 import { entityApi } from '../../api/ontology'
 import { getErrorMessage } from '../../utils/error'
-import type { Node, Edge } from '@vue-flow/core'
+import type { Node, Edge, NodeTypesObject, EdgeTypesObject } from '@vue-flow/core'
 
 const store = useOntologyStore()
 const router = useRouter()
@@ -96,8 +96,9 @@ const dataLayerItems = ref<any[]>([])
 const ontologyNodes = ref<Node[]>([])
 const ontologyEdges = ref<Edge[]>([])
 
-const nodeTypes = { ontologyNode: markRaw(OntologyNode), dataNode: markRaw(DataNode) }
-const edgeTypes = { ontologyEdge: markRaw(CanvasEdgeLabel) }
+// markRaw 包裹的自定义组件与 NodeTypesObject/EdgeTypesObject 存在 @vue-flow 已知类型摩擦，仅做类型标注，运行时不变
+const nodeTypes = { ontologyNode: markRaw(OntologyNode), dataNode: markRaw(DataNode) } as unknown as NodeTypesObject
+const edgeTypes = { ontologyEdge: markRaw(CanvasEdgeLabel) } as unknown as EdgeTypesObject
 const defaultEdgeOptions = { markerEnd: MarkerType.ArrowClosed, animated: false }
 
 const tierMiniColors: Record<number, string> = { 1: '#4f6ef7', 2: '#a855f7', 3: '#10b981' }

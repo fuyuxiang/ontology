@@ -20,6 +20,8 @@ export interface AipSceneBrief {
   created_at: string
   updated_at: string
   created_by: string
+  ontology_stale?: boolean
+  ontology_stale_detail?: Record<string, any> | null
 }
 
 export interface AipSceneFull extends AipSceneBrief {

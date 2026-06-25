@@ -9,7 +9,6 @@
 
       <div class="twin-view__svg-wrap">
         <svg
-          ref="svgRef"
           :viewBox="`-100 -100 ${svgW} ${svgH}`"
           preserveAspectRatio="xMidYMid meet"
           width="100%"
@@ -236,7 +235,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'select', obj: StudioObjectType): void }>()
 
-const svgRef = ref<SVGSVGElement | null>(null)
 const svgW = 1300
 const svgH = 700
 

@@ -16,20 +16,20 @@
       size="small"
       :columns="columns"
       :data-source="filtered"
-      :loading="loading"
+      :loading="store.loading"
       :pagination="{ pageSize: 8 }"
       :row-selection="rowSelection"
       row-key="id"
     >
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'kind'">
-          <a-tag :color="kindColor(record.kind)">{{ kindLabel(record) }}</a-tag>
+          <a-tag :color="kindColor((record as Asset).kind)">{{ kindLabel(record as Asset) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'locator'">
-          <code class="ap-mono">{{ locatorBrief(record) }}</code>
+          <code class="ap-mono">{{ locatorBrief(record as Asset) }}</code>
         </template>
         <template v-else-if="column.key === 'profile'">
-          <span v-if="record.profile?.row_count != null">{{ record.profile.row_count }} 行</span>
+          <span v-if="(record as Asset).profile?.row_count != null">{{ (record as Asset).profile!.row_count }} 行</span>
           <span v-else class="ap-muted">—</span>
         </template>
       </template>
@@ -43,6 +43,7 @@ import {
   InputSearch as AInputSearch, Modal as AModal, Segmented as ASegmented,
   Table as ATable, Tag as ATag,
 } from 'ant-design-vue'
+import type { TableProps } from 'ant-design-vue'
 import { useAssetStore } from '../../store/asset'
 import type { Asset, AssetKind } from '../../types/asset'
 
@@ -108,10 +109,11 @@ const columns = [
   { title: '统计', key: 'profile', width: 100 },
 ]
 
-const rowSelection = computed(() => ({
+// rowSelection 的 onChange 形参须兼容 antd 的 Key[]（string | number），故用 Key[] 再回收为 string[]
+const rowSelection = computed<TableProps['rowSelection']>(() => ({
   type: props.multiSelect ? 'checkbox' : 'radio',
   selectedRowKeys: selectedIds.value,
-  onChange: (keys: string[]) => { selectedIds.value = keys },
+  onChange: (keys: (string | number)[]) => { selectedIds.value = keys.map(String) },
 }))
 
 function kindLabel(record: Asset) {

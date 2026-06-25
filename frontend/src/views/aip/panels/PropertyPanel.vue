@@ -114,7 +114,7 @@
             <span class="aip-dot aip-dot--green"></span>
             <span style="flex:1">{{ s.name || s.skillId }}</span>
             <span v-if="s.isPrimary" class="aip-tag aip-tag--gold">主</span>
-            <button class="aip-icon-btn" @click="removeAt('skills', i)">×</button>
+            <button class="aip-icon-btn" @click="removeAt('skills', Number(i))">×</button>
           </div>
         </div>
       </template>
@@ -126,7 +126,7 @@
           <div v-for="(t, i) in (node.data.tools || [])" :key="i" class="aip-list-item">
             <span class="aip-dot aip-dot--cyan"></span>
             <span style="flex:1">{{ t.name || t.toolId }}</span>
-            <button class="aip-icon-btn" @click="removeAt('tools', i)">×</button>
+            <button class="aip-icon-btn" @click="removeAt('tools', Number(i))">×</button>
           </div>
         </div>
       </template>
@@ -212,7 +212,7 @@
         <div class="aip-field">
           <label>分支 ({{ (node.data.branches || []).length }})</label>
           <div v-for="(b, i) in (node.data.branches || [])" :key="i" class="aip-branch">
-            <span class="aip-branch__index">{{ i + 1 }}</span>
+            <span class="aip-branch__index">{{ Number(i) + 1 }}</span>
             <div style="flex:1">
               <input class="aip-input aip-input--sm" v-model="b.label" @input="touch" placeholder="分支名称" />
               <div class="aip-branch__expr">
@@ -224,7 +224,7 @@
               </div>
               <div class="aip-branch__handle">出口 Handle: <code>branch-{{ b.when || i }}</code></div>
             </div>
-            <button class="aip-icon-btn" @click="removeBranch(i)">×</button>
+            <button class="aip-icon-btn" @click="removeBranch(Number(i))">×</button>
           </div>
           <button class="aip-add-btn" @click="addBranch">+ 添加分支</button>
         </div>
@@ -294,7 +294,7 @@
       <template v-else-if="node.type === 'functionCall'">
         <div class="aip-field">
           <label>选择函数（已发布版本）</label>
-          <ResourcePicker type="versionFunction" :model-value="node.data.ref_id || ''"
+          <ResourcePicker type="function" :model-value="node.data.ref_id || ''"
             @update:model-value="(v: string) => onPick('ref_id', v)" placeholder="选择已发布函数" />
         </div>
         <div class="aip-field">
@@ -306,7 +306,7 @@
           <ParamMappingEditor
             :params="node.data._input_schema || []"
             :model-value="node.data.param_mapping || {}"
-            :upstream-nodes="store.nodes.filter((n: any) => n.id !== node.id)"
+            :upstream-nodes="store.currentNodes.filter((n: any) => n.id !== node.id)"
             @update:model-value="(v: any) => { node.data.param_mapping = v; touch() }" />
         </div>
       </template>
@@ -315,7 +315,7 @@
       <template v-else-if="node.type === 'ruleEvaluate'">
         <div class="aip-field">
           <label>选择规则（已发布版本）</label>
-          <ResourcePicker type="versionRule" :model-value="node.data.ref_id || ''"
+          <ResourcePicker type="rule" :model-value="node.data.ref_id || ''"
             @update:model-value="(v: string) => onPick('ref_id', v)" placeholder="选择已发布规则" />
         </div>
         <div class="aip-field" v-if="node.data.ref_id">
@@ -323,7 +323,7 @@
           <ParamMappingEditor
             :params="node.data._input_params || []"
             :model-value="node.data.param_mapping || {}"
-            :upstream-nodes="store.nodes.filter((n: any) => n.id !== node.id)"
+            :upstream-nodes="store.currentNodes.filter((n: any) => n.id !== node.id)"
             @update:model-value="(v: any) => { node.data.param_mapping = v; touch() }" />
         </div>
         <div class="aip-field">
@@ -337,7 +337,7 @@
       <template v-else-if="node.type === 'actionExecute'">
         <div class="aip-field">
           <label>选择行动（已发布版本）</label>
-          <ResourcePicker type="versionAction" :model-value="node.data.ref_id || ''"
+          <ResourcePicker type="action" :model-value="node.data.ref_id || ''"
             @update:model-value="(v: string) => onPick('ref_id', v)" placeholder="选择已发布行动" />
         </div>
         <div class="aip-field" v-if="node.data.ref_id">
@@ -345,7 +345,7 @@
           <ParamMappingEditor
             :params="node.data._parameters_json || []"
             :model-value="node.data.param_mapping || {}"
-            :upstream-nodes="store.nodes.filter((n: any) => n.id !== node.id)"
+            :upstream-nodes="store.currentNodes.filter((n: any) => n.id !== node.id)"
             @update:model-value="(v: any) => { node.data.param_mapping = v; touch() }" />
         </div>
       </template>

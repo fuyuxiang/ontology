@@ -109,7 +109,7 @@ export interface OntologyRelationDraft {
   id: string
   name: string
   displayName: string
-  inverseDisplayName: string
+  inverseDisplayName?: string
   source: string
   target: string
   cardinality: '1:1' | '1:N' | 'N:N'

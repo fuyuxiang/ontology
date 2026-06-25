@@ -101,10 +101,10 @@ const emit = defineEmits<{
 
 const editing = ref(false)
 const saving = ref(false)
-const rows = ref<{ attribute_id: string; attribute_name: string; attribute_type: string; source_column: string | null; transform: string | null }[]>([])
-const form = reactive<{ id_column: string | null; filter_expr: string | null }>({
-  id_column: props.binding.id_column,
-  filter_expr: props.binding.filter_expr,
+const rows = ref<{ attribute_id: string; attribute_name: string; attribute_type: string; source_column: string | undefined; transform: string | undefined }[]>([])
+const form = reactive<{ id_column: string | undefined; filter_expr: string | undefined }>({
+  id_column: props.binding.id_column ?? undefined,
+  filter_expr: props.binding.filter_expr ?? undefined,
 })
 
 const cols = [
@@ -128,11 +128,11 @@ function syncFromBinding() {
     attribute_id: a.id,
     attribute_name: a.name,
     attribute_type: a.type,
-    source_column: fmMap[a.id]?.source_column || null,
-    transform: fmMap[a.id]?.transform || null,
+    source_column: fmMap[a.id]?.source_column || undefined,
+    transform: fmMap[a.id]?.transform || undefined,
   }))
-  form.id_column = props.binding.id_column
-  form.filter_expr = props.binding.filter_expr
+  form.id_column = props.binding.id_column ?? undefined
+  form.filter_expr = props.binding.filter_expr ?? undefined
 }
 
 function toggleEdit() {
