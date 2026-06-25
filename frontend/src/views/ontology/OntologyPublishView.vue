@@ -288,8 +288,9 @@ async function loadVersions() {
 }
 
 async function loadAllEntities() {
-  const list = await get('/entities')
-  allEntities.value = (list.items || list).map((e: any) => ({ id: e.id, name: e.name, name_cn: e.name_cn, tier: e.tier }))
+  const list = await get<{ items?: any[] } | any[]>('/entities')
+  const items = Array.isArray(list) ? list : (list.items || [])
+  allEntities.value = items.map((e: any) => ({ id: e.id, name: e.name, name_cn: e.name_cn, tier: e.tier }))
 }
 
 async function selectVersion(id: string) {
@@ -299,7 +300,7 @@ async function selectVersion(id: string) {
 }
 
 async function createVersion() {
-  const v = await post('/ontology-publish/versions', { name: newVersion.name, description: newVersion.description || null })
+  const v = await post<{ id: string }>('/ontology-publish/versions', { name: newVersion.name, description: newVersion.description || null })
   showCreateDialog.value = false
   newVersion.name = ''
   newVersion.description = ''
@@ -374,7 +375,7 @@ async function rejectVersion() {
 async function rollbackVersion() {
   if (!detail.value) return
   loading.value = true
-  const v = await post(`/ontology-publish/versions/${detail.value.id}/rollback`)
+  const v = await post<{ id: string }>(`/ontology-publish/versions/${detail.value.id}/rollback`)
   await loadVersions()
   await selectVersion(v.id)
   loading.value = false

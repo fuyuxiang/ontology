@@ -9,6 +9,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { CSSProperties } from 'vue'
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@vue-flow/core'
 
 const props = defineProps<{
@@ -32,7 +33,7 @@ const path = computed(() => {
 
 const edgeStyle = { stroke: '#cbd5e1', strokeWidth: 1.5, opacity: 0.8 }
 
-const labelStyle = computed(() => ({
+const labelStyle = computed<CSSProperties>(() => ({
   position: 'absolute',
   transform: 'translate(-50%, -50%)',
   left: `${(props.sourceX + props.targetX) / 2}px`,

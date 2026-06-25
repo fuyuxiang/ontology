@@ -264,7 +264,6 @@ async function handleSubmit() {
 // ── 文件导入 ──
 const fileFormat = ref<'json' | 'owl' | 'ttl'>('json')
 const selectedFile = ref<File | null>(null)
-const fileInputRef = ref<HTMLInputElement | null>(null)
 const fileNamespace = ref('')
 const jsonPreview = ref<{ scenario: string; objectCount: number; linkCount: number; actionCount: number; ruleCount: number } | null>(null)
 const importResult = ref<FileImportResult | null>(null)
@@ -326,7 +325,6 @@ interface AiResult { entities: AiEntity[]; relations: AiRelation[] }
 const aiInputMode = ref<'text' | 'file'>('text')
 const aiText = ref('')
 const aiFile = ref<File | null>(null)
-const aiFileRef = ref<HTMLInputElement | null>(null)
 const aiExtracting = ref(false)
 const aiCreating = ref(false)
 const aiResult = ref<AiResult | null>(null)

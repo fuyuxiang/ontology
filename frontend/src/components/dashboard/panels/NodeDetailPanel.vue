@@ -138,6 +138,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { entityApi } from '../../../api/ontology'
 import type { RelationData } from '../../../api/relations'
+import type { Tier, EntityStatus } from '../../../types'
 
 const props = defineProps<{
   node: { id: string; label: string; desc: string; icon: string; tier: number; status: string; relationCount: number; ruleCount: number; attrCount: number; actionCount: number }
@@ -152,8 +153,8 @@ const saving = ref(false)
 const deleting = ref(false)
 const errMsg = ref('')
 
-const editForm = ref({ name: '', name_cn: '', tier: 1, status: 'active', description: '' })
-const createForm = ref({ name: '', name_cn: '', tier: 2, namespace: '', description: '' })
+const editForm = ref<{ name: string; name_cn: string; tier: Tier; status: EntityStatus; description: string }>({ name: '', name_cn: '', tier: 1, status: 'active', description: '' })
+const createForm = ref<{ name: string; name_cn: string; tier: Tier; namespace: string; description: string }>({ name: '', name_cn: '', tier: 2, namespace: '', description: '' })
 
 function goDetail() { router.push(`/ontology/${props.node.id}`) }
 
@@ -162,8 +163,8 @@ function startEdit() {
   editForm.value = {
     name,
     name_cn: props.node.label,
-    tier: props.node.tier,
-    status: props.node.status,
+    tier: props.node.tier as Tier,
+    status: props.node.status as EntityStatus,
     description: '',
   }
   errMsg.value = ''

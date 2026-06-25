@@ -74,7 +74,7 @@
     </div>
 
     <!-- 日志列表 -->
-    <div class="log-tab__list" ref="listRef">
+    <div class="log-tab__list">
       <!-- 实时流指示条 -->
       <div v-if="realtimeEnabled" class="log-tab__live-bar">
         <span class="log-tab__live-dot-animated"></span>
@@ -207,7 +207,7 @@ const levels = [
   { value: 'INFO', label: 'INFO', color: 'var(--status-info, #339af0)' },
   { value: 'WARN', label: 'WARN', color: 'var(--status-warning, #f59f00)' },
   { value: 'ERROR', label: 'ERROR', color: 'var(--status-error, #fa5252)' },
-]
+] as const
 
 const sourceOptions = [
   { label: '系统告警', value: 'alert' },
@@ -217,10 +217,9 @@ const sourceOptions = [
 const logs = ref<LogEntry[]>([])
 const loading = ref(false)
 const expandedId = ref<string | null>(null)
-const listRef = ref<HTMLElement | null>(null)
 const lastUpdate = ref('--:--')
 
-const dateRange = ref<[Dayjs, Dayjs] | null>(null)
+const dateRange = ref<[Dayjs, Dayjs] | undefined>(undefined)
 const selectedLevels = ref<string[]>(['DEBUG', 'INFO', 'WARN', 'ERROR'])
 const filterSource = ref<string | undefined>(undefined)
 const filterKeyword = ref('')
@@ -239,7 +238,7 @@ function handleSearch() {
 }
 
 function handleReset() {
-  dateRange.value = null
+  dateRange.value = undefined
   selectedLevels.value = ['DEBUG', 'INFO', 'WARN', 'ERROR']
   filterSource.value = undefined
   filterKeyword.value = ''

@@ -13,7 +13,7 @@
       <div class="section-toolbar">
         <a-input-search v-model:value="userKeyword" placeholder="搜索姓名或账号" style="width: 260px" allow-clear @search="fetchUsers" @change="(e: Event) => { if (!(e.target as HTMLInputElement).value) fetchUsers() }" />
         <a-select v-model:value="userRoleFilter" placeholder="全部角色" allow-clear style="width: 140px" :options="roleOptions" @change="fetchUsers" />
-        <a-select v-model:value="userStatusFilter" placeholder="全部状态" allow-clear style="width: 120px" :options="[{label:'启用',value:true},{label:'禁用',value:false}]" @change="fetchUsers" />
+        <a-select v-model:value="userStatusValue" placeholder="全部状态" allow-clear style="width: 120px" :options="userStatusOptions" @change="fetchUsers" />
         <a-button type="primary" style="margin-left:auto" @click="openCreateUser">＋ 新增用户</a-button>
       </div>
 
@@ -217,6 +217,12 @@ const usersLoading = ref(false)
 const userKeyword = ref('')
 const userRoleFilter = ref<string | undefined>(undefined)
 const userStatusFilter = ref<boolean | undefined>(undefined)
+// a-select 的 SelectValue 类型不含 boolean，但运行时支持布尔 value；此处用字符串选项承载，change 时再转布尔
+const userStatusOptions = [{ label: '启用', value: 'true' }, { label: '禁用', value: 'false' }]
+const userStatusValue = computed<string | undefined>({
+  get: () => userStatusFilter.value === undefined ? undefined : String(userStatusFilter.value),
+  set: (v) => { userStatusFilter.value = v === undefined ? undefined : v === 'true' },
+})
 
 const roleOptions = computed(() => roles.value.map(r => ({ label: r.label, value: r.key })))
 const roleLabelMap: Record<string, string> = { admin: '系统管理员', editor: '本体工程师', operator: '数据工程师', viewer: '只读用户' }

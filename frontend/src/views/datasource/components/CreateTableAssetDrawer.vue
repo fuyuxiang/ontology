@@ -123,7 +123,8 @@ watch(() => props.open, async (v) => {
   }
 })
 
-async function onConnectionChange(connId: string) {
+async function onConnectionChange(value: unknown) {
+  const connId = value == null ? '' : String(value)
   if (!connId) return
   loadingTables.value = true
   try {

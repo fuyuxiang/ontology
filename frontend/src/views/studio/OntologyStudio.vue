@@ -293,8 +293,9 @@ function filteredByTier(tier: 1 | 2 | 3) {
     .filter(o => !q || o.apiName.toLowerCase().includes(q) || o.displayName.toLowerCase().includes(q))
 }
 
-function selectObject(o: StudioObjectType) {
+function selectObject(o: StudioObjectType | null) {
   selectedObject.value = o
+  if (!o) return
   // 切换对象时若 tab 是规则/动作/函数，触发详情懒加载
   if (['rules', 'actions', 'functions'].includes(activeDetailTab.value)) {
     loadEntityDetail(o.id)

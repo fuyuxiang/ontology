@@ -37,7 +37,7 @@
 
       <!-- ═══ 顶部能力层 ═══ -->
       <div class="row row-top">
-        <CapabilityCard v-for="card in topCards" :key="card.title" v-bind="card" :card-key="card.key" />
+        <CapabilityCard v-for="card in topCards" v-bind="card" :card-key="card.key" />
       </div>
 
       <!-- ═══ 中间本体层 ═══ -->
@@ -113,7 +113,7 @@
 
       <!-- ═══ 底部数据层 ═══ -->
       <div class="row row-bottom">
-        <CapabilityCard v-for="card in bottomCards" :key="card.title" v-bind="card" :card-key="card.key" />
+        <CapabilityCard v-for="card in bottomCards" v-bind="card" :card-key="card.key" />
       </div>
     </div>
 
@@ -231,7 +231,7 @@ function toNode(e: EntityListItem): OntologyNode {
     relationCount: e.relation_count,
     ruleCount: e.rule_count,
     attrCount: e.attr_count ?? 0,
-    actionCount: e.action_count ?? 0,
+    actionCount: 0,
     isCore,
   }
 }

@@ -226,7 +226,7 @@ const groupList = computed(() => [
 const activeGroup = ref('basic')
 const showHistory = ref(false)
 const configData = ref<Record<string, ConfigItem[]>>({})
-const editingValues = reactive<Record<string, string | number | null>>({})
+const editingValues = reactive<Record<string, string | number>>({})
 const originalValues = reactive<Record<string, string | null>>({})
 const testing = ref(false)
 const saving = ref(false)
@@ -270,7 +270,7 @@ function isNumberField(key: string) { return ['password_min_length', 'session_ti
 function getMin(key: string) { if (key.includes('password_min_length')) return 6; if (key.includes('session_timeout')) return 5; if (key.includes('smtp_port')) return 1; if (key.includes('max_upload_mb')) return 1; if (key.includes('timeout_seconds')) return 10; return 0 }
 function getMax(key: string) { if (key.includes('password_min_length')) return 32; if (key.includes('session_timeout')) return 1440; if (key.includes('smtp_port')) return 65535; if (key.includes('max_upload_mb')) return 1024; if (key.includes('timeout_seconds')) return 300; return 9999 }
 function getStep(_key: string) { return 1 }
-function getSelectOptions(key: string) {
+function getSelectOptions(key: string): { label: string; value: string }[] | undefined {
   if (key === 'language') return [{ label: '简体中文', value: 'zh-CN' }, { label: 'English', value: 'en' }]
   if (key === 'timezone') return [{ label: 'Asia/Shanghai', value: 'Asia/Shanghai' }, { label: 'UTC', value: 'UTC' }]
   if (key === 'backend') return [{ label: '本地文件系统', value: 'local' }, { label: 'MinIO', value: 'minio' }, { label: '阿里云 OSS', value: 'oss' }]
@@ -278,7 +278,7 @@ function getSelectOptions(key: string) {
   if (key === 'password_complexity') return [{ label: '大写+小写+数字', value: 'upper,lower,digit' }, { label: '全部（含特殊字符）', value: 'upper,lower,digit,special' }]
   if (key === 'sso_enabled') return [{ label: '关闭', value: 'false' }, { label: '开启', value: 'true' }]
   if (key === 'sso_provider') return [{ label: 'OIDC', value: 'oidc' }, { label: 'SAML', value: 'saml' }, { label: 'LDAP', value: 'ldap' }]
-  return null
+  return undefined
 }
 function hasChanges(group: string) {
   const items = configData.value[group] || []

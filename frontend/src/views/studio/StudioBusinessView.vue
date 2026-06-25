@@ -68,7 +68,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, markRaw } from 'vue'
-import { VueFlow, MarkerType, Position, type Node, type Edge } from '@vue-flow/core'
+import { VueFlow, MarkerType, Position, type Node, type Edge, type NodeTypesObject } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import StudioNode from './StudioNode.vue'
@@ -82,7 +82,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{ (e: 'select', obj: StudioObjectType | null): void }>()
 
-const nodeTypes = { studioNode: markRaw(StudioNode) }
+// markRaw 包裹的自定义组件与 NodeTypesObject 存在 @vue-flow 已知类型摩擦，仅做类型标注，运行时不变
+const nodeTypes = { studioNode: markRaw(StudioNode) } as unknown as NodeTypesObject
 const defaultEdgeOptions = { markerEnd: MarkerType.ArrowClosed, animated: false }
 
 type ScenarioTab = 'tier1' | 'fttr' | 'churn' | 'ge'

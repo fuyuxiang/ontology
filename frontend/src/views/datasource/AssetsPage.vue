@@ -105,14 +105,14 @@
              :loading="store.loading" :pagination="{ pageSize: 20 }" row-key="id">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'name'">
-          <a class="ap-name" @click="openDetail(record)">{{ record.name }}</a>
+          <a class="ap-name" @click="openDetail(record as Asset)">{{ record.name }}</a>
           <a-tag v-if="record.alias" color="purple" style="margin-left:8px">@{{ record.alias }}</a-tag>
         </template>
         <template v-else-if="column.key === 'kind'">
-          <a-tag :color="kindColor(record.kind)">{{ kindLabel(record) }}</a-tag>
+          <a-tag :color="kindColor((record as Asset).kind)">{{ kindLabel(record as Asset) }}</a-tag>
         </template>
         <template v-else-if="column.key === 'locator'">
-          <code class="ap-mono">{{ locatorBrief(record) }}</code>
+          <code class="ap-mono">{{ locatorBrief(record as Asset) }}</code>
         </template>
         <template v-else-if="column.key === 'connection'">
           {{ connectionName(record.connection_id) }}
@@ -126,16 +126,16 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4" wrap>
-            <a-button type="link" size="small" @click="openDetail(record)">详情</a-button>
+            <a-button type="link" size="small" @click="openDetail(record as Asset)">详情</a-button>
             <a-button type="link" size="small"
-                      :disabled="record.kind === 'document'" @click="syncOne(record)">
+                      :disabled="record.kind === 'document'" @click="syncOne(record as Asset)">
               同步 Schema
             </a-button>
             <a-button type="link" size="small"
-                      :disabled="record.kind === 'document'" @click="profileOne(record)">
+                      :disabled="record.kind === 'document'" @click="profileOne(record as Asset)">
               Profile
             </a-button>
-            <a-popconfirm :title="`确认删除「${record.name}」？被引用时会被拒绝。`" @confirm="del(record)">
+            <a-popconfirm :title="`确认删除「${record.name}」？被引用时会被拒绝。`" @confirm="del(record as Asset)">
               <a-button type="link" size="small" danger>删除</a-button>
             </a-popconfirm>
           </a-space>

@@ -127,7 +127,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, markRaw } from 'vue'
-import { VueFlow, MarkerType, applyNodeChanges, applyEdgeChanges, addEdge as flowAddEdge } from '@vue-flow/core'
+import { VueFlow, MarkerType, applyNodeChanges, applyEdgeChanges, addEdge as flowAddEdge, type Edge } from '@vue-flow/core'
 import { Background } from '@vue-flow/background'
 import { Controls } from '@vue-flow/controls'
 import { MiniMap } from '@vue-flow/minimap'
@@ -278,7 +278,8 @@ function onConnect(conn: any) {
   // 找到新增的那条
   const before = new Set(flowEdges.value.map((e: any) => e.id))
   flowEdges.value = newEdges
-  for (const e of newEdges) {
+  // flowAddEdge 返回的元素被推断为通用 Element，这里显式标注为 Edge 以访问 source/target 等边字段
+  for (const e of newEdges as Edge[]) {
     if (!before.has(e.id)) {
       store.addEdge({
         id: e.id,

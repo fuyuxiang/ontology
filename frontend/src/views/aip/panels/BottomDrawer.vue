@@ -62,7 +62,7 @@
                 <div class="aip-bd__agent-loop-title">Agent 推理轮次 ({{ r.raw.rounds }} 轮)</div>
                 <div v-for="(round, ri) in (r.raw.agent_rounds || [])" :key="ri" class="aip-bd__agent-round">
                   <div class="aip-bd__agent-round-head">
-                    <span class="aip-bd__agent-round-num">R{{ ri + 1 }}</span>
+                    <span class="aip-bd__agent-round-num">R{{ Number(ri) + 1 }}</span>
                     <span v-if="round.thought" class="aip-bd__agent-thought">{{ round.thought.slice(0, 100) }}</span>
                   </div>
                   <div v-if="round.tool_call" class="aip-bd__agent-tool">

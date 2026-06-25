@@ -52,7 +52,7 @@ const tabOptions = computed(() => [
   { label: `🔍 审计记录${auditCount.value > 0 ? ` (${auditCount.value})` : ''}`, value: 'audit' },
 ])
 
-async function handleExport({ key }: { key: string }) {
+async function handleExport({ key }: { key: string | number }) {
   exporting.value = true
   try {
     await new Promise(r => setTimeout(r, 1500))

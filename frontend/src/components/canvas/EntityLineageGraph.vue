@@ -51,7 +51,7 @@ import { entityApi } from '../../api/ontology'
 import { useGraphLayout } from '../../composables/useGraphLayout'
 import OntologyNode from './OntologyNode.vue'
 import CanvasEdgeLabel from './CanvasEdgeLabel.vue'
-import type { Node, Edge } from '@vue-flow/core'
+import type { Node, Edge, NodeTypesObject, EdgeTypesObject } from '@vue-flow/core'
 
 const props = defineProps<{ entityId: string }>()
 
@@ -63,8 +63,9 @@ const flowEdges = ref<Edge[]>([])
 const depth = ref(2)
 const loading = ref(false)
 
-const nodeTypes = { ontologyNode: markRaw(OntologyNode) }
-const edgeTypes = { ontologyEdge: markRaw(CanvasEdgeLabel) }
+// 自定义节点/边组件经 markRaw 包裹后，结构与 VueFlow 的 NodeTypesObject/EdgeTypesObject 不完全兼容（@vue-flow 已知类型摩擦），此处仅做类型标注，运行时行为不变
+const nodeTypes = { ontologyNode: markRaw(OntologyNode) } as unknown as NodeTypesObject
+const edgeTypes = { ontologyEdge: markRaw(CanvasEdgeLabel) } as unknown as EdgeTypesObject
 
 async function loadLineage() {
   loading.value = true

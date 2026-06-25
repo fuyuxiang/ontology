@@ -210,7 +210,7 @@ export const useAipStore = defineStore('aip', () => {
         input_schema: sc.input_schema,
         output_schema: sc.output_schema,
         stats_json: sc.stats,
-      })
+      } as Partial<AipSceneFull> & { stats_json?: Record<string, any> })
       sceneCache.value[sc.id] = saved
       // 同步列表中的概要
       const idx = scenes.value.findIndex(s => s.id === sc.id)
