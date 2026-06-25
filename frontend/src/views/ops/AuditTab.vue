@@ -127,7 +127,7 @@ const currentPage = ref(1)
 const pageSize = ref(20)
 const loading = ref(false)
 
-const dateRange = ref<[Dayjs, Dayjs] | null>(null)
+const dateRange = ref<[Dayjs, Dayjs] | undefined>(undefined)
 const filterAction = ref<string | undefined>(undefined)
 const filterKeyword = ref('')
 

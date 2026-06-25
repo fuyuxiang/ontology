@@ -622,7 +622,7 @@ function onAiFileChange(e: Event) { aiFile.value = (e.target as HTMLInputElement
 
 function addEntity() {
   if (!aiResult.value) return
-  aiResult.value.entities.push({ name: 'NewEntity', name_cn: '新实体', tier: 2, description: '', attributes: [], selected: true })
+  aiResult.value.entities.push({ name: 'NewEntity', name_cn: '新实体', tier: 2, description: '', attributes: [], selected: true, datasource_id: '', table_name: '' })
   selectedEntityIdx.value = aiResult.value.entities.length - 1
 }
 

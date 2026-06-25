@@ -40,12 +40,12 @@
           <a-tag :color="typeColor(record.type)">{{ record.type }}</a-tag>
         </template>
         <template v-else-if="column.key === 'endpoint'">
-          <code class="cp-mono">{{ endpointBrief(record) }}</code>
+          <code class="cp-mono">{{ endpointBrief(record as Connection) }}</code>
         </template>
         <template v-else-if="column.key === 'status'">
           <span class="cp-status">
-            <span class="cp-status__dot" :style="{ background: statusColor(record) }" />
-            <span :style="{ color: statusColor(record) }">{{ statusLabel(record) }}</span>
+            <span class="cp-status__dot" :style="{ background: statusColor(record as Connection) }" />
+            <span :style="{ color: statusColor(record as Connection) }">{{ statusLabel(record as Connection) }}</span>
             <SyncOutlined v-if="testing === record.id" spin style="margin-left:4px;color:#f59e0b" />
           </span>
         </template>
@@ -55,14 +55,14 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4" wrap>
-            <a-button type="link" size="small" :loading="testing === record.id" @click="testOne(record)">
+            <a-button type="link" size="small" :loading="testing === record.id" @click="testOne(record as Connection)">
               <template #icon><LinkOutlined /></template>测试
             </a-button>
-            <a-button type="link" size="small" @click="openBrowser(record)">
+            <a-button type="link" size="small" @click="openBrowser(record as Connection)">
               <template #icon><TableOutlined /></template>列表
             </a-button>
-            <a-button type="link" size="small" @click="openEdit(record)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="openDelete(record)">删除</a-button>
+            <a-button type="link" size="small" @click="openEdit(record as Connection)">编辑</a-button>
+            <a-button type="link" size="small" danger @click="openDelete(record as Connection)">删除</a-button>
           </a-space>
         </template>
       </template>

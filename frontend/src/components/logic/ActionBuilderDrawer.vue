@@ -114,7 +114,7 @@ async function load() {
       form.value.category = action.category
       form.value.entity_id = action.entity_id || ''
       form.value.action_type = action.action_type
-      form.value.status = action.status
+      form.value.status = action.status as 'active' | 'inactive'
       form.value.parameters = (action.parameters_json ?? []) as any
       if (action.type_config) {
         for (const [k, v] of Object.entries(action.type_config)) {

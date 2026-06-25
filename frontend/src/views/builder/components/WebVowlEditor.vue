@@ -246,8 +246,8 @@ function render() {
           linkEls[i].setAttribute('y1', s.y)
           linkEls[i].setAttribute('x2', t.x)
           linkEls[i].setAttribute('y2', t.y)
-          linkLabelEls[i].setAttribute('x', (s.x + t.x) / 2)
-          linkLabelEls[i].setAttribute('y', (s.y + t.y) / 2 - 4)
+          linkLabelEls[i].setAttribute('x', String((s.x + t.x) / 2))
+          linkLabelEls[i].setAttribute('y', String((s.y + t.y) / 2 - 4))
         }
       }
     })
