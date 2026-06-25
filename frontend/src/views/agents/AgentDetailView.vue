@@ -87,7 +87,18 @@
         <div class="agent-detail__chat-body" v-else>
           <div class="agent-detail__messages" ref="messagesRef">
             <div v-for="(msg, i) in messages" :key="i" class="agent-detail__message" :class="`agent-detail__message--${msg.role}`">
-              <div class="agent-detail__bubble" :class="`agent-detail__bubble--${msg.role}`">{{ msg.content }}</div>
+              <div class="agent-detail__bubble" :class="`agent-detail__bubble--${msg.role}`">
+                <span v-if="msg.status && !msg.content" class="agent-detail__thinking">
+                  <span class="agent-detail__thinking-dots"><i></i><i></i><i></i></span>
+                  {{ msg.status }}
+                </span>
+                <div
+                  v-else-if="msg.role === 'assistant'"
+                  class="agent-detail__markdown"
+                  v-html="renderMarkdownSafe(msg.content)"
+                ></div>
+                <template v-else>{{ msg.content }}</template>
+              </div>
             </div>
           </div>
           <div class="agent-detail__dirty-hint" v-if="isDirty">配置已修改，保存后测试最新配置</div>
@@ -107,6 +118,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { agentsApi, type AgentItem } from '../../api/agents'
 import { entityApi } from '../../api/ontology'
 import { authHeaders } from '../../utils/authHeaders'
+import { renderMarkdownSafe } from '@/utils/sanitize'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,7 +143,30 @@ let savedSnapshot = ''
 
 const messagesRef = ref<HTMLElement | null>(null)
 const chatInput = ref('')
-const messages = ref<{ role: 'user' | 'assistant'; content: string }[]>([])
+const messages = ref<{ role: 'user' | 'assistant'; content: string; status?: string }[]>([])
+
+// 工具英文名 → 中文提示，未命中则回退显示原始名
+const TOOL_LABELS: Record<string, string> = {
+  describe_ontology_model: '读取本体模型',
+  list_datasources: '查询数据源列表',
+  get_table_schema: '读取表结构',
+  query_datasource: '查询数据源',
+  get_entity_detail: '读取实体详情',
+  query_entity_data: '查询实体数据',
+  get_business_rules: '读取业务规则',
+  evaluate_rule: '评估规则',
+  evaluate_all_rules: '评估全部规则',
+  screen_users_by_rule: '按规则筛选用户',
+  execute_action: '执行动作',
+  list_business_datasources: '查询业务数据源',
+  list_business_documents: '查询业务文档',
+  analyze_assets_for_ontology: '分析资产生成本体',
+}
+function toolLabel(tool: string): string {
+  // 画布节点工具名形如 "[节点标签]"，直接展示
+  if (tool.startsWith('[')) return tool.replace(/^\[|\]$/g, '')
+  return TOOL_LABELS[tool] || tool
+}
 
 function formToPayload() {
   return {
@@ -206,7 +241,7 @@ async function sendMessage() {
   if (!text || !current.value || streaming.value) return
   chatInput.value = ''
   messages.value.push({ role: 'user', content: text })
-  messages.value.push({ role: 'assistant', content: '' })
+  messages.value.push({ role: 'assistant', content: '', status: '思考中…' })
   streaming.value = true
 
   await nextTick()
@@ -235,12 +270,21 @@ async function sendMessage() {
         if (data === '[DONE]') break
         try {
           const evt = JSON.parse(data)
+          const cur = messages.value[lastIdx]
           if (evt.type === 'content') {
             // 正文分块（orchestrator / graph_engine 均以 content 事件流式输出）
-            messages.value[lastIdx].content += evt.content
+            cur.status = undefined  // 正文开始，清除阶段提示
+            cur.content += evt.content
           } else if (evt.type === 'answer') {
             // 出错兜底：后端直接返回完整答复
-            messages.value[lastIdx].content = evt.content
+            cur.status = undefined
+            cur.content = evt.content
+          } else if (evt.type === 'tool_start') {
+            // 工具调用开始：在气泡里提示正在做什么
+            if (!cur.content) cur.status = `正在${toolLabel(evt.tool)}…`
+          } else if (evt.type === 'tool_result') {
+            // 工具返回：展示该步骤的结果摘要
+            if (!cur.content && evt.summary) cur.status = evt.summary
           }
         } catch { /* skip non-json lines */ }
       }
@@ -249,6 +293,12 @@ async function sendMessage() {
     }
   } finally {
     streaming.value = false
+    // 流结束后若气泡仍无正文，清掉阶段提示并给出兜底文案，避免卡在“思考中”
+    const cur = messages.value[messages.value.length - 1]
+    if (cur && cur.role === 'assistant' && !cur.content) {
+      cur.status = undefined
+      cur.content = '（未返回内容）'
+    }
   }
 }
 
@@ -466,6 +516,29 @@ onMounted(async () => {
 .agent-detail__bubble--assistant {
   background: var(--neutral-100, #f3f4f6);
   color: var(--neutral-800, #1f2937);
+}
+.agent-detail__thinking {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--neutral-500, #6b7280);
+}
+.agent-detail__thinking-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.agent-detail__thinking-dots i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--neutral-400, #9ca3af);
+  animation: agent-detail-blink 1.4s infinite both;
+}
+.agent-detail__thinking-dots i:nth-child(2) { animation-delay: 0.2s; }
+.agent-detail__thinking-dots i:nth-child(3) { animation-delay: 0.4s; }
+@keyframes agent-detail-blink {
+  0%, 80%, 100% { opacity: 0.25; }
+  40% { opacity: 1; }
 }
 .agent-detail__dirty-hint {
   padding: 6px 16px;

@@ -63,39 +63,86 @@ class AgentService:
 
         for _round in range(self.MAX_TOOL_ROUNDS):
             try:
-                response = self.client.chat.completions.create(
+                stream = self.client.chat.completions.create(
                     model=self._model_name,
                     messages=messages,
                     tools=tool_defs,
                     tool_choice="auto",
                     temperature=temperature,
                     max_tokens=self._model_config.get("max_tokens", 4096),
+                    stream=True,
                 )
             except Exception as e:
                 logger.error(f"LLM 调用失败: {e}")
                 yield {"type": "answer", "content": f"AI 服务调用失败: {e}", "suggestions": []}
                 return
 
-            choice = response.choices[0]
-            assistant_msg = choice.message
+            # 累积本轮流式输出：正文 buffer + 工具调用 delta
+            text_buffer = ""
+            emitted_len = 0  # 已通过 content 事件吐出的 answer 字符数
+            tool_calls_acc: dict[int, dict[str, Any]] = {}
+            try:
+                for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    delta = chunk.choices[0].delta
+                    # 累积工具调用分片
+                    if delta and delta.tool_calls:
+                        for tc in delta.tool_calls:
+                            slot = tool_calls_acc.setdefault(
+                                tc.index, {"id": "", "name": "", "arguments": ""}
+                            )
+                            if tc.id:
+                                slot["id"] = tc.id
+                            if tc.function and tc.function.name:
+                                slot["name"] = tc.function.name
+                            if tc.function and tc.function.arguments:
+                                slot["arguments"] += tc.function.arguments
+                    # 累积正文，并增量提取 answer 字段流式吐出
+                    if delta and delta.content:
+                        text_buffer += delta.content
+                        if not tool_calls_acc:
+                            answer_so_far = self._extract_answer_prefix(text_buffer)
+                            if answer_so_far is not None and len(answer_so_far) > emitted_len:
+                                yield {"type": "content", "content": answer_so_far[emitted_len:]}
+                                emitted_len = len(answer_so_far)
+            except Exception as e:
+                logger.error(f"LLM 流式读取失败: {e}")
+                yield {"type": "answer", "content": f"AI 服务调用失败: {e}", "suggestions": []}
+                return
 
-            if not assistant_msg.tool_calls:
-                content = assistant_msg.content or ""
-                answer, suggestions, actions = self._parse_final_answer(content)
+            # 本轮无工具调用 → 最终回答
+            if not tool_calls_acc:
+                answer, suggestions, actions = self._parse_final_answer(text_buffer)
                 if tool_runs:
                     yield {"type": "tool_summary", "toolRuns": tool_runs}
-                chunk_size = 20
-                for i in range(0, len(answer), chunk_size):
-                    yield {"type": "content", "content": answer[i:i + chunk_size]}
+                # 增量提取已覆盖大部分正文；若解析后的 answer 与已吐出内容不一致则补齐尾部
+                if len(answer) > emitted_len:
+                    yield {"type": "content", "content": answer[emitted_len:]}
+                elif emitted_len == 0 and answer:
+                    yield {"type": "content", "content": answer}
                 yield {"type": "done", "suggestions": suggestions, "actions": actions}
                 return
 
-            messages.append(self._serialize_assistant_message(assistant_msg))
+            # 有工具调用 → 拼装 assistant 消息并执行工具
+            ordered = [tool_calls_acc[i] for i in sorted(tool_calls_acc)]
+            messages.append({
+                "role": "assistant",
+                "content": text_buffer or "",
+                "tool_calls": [
+                    {
+                        "id": tc["id"],
+                        "type": "function",
+                        "function": {"name": tc["name"], "arguments": tc["arguments"]},
+                    }
+                    for tc in ordered
+                ],
+            })
 
-            for tool_call in assistant_msg.tool_calls:
-                tool_name = tool_call.function.name
+            for tc in ordered:
+                tool_name = tc["name"]
                 try:
-                    tool_args = json.loads(tool_call.function.arguments or "{}")
+                    tool_args = json.loads(tc["arguments"] or "{}")
                 except json.JSONDecodeError:
                     tool_args = {}
 
@@ -121,7 +168,7 @@ class AgentService:
 
                 messages.append({
                     "role": "tool",
-                    "tool_call_id": tool_call.id,
+                    "tool_call_id": tc["id"],
                     "content": json.dumps(result, ensure_ascii=False, default=str),
                 })
 
@@ -146,6 +193,62 @@ class AgentService:
                 for tc in msg.tool_calls
             ]
         return result
+
+    @staticmethod
+    def _extract_answer_prefix(buffer: str) -> str | None:
+        """从尚未结束的 LLM JSON 输出中，增量提取 answer 字段已生成的文本。
+
+        LLM 被要求输出 {"answer": "...", "suggestions": [...], ...}。
+        在流式过程中 buffer 是半截 JSON，这里解析出 answer 字符串值的当前部分，
+        正确处理转义字符；若 answer 尚未开始则返回 None。
+        """
+        # 去掉可能的 ```json 代码块围栏
+        raw = buffer.lstrip()
+        if raw.startswith("```"):
+            nl = raw.find("\n")
+            if nl != -1:
+                raw = raw[nl + 1:]
+        key_idx = raw.find('"answer"')
+        if key_idx == -1:
+            return None
+        # 定位 answer 值起始的引号
+        colon = raw.find(":", key_idx + len('"answer"'))
+        if colon == -1:
+            return None
+        q = raw.find('"', colon + 1)
+        if q == -1:
+            return None
+        out: list[str] = []
+        i = q + 1
+        n = len(raw)
+        while i < n:
+            ch = raw[i]
+            if ch == "\\":
+                if i + 1 >= n:
+                    break  # 转义符还没传完，停在此处
+                nxt = raw[i + 1]
+                mapping = {"n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "/": "/"}
+                if nxt in mapping:
+                    out.append(mapping[nxt])
+                    i += 2
+                    continue
+                if nxt == "u":
+                    if i + 6 > n:
+                        break  # \uXXXX 还没传完
+                    try:
+                        out.append(chr(int(raw[i + 2:i + 6], 16)))
+                    except ValueError:
+                        pass
+                    i += 6
+                    continue
+                out.append(nxt)
+                i += 2
+                continue
+            if ch == '"':
+                break  # answer 字符串结束
+            out.append(ch)
+            i += 1
+        return "".join(out)
 
     @staticmethod
     def _parse_final_answer(content: str) -> tuple[str, list[str], list[dict]]:
