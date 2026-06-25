@@ -235,9 +235,11 @@ async function sendMessage() {
         if (data === '[DONE]') break
         try {
           const evt = JSON.parse(data)
-          if (evt.type === 'token') {
+          if (evt.type === 'content') {
+            // 正文分块（orchestrator / graph_engine 均以 content 事件流式输出）
             messages.value[lastIdx].content += evt.content
           } else if (evt.type === 'answer') {
+            // 出错兜底：后端直接返回完整答复
             messages.value[lastIdx].content = evt.content
           }
         } catch { /* skip non-json lines */ }
