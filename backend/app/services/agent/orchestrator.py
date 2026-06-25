@@ -195,6 +195,22 @@ class AgentService:
         return result
 
     @staticmethod
+    def _strip_reasoning(raw: str) -> str:
+        """剥离推理类模型在正文前输出的 <think>...</think> 思维块。
+
+        部分模型（如 deepseek-r1 系）会先吐 <think> 推理再给出 JSON 答复。
+        若思维块尚未闭合（流式中途），则丢弃 <think> 之后的全部内容，
+        避免把推理过程误当成 answer。
+        """
+        s = raw.lstrip()
+        if not s.startswith("<think>"):
+            return raw
+        end = s.find("</think>")
+        if end == -1:
+            return ""  # 思维块还没结束，正文尚未开始
+        return s[end + len("</think>"):].lstrip()
+
+    @staticmethod
     def _extract_answer_prefix(buffer: str) -> str | None:
         """从尚未结束的 LLM JSON 输出中，增量提取 answer 字段已生成的文本。
 
@@ -202,8 +218,8 @@ class AgentService:
         在流式过程中 buffer 是半截 JSON，这里解析出 answer 字符串值的当前部分，
         正确处理转义字符；若 answer 尚未开始则返回 None。
         """
-        # 去掉可能的 ```json 代码块围栏
-        raw = buffer.lstrip()
+        # 先剥离 <think> 思维块，再去掉可能的 ```json 代码块围栏
+        raw = AgentService._strip_reasoning(buffer).lstrip()
         if raw.startswith("```"):
             nl = raw.find("\n")
             if nl != -1:
@@ -252,7 +268,9 @@ class AgentService:
 
     @staticmethod
     def _parse_final_answer(content: str) -> tuple[str, list[str], list[dict]]:
-        raw = content.strip()
+        # 先剥离 <think> 思维块，避免污染 answer
+        cleaned = AgentService._strip_reasoning(content)
+        raw = cleaned.strip()
         if raw.startswith("```"):
             parts = raw.split("```")
             if len(parts) >= 3:
@@ -263,7 +281,7 @@ class AgentService:
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, dict):
-                answer = str(parsed.get("answer", content))
+                answer = str(parsed.get("answer", cleaned))
                 suggestions = parsed.get("suggestions", [])
                 if isinstance(suggestions, list):
                     suggestions = [str(s) for s in suggestions[:3]]
@@ -277,7 +295,7 @@ class AgentService:
                 return answer, suggestions, actions
         except json.JSONDecodeError:
             pass
-        return content, [], []
+        return cleaned, [], []
 
     def _extract_tool_detail(self, tool_name: str, args: dict, result: Any) -> dict | None:
         try:
