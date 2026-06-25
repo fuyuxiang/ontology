@@ -218,8 +218,9 @@ class AgentService:
         在流式过程中 buffer 是半截 JSON，这里解析出 answer 字符串值的当前部分，
         正确处理转义字符；若 answer 尚未开始则返回 None。
         """
-        # 先剥离 <think> 思维块，再去掉可能的 ```json 代码块围栏
+        # 先剥离 <think> 思维块，规范化全角引号，再去掉 ```json 代码块围栏
         raw = AgentService._strip_reasoning(buffer).lstrip()
+        raw = AgentService._normalize_json_quotes(raw)
         if raw.startswith("```"):
             nl = raw.find("\n")
             if nl != -1:
@@ -267,6 +268,18 @@ class AgentService:
         return "".join(out)
 
     @staticmethod
+    def _normalize_json_quotes(s: str) -> str:
+        """将模型偶发输出的全角/弯引号规范化为标准 JSON 引号。
+
+        部分模型会把 JSON 结构引号写成中文全角引号（“ ” ‘ ’），
+        导致 json.loads 失败。规范化后可重试解析。
+        """
+        return (
+            s.replace("“", '"').replace("”", '"')
+            .replace("‘", "'").replace("’", "'")
+        )
+
+    @staticmethod
     def _parse_final_answer(content: str) -> tuple[str, list[str], list[dict]]:
         # 先剥离 <think> 思维块，避免污染 answer
         cleaned = AgentService._strip_reasoning(content)
@@ -278,23 +291,33 @@ class AgentService:
                 if raw.startswith("json"):
                     raw = raw[4:]
                 raw = raw.strip()
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                answer = str(parsed.get("answer", cleaned))
-                suggestions = parsed.get("suggestions", [])
-                if isinstance(suggestions, list):
-                    suggestions = [str(s) for s in suggestions[:3]]
-                else:
-                    suggestions = []
-                actions = parsed.get("actions", [])
-                if isinstance(actions, list):
-                    actions = [a for a in actions if isinstance(a, dict)]
-                else:
-                    actions = []
-                return answer, suggestions, actions
-        except json.JSONDecodeError:
-            pass
+        # 先按标准 JSON 解析；失败则规范化全角引号后重试
+        parsed = None
+        for candidate in (raw, AgentService._normalize_json_quotes(raw)):
+            try:
+                parsed = json.loads(candidate)
+                break
+            except json.JSONDecodeError:
+                continue
+        if isinstance(parsed, dict):
+            answer = str(parsed.get("answer", cleaned))
+            suggestions = parsed.get("suggestions", [])
+            if isinstance(suggestions, list):
+                suggestions = [str(s) for s in suggestions[:3]]
+            else:
+                suggestions = []
+            actions = parsed.get("actions", [])
+            if isinstance(actions, list):
+                actions = [a for a in actions if isinstance(a, dict)]
+            else:
+                actions = []
+            return answer, suggestions, actions
+        # 解析仍失败：宽松提取 answer 文本，避免把 JSON 结构泄漏到正文
+        loose = AgentService._extract_answer_prefix(
+            AgentService._normalize_json_quotes(content)
+        )
+        if loose:
+            return loose, [], []
         return cleaned, [], []
 
     def _extract_tool_detail(self, tool_name: str, args: dict, result: Any) -> dict | None:
