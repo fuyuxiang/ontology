@@ -3,7 +3,7 @@
     <div class="step1-import__inner">
       <div class="step1-import__header">
         <div class="step1-import__title">文件导入</div>
-        <div class="step1-import__sub">导入 OWL / RDF / JSON 标准本体文件，系统会解析对象、属性与关系，进入审核流程</div>
+        <div class="step1-import__sub">导入 OWL / RDF / JSON 标准本体文件或 Excel 模板，系统会解析对象、属性与关系，进入审核流程</div>
       </div>
 
       <div
@@ -16,8 +16,8 @@
       >
         <div class="import-drop__icon">📤</div>
         <div class="import-drop__title">点击或拖拽文件到此区域</div>
-        <div class="import-drop__sub">支持 .owl / .json / .ttl / .rdf — 最大 50MB</div>
-        <input ref="fileInput" type="file" class="hidden-file" accept=".owl,.json,.ttl,.rdf" @change="onFileChange" />
+        <div class="import-drop__sub">支持 .owl / .json / .ttl / .rdf / .xlsx — 最大 50MB</div>
+        <input ref="fileInput" type="file" class="hidden-file" accept=".owl,.json,.ttl,.rdf,.xlsx,.xls" @change="onFileChange" />
       </div>
 
       <div v-if="parsedSummary" class="import-summary">
@@ -110,14 +110,15 @@ async function parseFile(file: File) {
 
   const ext = (file.name.split('.').pop() || '').toLowerCase()
 
-  if (ext === 'json') {
+  if (ext === 'json' || ext === 'xlsx' || ext === 'xls') {
     try {
-      // 统一走后端预览接口（只解析不落库），消除前后端两套解析逻辑
-      // namespace 留空，由后端从 JSON 的 scenario.namespace 推导
-      const preview: OntologyPreviewResult = await entityApi.previewFile(file, 'json')
+      // 统一走后端预览接口（只解析不落库），json 与 excel 复用同一套草稿映射
+      // namespace 留空，由后端推导（json 取 scenario.namespace，excel 不需要）
+      const preview: OntologyPreviewResult = await entityApi.previewFile(file, ext)
 
       if (!preview.objects.length) {
-        message.error({ content: '未在 JSON 中找到 object_types / entities 定义', key: 'parse' })
+        const tip = ext === 'json' ? '未在 JSON 中找到 object_types / entities 定义' : '未在 Excel 中解析到对象信息，请检查模板表头是否正确'
+        message.error({ content: tip, key: 'parse' })
         return
       }
 
