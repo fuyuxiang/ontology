@@ -486,20 +486,29 @@ async def preview_from_file(
     file_type: str = Form(...),
     namespace: str = Form(""),
 ):
-    """预览本体文件：仅解析为草稿结构，不落库、不写审计。供模版构建使用。"""
+    """预览本体文件：仅解析为草稿结构，不落库、不写审计。供模版构建使用。
+
+    支持 json（V1.1 本体规范）与 xlsx/xls（对象信息+对象关系信息 Excel 模板）。
+    """
     from app.services.file_import import preview_json_ontology
 
-    if file_type != "json":
-        raise HTTPException(status_code=400, detail="预览目前仅支持 json 格式")
-
+    ft = (file_type or "").lower()
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
 
     try:
-        import json as _json
-        data = _json.loads(content.decode("utf-8"))
-        preview = preview_json_ontology(data, namespace)
+        if ft in ("xlsx", "xls"):
+            from app.services.excel_import import preview_excel_ontology
+            preview = preview_excel_ontology(content, namespace)
+        elif ft == "json":
+            import json as _json
+            data = _json.loads(content.decode("utf-8"))
+            preview = preview_json_ontology(data, namespace)
+        else:
+            raise HTTPException(status_code=400, detail="预览仅支持 json / xlsx 格式")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}") from e
 
