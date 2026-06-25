@@ -18,6 +18,18 @@ export interface ReferencedScene {
   name: string
 }
 
+export interface OntologyBreakingChange {
+  entity_name: string
+  change_type: 'deleted' | 'renamed'
+  new_name?: string
+}
+
+export interface OntologyStaleDetail {
+  breaking_changes: OntologyBreakingChange[]
+  affected_scenes?: number
+  affected_agents?: number
+}
+
 export interface AgentItem {
   id: string
   name: string
@@ -34,6 +46,8 @@ export interface AgentItem {
   created_at: string
   updated_at: string
   referenced_scenes?: ReferencedScene[]
+  ontology_stale?: boolean
+  ontology_stale_detail?: OntologyStaleDetail | null
 }
 
 export interface ApiInfo {
