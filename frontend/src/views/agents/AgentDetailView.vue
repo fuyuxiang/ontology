@@ -104,7 +104,7 @@
                 class="agent-detail__msg-actions"
               >
                 <button class="agent-detail__download-btn" @click="copyMessage(msg.content, i)">
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" stroke-width="1.3"/></svg>
+                  <svg viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" stroke-width="1.3"/></svg>
                   {{ copiedIdx === i ? '已复制' : '复制' }}
                 </button>
                 <button
@@ -112,7 +112,7 @@
                   class="agent-detail__download-btn"
                   @click="downloadHtml(msg.content, form.name || '智能体分析报告')"
                 >
-                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <svg viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   下载 HTML
                 </button>
               </div>
@@ -558,22 +558,27 @@ onMounted(async () => {
   white-space: normal;  /* 覆盖气泡的 pre-wrap，避免模板换行被当成真实换行 */
 }
 .agent-detail__msg-actions {
-  margin-top: 6px;
+  margin-top: 4px;
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 .agent-detail__download-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
+  gap: 3px;
+  padding: 2px 7px;
   border: 1px solid var(--neutral-200, #e5e7eb);
-  border-radius: 6px;
+  border-radius: 5px;
   background: #fff;
-  color: var(--neutral-600, #4b5563);
-  font-size: 12px;
+  color: var(--neutral-500, #6b7280);
+  font-size: 11px;
+  line-height: 1.5;
   cursor: pointer;
   transition: all 0.15s;
+}
+.agent-detail__download-btn svg {
+  width: 11px;
+  height: 11px;
 }
 .agent-detail__download-btn:hover {
   border-color: var(--semantic-400, #60a5fa);
