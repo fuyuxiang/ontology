@@ -494,6 +494,10 @@ onMounted(async () => {
   flex-direction: column;
   gap: 12px;
 }
+.agent-detail__message {
+  max-width: 88%;
+  min-width: 0;
+}
 .agent-detail__message--user {
   align-self: flex-end;
 }
@@ -501,7 +505,8 @@ onMounted(async () => {
   align-self: flex-start;
 }
 .agent-detail__bubble {
-  max-width: 80%;
+  width: fit-content;
+  max-width: 100%;
   padding: 8px 12px;
   border-radius: 10px;
   font-size: 13px;
