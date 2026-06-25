@@ -99,6 +99,23 @@
                 ></div>
                 <template v-else>{{ msg.content }}</template>
               </div>
+              <div
+                v-if="msg.role === 'assistant' && !streaming && msg.content"
+                class="agent-detail__msg-actions"
+              >
+                <button class="agent-detail__download-btn" @click="copyMessage(msg.content, i)">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" stroke-width="1.3"/></svg>
+                  {{ copiedIdx === i ? '已复制' : '复制' }}
+                </button>
+                <button
+                  v-if="looksLikeMarkdown(msg.content)"
+                  class="agent-detail__download-btn"
+                  @click="downloadHtml(msg.content, form.name || '智能体分析报告')"
+                >
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  下载 HTML
+                </button>
+              </div>
             </div>
           </div>
           <div class="agent-detail__dirty-hint" v-if="isDirty">配置已修改，保存后测试最新配置</div>
@@ -119,6 +136,7 @@ import { agentsApi, type AgentItem } from '../../api/agents'
 import { entityApi } from '../../api/ontology'
 import { authHeaders } from '../../utils/authHeaders'
 import { renderMarkdownSafe } from '@/utils/sanitize'
+import { looksLikeMarkdown, downloadHtml, copyText } from '@/utils/markdownExport'
 
 const route = useRoute()
 const router = useRouter()
@@ -144,6 +162,16 @@ let savedSnapshot = ''
 const messagesRef = ref<HTMLElement | null>(null)
 const chatInput = ref('')
 const messages = ref<{ role: 'user' | 'assistant'; content: string; status?: string }[]>([])
+
+const copiedIdx = ref(-1)
+let copiedTimer: ReturnType<typeof setTimeout> | undefined
+async function copyMessage(content: string, idx: number) {
+  const ok = await copyText(content)
+  if (!ok) return
+  copiedIdx.value = idx
+  clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => { copiedIdx.value = -1 }, 1500)
+}
 
 // 工具英文名 → 中文提示，未命中则回退显示原始名
 const TOOL_LABELS: Record<string, string> = {
@@ -528,6 +556,29 @@ onMounted(async () => {
   gap: 8px;
   color: var(--neutral-500, #6b7280);
   white-space: normal;  /* 覆盖气泡的 pre-wrap，避免模板换行被当成真实换行 */
+}
+.agent-detail__msg-actions {
+  margin-top: 6px;
+  display: flex;
+  gap: 8px;
+}
+.agent-detail__download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--neutral-200, #e5e7eb);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--neutral-600, #4b5563);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.agent-detail__download-btn:hover {
+  border-color: var(--semantic-400, #60a5fa);
+  color: var(--semantic-600, #2563eb);
+  background: #f0f7ff;
 }
 .agent-detail__thinking-dots {
   display: inline-flex;
