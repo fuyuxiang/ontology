@@ -77,6 +77,7 @@ export interface OntologyEntity {
   tier: Tier
   status: EntityStatus
   description?: string
+  scenario_codes?: string[]
   schema_json?: Record<string, unknown>
   attributes: EntityAttribute[]
   relations: EntityRelationDetail[]
@@ -153,6 +154,7 @@ export interface EntityListItem {
   relation_count: number
   rule_count: number
   datasource_name: string | null
+  scenario_codes?: string[]
 }
 
 // ── 图遍历结果（匹配后端 snake_case）──

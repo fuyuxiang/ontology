@@ -65,6 +65,7 @@ class OntologyVersionEntity(Base):
     description: Mapped[str | None] = mapped_column(Text)
     config_json: Mapped[dict | None] = mapped_column(JSON)
     publish_config: Mapped[dict | None] = mapped_column(JSON)
+    scenario_codes: Mapped[list | None] = mapped_column(JSON)
 
     version: Mapped["OntologyVersion"] = relationship(back_populates="entities")
     attributes: Mapped[list["OntologyVersionAttribute"]] = relationship(

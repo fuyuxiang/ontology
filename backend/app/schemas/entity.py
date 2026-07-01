@@ -34,6 +34,7 @@ class EntityBase(BaseModel):
     status: str = "active"
     description: str | None = None
     config_json: dict | None = None
+    scenario_codes: list[str] | None = None
 
 
 class EntityCreate(EntityBase):
@@ -47,6 +48,7 @@ class EntityUpdate(BaseModel):
     status: str | None = None
     description: str | None = None
     config_json: dict | None = None
+    scenario_codes: list[str] | None = None
 
 
 class FromDatasourceRequest(BaseModel):
@@ -67,6 +69,7 @@ class EntityListItem(BaseModel):
     relation_count: int = 0
     rule_count: int = 0
     datasource_name: str | None = None
+    scenario_codes: list[str] | None = None
     model_config = {"from_attributes": True}
 
 

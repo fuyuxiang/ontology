@@ -110,6 +110,7 @@ const ico = {
   rule: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="2" width="11" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5l1 1 1.5-1.5M5.5 9.5l1 1 1.5-1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 6h2M9.5 10h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
   action: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 5.5l4 2.5-4 2.5v-5z" fill="currentColor"/></svg>`,
   mapping: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="4" width="4" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="10.5" y="4" width="4" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 6.5h5M5.5 9.5h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  scenario: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4.5A1.5 1.5 0 013.5 3h4l1.5 1.5H13a1 1 0 011 1V6" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M2 6.5h11.5a1 1 0 011 1l-.6 4.2a1.5 1.5 0 01-1.5 1.3H3.6a1.5 1.5 0 01-1.5-1.3L1.5 7.5A1 1 0 012.5 6.5z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>`,
 }
 
 const navGroups: NavGroup[] = [
@@ -134,6 +135,7 @@ const navGroups: NavGroup[] = [
     ]},
     { path: '/logic/actions', label: '行动建模', icon: ico.action },
     { path: '/browser', label: '本体管理', icon: ico.ontologyMgr },
+    { path: '/scenarios', label: '场景管理', icon: ico.scenario },
     { path: '/data/mapping', label: '数据映射', icon: ico.mapping },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
     { path: '/service/api', label: '本体服务', icon: ico.api },
