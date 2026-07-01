@@ -83,6 +83,7 @@
             class="agent-detail__conv-select"
             v-if="!isNew && current"
             :value="activeConversationId || ''"
+            :disabled="streaming"
             @change="selectConversation(($event.target as HTMLSelectElement).value)"
           >
             <option value="" disabled>选择会话</option>
@@ -91,11 +92,12 @@
           <button
             class="agent-detail__btn agent-detail__btn--ghost"
             @click="newConversation"
-            :disabled="!current || isNew"
+            :disabled="!current || isNew || streaming"
           >+ 新会话</button>
           <button
             class="agent-detail__btn agent-detail__btn--ghost"
             v-if="activeConversationId"
+            :disabled="streaming"
             @click="removeConversation(activeConversationId)"
           >删除会话</button>
         </div>
@@ -304,6 +306,7 @@ async function newConversation() {
   const conv = await agentsApi.createConversation(current.value.id)
   activeConversationId.value = conv.id
   messages.value = []
+  chatInput.value = ''
   await loadConversations()
 }
 
@@ -322,6 +325,20 @@ async function removeConversation(cid: string) {
 async function sendMessage() {
   const text = chatInput.value.trim()
   if (!text || !current.value || streaming.value) return
+
+  // 先确保有会话：在 push 气泡、置 streaming=true 之前创建，
+  // 避免创建失败时留下卡在“思考中…”的气泡并把发送锁死。
+  if (!activeConversationId.value) {
+    try {
+      const conv = await agentsApi.createConversation(current.value.id)
+      activeConversationId.value = conv.id
+    } catch (e) {
+      console.error('创建会话失败', e)
+      alert('创建会话失败，请稍后重试')
+      return
+    }
+  }
+
   chatInput.value = ''
   messages.value.push({ role: 'user', content: text })
   messages.value.push({ role: 'assistant', content: '', status: '思考中…' })
@@ -329,11 +346,6 @@ async function sendMessage() {
 
   await nextTick()
   scrollToBottom()
-
-  if (!activeConversationId.value) {
-    const conv = await agentsApi.createConversation(current.value.id)
-    activeConversationId.value = conv.id
-  }
 
   try {
     const response = await fetch(`/api/v1/agents/${current.value.id}/chat`, {
