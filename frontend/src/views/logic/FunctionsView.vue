@@ -103,9 +103,9 @@
           </div>
 
           <div class="detail-panel__actions">
-            <button class="btn-sm-exec" @click="handleTest(selectedFn)">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor"/></svg>
-              测试
+            <button class="btn-sm-exec" @click="handleEdit(selectedFn)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5l2 2L4 10l-2.5.5L2 8l6.5-6.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              编辑
             </button>
             <button class="btn-sm-del" @click="handleDelete(selectedFn)">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4 3V2h4v1M3 3v7h6V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -190,10 +190,9 @@ function onFuncSaved(fn: { id: string; name: string }) {
   }
 }
 
-async function handleTest(fn: FunctionItem) {
-  const result = await functionApi.test(fn.id)
-  alert(result.success ? `结果: ${result.result} (${result.execution_ms.toFixed(1)}ms)` : `错误: ${result.error}`)
-  await fetchFunctions()
+function handleEdit(fn: FunctionItem) {
+  editingFuncId.value = fn.id
+  showAdd.value = true
 }
 
 async function handleDelete(fn: FunctionItem) {
