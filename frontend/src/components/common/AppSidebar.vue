@@ -112,7 +112,7 @@ const navGroups: NavGroup[] = [
     { path: '/data/assets', label: '资产目录', icon: ico.catalog },
   ]},
   { label: '本体中心', items: [
-    { path: '/builder', label: '本体构建', icon: ico.model, children: [
+    { path: '/builder', label: '对象构建', icon: ico.model, children: [
       { path: '/builder', label: '手动构建', exact: true },
       { path: '/builder/template', label: '模板构建' },
       { path: '/builder/doc', label: '文档构建' },
