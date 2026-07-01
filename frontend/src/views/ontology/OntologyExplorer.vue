@@ -75,6 +75,21 @@
         <input v-model="searchQuery" class="explorer__search-input" :placeholder="activeTierMeta.searchPlaceholder" />
       </div>
 
+      <div v-if="scenarioStore.scenarios.length" class="explorer__scenario-filter">
+        <button
+          class="scenario-filter-chip"
+          :class="{ 'scenario-filter-chip--active': activeScenarioFilter === null }"
+          @click="activeScenarioFilter = null"
+        >全部场景</button>
+        <button
+          v-for="s in scenarioStore.scenarios" :key="s.code"
+          class="scenario-filter-chip"
+          :class="{ 'scenario-filter-chip--active': activeScenarioFilter === s.code }"
+          :style="activeScenarioFilter === s.code && s.color ? { borderColor: s.color, color: s.color, background: `${s.color}1a` } : {}"
+          @click="activeScenarioFilter = activeScenarioFilter === s.code ? null : s.code"
+        >{{ s.name }}</button>
+      </div>
+
       <div v-if="store.loading && totalEntities === 0" class="explorer__panel-loading">
         <div class="spinner"></div>
       </div>
@@ -102,6 +117,9 @@
               <div>
                 <h1 class="text-h1">{{ selected.nameCn }}</h1>
                 <p class="text-caption">Tier {{ selected.tier }} {{ tierLabel(selected.tier) }}</p>
+                <div v-if="selected.scenarioCodes && selected.scenarioCodes.length" class="explorer__detail-scenarios">
+                  <ScenarioBadge v-for="c in selected.scenarioCodes" :key="c" :code="c" />
+                </div>
               </div>
               <button class="explorer__edit-btn" @click="showEditEntity = true">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -353,6 +371,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import EntityCard, { type Entity } from '../../components/common/EntityCard.vue'
 import TierBadge from '../../components/common/TierBadge.vue'
+import ScenarioBadge from '../../components/common/ScenarioBadge.vue'
 import EntityCreateForm from '../../components/common/EntityCreateForm.vue'
 import EntityEditForm from '../../components/common/EntityEditForm.vue'
 import ModalDialog from '../../components/common/ModalDialog.vue'
@@ -360,10 +379,12 @@ import { relationApi } from '../../api/relations'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
 import { useOntologyStore } from '../../store/ontology'
+import { useScenarioStore } from '../../store/scenarios'
 
 const router = useRouter()
 
 const store = useOntologyStore()
+const scenarioStore = useScenarioStore()
 const toast = useToast()
 
 const showCreateEntity = ref(false)
@@ -371,6 +392,7 @@ const showEditEntity = ref(false)
 const showCreateRelation = ref(false)
 const searchQuery = ref('')
 const activeTierFilter = ref<1 | 2 | 3 | null>(null)
+const activeScenarioFilter = ref<string | null>(null)
 const selectedId = ref<string | null>(null)
 const activeTab = ref('属性')
 const tabs = ['属性', '关系', '规则', '动作', '数据绑定', '版本', '血缘']
@@ -384,6 +406,7 @@ const relForm = reactive({
 
 onMounted(() => {
   store.fetchEntities()
+  scenarioStore.fetchScenarios()
 })
 
 const allEntities = computed<Entity[]>(() =>
@@ -397,6 +420,7 @@ const allEntities = computed<Entity[]>(() =>
     rules: e.rule_count,
     status: e.status as 'active' | 'warning' | 'error',
     datasource: e.datasource_name || null,
+    scenarioCodes: e.scenario_codes || [],
   }))
 )
 
@@ -439,7 +463,10 @@ const activeTierMeta = computed(() => {
 })
 
 const filteredEntities = computed(() => {
-  const base = tierEntities.value
+  let base = tierEntities.value
+  if (activeScenarioFilter.value) {
+    base = base.filter(e => (e.scenarioCodes || []).includes(activeScenarioFilter.value as string))
+  }
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return base
   return base.filter(e =>
@@ -480,6 +507,7 @@ const editEntityData = computed(() => {
     tier: detail.value.tier,
     status: detail.value.status,
     description: detail.value.description || '',
+    scenario_codes: detail.value.scenario_codes || [],
   }
 })
 
@@ -973,6 +1001,36 @@ async function handleDeleteAttribute(id: string, name: string) {
 
 .explorer__search-input::placeholder {
   color: var(--neutral-400);
+}
+
+.explorer__scenario-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 0 10px;
+}
+.scenario-filter-chip {
+  padding: 3px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--neutral-200);
+  background: var(--neutral-0);
+  color: var(--neutral-600);
+  font-size: var(--text-caption-size);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.scenario-filter-chip:hover { border-color: var(--semantic-300); }
+.scenario-filter-chip--active {
+  border-color: var(--semantic-500);
+  background: var(--semantic-50);
+  color: var(--semantic-700);
+  font-weight: 600;
+}
+.explorer__detail-scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 .explorer__entity-list {

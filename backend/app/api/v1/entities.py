@@ -52,6 +52,7 @@ def list_entities(
             relation_count=rel_count,
             rule_count=len(e.rules),
             datasource_name=(e.config_json or {}).get("datasource_name"),
+            scenario_codes=e.scenario_codes,
         ))
     return result
 
@@ -542,6 +543,7 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
         id=entity.id, name=entity.name, name_cn=entity.name_cn,
         tier=entity.tier, status=entity.status, description=entity.description,
         config_json=entity.config_json,
+        scenario_codes=entity.scenario_codes,
         attributes=[AttributeOut.model_validate(a) for a in entity.attributes],
         relations=rel_list,
         rules=[RuleOut(
@@ -567,6 +569,7 @@ def create_entity(
         name=data.name, name_cn=data.name_cn, tier=data.tier,
         status=data.status, description=data.description,
         config_json=data.config_json,
+        scenario_codes=data.scenario_codes,
         created_by=user.id,
     )
     for attr in data.attributes:

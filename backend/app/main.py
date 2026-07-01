@@ -193,6 +193,26 @@ def _seed_cron(schedule: dict) -> str:
     return schedule.get("cron", f"{m} {h} * * *")
 
 
+def _seed_scenarios(db):
+    """初始化默认场景字典（幂等：已存在则跳过）"""
+    from app.models import ScenarioDict
+    defaults = [
+        ("core", "核心域", "#2E5BFF", "跨场景共享的核心对象", 0),
+        ("churn", "退单智能归因", "#FF6B35", "宽带装机退单根因分析", 1),
+        ("fttr", "FTTR 续约策划", "#00C7B1", "FTTR 合约续约营销", 2),
+        ("ge", "政企智能问数", "#8B5CF6", "政企 KPI 问数及根因分析", 3),
+    ]
+    existing = {r.code for r in db.query(ScenarioDict.code).all()}
+    added = 0
+    for code, name, color, desc, order in defaults:
+        if code not in existing:
+            db.add(ScenarioDict(code=code, name=name, color=color, description=desc, sort_order=order))
+            added += 1
+    if added:
+        db.commit()
+        logger.info(f"场景字典 seed 完成: 新增 {added} 个")
+
+
 def _seed_system_config(db):
     """初始化默认系统配置项（幂等：已存在则跳过）"""
     from app.models.system_config import SystemConfig
@@ -346,6 +366,7 @@ from app.api.v1.registry import router as registry_router
 from app.api.v1.relations import router as relations_router
 from app.api.v1.resolution import router as resolution_router
 from app.api.v1.rules import router as rules_router
+from app.api.v1.scenarios import router as scenarios_router
 from app.api.v1.scenes import router as scenes_router
 from app.api.v1.skill_gen import router as skill_gen_router
 from app.api.v1.skills import router as skills_router
@@ -370,6 +391,7 @@ async def lifespan(app: FastAPI):
         _seed_agents(db)
         _seed_skills(db)
         _seed_aip_scenes(db)
+        _seed_scenarios(db)
         _seed_system_config(db)
     finally:
         db.close()
@@ -462,6 +484,7 @@ app.include_router(auth_router, prefix="/api/v1")
 # app.include_router(datasources_router, prefix="/api/v1")  # 已废弃
 app.include_router(mnp_router, prefix="/api/v1")
 app.include_router(scenes_router, prefix="/api/v1")
+app.include_router(scenarios_router, prefix="/api/v1")
 app.include_router(broadband_router, prefix="/api/v1")
 app.include_router(models_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")

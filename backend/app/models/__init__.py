@@ -21,6 +21,7 @@ from app.models.quality_metric import QualityMetric
 from app.models.quality_rule import HealthStatus, QualityRule
 from app.models.relation import EntityRelation
 from app.models.rule import BusinessRule, EntityAction
+from app.models.scenario import ScenarioDict
 from app.models.scene import (
     AipScene,
     AipSceneExecution,
@@ -56,6 +57,7 @@ __all__ = [
     "OntologyVersionAttribute", "OntologyVersionRelation",
     "OntologyVersionFunction", "OntologyVersionRule", "OntologyVersionAction",
     "AipScene", "AipSceneVersion", "AipSceneExecution", "AipSceneTrigger",
+    "ScenarioDict",
     "BusinessDocument",
     # Data Plane
     "Connection", "Asset", "AssetUsage", "ExecutionLog",

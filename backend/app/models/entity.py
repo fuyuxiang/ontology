@@ -17,6 +17,7 @@ class OntologyEntity(Base):
     status: Mapped[str] = mapped_column(String(20), default="active")
     description: Mapped[str | None] = mapped_column(Text)
     config_json: Mapped[dict | None] = mapped_column(JSON)
+    scenario_codes: Mapped[list | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     created_by: Mapped[str | None] = mapped_column(String(36))
