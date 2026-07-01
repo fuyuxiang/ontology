@@ -56,6 +56,24 @@ export interface ApiInfo {
   curl: string
 }
 
+export interface ConversationSummary {
+  id: string
+  agent_id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationMessage {
+  role: 'user' | 'assistant'
+  content: string
+  ts?: string
+}
+
+export interface ConversationDetail extends ConversationSummary {
+  messages: ConversationMessage[]
+}
+
 export const modelsApi = {
   list: () => client.get<ModelRegistry[]>('/models').then(r => r.data),
   create: (data: Partial<ModelRegistry>) => client.post<ModelRegistry>('/models', data).then(r => r.data),
@@ -75,4 +93,12 @@ export const agentsApi = {
   chatUrl: (id: string) => `/api/v1/agents/${id}/chat`,
   acknowledgeStale: (id: string) =>
     client.post(`/agents/${id}/acknowledge-stale`).then(r => r.data),
+  listConversations: (aid: string) =>
+    client.get<ConversationSummary[]>(`/agents/${aid}/conversations`).then(r => r.data),
+  createConversation: (aid: string) =>
+    client.post<ConversationDetail>(`/agents/${aid}/conversations`).then(r => r.data),
+  getConversation: (aid: string, cid: string) =>
+    client.get<ConversationDetail>(`/agents/${aid}/conversations/${cid}`).then(r => r.data),
+  deleteConversation: (aid: string, cid: string) =>
+    client.delete(`/agents/${aid}/conversations/${cid}`).then(r => r.data),
 }
