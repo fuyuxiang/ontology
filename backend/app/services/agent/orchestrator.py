@@ -42,7 +42,12 @@ class AgentService:
 
     # ── public ──────────────────────────────────────────────
 
-    def ask(self, question: str, entity_id: str | None = None) -> Generator[dict, None, None]:
+    def ask(
+        self,
+        question: str,
+        entity_id: str | None = None,
+        history: list[dict] | None = None,
+    ) -> Generator[dict, None, None]:
         """Agent 循环，yield SSE 事件字典"""
         question = question.strip()
         if not question:
@@ -52,10 +57,13 @@ class AgentService:
         system_prompt = build_system_prompt(self.db, entity_id, None)
         if self._system_prompt_prefix:
             system_prompt = self._system_prompt_prefix + "\n\n" + system_prompt
-        messages: list[dict[str, Any]] = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": question},
-        ]
+        messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+        for h in history or []:
+            role = h.get("role")
+            content = h.get("content")
+            if role in ("user", "assistant") and content:
+                messages.append({"role": role, "content": content})
+        messages.append({"role": "user", "content": question})
         tool_runs: list[dict[str, Any]] = []
         tool_defs = agent_tool_definitions()
 
