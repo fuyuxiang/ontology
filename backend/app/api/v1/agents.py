@@ -5,15 +5,18 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_user
+from app.core.deps import get_current_user, require_user
 from app.database import get_db
 from app.models.agent import Agent, ModelRegistry
 from app.models.agent_test_conversation import AgentTestConversation
 from app.models.scene import AipScene
 from app.models.user import User
+from app.services.agent.orchestrator import AgentService
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 open_router = APIRouter(prefix="/open/agents", tags=["open-api"])
+
+HISTORY_MAX_TURNS = 10  # 最近 N 轮（每轮 user+assistant 共 2 条）
 
 
 class AgentCreate(BaseModel):
@@ -47,6 +50,7 @@ class ChatRequest(BaseModel):
     messages: list | None = None
     question: str | None = None
     stream: bool | None = True
+    conversation_id: str | None = None
 
 
 def _agent_out(a: Agent, db: Session, referenced_scenes: list | None = None) -> dict:
@@ -220,8 +224,32 @@ def delete_conversation(aid: str, cid: str, db: Session = Depends(get_db), user:
     return {"ok": True}
 
 
+def _writeback_conversation(db: Session, conv, question: str, answer: str) -> None:
+    """把本轮问答追加写回会话；title 若为默认值则用首条 user 消息生成。失败静默。"""
+    if conv is None:
+        return
+    try:
+        msgs = list(conv.messages or [])
+        msgs.append({"role": "user", "content": question})
+        msgs.append({"role": "assistant", "content": answer})
+        conv.messages = msgs
+        if not conv.title or conv.title == "新会话":
+            conv.title = question.strip()[:30] or "新会话"
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(conv, "messages")
+        db.add(conv)
+        db.commit()
+    except Exception:
+        db.rollback()
+
+
 @router.post("/{aid}/chat")
-async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get_db)):
+async def chat_with_agent(
+    aid: str,
+    body: ChatRequest,
+    db: Session = Depends(get_db),
+    user: User | None = Depends(get_current_user),
+):
     a = db.get(Agent, aid)
     if not a:
         raise HTTPException(404, "Agent not found")
@@ -231,7 +259,6 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
 
     from app.models.trace import AgentTrace
     from app.services.agent.graph_engine import GraphEngine
-    from app.services.agent.orchestrator import AgentService
 
     # Extract question from messages or direct field
     question = body.question or ""
@@ -243,6 +270,22 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
 
     if not question:
         raise HTTPException(400, "No question provided")
+
+    # 加载会话历史（仅当带 conversation_id 且属于当前用户）
+    conv = None
+    history: list[dict] | None = None
+    if body.conversation_id and user:
+        c = db.get(AgentTestConversation, body.conversation_id)
+        if c and c.agent_id == aid and c.user_id == user.id:
+            conv = c
+            prior = c.messages or []
+            # 取最近 N 轮 = 最多 2N 条，转纯 role/content
+            trimmed = prior[-(HISTORY_MAX_TURNS * 2):]
+            history = [
+                {"role": m["role"], "content": m["content"]}
+                for m in trimmed
+                if m.get("role") in ("user", "assistant") and m.get("content")
+            ]
 
     # Build model config from agent settings
     model_name = None
@@ -302,6 +345,7 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
                     db.commit()
                 except Exception:
                     pass
+                _writeback_conversation(db, conv, question_for_trace, "".join(chunks))
     else:
         entity_id = (a.entity_ids or [None])[0] if a.entity_ids else None
         agent_svc = AgentService(
@@ -316,8 +360,8 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
             chunks = []
             status = "ok"
             try:
-                for event in agent_svc.ask(question_for_trace, entity_id):
-                    if event.get("type") == "answer" and event.get("content"):
+                for event in agent_svc.ask(question_for_trace, entity_id, history=history):
+                    if event.get("type") in ("answer", "content") and event.get("content"):
                         chunks.append(event["content"])
                     yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as e:
@@ -337,6 +381,7 @@ async def chat_with_agent(aid: str, body: ChatRequest, db: Session = Depends(get
                     db.commit()
                 except Exception:
                     pass
+                _writeback_conversation(db, conv, question_for_trace, "".join(chunks))
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
@@ -359,7 +404,7 @@ async def open_chat(
         raise HTTPException(401, "Invalid or missing X-Agent-Key")
 
     # Reuse internal chat logic
-    return await chat_with_agent(aid, body, db)
+    return await chat_with_agent(aid, body, db, user=None)
 
 
 @open_router.get("/{aid}/info")
