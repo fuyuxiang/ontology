@@ -119,7 +119,7 @@ function onPersistDone() {
 }
 
 function gotoStudio() {
-  router.push('/studio')
+  router.push('/browser')
 }
 
 onMounted(() => {
