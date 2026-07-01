@@ -100,6 +100,9 @@ const ico = {
   audit: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 3h8M2 6h6M2 9h5M2 12h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="11.5" cy="10.5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M11.5 9v1.5l1.2 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   permissions: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="5.5" cy="6.5" r="3" stroke="currentColor" stroke-width="1.4"/><path d="M8 8.5l5 5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><path d="M11 11.5l1.5 1.5M12 10.5l1.5 1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="5.5" cy="6.5" r="1" fill="currentColor"/></svg>`,
   config: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4h4M10 4h4M2 8h7M12 8h2M2 12h2M7 12h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="10.5" cy="8" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.8" stroke="currentColor" stroke-width="1.4"/></svg>`,
+  rule: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="2" width="11" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5l1 1 1.5-1.5M5.5 9.5l1 1 1.5-1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 6h2M9.5 10h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  func: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 3H8.5a2 2 0 00-2 2v1H4.5m0 0v.5m0-.5H6m0 0v5.5a1.5 1.5 0 01-1.5 1.5H4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 9.5l3 3M12 9.5l-3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
+  action: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 5.5l4 2.5-4 2.5v-5z" fill="currentColor"/></svg>`,
 }
 
 const navGroups: NavGroup[] = [
@@ -112,18 +115,18 @@ const navGroups: NavGroup[] = [
     { path: '/data/assets', label: '资产目录', icon: ico.catalog },
   ]},
   { label: '本体中心', items: [
-    { path: '/builder', label: '对象构建', icon: ico.model, children: [
+    { path: '/builder', label: '对象建模', icon: ico.model, children: [
       { path: '/builder', label: '手动构建', exact: true },
       { path: '/builder/template', label: '模板构建' },
       { path: '/builder/doc', label: '文档构建' },
       { path: '/builder/ai', label: '资产构建' },
     ]},
+    { path: '/logic/rules', label: '规则管理', icon: ico.rule },
+    { path: '/logic/functions', label: '函数管理', icon: ico.func },
+    { path: '/logic/actions', label: '行动管理', icon: ico.action },
     { path: '/browser', label: '本体管理', icon: ico.ontologyMgr, children: [
       { path: '/browser', label: '对象管理', exact: true },
       { path: '/data/mapping', label: '映射管理' },
-      { path: '/logic/rules', label: '规则管理' },
-      { path: '/logic/functions', label: '函数管理' },
-      { path: '/logic/actions', label: '行动管理' },
     ]},
     { path: '/studio', label: '本体探索', icon: ico.graph },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
