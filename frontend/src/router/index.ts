@@ -29,7 +29,7 @@ const router = createRouter({
         { path: '', name: 'browser-objects', component: () => import('../views/ontology/OntologyExplorer.vue'), meta: { title: '对象与关系管理' } },
       ]
     },
-    { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '映射管理' } },
+    { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '数据映射' } },
     { path: '/logic', redirect: '/logic/functions' },
     { path: '/logic/rules', name: 'logic-rules', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
     { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
