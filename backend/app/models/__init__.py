@@ -1,4 +1,5 @@
 from app.models.agent import Agent, ModelRegistry
+from app.models.agent_test_conversation import AgentTestConversation  # noqa: F401
 from app.models.ai_code_conversation import AiCodeConversation  # noqa: F401
 from app.models.asset import Asset
 from app.models.asset_usage import AssetUsage
@@ -65,4 +66,6 @@ __all__ = [
     "Skill", "SkillVersion", "SkillTool", "SkillToolRef",
     # AI Code Conversation
     "AiCodeConversation",
+    # Agent Test Conversation
+    "AgentTestConversation",
 ]
