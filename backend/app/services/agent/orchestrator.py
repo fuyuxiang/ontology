@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class AgentService:
-    MAX_TOOL_ROUNDS = 8
+    MAX_TOOL_ROUNDS = 12
 
     def __init__(
         self,
@@ -69,13 +69,22 @@ class AgentService:
 
         temperature = self._model_config.get("temperature", 0)
 
+        # 强制出答案标志：最后一轮或检测到重复打转时置位，
+        # 关闭工具调用逼模型基于已有工具结果给出最终回答
+        force_answer = False
+        prev_tool_signature: str | None = None
+        repeat_count = 0
+
         for _round in range(self.MAX_TOOL_ROUNDS):
+            # 最后一轮预留给强制作答，避免跑满后只能扔一句道歉、丢弃已查数据
+            if _round == self.MAX_TOOL_ROUNDS - 1:
+                force_answer = True
             try:
                 stream = self.client.chat.completions.create(
                     model=self._model_name,
                     messages=messages,
                     tools=tool_defs,
-                    tool_choice="auto",
+                    tool_choice="none" if force_answer else "auto",
                     temperature=temperature,
                     max_tokens=self._model_config.get("max_tokens", 4096),
                     stream=True,
@@ -134,6 +143,20 @@ class AgentService:
 
             # 有工具调用 → 拼装 assistant 消息并执行工具
             ordered = [tool_calls_acc[i] for i in sorted(tool_calls_acc)]
+
+            # 打转检测：本轮工具调用（名称+参数）与上一轮完全相同则计数，
+            # 连续重复达 2 次说明模型没在收敛，下一轮强制作答避免空耗预算
+            tool_signature = "|".join(
+                f"{tc['name']}:{tc['arguments']}" for tc in ordered
+            )
+            if tool_signature == prev_tool_signature:
+                repeat_count += 1
+            else:
+                repeat_count = 0
+            prev_tool_signature = tool_signature
+            if repeat_count >= 2:
+                force_answer = True
+
             messages.append({
                 "role": "assistant",
                 "content": text_buffer or "",
