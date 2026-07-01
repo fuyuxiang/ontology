@@ -79,7 +79,25 @@
       <div class="agent-detail__right">
         <div class="agent-detail__chat-header">
           <span class="agent-detail__chat-title">对话测试</span>
-          <button class="agent-detail__btn agent-detail__btn--ghost" @click="resetChat" :disabled="!current || isNew">重置对话</button>
+          <select
+            class="agent-detail__conv-select"
+            v-if="!isNew && current"
+            :value="activeConversationId || ''"
+            @change="selectConversation(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="" disabled>选择会话</option>
+            <option v-for="c in conversations" :key="c.id" :value="c.id">{{ c.title }}</option>
+          </select>
+          <button
+            class="agent-detail__btn agent-detail__btn--ghost"
+            @click="newConversation"
+            :disabled="!current || isNew"
+          >+ 新会话</button>
+          <button
+            class="agent-detail__btn agent-detail__btn--ghost"
+            v-if="activeConversationId"
+            @click="removeConversation(activeConversationId)"
+          >删除会话</button>
         </div>
         <div class="agent-detail__chat-body" v-if="!current || isNew">
           <div class="agent-detail__chat-placeholder">请先保存智能体后测试</div>
@@ -132,7 +150,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { agentsApi, type AgentItem } from '../../api/agents'
+import { agentsApi, type AgentItem, type ConversationSummary } from '../../api/agents'
 import { entityApi } from '../../api/ontology'
 import { authHeaders } from '../../utils/authHeaders'
 import { renderMarkdownSafe } from '@/utils/sanitize'
@@ -162,6 +180,9 @@ let savedSnapshot = ''
 const messagesRef = ref<HTMLElement | null>(null)
 const chatInput = ref('')
 const messages = ref<{ role: 'user' | 'assistant'; content: string; status?: string }[]>([])
+
+const conversations = ref<ConversationSummary[]>([])
+const activeConversationId = ref<string | null>(null)
 
 const copiedIdx = ref(-1)
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -259,9 +280,43 @@ async function ackStale() {
   showStaleDetail.value = false
 }
 
-function resetChat() {
+async function loadConversations() {
+  if (!current.value || isNew.value) return
+  conversations.value = await agentsApi.listConversations(current.value.id).catch(() => [])
+}
+
+async function selectConversation(cid: string) {
+  if (!current.value) return
+  activeConversationId.value = cid
+  try {
+    const detail = await agentsApi.getConversation(current.value.id, cid)
+    messages.value = detail.messages.map(m => ({ role: m.role, content: m.content }))
+  } catch {
+    messages.value = []
+    await loadConversations()
+  }
+  await nextTick()
+  scrollToBottom()
+}
+
+async function newConversation() {
+  if (!current.value) return
+  const conv = await agentsApi.createConversation(current.value.id)
+  activeConversationId.value = conv.id
   messages.value = []
-  chatInput.value = ''
+  await loadConversations()
+}
+
+async function removeConversation(cid: string) {
+  if (!current.value) return
+  await agentsApi.deleteConversation(current.value.id, cid)
+  if (activeConversationId.value === cid) {
+    activeConversationId.value = null
+    messages.value = []
+  }
+  await loadConversations()
+  const first = conversations.value[0]
+  if (!activeConversationId.value && first) await selectConversation(first.id)
 }
 
 async function sendMessage() {
@@ -275,11 +330,16 @@ async function sendMessage() {
   await nextTick()
   scrollToBottom()
 
+  if (!activeConversationId.value) {
+    const conv = await agentsApi.createConversation(current.value.id)
+    activeConversationId.value = conv.id
+  }
+
   try {
     const response = await fetch(`/api/v1/agents/${current.value.id}/chat`, {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ question: text }),
+      body: JSON.stringify({ question: text, conversation_id: activeConversationId.value }),
     })
     const reader = response.body!.getReader()
     const decoder = new TextDecoder()
@@ -328,6 +388,7 @@ async function sendMessage() {
       cur.content = '（未返回内容）'
     }
   }
+  await loadConversations()
 }
 
 function scrollToBottom() {
@@ -343,6 +404,10 @@ onMounted(async () => {
   if (!isNew.value) {
     const agent = await agentsApi.get(route.params.id as string)
     loadFormFromAgent(agent)
+    await loadConversations()
+    if (conversations.value.length > 0) {
+      await selectConversation(conversations.value[0].id)
+    }
   }
 })
 </script>
@@ -652,4 +717,11 @@ onMounted(async () => {
 }
 .agent-detail__stale-detail ul { margin: 0; padding-left: 16px; }
 .agent-detail__stale-detail li { margin: 2px 0; }
+.agent-detail__conv-select {
+  max-width: 160px;
+  padding: 4px 8px;
+  border: 1px solid var(--neutral-200, #e5e7eb);
+  border-radius: 4px;
+  font-size: 12px;
+}
 </style>
