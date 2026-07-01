@@ -30,8 +30,9 @@ const router = createRouter({
       ]
     },
     { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '映射管理' } },
-    { path: '/logic/rules', name: 'logic-rules', component: () => import('../views/logic/LogicView.vue'), meta: { title: '规则管理' } },
-    { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/FunctionsView.vue'), meta: { title: '函数管理' } },
+    { path: '/logic', redirect: '/logic/functions' },
+    { path: '/logic/rules', name: 'logic-rules', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
+    { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
     { path: '/logic/actions', name: 'logic-actions', component: () => import('../views/logic/ActionsView.vue'), meta: { title: '行动管理' } },
 
     // 本体中心 — 本体探索

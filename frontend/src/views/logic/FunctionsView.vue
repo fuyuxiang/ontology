@@ -1,8 +1,8 @@
 <template>
-  <div class="logic-page">
+  <div class="logic-page" :class="{ 'logic-page--embedded': embedded }">
     <BuilderReturnBanner kind-label="函数" />
     <div class="logic-page__header">
-      <div>
+      <div v-if="!embedded">
         <h1 class="text-display">函数管理</h1>
         <p class="text-caption" style="margin-top: 4px;">计算逻辑管理</p>
       </div>
@@ -135,6 +135,8 @@ import { functionApi, type FunctionItem } from '../../api/functions'
 import FunctionBuilderDrawer from '../../components/logic/FunctionBuilderDrawer.vue'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 
+defineProps<{ embedded?: boolean }>()
+
 const route = useRoute()
 const router = useRouter()
 
@@ -212,6 +214,9 @@ onMounted(() => {
 
 <style scoped>
 @import './logic-shared.css';
+
+.logic-page--embedded { padding: 0; max-width: none; }
+.logic-page--embedded .logic-page__header { margin-bottom: 16px; justify-content: flex-end; }
 
 .master-detail {
   display: grid;

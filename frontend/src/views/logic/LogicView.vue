@@ -1,8 +1,8 @@
 <template>
-  <div class="logic-page">
+  <div class="logic-page" :class="{ 'logic-page--embedded': embedded }">
     <BuilderReturnBanner kind-label="规则" />
     <div class="logic-page__header">
-      <div>
+      <div v-if="!embedded">
         <h1 class="text-display">规则管理</h1>
         <p class="text-caption" style="margin-top: 4px;">业务规则配置与管理</p>
       </div>
@@ -146,6 +146,8 @@ import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue
 import { ruleApi } from '../../api/rules'
 import { useToast } from '../../composables/useToast'
 
+defineProps<{ embedded?: boolean }>()
+
 const store = useRulesStore()
 const toast = useToast()
 const route = useRoute()
@@ -240,6 +242,9 @@ const filteredRules = computed(() =>
 
 <style scoped>
 @import './logic-shared.css';
+
+.logic-page--embedded { padding: 0; max-width: none; }
+.logic-page--embedded .logic-page__header { margin-bottom: 16px; justify-content: flex-end; }
 
 .master-detail {
   display: grid;
