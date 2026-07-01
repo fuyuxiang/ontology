@@ -224,7 +224,7 @@ function rebuild() {
     },
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
-  }))
+  })) as Node[]
 
   flowEdges.value = filteredEdges.value.map(r => ({
     id: `${r.source}-${r.target}-${r.apiName}`,
@@ -236,7 +236,7 @@ function rebuild() {
     labelBgStyle: { fill: '#fff', fillOpacity: 0.85 },
     style: { stroke: '#94a3b8', strokeWidth: 1.2 },
     markerEnd: MarkerType.ArrowClosed,
-  }))
+  })) as Edge[]
 }
 
 watch([activeTab, () => props.objects, () => props.relations, showRbox, showAbox], rebuild, { immediate: true })
