@@ -131,7 +131,7 @@ const navGroups: NavGroup[] = [
       { path: '/logic/functions', label: '函数' },
       { path: '/logic/rules', label: '规则' },
     ]},
-    { path: '/logic/actions', label: '行动管理', icon: ico.action },
+    { path: '/logic/actions', label: '行动建模', icon: ico.action },
     { path: '/browser', label: '本体管理', icon: ico.ontologyMgr, children: [
       { path: '/browser', label: '对象管理', exact: true },
       { path: '/data/mapping', label: '映射管理' },
