@@ -5,9 +5,12 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.core.deps import require_user
 from app.database import get_db
 from app.models.agent import Agent, ModelRegistry
+from app.models.agent_test_conversation import AgentTestConversation
 from app.models.scene import AipScene
+from app.models.user import User
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 open_router = APIRouter(prefix="/open/agents", tags=["open-api"])
@@ -159,6 +162,62 @@ def get_api_info(aid: str, db: Session = Depends(get_db)):
         f'  -d \'{{"messages": [{{"role": "user", "content": "你好"}}]}}\''
     )
     return {"endpoint": endpoint, "api_key": a.api_key, "curl": curl}
+
+
+def _conv_out(conv: AgentTestConversation, with_messages: bool = False) -> dict:
+    out = {
+        "id": conv.id,
+        "agent_id": conv.agent_id,
+        "title": conv.title,
+        "created_at": conv.created_at.isoformat() if conv.created_at else None,
+        "updated_at": conv.updated_at.isoformat() if conv.updated_at else None,
+    }
+    if with_messages:
+        out["messages"] = conv.messages or []
+    return out
+
+
+def _get_owned_conv(db: Session, aid: str, cid: str, user: User) -> AgentTestConversation:
+    conv = db.get(AgentTestConversation, cid)
+    if not conv or conv.agent_id != aid or conv.user_id != user.id:
+        raise HTTPException(404, "会话不存在")
+    return conv
+
+
+@router.get("/{aid}/conversations")
+def list_conversations(aid: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    rows = (
+        db.query(AgentTestConversation)
+        .filter_by(agent_id=aid, user_id=user.id)
+        .order_by(AgentTestConversation.updated_at.desc())
+        .all()
+    )
+    return [_conv_out(c, with_messages=False) for c in rows]
+
+
+@router.post("/{aid}/conversations")
+def create_conversation(aid: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    if not db.get(Agent, aid):
+        raise HTTPException(404, "Agent not found")
+    conv = AgentTestConversation(agent_id=aid, user_id=user.id)
+    db.add(conv)
+    db.commit()
+    db.refresh(conv)
+    return _conv_out(conv, with_messages=True)
+
+
+@router.get("/{aid}/conversations/{cid}")
+def get_conversation(aid: str, cid: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    conv = _get_owned_conv(db, aid, cid, user)
+    return _conv_out(conv, with_messages=True)
+
+
+@router.delete("/{aid}/conversations/{cid}")
+def delete_conversation(aid: str, cid: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    conv = _get_owned_conv(db, aid, cid, user)
+    db.delete(conv)
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/{aid}/chat")
