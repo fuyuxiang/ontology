@@ -118,7 +118,7 @@ function onExtractionDone(result: any) {
 }
 
 function gotoStudio() {
-  router.push('/studio')
+  router.push('/browser')
 }
 
 onMounted(() => {

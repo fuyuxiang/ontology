@@ -56,7 +56,7 @@ function ensureSession() {
 }
 
 function gotoStudio() {
-  router.push('/studio')
+  router.push('/browser')
 }
 
 watch(editorMode, (mode) => {

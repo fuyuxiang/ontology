@@ -135,7 +135,6 @@ const navGroups: NavGroup[] = [
     { path: '/logic/actions', label: '行动建模', icon: ico.action },
     { path: '/browser', label: '本体管理', icon: ico.ontologyMgr },
     { path: '/data/mapping', label: '数据映射', icon: ico.mapping },
-    { path: '/studio', label: '本体探索', icon: ico.graph },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
     { path: '/service/api', label: '本体服务', icon: ico.api },
   ]},

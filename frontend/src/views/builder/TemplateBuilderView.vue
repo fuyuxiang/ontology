@@ -46,7 +46,7 @@ function onImportDone() {
 }
 
 function gotoStudio() {
-  router.push('/studio')
+  router.push('/browser')
 }
 
 onMounted(() => {
