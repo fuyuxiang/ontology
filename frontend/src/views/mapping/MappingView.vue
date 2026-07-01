@@ -3,7 +3,7 @@
     <div class="mp-page__top">
       <div class="mp-page__header">
         <div>
-          <h1 class="mp-page__title">映射管理</h1>
+          <h1 class="mp-page__title">数据映射</h1>
           <p class="mp-page__subtitle">选 ObjectType，AI 自动从所有数据资产中推荐最匹配的 Backing Datasets</p>
         </div>
         <div v-if="overview" class="mp-coverage">
