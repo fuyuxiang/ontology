@@ -3,7 +3,7 @@
     <BuilderReturnBanner kind-label="动作" />
     <div class="logic-page__header">
       <div>
-        <h1 class="text-display">行动管理</h1>
+        <h1 class="text-display">行动建模</h1>
         <p class="text-caption" style="margin-top: 4px;">行动注册与执行管理</p>
       </div>
       <div class="logic-page__actions">
