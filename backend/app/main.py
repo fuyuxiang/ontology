@@ -349,7 +349,6 @@ from app.api.v1.rules import router as rules_router
 from app.api.v1.scenes import router as scenes_router
 from app.api.v1.skill_gen import router as skill_gen_router
 from app.api.v1.skills import router as skills_router
-from app.api.v1.studio import router as studio_router
 from app.api.v1.system_config import router as system_config_router
 from app.api.v1.traces import router as traces_router
 
@@ -480,7 +479,6 @@ app.include_router(evals_router, prefix="/api/v1")
 app.include_router(actions_router, prefix="/api/v1")
 app.include_router(functions_router, prefix="/api/v1")
 app.include_router(monitor_router, prefix="/api/v1")
-app.include_router(studio_router, prefix="/api/v1")
 app.include_router(aip_scenes_router, prefix="/api/v1")
 app.include_router(aip_executions_router, prefix="/api/v1")
 app.include_router(aip_webhooks_router, prefix="/api/v1")
