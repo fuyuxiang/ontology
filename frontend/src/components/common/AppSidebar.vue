@@ -109,6 +109,7 @@ const ico = {
   config: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 4h4M10 4h4M2 8h7M12 8h2M2 12h2M7 12h7" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="10.5" cy="8" r="1.8" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="12" r="1.8" stroke="currentColor" stroke-width="1.4"/></svg>`,
   rule: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2.5" y="2" width="11" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 5.5l1 1 1.5-1.5M5.5 9.5l1 1 1.5-1.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M9.5 6h2M9.5 10h2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
   action: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4"/><path d="M6.5 5.5l4 2.5-4 2.5v-5z" fill="currentColor"/></svg>`,
+  mapping: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1.5" y="4" width="4" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/><rect x="10.5" y="4" width="4" height="8" rx="1" stroke="currentColor" stroke-width="1.4"/><path d="M5.5 6.5h5M5.5 9.5h5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`,
 }
 
 const navGroups: NavGroup[] = [
@@ -132,10 +133,8 @@ const navGroups: NavGroup[] = [
       { path: '/logic/rules', label: '规则' },
     ]},
     { path: '/logic/actions', label: '行动建模', icon: ico.action },
-    { path: '/browser', label: '本体管理', icon: ico.ontologyMgr, children: [
-      { path: '/browser', label: '对象管理', exact: true },
-      { path: '/data/mapping', label: '映射管理' },
-    ]},
+    { path: '/browser', label: '本体管理', icon: ico.ontologyMgr },
+    { path: '/data/mapping', label: '映射管理', icon: ico.mapping },
     { path: '/studio', label: '本体探索', icon: ico.graph },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
     { path: '/service/api', label: '本体服务', icon: ico.api },
