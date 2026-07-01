@@ -193,6 +193,16 @@ def _migrate_ontology_entities(conn, inspector, tables):
     if "publish_config" not in cols:
         conn.execute(text("ALTER TABLE ontology_entities ADD COLUMN publish_config JSON"))
         conn.commit()
+    if "scenario_codes" not in cols:
+        conn.execute(text("ALTER TABLE ontology_entities ADD COLUMN scenario_codes JSON"))
+        conn.commit()
+
+    # 版本快照实体表同步补列
+    if "ontology_version_entities" in tables:
+        ve_cols = _get_cols(inspector, "ontology_version_entities")
+        if "scenario_codes" not in ve_cols:
+            conn.execute(text("ALTER TABLE ontology_version_entities ADD COLUMN scenario_codes JSON"))
+            conn.commit()
 
 
 def _migrate_users(conn, inspector, tables):

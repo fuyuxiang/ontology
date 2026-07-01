@@ -28,6 +28,22 @@
         </select>
       </div>
       <div class="form-row">
+        <label class="form-label">所属场景</label>
+        <div class="scenario-select">
+          <button
+            v-for="s in scenarioStore.scenarios" :key="s.code"
+            type="button"
+            class="scenario-chip"
+            :class="{ 'scenario-chip--active': form.scenario_codes.includes(s.code) }"
+            :style="chipStyle(s.code, s.color)"
+            @click="toggleScenario(s.code)"
+          >{{ s.name }}</button>
+          <span v-if="scenarioStore.scenarios.length === 0" class="scenario-empty">
+            暂无场景，请先在「场景管理」中创建
+          </span>
+        </div>
+      </div>
+      <div class="form-row">
         <label class="form-label">描述</label>
         <textarea v-model="form.description" class="form-input form-textarea" rows="2" />
       </div>
@@ -45,23 +61,28 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref, watch, onMounted } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
+import { useScenarioStore } from '../../store/scenarios'
 
 interface EntityData {
   id: string; name: string; name_cn: string; tier: number; status: string; description: string
+  scenario_codes?: string[]
 }
 
 const props = defineProps<{ visible: boolean; entity: EntityData | null }>()
 const emit = defineEmits<{ close: []; updated: []; deleted: [] }>()
 const toast = useToast()
+const scenarioStore = useScenarioStore()
 
 const tierNames: Record<number, string> = { 1: '核心', 2: '领域', 3: '场景' }
 const submitting = ref(false)
 
-const form = reactive({ name: '', name_cn: '', tier: 1, status: 'active', description: '' })
+const form = reactive({ name: '', name_cn: '', tier: 1, status: 'active', description: '', scenario_codes: [] as string[] })
+
+onMounted(() => { scenarioStore.fetchScenarios() })
 
 watch(() => props.entity, (e) => {
   if (e) {
@@ -70,8 +91,21 @@ watch(() => props.entity, (e) => {
     form.tier = e.tier
     form.status = e.status
     form.description = e.description || ''
+    form.scenario_codes = [...(e.scenario_codes || [])]
   }
 }, { immediate: true })
+
+function toggleScenario(code: string) {
+  const i = form.scenario_codes.indexOf(code)
+  if (i >= 0) form.scenario_codes.splice(i, 1)
+  else form.scenario_codes.push(code)
+}
+
+function chipStyle(code: string, color: string | null) {
+  if (!form.scenario_codes.includes(code)) return {}
+  const c = color || '#4c6ef5'
+  return { borderColor: c, color: c, background: `${c}1a` }
+}
 
 async function handleSubmit() {
   if (!props.entity || !form.name) return
@@ -124,6 +158,15 @@ async function handleDelete() {
 .form-radio input { display: none; }
 .form-radio--active { border-color: var(--semantic-500); background: var(--semantic-50); }
 .tier-dot { width: 8px; height: 8px; border-radius: 50%; }
+.scenario-select { display: flex; flex-wrap: wrap; gap: 8px; }
+.scenario-chip {
+  padding: 5px 12px; border-radius: 14px; border: 1px solid var(--neutral-200);
+  background: var(--neutral-0); color: var(--neutral-600); font-size: var(--text-code-size);
+  cursor: pointer; transition: all var(--transition-fast);
+}
+.scenario-chip:hover { border-color: var(--semantic-300); }
+.scenario-chip--active { font-weight: 600; }
+.scenario-empty { font-size: var(--text-code-size); color: var(--neutral-400); }
 .btn-primary {
   padding: 8px 20px; border-radius: var(--radius-md); border: none;
   background: var(--semantic-600); color: var(--neutral-0); font-size: var(--text-body-size); font-weight: 500; cursor: pointer;

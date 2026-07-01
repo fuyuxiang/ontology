@@ -9,6 +9,9 @@
       <div class="entity-card__header">
         <span class="entity-card__name">{{ entity.nameCn }}</span>
       </div>
+      <div v-if="entity.scenarioCodes && entity.scenarioCodes.length" class="entity-card__scenarios">
+        <ScenarioBadge v-for="c in entity.scenarioCodes" :key="c" :code="c" />
+      </div>
       <div class="entity-card__meta">
         <span>属性: {{ entity.attrs }}</span>
         <span>关系: {{ entity.relations }}</span>
@@ -25,6 +28,7 @@
 
 <script setup lang="ts">
 import TierBadge from './TierBadge.vue'
+import ScenarioBadge from './ScenarioBadge.vue'
 
 export interface Entity {
   id: string
@@ -36,6 +40,7 @@ export interface Entity {
   rules: number
   status: 'active' | 'warning' | 'error'
   datasource?: string | null
+  scenarioCodes?: string[]
 }
 
 defineProps<{ entity: Entity; selected?: boolean }>()
@@ -92,6 +97,13 @@ defineEmits<{ click: [entity: Entity] }>()
   font-size: var(--text-caption-size);
   color: var(--neutral-500);
   white-space: nowrap;
+}
+
+.entity-card__scenarios {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
 }
 
 .entity-card__meta {
