@@ -367,6 +367,15 @@ const gates = computed<PublishGate[]>(() => {
     pass: !!drillResult.value && drillStatus.value !== 'error',
   }
   list[2] = { ...list[2], desc: versionLabel.value, pass: true }
+  // 场景归属门禁：至少选择/新建一个场景才能发布
+  list.push({
+    key: 'scenario',
+    label: '场景归属已设置',
+    desc: selectedScenarioCodes.value.length
+      ? selectedScenarioNames.value.join('、')
+      : '未选择场景',
+    pass: selectedScenarioCodes.value.length > 0,
+  })
   return list
 })
 
