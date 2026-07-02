@@ -597,48 +597,72 @@ function handleHydrationEvent(ev: any, phaseData: Record<string, DrillPhase>) {
   }
 }
 
+interface FinalizeResult {
+  created_entities: number
+  created_bindings: number
+  created_relations: number
+  skipped: number
+  total: number
+}
+
 async function confirmPublish() {
+  const objects = (props.session.ontologyObjects || []).map((o: any) => ({
+    name: o.name,
+    displayName: o.displayName,
+    tier: o.tier,
+    namespace: o.namespace,
+    description: o.description,
+    primaryKey: o.primaryKey,
+    properties: (o.properties || []).map((p: any) => ({
+      name: p.name,
+      displayName: p.displayName,
+      type: p.type,
+      required: !!p.required,
+      description: p.description,
+      source_asset_id: p.source_asset_id ?? null,
+      source_column: p.source_column ?? null,
+    })),
+    backing_asset_ids: o.backing_asset_ids || [],
+  }))
+
+  // 无对象不允许发布，否则会产生「发布成功却空库」的假象
+  if (objects.length === 0) {
+    message.error('没有可发布的对象，请先在前序步骤中导入或创建对象')
+    return
+  }
+
+  const relations = (props.session.ontologyRelations || []).map((r: any) => {
+    const srcObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.source)
+    const tgtObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.target)
+    return {
+      name: r.name,
+      displayName: r.displayName,
+      source: srcObj?.name || r.source,
+      target: tgtObj?.name || r.target,
+      cardinality: r.cardinality || '1:N',
+      relationType: r.relationType || 'ObjectProperty',
+      description: r.description || r.displayName || r.name,
+    }
+  })
+
   publishing.value = true
   store.setStatus('publishing')
+
+  let result: FinalizeResult
   try {
-    const objects = (props.session.ontologyObjects || []).map((o: any) => ({
-      name: o.name,
-      displayName: o.displayName,
-      tier: o.tier,
-      namespace: o.namespace,
-      description: o.description,
-      primaryKey: o.primaryKey,
-      properties: (o.properties || []).map((p: any) => ({
-        name: p.name,
-        displayName: p.displayName,
-        type: p.type,
-        required: !!p.required,
-        description: p.description,
-        source_asset_id: p.source_asset_id ?? null,
-        source_column: p.source_column ?? null,
-      })),
-      backing_asset_ids: o.backing_asset_ids || [],
-    }))
-    const relations = (props.session.ontologyRelations || []).map((r: any) => {
-      const srcObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.source)
-      const tgtObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.target)
-      return {
-        name: r.name,
-        displayName: r.displayName,
-        source: srcObj?.name || r.source,
-        target: tgtObj?.name || r.target,
-        cardinality: r.cardinality || '1:N',
-        relationType: r.relationType || 'ObjectProperty',
-        description: r.description || r.displayName || r.name,
-      }
-    })
-    if (objects.length > 0) {
-      const { post } = await import('../../../api/client')
-      await post('/builder/finalize', { objects, relations })
-    }
-  } catch (e) {
+    const { post } = await import('../../../api/client')
+    result = await post<FinalizeResult>('/builder/finalize', { objects, relations })
+  } catch (e: any) {
+    // finalize 失败：不得标记为已发布，必须让用户看到真实错误
     console.error('finalize failed', e)
+    store.setStatus('drafting')
+    publishing.value = false
+    const detail = e?.response?.data?.detail || e?.message || '未知错误'
+    message.error({ content: `发布失败：${detail}`, duration: 6 })
+    return
   }
+
+  // 仅在 finalize 真正成功后，才标记为已发布并展示成功大屏
   const version = props.session.publishedVersion || 'v0.1'
   store.patchActive({
     status: 'published',
@@ -648,6 +672,20 @@ async function confirmPublish() {
   publishing.value = false
   publishModalOpen.value = false
   success.value = true
+
+  const created = result.created_entities
+  const skipped = result.skipped
+  if (created > 0) {
+    message.success(
+      skipped > 0
+        ? `发布成功：新建 ${created} 个对象，跳过 ${skipped} 个已存在对象`
+        : `发布成功：新建 ${created} 个对象`,
+    )
+  } else if (skipped > 0) {
+    message.warning(`发布完成：${skipped} 个对象已存在，未新建对象`)
+  } else {
+    message.success('发布成功')
+  }
 }
 
 // ── 生命周期 ──
