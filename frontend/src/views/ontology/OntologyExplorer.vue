@@ -4,9 +4,9 @@
     <aside class="explorer__summary-panel">
       <div class="explorer__summary-head">
         <div>
-          <p class="explorer__eyebrow">本体分层</p>
+          <p class="explorer__eyebrow">业务场景</p>
           <h2 class="explorer__summary-title">对象概览</h2>
-          <p class="explorer__summary-subtitle">左侧仅展示 Tier 1 到 Tier 3 的对象数量</p>
+          <p class="explorer__summary-subtitle">按业务场景查看实体对象，同一对象可归属多个场景</p>
         </div>
         <button class="explorer__add-btn" @click="router.push('/builder')">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -26,8 +26,8 @@
         <button
           type="button"
           class="explorer__summary-total"
-          :class="{ 'explorer__summary-total--active': activeTierFilter === null }"
-          @click="setTierFilter(null)"
+          :class="{ 'explorer__summary-total--active': activeScenarioFilter === null }"
+          @click="setScenarioFilter(null)"
         >
           <span class="explorer__summary-total-label">全部对象</span>
           <span class="explorer__summary-total-value">{{ totalEntities }}</span>
@@ -35,17 +35,14 @@
 
         <button
           v-for="group in groups"
-          :key="group.tier"
+          :key="group.code"
           type="button"
           class="explorer__summary-card"
-          :class="[
-            `explorer__summary-card--tier${group.tier}`,
-            { 'explorer__summary-card--active': activeTierFilter === group.tier },
-          ]"
-          @click="setTierFilter(group.tier)"
+          :class="{ 'explorer__summary-card--active': activeScenarioFilter === group.code }"
+          @click="setScenarioFilter(group.code)"
         >
           <div class="explorer__summary-card-main">
-            <TierBadge :tier="group.tier" />
+            <span class="explorer__summary-dot" :style="{ background: group.color || '#94a3b8' }"></span>
             <div class="explorer__summary-card-text">
               <span class="explorer__summary-card-title">{{ group.label }}</span>
               <span class="explorer__summary-card-note">对象数量</span>
@@ -61,10 +58,10 @@
       <div class="explorer__list-head">
         <div>
           <p class="explorer__eyebrow">实体对象</p>
-          <h2 class="explorer__list-title">{{ activeTierMeta.title }}</h2>
-          <p class="explorer__list-subtitle">{{ activeTierMeta.subtitle }}</p>
+          <h2 class="explorer__list-title">{{ activeScenarioMeta.title }}</h2>
+          <p class="explorer__list-subtitle">{{ activeScenarioMeta.subtitle }}</p>
         </div>
-        <span class="explorer__list-count">{{ filteredEntities.length }} / {{ activeTierMeta.count }}</span>
+        <span class="explorer__list-count">{{ filteredEntities.length }} / {{ activeScenarioMeta.count }}</span>
       </div>
 
       <div class="explorer__search">
@@ -72,29 +69,14 @@
           <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.5"/>
           <path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>
-        <input v-model="searchQuery" class="explorer__search-input" :placeholder="activeTierMeta.searchPlaceholder" />
-      </div>
-
-      <div v-if="scenarioStore.scenarios.length" class="explorer__scenario-filter">
-        <button
-          class="scenario-filter-chip"
-          :class="{ 'scenario-filter-chip--active': activeScenarioFilter === null }"
-          @click="activeScenarioFilter = null"
-        >全部场景</button>
-        <button
-          v-for="s in scenarioStore.scenarios" :key="s.code"
-          class="scenario-filter-chip"
-          :class="{ 'scenario-filter-chip--active': activeScenarioFilter === s.code }"
-          :style="activeScenarioFilter === s.code && s.color ? { borderColor: s.color, color: s.color, background: `${s.color}1a` } : {}"
-          @click="activeScenarioFilter = activeScenarioFilter === s.code ? null : s.code"
-        >{{ s.name }}</button>
+        <input v-model="searchQuery" class="explorer__search-input" :placeholder="activeScenarioMeta.searchPlaceholder" />
       </div>
 
       <div v-if="store.loading && totalEntities === 0" class="explorer__panel-loading">
         <div class="spinner"></div>
       </div>
       <div v-else-if="filteredEntities.length === 0" class="explorer__panel-empty">
-        <p class="text-caption">{{ searchQuery ? activeTierMeta.emptySearchText : activeTierMeta.emptyText }}</p>
+        <p class="text-caption">{{ searchQuery ? activeScenarioMeta.emptySearchText : activeScenarioMeta.emptyText }}</p>
       </div>
       <div v-else class="explorer__entity-list">
         <EntityCard
@@ -392,7 +374,7 @@ const showCreateEntity = ref(false)
 const showEditEntity = ref(false)
 const showCreateRelation = ref(false)
 const searchQuery = ref('')
-const activeTierFilter = ref<1 | 2 | 3 | null>(null)
+const UNCATEGORIZED = '__uncategorized__'
 const activeScenarioFilter = ref<string | null>(null)
 const selectedId = ref<string | null>(null)
 const activeTab = ref('属性')
@@ -425,25 +407,36 @@ const allEntities = computed<Entity[]>(() =>
   }))
 )
 
-const groups = computed(() => [
-  { tier: 1 as const, label: 'Tier 1 核心对象', entities: allEntities.value.filter(e => e.tier === 1) },
-  { tier: 2 as const, label: 'Tier 2 领域对象', entities: allEntities.value.filter(e => e.tier === 2) },
-  { tier: 3 as const, label: 'Tier 3 场景对象', entities: allEntities.value.filter(e => e.tier === 3) },
-])
+// 左侧按场景分组：每个场景一组 + 未分类兜底（对象可属多个场景，故各组之和可能大于总数）
+const groups = computed(() => {
+  const list = scenarioStore.scenarios.map(s => ({
+    code: s.code,
+    label: s.name,
+    color: s.color || null,
+    entities: allEntities.value.filter(e => (e.scenarioCodes || []).includes(s.code)),
+  }))
+  const uncategorized = allEntities.value.filter(e => !(e.scenarioCodes || []).length)
+  if (uncategorized.length) {
+    list.push({ code: UNCATEGORIZED, label: '未分类', color: null, entities: uncategorized })
+  }
+  return list
+})
 
-const tierEntities = computed(() =>
-  activeTierFilter.value === null
-    ? allEntities.value
-    : allEntities.value.filter(e => e.tier === activeTierFilter.value)
-)
+const scenarioEntities = computed(() => {
+  if (activeScenarioFilter.value === null) return allEntities.value
+  if (activeScenarioFilter.value === UNCATEGORIZED) {
+    return allEntities.value.filter(e => !(e.scenarioCodes || []).length)
+  }
+  return allEntities.value.filter(e => (e.scenarioCodes || []).includes(activeScenarioFilter.value as string))
+})
 
 const totalEntities = computed(() => allEntities.value.length)
 
-const activeTierMeta = computed(() => {
-  if (activeTierFilter.value === null) {
+const activeScenarioMeta = computed(() => {
+  if (activeScenarioFilter.value === null) {
     return {
       title: '全部实体对象',
-      subtitle: '当前展示 Tier 1 到 Tier 3 的全部实体对象',
+      subtitle: '当前展示所有场景的实体对象',
       searchPlaceholder: '搜索全部实体对象...',
       emptyText: '暂无实体对象',
       emptySearchText: '未找到匹配的实体对象',
@@ -451,23 +444,23 @@ const activeTierMeta = computed(() => {
     }
   }
 
-  const tier = activeTierFilter.value
-  const label = tierLabel(tier)
+  const label = activeScenarioFilter.value === UNCATEGORIZED
+    ? '未分类'
+    : (scenarioStore.byCode(activeScenarioFilter.value)?.name || activeScenarioFilter.value)
   return {
-    title: `Tier ${tier} ${label}`,
-    subtitle: `当前仅展示 Tier ${tier} 的实体对象`,
-    searchPlaceholder: `搜索 Tier ${tier} ${label}...`,
-    emptyText: `暂无 Tier ${tier} ${label}`,
-    emptySearchText: `未找到匹配的 Tier ${tier} ${label}`,
-    count: tierEntities.value.length,
+    title: label,
+    subtitle: activeScenarioFilter.value === UNCATEGORIZED
+      ? '当前仅展示未归属任何场景的实体对象'
+      : `当前仅展示「${label}」场景下的实体对象`,
+    searchPlaceholder: `搜索「${label}」...`,
+    emptyText: `「${label}」下暂无实体对象`,
+    emptySearchText: `未在「${label}」下找到匹配的实体对象`,
+    count: scenarioEntities.value.length,
   }
 })
 
 const filteredEntities = computed(() => {
-  let base = tierEntities.value
-  if (activeScenarioFilter.value) {
-    base = base.filter(e => (e.scenarioCodes || []).includes(activeScenarioFilter.value as string))
-  }
+  const base = scenarioEntities.value
   const q = searchQuery.value.trim().toLowerCase()
   if (!q) return base
   return base.filter(e =>
@@ -477,10 +470,10 @@ const filteredEntities = computed(() => {
 
 const selected = computed(() => allEntities.value.find(e => e.id === selectedId.value) ?? null)
 
-watch([activeTierFilter, allEntities], () => {
+watch([activeScenarioFilter, allEntities], () => {
   if (!selectedId.value) return
-  const existsInCurrentTier = tierEntities.value.some(entity => entity.id === selectedId.value)
-  if (!existsInCurrentTier) {
+  const existsInCurrentScope = scenarioEntities.value.some(entity => entity.id === selectedId.value)
+  if (!existsInCurrentScope) {
     selectedId.value = null
     store.currentEntity = null
   }
@@ -593,8 +586,8 @@ function selectEntity(entity: Entity) {
   activeTab.value = '属性'
 }
 
-function setTierFilter(tier: 1 | 2 | 3 | null) {
-  activeTierFilter.value = tier
+function setScenarioFilter(code: string | null) {
+  activeScenarioFilter.value = code
 }
 
 function onEntityUpdated() {
@@ -891,34 +884,16 @@ async function handleDeleteAttribute(id: string, name: string) {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
-.explorer__summary-card--tier1 {
-  border-left: 4px solid var(--tier1-primary);
-  background: var(--tier1-bg);
-}
-
-.explorer__summary-card--tier2 {
-  border-left: 4px solid var(--tier2-primary);
-  background: var(--tier2-bg);
-}
-
-.explorer__summary-card--tier3 {
-  border-left: 4px solid var(--tier3-primary);
-  background: var(--tier3-bg);
-}
-
-.explorer__summary-card--tier1.explorer__summary-card--active {
-  border-color: var(--tier1-primary);
+.explorer__summary-card--active {
+  border-color: var(--semantic-500);
   box-shadow: 0 0 0 1px rgba(76, 110, 245, 0.16), var(--shadow-sm);
 }
 
-.explorer__summary-card--tier2.explorer__summary-card--active {
-  border-color: var(--tier2-primary);
-  box-shadow: 0 0 0 1px rgba(121, 80, 242, 0.16), var(--shadow-sm);
-}
-
-.explorer__summary-card--tier3.explorer__summary-card--active {
-  border-color: var(--tier3-primary);
-  box-shadow: 0 0 0 1px rgba(32, 201, 151, 0.16), var(--shadow-sm);
+.explorer__summary-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 .explorer__summary-card-main {
@@ -1013,29 +988,6 @@ async function handleDeleteAttribute(id: string, name: string) {
   color: var(--neutral-400);
 }
 
-.explorer__scenario-filter {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 0 10px;
-}
-.scenario-filter-chip {
-  padding: 3px 10px;
-  border-radius: 12px;
-  border: 1px solid var(--neutral-200);
-  background: var(--neutral-0);
-  color: var(--neutral-600);
-  font-size: var(--text-caption-size);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-.scenario-filter-chip:hover { border-color: var(--semantic-300); }
-.scenario-filter-chip--active {
-  border-color: var(--semantic-500);
-  background: var(--semantic-50);
-  color: var(--semantic-700);
-  font-weight: 600;
-}
 .explorer__detail-scenarios {
   display: flex;
   flex-wrap: wrap;
