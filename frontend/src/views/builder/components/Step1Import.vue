@@ -75,7 +75,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { useBuilderStore, buildPresetClasses, buildPresetRelations } from '../../../store/builder'
+import { useBuilderStore } from '../../../store/builder'
 import type { BuilderSession, OntologyObjectDraft, OntologyRelationDraft } from '../../../types/builder'
 import { entityApi } from '../../../api/ontology'
 import type { OntologyPreviewResult } from '../../../api/ontology'
@@ -109,109 +109,98 @@ async function parseFile(file: File) {
   message.loading({ content: '正在解析本体文件...', key: 'parse', duration: 0 })
 
   const ext = (file.name.split('.').pop() || '').toLowerCase()
+  const supported = ['json', 'xlsx', 'xls', 'owl', 'rdf', 'xml', 'ttl']
+  if (!supported.includes(ext)) {
+    parsedSummary.value = null
+    message.error({ content: `不支持的文件格式 .${ext}，请上传 .json / .xlsx / .owl / .ttl / .rdf 文件`, key: 'parse' })
+    return
+  }
 
-  if (ext === 'json' || ext === 'xlsx' || ext === 'xls') {
-    try {
-      // 统一走后端预览接口（只解析不落库），json 与 excel 复用同一套草稿映射
-      // namespace 留空，由后端推导（json 取 scenario.namespace，excel 不需要）
-      const preview: OntologyPreviewResult = await entityApi.previewFile(file, ext)
+  try {
+    // 统一走后端预览接口（只解析不落库），json / excel / owl / ttl 复用同一套草稿映射
+    // namespace 留空，由后端推导（json 取 scenario.namespace，excel/owl 不需要）
+    const preview: OntologyPreviewResult = await entityApi.previewFile(file, ext)
 
-      if (!preview.objects.length) {
-        const tip = ext === 'json' ? '未在 JSON 中找到 object_types / entities 定义' : '未在 Excel 中解析到对象信息，请检查模板表头是否正确'
-        message.error({ content: tip, key: 'parse' })
-        return
-      }
-
-      const stamp = Date.now().toString(36)
-      const nameToId = new Map<string, string>()
-      const classes: OntologyObjectDraft[] = preview.objects.map((o, i) => {
-        const id = `obj-${stamp}-${i}`
-        nameToId.set(o.name, id)
-        return {
-          id,
-          name: o.name,
-          displayName: o.display_name || o.name,
-          tier: (o.tier || 3) as 1 | 2 | 3,
-          namespace: o.namespace || undefined,
-          description: o.description || '',
-          primaryKey: o.primary_key || 'id',
-          icon: '🔷',
-          instanceCount: 0,
-          backing_asset_ids: [],
-          properties: o.properties.map((p, pi) => ({
-            id: `prop-${stamp}-${i}-${pi}`,
-            name: p.name,
-            displayName: p.display_name || p.name,
-            type: p.type || 'string',
-            required: !!p.required,
-            description: p.description || '',
-            source_asset_id: null,
-            source_column: p.source_field || null,
-            source_field: p.source_field || null,
-            source_table: p.source_table || null,
-          })),
-          derivedProperties: [],
-          rules: [],
-          actions: [],
-          approved: false,
-        }
-      })
-
-      // 基数归一：后端已归一（1:N / N:1 / 1:1 / N:N），N:1 在草稿模型里折叠为 1:N
-      const toDraftCardinality = (c: string): '1:1' | '1:N' | 'N:N' =>
-        c === 'N:N' ? 'N:N' : c === '1:1' ? '1:1' : '1:N'
-
-      const relations: OntologyRelationDraft[] = preview.relations.map((r, i) => ({
-        id: `rel-${stamp}-${i}`,
-        name: r.name || `relation_${i}`,
-        displayName: r.display_name || r.name || `关系${i + 1}`,
-        source: nameToId.get(r.source)!,
-        target: nameToId.get(r.target)!,
-        cardinality: toDraftCardinality(r.cardinality),
-        description: r.description || '',
-        relationType: 'ObjectProperty' as const,
-        semanticType: 'association' as const,
-      }))
-
-      // actions 按 target_object 挂到对应对象（仅记录名称，发布链路再落库）
-      const objByName = new Map(classes.map(c => [c.name, c]))
-      preview.actions.forEach(a => {
-        if (a.target_object && objByName.has(a.target_object)) {
-          objByName.get(a.target_object)!.actions.push(a.display_name || a.name)
-        }
-      })
-
-      const skipped = preview.summary.relation_count < preview.relations.length
-      if (skipped) {
-        message.warning('部分关系因实体缺失被跳过')
-      }
-
-      parsedSummary.value = {
-        classCount: preview.summary.object_count,
-        relationCount: preview.summary.relation_count,
-        propertyCount: preview.summary.property_count,
-        actionCount: preview.summary.action_count,
-        fileSize: (file.size / 1024).toFixed(1) + ' KB',
-        preview: classes.slice(0, 10),
-      }
-      store.patchActive({
-        ontologyObjects: classes,
-        ontologyRelations: relations,
-      })
-    } catch (e: any) {
-      message.error({ content: `本体文件解析失败: ${e?.response?.data?.detail || e?.message || '未知错误'}`, key: 'parse' })
+    if (!preview.objects.length) {
+      parsedSummary.value = null
+      const tip = ext === 'json'
+        ? '未在 JSON 中找到 object_types / entities 定义'
+        : (ext === 'xlsx' || ext === 'xls')
+          ? '未在 Excel 中解析到对象信息，请检查模板表头是否正确'
+          : '未在本体文件中解析到 owl:Class 定义'
+      message.error({ content: tip, key: 'parse' })
       return
     }
-  } else {
-    // OWL / TTL / RDF — 使用 preset fallback
-    const classes = buildPresetClasses(props.session.scenarioId || 'refund-root-cause')
-    const relations = buildPresetRelations(props.session.scenarioId || 'refund-root-cause', classes)
-    const propertyCount = classes.reduce((sum, c) => sum + c.properties.length, 0)
+
+    const stamp = Date.now().toString(36)
+    const nameToId = new Map<string, string>()
+    const classes: OntologyObjectDraft[] = preview.objects.map((o, i) => {
+      const id = `obj-${stamp}-${i}`
+      nameToId.set(o.name, id)
+      return {
+        id,
+        name: o.name,
+        displayName: o.display_name || o.name,
+        tier: (o.tier || 3) as 1 | 2 | 3,
+        namespace: o.namespace || undefined,
+        description: o.description || '',
+        primaryKey: o.primary_key || 'id',
+        icon: '🔷',
+        instanceCount: 0,
+        backing_asset_ids: [],
+        properties: o.properties.map((p, pi) => ({
+          id: `prop-${stamp}-${i}-${pi}`,
+          name: p.name,
+          displayName: p.display_name || p.name,
+          type: p.type || 'string',
+          required: !!p.required,
+          description: p.description || '',
+          source_asset_id: null,
+          source_column: p.source_field || null,
+          source_field: p.source_field || null,
+          source_table: p.source_table || null,
+        })),
+        derivedProperties: [],
+        rules: [],
+        actions: [],
+        approved: false,
+      }
+    })
+
+    // 基数归一：后端已归一（1:N / N:1 / 1:1 / N:N），N:1 在草稿模型里折叠为 1:N
+    const toDraftCardinality = (c: string): '1:1' | '1:N' | 'N:N' =>
+      c === 'N:N' ? 'N:N' : c === '1:1' ? '1:1' : '1:N'
+
+    const relations: OntologyRelationDraft[] = preview.relations.map((r, i) => ({
+      id: `rel-${stamp}-${i}`,
+      name: r.name || `relation_${i}`,
+      displayName: r.display_name || r.name || `关系${i + 1}`,
+      source: nameToId.get(r.source)!,
+      target: nameToId.get(r.target)!,
+      cardinality: toDraftCardinality(r.cardinality),
+      description: r.description || '',
+      relationType: 'ObjectProperty' as const,
+      semanticType: 'association' as const,
+    }))
+
+    // actions 按 target_object 挂到对应对象（仅记录名称，发布链路再落库）
+    const objByName = new Map(classes.map(c => [c.name, c]))
+    preview.actions.forEach(a => {
+      if (a.target_object && objByName.has(a.target_object)) {
+        objByName.get(a.target_object)!.actions.push(a.display_name || a.name)
+      }
+    })
+
+    const skipped = preview.summary.relation_count < preview.relations.length
+    if (skipped) {
+      message.warning('部分关系因实体缺失被跳过')
+    }
+
     parsedSummary.value = {
-      classCount: classes.length,
-      relationCount: relations.length,
-      propertyCount,
-      actionCount: 0,
+      classCount: preview.summary.object_count,
+      relationCount: preview.summary.relation_count,
+      propertyCount: preview.summary.property_count,
+      actionCount: preview.summary.action_count,
       fileSize: (file.size / 1024).toFixed(1) + ' KB',
       preview: classes.slice(0, 10),
     }
@@ -219,6 +208,10 @@ async function parseFile(file: File) {
       ontologyObjects: classes,
       ontologyRelations: relations,
     })
+  } catch (e: any) {
+    parsedSummary.value = null
+    message.error({ content: `本体文件解析失败: ${e?.response?.data?.detail || e?.message || '未知错误'}`, key: 'parse' })
+    return
   }
 
   store.addUploadRecord({

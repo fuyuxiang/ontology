@@ -634,3 +634,120 @@ def parse_owl_ontology(content: bytes, fmt: str, db: Session) -> ImportResult:
         result.relations_created += 1
 
     return result
+
+
+def preview_owl_ontology(content: bytes, fmt: str, namespace: str = "") -> dict:
+    """纯解析：把 OWL/XML 或 TTL 文件解析成内存草稿结构，不接触数据库、不落库。
+
+    供模版构建预览使用。解析口径与 parse_owl_ontology 保持一致
+    （owl:Class→对象、DatatypeProperty→属性、ObjectProperty/subClassOf→关系），
+    返回结构与 preview_json_ontology / preview_excel_ontology 完全一致。
+    """
+    from rdflib import OWL, RDF, RDFS, Graph
+
+    g = Graph()
+    g.parse(data=content, format=fmt)
+
+    # ── owl:Class → objects ──
+    objects: list[dict] = []
+    by_uri: dict[str, dict] = {}  # URI → object 草稿
+    for cls in g.subjects(RDF.type, OWL.Class):
+        uri = str(cls)
+        name = _local_name(uri)
+        if not name or name.startswith("_:"):
+            continue
+        if uri in by_uri:
+            continue
+        labels = list(g.objects(cls, RDFS.label))
+        comments = list(g.objects(cls, RDFS.comment))
+        obj = {
+            "name": name,
+            "display_name": str(labels[0]) if labels else name,
+            "tier": 3,
+            "namespace": namespace or None,
+            "primary_key": None,
+            "description": str(comments[0]) if comments else "",
+            "properties": [],
+        }
+        by_uri[uri] = obj
+        objects.append(obj)
+
+    # ── owl:DatatypeProperty → 属性（按 rdfs:domain 挂到对象）──
+    property_count = 0
+    for prop in g.subjects(RDF.type, OWL.DatatypeProperty):
+        domains = list(g.objects(prop, RDFS.domain))
+        if not domains:
+            continue
+        obj = by_uri.get(str(domains[0]))
+        if not obj:
+            continue
+        prop_name = _local_name(str(prop))
+        if any(p["name"] == prop_name for p in obj["properties"]):
+            continue
+        ranges = list(g.objects(prop, RDFS.range))
+        attr_type = _XSD_TYPE_MAP.get(str(ranges[0]), "string") if ranges else "string"
+        labels = list(g.objects(prop, RDFS.label))
+        obj["properties"].append({
+            "name": prop_name,
+            "display_name": str(labels[0]) if labels else prop_name,
+            "type": attr_type,
+            "raw_type": str(ranges[0]) if ranges else "string",
+            "required": False,
+            "description": str(labels[0]) if labels else prop_name,
+            "source_table": None,
+            "source_field": prop_name,
+        })
+        property_count += 1
+
+    # ── 关系：subClassOf（父子）+ ObjectProperty（业务关系）──
+    relations: list[dict] = []
+    seen_rel: set[tuple[str, str, str]] = set()
+
+    def _add_rel(src_uri: str, tgt_uri: str, name: str, display: str, card: str, desc: str) -> None:
+        src, tgt = by_uri.get(src_uri), by_uri.get(tgt_uri)
+        if not src or not tgt:
+            return
+        key = (src["name"], tgt["name"], name)
+        if key in seen_rel:
+            return
+        seen_rel.add(key)
+        relations.append({
+            "name": name,
+            "display_name": display or name,
+            "source": src["name"],
+            "target": tgt["name"],
+            "cardinality": _normalize_cardinality(card),
+            "description": desc,
+        })
+
+    for sub, _, parent in g.triples((None, RDFS.subClassOf, None)):
+        _add_rel(
+            str(sub), str(parent), "subClassOf", "子类",
+            "N:1", f"{_local_name(str(sub))} 是 {_local_name(str(parent))} 的子类",
+        )
+
+    for prop in g.subjects(RDF.type, OWL.ObjectProperty):
+        domains = list(g.objects(prop, RDFS.domain))
+        ranges = list(g.objects(prop, RDFS.range))
+        if not domains or not ranges:
+            continue
+        prop_name = _local_name(str(prop))
+        labels = list(g.objects(prop, RDFS.label))
+        _add_rel(
+            str(domains[0]), str(ranges[0]), prop_name,
+            str(labels[0]) if labels else prop_name,
+            "1:N", str(labels[0]) if labels else prop_name,
+        )
+
+    return {
+        "objects": objects,
+        "relations": relations,
+        "actions": [],
+        "data_sources": [],
+        "summary": {
+            "object_count": len(objects),
+            "relation_count": len(relations),
+            "property_count": property_count,
+            "action_count": 0,
+        },
+    }

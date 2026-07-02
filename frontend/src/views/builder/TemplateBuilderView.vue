@@ -56,7 +56,12 @@ onMounted(() => {
       buildMethod: 'import',
     })
   } else {
+    // 复用旧的 drafting 会话时，清空上次残留的解析结果，
+    // 避免上一份导入（如宽带退单预置样例）串到本次导入
     store.setActiveSession(session.value.sessionId)
+    if (session.value.ontologyObjects.length || session.value.ontologyRelations.length) {
+      store.patchActive({ ontologyObjects: [], ontologyRelations: [] })
+    }
   }
 })
 </script>
