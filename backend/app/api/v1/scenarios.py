@@ -34,6 +34,7 @@ def create_scenario(
         description=data.description, sort_order=data.sort_order,
     )
     db.add(sc)
+    db.flush()
     write_audit(
         db, user_id=user.id, user_name=user.name,
         action="create", target_type="scenario", target_id=sc.id, target_name=sc.name,
