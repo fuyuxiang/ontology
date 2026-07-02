@@ -489,9 +489,10 @@ async def preview_from_file(
 ):
     """预览本体文件：仅解析为草稿结构，不落库、不写审计。供模版构建使用。
 
-    支持 json（V1.1 本体规范）与 xlsx/xls（对象信息+对象关系信息 Excel 模板）。
+    支持 json（V1.1 本体规范）、xlsx/xls（对象信息+对象关系信息 Excel 模板）
+    与 owl/rdf/xml/ttl（标准本体文件）。
     """
-    from app.services.file_import import preview_json_ontology
+    from app.services.file_import import preview_json_ontology, preview_owl_ontology
 
     ft = (file_type or "").lower()
     content = await file.read()
@@ -506,8 +507,12 @@ async def preview_from_file(
             import json as _json
             data = _json.loads(content.decode("utf-8"))
             preview = preview_json_ontology(data, namespace)
+        elif ft in ("owl", "rdf", "xml"):
+            preview = preview_owl_ontology(content, "xml", namespace)
+        elif ft == "ttl":
+            preview = preview_owl_ontology(content, "turtle", namespace)
         else:
-            raise HTTPException(status_code=400, detail="预览仅支持 json / xlsx 格式")
+            raise HTTPException(status_code=400, detail="预览仅支持 json / xlsx / owl / ttl 格式")
     except HTTPException:
         raise
     except Exception as e:
