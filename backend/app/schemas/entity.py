@@ -79,6 +79,7 @@ class RelationOut(BaseModel):
     rel_type: str
     from_entity_id: str
     from_entity_name: str = ""
+    from_entity_tier: int = 1
     to_entity_id: str
     to_entity_name: str = ""
     to_entity_tier: int = 1

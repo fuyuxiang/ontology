@@ -534,6 +534,7 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
         rel_list.append(RelationOut(
             id=r.id, name=r.name, rel_type=r.rel_type,
             from_entity_id=r.from_entity_id, from_entity_name=from_e.name_cn if from_e else "",
+            from_entity_tier=from_e.tier if from_e else 1,
             to_entity_id=r.to_entity_id, to_entity_name=to_e.name_cn if to_e else "",
             to_entity_tier=to_e.tier if to_e else 1,
             cardinality=r.cardinality, acyclic=r.acyclic, description=r.description,

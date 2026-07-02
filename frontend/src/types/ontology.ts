@@ -96,6 +96,7 @@ export interface EntityRelationDetail {
   rel_type: string
   from_entity_id: string
   from_entity_name: string
+  from_entity_tier?: number
   to_entity_id: string
   to_entity_name: string
   to_entity_tier: number
