@@ -200,6 +200,43 @@
         </div>
 
         <div class="step3-panel">
+          <div class="step3-panel__title">场景归属</div>
+          <div class="step3-panel__sub">为本次发布的对象选择业务场景，可在本体管理中按场景筛选</div>
+          <div class="step3-scenario-chips">
+            <button
+              v-for="s in scenarioStore.scenarios"
+              :key="s.code"
+              type="button"
+              class="step3-scenario-chip"
+              :class="{ 'step3-scenario-chip--active': selectedScenarioCodes.includes(s.code) }"
+              :style="selectedScenarioCodes.includes(s.code) && s.color ? { borderColor: s.color, color: s.color, background: `${s.color}1a` } : {}"
+              @click="toggleScenario(s.code)"
+            >
+              {{ s.name }}
+            </button>
+            <span v-if="scenarioStore.scenarios.length === 0" class="step3-scenario-empty">
+              暂无场景，可在下方新建
+            </span>
+          </div>
+          <div class="step3-scenario-new">
+            <input
+              v-model="newScenarioName"
+              class="step3-scenario-input"
+              placeholder="输入新场景名并回车"
+              @keyup.enter="createScenario"
+            />
+            <button
+              type="button"
+              class="step3-scenario-add"
+              :disabled="!newScenarioName.trim() || creatingScenario"
+              @click="createScenario"
+            >
+              {{ creatingScenario ? '新建中' : '新建' }}
+            </button>
+          </div>
+        </div>
+
+        <div class="step3-panel">
           <div class="step3-panel__title">版本信息</div>
           <div class="step3-version-info">
             <div class="step3-version-row"><span>版本号</span><strong>{{ versionLabel }}</strong></div>
@@ -233,6 +270,9 @@
           <div><span>数据行数：</span><strong>{{ drillResult.entityCount?.toLocaleString() || 0 }}</strong></div>
           <div><span>关系实例：</span><strong>{{ drillResult.relationCount?.toLocaleString() || 0 }}</strong></div>
         </div>
+        <div class="step3-modal-text" v-if="selectedScenarioNames.length">
+          场景归属：<strong>{{ selectedScenarioNames.join('、') }}</strong>
+        </div>
         <div class="step3-modal-actions">
           <a-button @click="publishModalOpen = false">取消</a-button>
           <a-button type="primary" :loading="publishing" @click="confirmPublish">确认发布</a-button>
@@ -246,6 +286,8 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
+import { useScenarioStore } from '../../../store/scenarios'
+import { scenarioApi } from '../../../api/scenarios'
 import { authHeaders } from '../../../utils/authHeaders'
 import { HYDRATION_PHASES, DEFAULT_PUBLISH_GATES } from '../../../data/builderPresets'
 import type { BuilderSession, DrillLogLine, DrillPhase, DrillResult, PublishGate } from '../../../types/builder'
@@ -253,6 +295,7 @@ import type { BuilderSession, DrillLogLine, DrillPhase, DrillResult, PublishGate
 const props = defineProps<{ session: BuilderSession }>()
 defineEmits<{ (e: 'prev'): void; (e: 'goto-studio'): void }>()
 const store = useBuilderStore()
+const scenarioStore = useScenarioStore()
 
 // ── 状态 ──
 const drillStarted = ref(!!props.session.drillResult)
@@ -268,6 +311,11 @@ const success = ref(props.session.status === 'published')
 const logBodyRef = ref<HTMLElement | null>(null)
 const assetLoading = ref(false)
 const assetList = ref<AssetDisplayItem[]>([])
+
+// 场景归属：本批发布对象统一挂到这些场景 code
+const selectedScenarioCodes = ref<string[]>([])
+const newScenarioName = ref('')
+const creatingScenario = ref(false)
 
 let drillTimer: number | null = null
 
@@ -406,6 +454,61 @@ async function loadAssetDetails() {
 
 function selectAll() {
   selectedSourceIds.value = assetList.value.map(i => i.id)
+}
+
+// ── 场景归属 ──
+const selectedScenarioNames = computed(() =>
+  selectedScenarioCodes.value.map(c => scenarioStore.byCode(c)?.name || c)
+)
+
+function toggleScenario(code: string) {
+  const i = selectedScenarioCodes.value.indexOf(code)
+  if (i >= 0) selectedScenarioCodes.value.splice(i, 1)
+  else selectedScenarioCodes.value.push(code)
+}
+
+// 由场景名生成一个 slug 作为 code（英文/数字保留，其余转连字符）
+function slugify(name: string): string {
+  const base = name.trim().toLowerCase()
+    .replace(/[^a-z0-9一-龥]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return base || `scene-${Date.now().toString(36)}`
+}
+
+async function createScenario() {
+  const name = newScenarioName.value.trim()
+  if (!name) return
+  // 已存在同名场景则直接选中，不重复创建
+  const existed = scenarioStore.scenarios.find(s => s.name === name)
+  if (existed) {
+    if (!selectedScenarioCodes.value.includes(existed.code)) {
+      selectedScenarioCodes.value.push(existed.code)
+    }
+    newScenarioName.value = ''
+    return
+  }
+  creatingScenario.value = true
+  try {
+    let code = slugify(name)
+    // code 冲突时追加短随机后缀
+    if (scenarioStore.scenarios.some(s => s.code === code)) {
+      code = `${code}-${Date.now().toString(36).slice(-4)}`
+    }
+    const palette = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777']
+    const color = palette[scenarioStore.scenarios.length % palette.length]
+    const sc = await scenarioApi.create({
+      code, name, color,
+      sort_order: scenarioStore.scenarios.length,
+    })
+    await scenarioStore.fetchScenarios(true)
+    selectedScenarioCodes.value.push(sc.code)
+    newScenarioName.value = ''
+    message.success(`已新建场景「${name}」`)
+  } catch (e: any) {
+    message.error(e?.response?.data?.detail || '新建场景失败')
+  } finally {
+    creatingScenario.value = false
+  }
 }
 
 // ── 演练 ──
@@ -651,7 +754,7 @@ async function confirmPublish() {
   let result: FinalizeResult
   try {
     const { post } = await import('../../../api/client')
-    result = await post<FinalizeResult>('/builder/finalize', { objects, relations })
+    result = await post<FinalizeResult>('/builder/finalize', { objects, relations, scenario_codes: selectedScenarioCodes.value })
   } catch (e: any) {
     // finalize 失败：不得标记为已发布，必须让用户看到真实错误
     console.error('finalize failed', e)
@@ -691,6 +794,7 @@ async function confirmPublish() {
 // ── 生命周期 ──
 onMounted(() => {
   loadAssetDetails()
+  scenarioStore.fetchScenarios()
 })
 
 watch(() => props.session.sessionId, () => {
@@ -894,6 +998,29 @@ onUnmounted(() => {
   display: flex; justify-content: space-between; font-size: 12px; color: #475569;
 }
 .step3-version-row strong { color: #0f172a; }
+
+/* 场景归属 */
+.step3-scenario-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+.step3-scenario-chip {
+  padding: 3px 10px; border-radius: 999px;
+  border: 1px solid #e2e8f0; background: #f8fafc;
+  color: #475569; font-size: 11px; cursor: pointer; transition: all 120ms ease;
+}
+.step3-scenario-chip:hover { border-color: #cbd5e1; }
+.step3-scenario-chip--active { font-weight: 600; }
+.step3-scenario-empty { font-size: 11px; color: #94a3b8; }
+.step3-scenario-new { display: flex; gap: 6px; }
+.step3-scenario-input {
+  flex: 1; min-width: 0; padding: 6px 10px;
+  border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px; color: #0f172a;
+}
+.step3-scenario-input:focus { outline: none; border-color: #a5b4fc; }
+.step3-scenario-add {
+  padding: 6px 12px; border: 0; border-radius: 8px;
+  background: #eef2ff; color: #4f46e5; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.step3-scenario-add:disabled { opacity: 0.4; cursor: not-allowed; }
+.step3-scenario-add:hover:not(:disabled) { background: #e0e7ff; }
 
 .step3-publish-btn {
   width: 100%; padding: 10px; border: 0; border-radius: 10px;
