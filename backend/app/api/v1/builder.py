@@ -805,6 +805,8 @@ class _DraftObject(BaseModel):
 class FinalizeRequest(BaseModel):
     objects: list[_DraftObject]
     relations: list[_DraftRelation] = []
+    # 本批发布对象统一归属的场景 code 列表（与已存在场景做并集写入）
+    scenario_codes: list[str] = []
 
 
 @router.post("/finalize")
@@ -820,6 +822,9 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
 
     asset_repo = AssetRepository(db)
     binding_svc = ObjectBindingService(db)
+
+    # 本批发布统一归属的场景（去重、去空）
+    batch_scenarios = [c for c in dict.fromkeys(body.scenario_codes) if c]
 
     created_entities = 0
     created_bindings = 0
@@ -842,6 +847,12 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
             db.add(entity)
             db.flush()
             created_entities += 1
+
+        # 场景归属：与对象已有 scenario_codes 做并集，保持顺序
+        if batch_scenarios:
+            merged = list(dict.fromkeys([*(entity.scenario_codes or []), *batch_scenarios]))
+            entity.scenario_codes = merged
+            db.flush()
 
         # 属性（按 name 去重）
         attr_by_name: dict[str, EntityAttribute] = {a.name: a for a in entity.attributes}
