@@ -829,10 +829,21 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
     created_entities = 0
     created_bindings = 0
     skipped = 0
+    # 对象名 → 实际落库的 entity.id（命中已有实体时为其真实 id，非重新拼接的 eid），
+    # 供后续关系持久化引用，避免外键指向不存在的 id
+    entity_id_map: dict[str, str] = {}
 
     for obj in body.objects:
         eid = (f"{obj.namespace}_{obj.name}" if obj.namespace else obj.name)
+        # 幂等查重：先按主键 id，再按 name（name 列有唯一约束，
+        # 带 namespace 时 id 与已有裸 name 记录不同，仅查 id 会漏判导致 1062 冲突）
         existing = db.get(OntologyEntity, eid)
+        if existing is None:
+            existing = (
+                db.query(OntologyEntity)
+                .filter(OntologyEntity.name == obj.name)
+                .first()
+            )
         if existing:
             skipped += 1
             entity = existing
@@ -847,6 +858,9 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
             db.add(entity)
             db.flush()
             created_entities += 1
+
+        # 记录对象名 → 实际 entity.id（关系持久化引用真实 id）
+        entity_id_map[obj.name] = entity.id
 
         # 场景归属：与对象已有 scenario_codes 做并集，保持顺序
         if batch_scenarios:
@@ -904,10 +918,6 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
     from app.models.relation import EntityRelation
 
     created_relations = 0
-    entity_id_map = {}
-    for obj in body.objects:
-        eid = (f"{obj.namespace}_{obj.name}" if obj.namespace else obj.name)
-        entity_id_map[obj.name] = eid
 
     for rel in body.relations:
         from_eid = entity_id_map.get(rel.source)
