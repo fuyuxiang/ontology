@@ -39,7 +39,7 @@
             @click="toggleScenario(s.code)"
           >{{ s.name }}</button>
           <span v-if="scenarioStore.scenarios.length === 0" class="scenario-empty">
-            暂无场景，请先在「场景管理」中创建
+            暂无场景，可在对象建模发布时新建
           </span>
         </div>
       </div>
