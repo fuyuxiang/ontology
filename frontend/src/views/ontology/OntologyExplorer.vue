@@ -193,20 +193,21 @@
                 <button class="btn-sm-add" @click="showCreateRelation = true">+ 添加关系</button>
               </div>
               <div class="relation-list">
-                <div class="relation-item" v-for="rel in selectedRelations" :key="rel.name">
+                <div class="relation-item" v-for="rel in selectedRelations" :key="rel.id">
                   <div class="relation-item__from">
-                    <TierBadge :tier="selected.tier" />
-                    <span>{{ selected.nameCn }}</span>
+                    <TierBadge :tier="rel.sourceTier" />
+                    <span>{{ rel.sourceName }}</span>
                   </div>
                   <div class="relation-item__arrow">
                     <span class="relation-item__type">{{ rel.name }}</span>
+                    <span v-if="rel.selfLoop" class="relation-item__selfloop" title="自引用关系（源与目标为同一对象）">自引用</span>
                     <svg width="40" height="12" viewBox="0 0 40 12" fill="none">
                       <path d="M0 6h36M30 2l6 4-6 4" stroke="var(--neutral-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                   </div>
                   <div class="relation-item__to">
                     <TierBadge :tier="rel.targetTier" />
-                    <span>{{ rel.target }}</span>
+                    <span>{{ rel.targetName }}</span>
                   </div>
                   <button class="btn-icon-del" @click="handleDeleteRelation(rel.id, rel.name)" title="删除关系">
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
@@ -540,14 +541,23 @@ const selectedAttrs = computed(() =>
 
 const selectedRelations = computed(() =>
   detail.value?.relations
-    .filter(r => r.from_entity_id !== r.to_entity_id)
-    .map(r => ({
-      id: r.id,
-      name: r.name,
-      type: r.rel_type,
-      target: r.to_entity_name || r.from_entity_name,
-      targetTier: (r.to_entity_tier || 1) as 1 | 2 | 3,
-    })) ?? []
+    .map(r => {
+      // 后端返回双向关系（当前对象既可能是 from 也可能是 to）。
+      // 按方向还原真实两端，避免入边被渲染成「当前对象 → 当前对象」的假自环。
+      const outgoing = r.from_entity_id === selectedId.value
+      const selfLoop = r.from_entity_id === r.to_entity_id
+      return {
+        id: r.id,
+        name: r.name,
+        type: r.rel_type,
+        sourceName: r.from_entity_name,
+        sourceTier: (r.from_entity_tier || 1) as 1 | 2 | 3,
+        targetName: r.to_entity_name,
+        targetTier: (r.to_entity_tier || 1) as 1 | 2 | 3,
+        outgoing,
+        selfLoop,
+      }
+    }) ?? []
 )
 
 const selectedRules = computed(() =>
@@ -1360,6 +1370,17 @@ async function handleDeleteAttribute(id: string, name: string) {
   text-transform: uppercase;
   letter-spacing: 0.3px;
   color: var(--neutral-500);
+}
+.relation-item__selfloop {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--warning-600, #b45309);
+  background: var(--warning-50, #fffbeb);
+  border: 1px solid var(--warning-200, #fde68a);
+  border-radius: 4px;
 }
 
 .action-list {
