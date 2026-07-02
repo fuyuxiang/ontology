@@ -16,8 +16,17 @@ _NAMED_PATTERN = re.compile(r"(?<!:):([A-Za-z_][A-Za-z0-9_]*)")
 
 
 def to_pyformat(sql: str, params: dict) -> tuple[str, dict]:
-    """:name → %(name)s；参数字典原样返回。"""
-    new_sql = _replace_outside_strings(sql, lambda n: f"%({n})s")
+    """:name → %(name)s；参数字典原样返回。
+
+    pyformat 驱动（pymysql/pymssql/psycopg2）在有参数时会执行
+    `query % escape_args(args)`，此时 SQL 正文里字面量的 `%`
+    （如 LIKE '%关键词%'）会被当成格式化占位符而报
+    `unsupported format character`。因此除我们主动生成的
+    `%(name)s` 占位符外，所有裸 `%` 必须转义成 `%%`。
+    """
+    new_sql = _replace_outside_strings(
+        sql, lambda n: f"%({n})s", escape_percent=True
+    )
     return new_sql, dict(params or {})
 
 
@@ -26,8 +35,15 @@ def to_named(sql: str, params: dict) -> tuple[str, dict]:
     return sql, dict(params or {})
 
 
-def _replace_outside_strings(sql: str, replacer) -> str:
-    """跨字符串字面量安全替换 :name 占位符。"""
+def _replace_outside_strings(sql: str, replacer, escape_percent: bool = False) -> str:
+    """跨字符串字面量安全替换 :name 占位符。
+
+    escape_percent=True 时，把占位符以外的所有裸 `%` 转义成 `%%`
+    （供 pyformat 驱动使用；生成的 `%(name)s` 由 replacer 直接产出，不受影响）。
+    """
+    def _emit(segment: str) -> str:
+        return segment.replace("%", "%%") if escape_percent else segment
+
     out = []
     i = 0
     n = len(sql)
@@ -48,7 +64,7 @@ def _replace_outside_strings(sql: str, replacer) -> str:
                     j += 2
                     continue
                 j += 1
-            out.append(sql[i:j])
+            out.append(_emit(sql[i:j]))
             i = j
             continue
         if ch == "-" and i + 1 < n and sql[i + 1] == "-":
@@ -56,7 +72,7 @@ def _replace_outside_strings(sql: str, replacer) -> str:
             j = sql.find("\n", i)
             if j < 0:
                 j = n
-            out.append(sql[i:j])
+            out.append(_emit(sql[i:j]))
             i = j
             continue
         # 替换 :name
@@ -66,6 +82,6 @@ def _replace_outside_strings(sql: str, replacer) -> str:
             out.append(replacer(name))
             i = m.end()
             continue
-        out.append(ch)
+        out.append(_emit(ch))
         i += 1
     return "".join(out)
