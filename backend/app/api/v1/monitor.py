@@ -30,6 +30,9 @@ router = APIRouter(prefix="/monitor", tags=["monitor"])
 
 logger = logging.getLogger(__name__)
 
+# 本体分层语义标签,与前端 OntologyNode 保持一致(1 核心 / 2 领域 / 3 场景)
+_TIER_LABELS = {1: "核心", 2: "领域", 3: "场景"}
+
 
 def _to_alert_item(a) -> AlertItem:
     """ORM Alert → AlertItem schema 的统一映射。"""
@@ -62,18 +65,18 @@ def _resource_metrics() -> ResourceMetrics:
 
 
 def _ontology_stats(db: Session) -> OntologyStatsResponse:
-    """本体实体统计(总数 + 按类型分组),供单项端点与概览复用。"""
+    """本体实体统计(总数 + 按分层分组),供单项端点与概览复用。"""
     total = db.query(OntologyEntity).count()
     by_type = {}
     try:
         rows = (
-            db.query(OntologyEntity.entity_type, func.count(OntologyEntity.id))
-            .group_by(OntologyEntity.entity_type)
+            db.query(OntologyEntity.tier, func.count(OntologyEntity.id))
+            .group_by(OntologyEntity.tier)
             .all()
         )
-        by_type = {r[0] or "unknown": r[1] for r in rows}
+        by_type = {_TIER_LABELS.get(r[0], f"T{r[0]}"): r[1] for r in rows}
     except Exception:
-        logger.warning("本体类型分组统计失败,by_type 回退为空", exc_info=True)
+        logger.warning("本体分层统计失败,by_type 回退为空", exc_info=True)
     return OntologyStatsResponse(total_entities=total, by_type=by_type)
 
 
