@@ -220,6 +220,10 @@ def _migrate_ontology_functions(conn, inspector, tables):
         _add.append("ALTER TABLE ontology_functions ADD COLUMN callable_name VARCHAR(100)")
     if "tags" not in cols:
         _add.append("ALTER TABLE ontology_functions ADD COLUMN tags JSON")
+    if "is_derived_property" not in cols:
+        _add.append("ALTER TABLE ontology_functions ADD COLUMN is_derived_property TINYINT NOT NULL DEFAULT 0")
+    else:
+        _add.append("ALTER TABLE ontology_functions ALTER COLUMN is_derived_property SET DEFAULT 0")
     if "entity_ids" not in cols:
         _add.append("ALTER TABLE ontology_functions ADD COLUMN entity_ids JSON")
     for stmt in _add:
