@@ -57,16 +57,12 @@
           <span>抽取结果</span>
           <span class="extract-stream-stats">
             {{ proposedObjects.length }} 对象 · {{ proposedRelations.length }} 关系
-            · 建议 {{ suggestedRules.length + suggestedActions.length }}
+            · 建议 {{ suggestedActions.length }}
           </span>
         </div>
 
-        <div v-if="suggestedRules.length || suggestedActions.length" class="suggest-zone">
-          <div class="suggest-title">💡 LLM 规则/动作建议（将在审核页二次决策）</div>
-          <div v-for="r in suggestedRules" :key="r.id" class="suggest-card suggest-card--rule">
-            <strong>{{ r.name }}</strong>
-            <span>{{ r.description }}</span>
-          </div>
+        <div v-if="suggestedActions.length" class="suggest-zone">
+          <div class="suggest-title">💡 LLM 动作建议（将在审核页二次决策）</div>
           <div v-for="a in suggestedActions" :key="a.id" class="suggest-card suggest-card--action">
             <strong>{{ a.name }}</strong>
             <span>{{ a.description }}</span>
@@ -124,7 +120,6 @@ import type {
   OntologyObjectDraft,
   OntologyProperty,
   OntologyRelationDraft,
-  SuggestedRule,
   SuggestedAction,
 } from '../../../types/builder'
 
@@ -141,7 +136,6 @@ const dragOver = ref(false)
 const files = ref<ExtractFile[]>([])
 const proposedObjects = ref<ExtractedObject[]>([])
 const proposedRelations = ref<ExtractedRelation[]>([])
-const suggestedRules = ref<SuggestedRule[]>([])
 const suggestedActions = ref<SuggestedAction[]>([])
 const extracting = ref(false)
 const elapsed = ref(0)
@@ -193,7 +187,6 @@ async function startExtract() {
   elapsedTimer = window.setInterval(() => elapsed.value++, 1000)
   proposedObjects.value = []
   proposedRelations.value = []
-  suggestedRules.value = []
   suggestedActions.value = []
 
   const fd = new FormData()
@@ -284,16 +277,6 @@ function handleEvent(ev: any) {
       semanticType: 'association',
       checked: true,
     })
-  } else if (t === 'rule_suggested') {
-    suggestedRules.value.push({
-      id: uid('sgr'),
-      name: ev.name,
-      description: ev.description || '',
-      conditionHint: ev.condition_hint,
-      actionHint: ev.action_hint,
-      targetObjectId: matchObj(ev.target_entity)?.id,
-      source: ev.source_file,
-    })
   } else if (t === 'action_suggested') {
     suggestedActions.value.push({
       id: uid('sga'),
@@ -328,7 +311,6 @@ function confirmAll() {
     ontologyObjects: objs,
     ontologyRelations: rels,
     hints: {
-      suggested_rules: [...suggestedRules.value],
       suggested_actions: [...suggestedActions.value],
     },
     status: 'pending_review',

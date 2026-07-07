@@ -112,7 +112,6 @@ export interface NodeTypeMeta {
 export const NODE_TYPES: NodeTypeMeta[] = [
   { type: 'ontologyQuery', label: '本体查询', group: '数据节点', color: '#2E5BFF', description: '查询本体对象实例', icon: 'database' },
   { type: 'datasource', label: '数据源查询', group: '数据节点', color: '#2E5BFF', description: '直接 SQL 查询', icon: 'database' },
-  { type: 'ruleEngine', label: '规则引擎', group: '逻辑节点', color: '#FF8900', description: '执行业务规则', icon: 'filter' },
   { type: 'llmAgent', label: '模型节点', group: '逻辑节点', color: '#FF8900', description: '大模型推理', icon: 'brain' },
   { type: 'function', label: 'Function 计算', group: '函数节点', color: '#0EA5E9', description: '调用 OntologyFunction', icon: 'tool' },
   { type: 'agentNode', label: 'Agent 节点', group: 'Agent 节点', color: '#10B981', description: '本体驱动 ReAct 推理', icon: 'robot' },

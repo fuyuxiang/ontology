@@ -1,6 +1,6 @@
 """
 场景 API — 携号转网预警全流程编排
-复用本体数据源查询和规则引擎，为前端提供真实实例数据
+复用本体数据源查询，为前端提供真实实例数据
 """
 import re
 from typing import Any
@@ -13,7 +13,6 @@ from app.database import get_db
 from app.models import EntityAction, OntologyEntity
 from app.models.asset import Asset
 from app.services.data_plane.entity_data_service import EntityDataService
-from app.services.rule_engine import RuleEvaluator
 
 router = APIRouter(prefix="/scenes", tags=["scenes"])
 
@@ -45,27 +44,10 @@ class EntityInstanceData(BaseModel):
     entity_name_cn: str
     data: dict[str, Any]
 
-class RuleConditionResult(BaseModel):
-    condition: str
-    sourceEntity: str
-    sourceAttribute: str
-    operator: str
-    threshold: str
-    actual: str
-    matched: bool
-
-class RuleEvalResult(BaseModel):
-    ruleName: str
-    riskLevel: str | None = None
-    triggered: bool
-    matchedCount: int
-    totalCount: int
-    conditions: list[RuleConditionResult]
-
 class MnpExecuteResult(BaseModel):
     user_id: str
     entities: dict[str, dict[str, Any]]
-    ruleResults: list[RuleEvalResult]
+    ruleResults: list[dict]
     finalRiskLevel: str
     riskScore: int
     churnReasonTop3: list[str]
@@ -232,8 +214,7 @@ def list_mnp_case_users(db: Session = Depends(get_db)):
     columns = result.get("columns", [])
     rows = result.get("rows", [])
 
-    # 2. 对每个用户执行规则评估，收集分数
-    evaluator = RuleEvaluator(db)
+    # 2. 对每个用户计算风险分数
     all_users: list[MnpCaseUser] = []
 
     for row in rows:
@@ -246,13 +227,7 @@ def list_mnp_case_users(db: Session = Depends(get_db)):
         if len(phone) >= 7:
             phone = phone[:3] + "****" + phone[-4:]
 
-        # 评估风险
-        try:
-            eval_result = evaluator.evaluate_all(uid)
-        except Exception:
-            eval_result = {"overall_risk": "none", "results": []}
-
-        risk_score = _calc_risk_score(eval_result)
+        risk_score = _calc_risk_score({"overall_risk": "none", "results": []})
 
         user = MnpCaseUser(
             user_id=uid,
@@ -333,49 +308,11 @@ def execute_mnp_flow(
     if not entities_data:
         raise HTTPException(status_code=404, detail=f"未找到用户 {user_id} 的实例数据")
 
-    # 2. 评估所有规则（容错处理）
+    # 2. 规则评估已移除，返回空结果
     rule_results: list[dict] = []
-    eval_result: dict = {"overall_risk": "none", "results": []}
-    try:
-        evaluator = RuleEvaluator(db)
-        eval_result = evaluator.evaluate_all(user_id)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"规则评估失败: {e}")
-    # 数据库实体名 → 前端实体名的反向映射
-    _REVERSE_ALIAS = {v: k for k, v in _ENTITY_ALIAS.items()}
 
-    for r in eval_result.get("results", []):
-        conditions = []
-        for c in r.get("conditions", []):
-            # 从 field 中解析 sourceEntity 和 sourceAttribute
-            field = c.get("field", "")
-            parts = field.split(".", 1) if "." in field else [field, ""]
-            db_entity = parts[0]
-            # 映射回前端名称
-            frontend_entity = _REVERSE_ALIAS.get(db_entity, db_entity)
-            conditions.append({
-                "condition": c.get("display", field),
-                "sourceEntity": frontend_entity,
-                "sourceAttribute": parts[1] if len(parts) > 1 else "",
-                "operator": c.get("operator", ""),
-                "threshold": str(c.get("expected", "")),
-                "actual": str(c.get("actual", "")),
-                "matched": c.get("matched", False),
-            })
-        rule_results.append({
-            "ruleName": r.get("rule_name", ""),
-            "riskLevel": r.get("risk_level"),
-            "triggered": r.get("triggered", False),
-            "matchedCount": r.get("matched_count", 0),
-            "totalCount": r.get("total_count", 0),
-            "conditions": conditions,
-        })
-
-    final_risk = eval_result.get("overall_risk", "none")
-    risk_score = _calc_risk_score(eval_result)
-
-    # 用分数区间重新定级，保证与 case-users 接口一致
+    risk_score = _calc_risk_score({"overall_risk": "none", "results": []})
+    final_risk = "none"
     if risk_score >= 65:
         final_risk = "high"
     elif risk_score >= 40:
@@ -386,7 +323,7 @@ def execute_mnp_flow(
     # 3. 根因分析（基于实例数据推断）
     churn_reasons = _analyze_churn_reasons(entities_data)
 
-    # 4. 推荐动作（基于规则和实体数据）
+    # 4. 推荐动作
     recommended_actions = _recommend_actions(db, final_risk, churn_reasons)
 
     # 5. 分发渠道

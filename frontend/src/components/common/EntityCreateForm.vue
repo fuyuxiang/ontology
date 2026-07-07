@@ -173,7 +173,6 @@
           <div class="preview-item"><span class="preview-label">本体对象</span><span>{{ jsonPreview.objectCount }} 个</span></div>
           <div class="preview-item"><span class="preview-label">关系</span><span>{{ jsonPreview.linkCount }} 个</span></div>
           <div class="preview-item"><span class="preview-label">动作</span><span>{{ jsonPreview.actionCount }} 个</span></div>
-          <div class="preview-item"><span class="preview-label">业务规则</span><span>{{ jsonPreview.ruleCount }} 个</span></div>
         </div>
       </div>
 
@@ -193,7 +192,6 @@
           <div class="preview-item"><span class="preview-label">跳过实体</span><span>{{ importResult.entities_skipped }} 个</span></div>
           <div class="preview-item"><span class="preview-label">创建属性</span><span>{{ importResult.attributes_created }} 个</span></div>
           <div class="preview-item"><span class="preview-label">创建关系</span><span>{{ importResult.relations_created }} 个</span></div>
-          <div class="preview-item"><span class="preview-label">创建规则</span><span>{{ importResult.rules_created }} 个</span></div>
           <div class="preview-item"><span class="preview-label">创建动作</span><span>{{ importResult.actions_created }} 个</span></div>
           <div v-if="importResult.errors.length" class="preview-errors">
             <div v-for="(err, i) in importResult.errors" :key="i" class="preview-error">{{ err }}</div>
@@ -265,7 +263,7 @@ async function handleSubmit() {
 const fileFormat = ref<'json' | 'owl' | 'ttl'>('json')
 const selectedFile = ref<File | null>(null)
 const fileNamespace = ref('')
-const jsonPreview = ref<{ scenario: string; objectCount: number; linkCount: number; actionCount: number; ruleCount: number } | null>(null)
+const jsonPreview = ref<{ scenario: string; objectCount: number; linkCount: number; actionCount: number } | null>(null)
 const importResult = ref<FileImportResult | null>(null)
 
 const fileAccept = computed(() => {
@@ -292,7 +290,6 @@ function onFileChange(e: Event) {
           objectCount: data.object_types?.length || 0,
           linkCount: data.link_types?.length || 0,
           actionCount: data.action_types?.length || 0,
-          ruleCount: data.business_rules?.length || 0,
         }
         if (scenario?.namespace && !fileNamespace.value) {
           fileNamespace.value = scenario.namespace

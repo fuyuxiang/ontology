@@ -70,7 +70,6 @@ export interface OntologyObjectDraft {
   instanceCount: number
   properties: OntologyProperty[]
   derivedProperties: string[]   // Function ID 数组（派生属性）
-  rules: string[]               // BusinessRule ID 数组
   actions: string[]             // EntityAction ID 数组
   approved?: boolean
   // M2.2：AI 召回回写 backing
@@ -78,17 +77,7 @@ export interface OntologyObjectDraft {
   evidence_asset_ids?: string[]
 }
 
-// ── LLM 抽取/对话生成产生的"规则/动作建议"（只放 hints，不直接落库） ──
-export interface SuggestedRule {
-  id: string
-  name: string
-  description: string
-  conditionHint?: string
-  actionHint?: string
-  targetObjectId?: string  // 建议挂到哪个对象（按 id）
-  source?: string          // 来自哪个文档/消息
-}
-
+// ── LLM 抽取/对话生成产生的"动作建议"（只放 hints，不直接落库） ──
 export interface SuggestedAction {
   id: string
   name: string
@@ -100,7 +89,6 @@ export interface SuggestedAction {
 }
 
 export interface OntologyHints {
-  suggested_rules: SuggestedRule[]
   suggested_actions: SuggestedAction[]
 }
 

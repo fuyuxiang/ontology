@@ -39,7 +39,6 @@
 
             <div v-if="m.draft" class="msg-draft-summary">
               ✅ 已抽取 {{ m.draft.entities.length }} 对象 / {{ m.draft.relations.length }} 关系
-              · 规则建议 {{ m.draft.suggested_rules.length }}
               · 动作建议 {{ m.draft.suggested_actions.length }}
               <button class="msg-draft-btn" @click="confirmAll">确认进入走测 →</button>
             </div>
@@ -111,7 +110,6 @@ import type {
   OntologyObjectDraft,
   OntologyProperty,
   OntologyRelationDraft,
-  SuggestedRule,
   SuggestedAction,
 } from '../../../types/builder'
 import SemanticCanvas from './graph/SemanticCanvas.vue'
@@ -121,7 +119,6 @@ interface PickerCard { title: string; kind: 'datasource' | 'document'; items: an
 interface DraftPayload {
   entities: any[]
   relations: any[]
-  suggested_rules: any[]
   suggested_actions: any[]
 }
 interface ChatMessage {
@@ -314,7 +311,6 @@ function handleToolResult(ev: any) {
     draft.value = {
       entities: detail.entities || [],
       relations: detail.relations || [],
-      suggested_rules: detail.suggested_rules || [],
       suggested_actions: detail.suggested_actions || [],
     }
     const last = messages.value[messages.value.length - 1]
@@ -378,12 +374,6 @@ function confirmAll() {
       relationType: 'ObjectProperty' as const,
       semanticType: 'association' as const,
     }))
-  const suggested_rules: SuggestedRule[] = draft.value.suggested_rules.map((s: any, i: number) => ({
-    id: `sgr-${Date.now().toString(36)}-${i}`,
-    name: s.name, description: s.description || '',
-    conditionHint: s.condition_hint, actionHint: s.action_hint,
-    targetObjectId: nameToId.get(s.target_entity || '') || undefined,
-  }))
   const suggested_actions: SuggestedAction[] = draft.value.suggested_actions.map((s: any, i: number) => ({
     id: `sga-${Date.now().toString(36)}-${i}`,
     name: s.name, description: s.description || '',
@@ -393,7 +383,7 @@ function confirmAll() {
   store.patchActive({
     ontologyObjects: objects,
     ontologyRelations: relations,
-    hints: { suggested_rules, suggested_actions },
+    hints: { suggested_actions },
     selectedAssetIds: selectedDsIds.value,
     status: 'pending_review',
   })

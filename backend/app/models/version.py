@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     from app.models.version_components import (
         OntologyVersionAction,
         OntologyVersionFunction,
-        OntologyVersionRule,
     )
 
 
@@ -43,9 +42,6 @@ class OntologyVersion(Base):
         foreign_keys="OntologyVersionRelation.version_id"
     )
     functions: Mapped[list["OntologyVersionFunction"]] = relationship(
-        back_populates="version", cascade="all, delete-orphan"
-    )
-    rules: Mapped[list["OntologyVersionRule"]] = relationship(
         back_populates="version", cascade="all, delete-orphan"
     )
     actions: Mapped[list["OntologyVersionAction"]] = relationship(

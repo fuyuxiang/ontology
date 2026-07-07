@@ -24,7 +24,6 @@ class OntologyEntity(Base):
     publish_config: Mapped[dict | None] = mapped_column(JSON)
 
     attributes: Mapped[list["EntityAttribute"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
-    rules: Mapped[list["BusinessRule"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
     actions: Mapped[list["EntityAction"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
     functions: Mapped[list["OntologyFunction"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
 

@@ -1,4 +1,4 @@
-"""Impact analysis API — check what depends on a given F/R/A before deletion."""
+"""Impact analysis API — check what depends on a given F/A before deletion."""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -10,7 +10,6 @@ from app.models.version import OntologyVersion
 from app.models.version_components import (
     OntologyVersionAction,
     OntologyVersionFunction,
-    OntologyVersionRule,
 )
 
 router = APIRouter(prefix="/impact-analysis", tags=["impact-analysis"])
@@ -23,11 +22,6 @@ def _analyze(db: Session, ref_type: str, source_id: str) -> dict:
             OntologyVersionFunction.source_function_id == source_id).all()]
         version_ids = [r[0] for r in db.query(OntologyVersionFunction.version_id).filter(
             OntologyVersionFunction.source_function_id == source_id).distinct().all()]
-    elif ref_type == "rule":
-        snapshot_ids = [r[0] for r in db.query(OntologyVersionRule.id).filter(
-            OntologyVersionRule.source_rule_id == source_id).all()]
-        version_ids = [r[0] for r in db.query(OntologyVersionRule.version_id).filter(
-            OntologyVersionRule.source_rule_id == source_id).distinct().all()]
     else:
         snapshot_ids = [r[0] for r in db.query(OntologyVersionAction.id).filter(
             OntologyVersionAction.source_action_id == source_id).all()]
@@ -76,11 +70,6 @@ def _analyze(db: Session, ref_type: str, source_id: str) -> dict:
 @router.get("/functions/{function_id}")
 def function_impact(function_id: str, db: Session = Depends(get_db)):
     return _analyze(db, "function", function_id)
-
-
-@router.get("/rules/{rule_id}")
-def rule_impact(rule_id: str, db: Session = Depends(get_db)):
-    return _analyze(db, "rule", rule_id)
 
 
 @router.get("/actions/{action_id}")

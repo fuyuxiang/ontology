@@ -8,9 +8,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import BusinessRule, OntologyEntity
+from app.models import OntologyEntity
 from app.services.data_plane.entity_data_service import EntityDataService
-from app.services.rule_engine import RuleEvaluator
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +190,7 @@ def _analyze_churn_reasons(entities: dict) -> list[str]:
 
 
 def _recommend_actions(db: Session, risk_level: str, reasons: list[str]) -> list[str]:
-    from app.models.rule import EntityAction
+    from app.models.action import EntityAction
     actions = []
     entity, _ = _get_entity_and_asset(db, "MnpRiskUser")
     if entity:
@@ -237,41 +236,10 @@ def mnp_risk_evaluate(params: dict, db: Session) -> dict:
     if not entities_data:
         return {"success": False, "summary": f"未找到用户 {user_id} 的数据", "data": {}}
 
-    evaluator = RuleEvaluator(db)
-    try:
-        eval_result = evaluator.evaluate_all(user_id)
-    except Exception as e:
-        logger.exception("规则评估失败 user_id=%s", user_id)
-        return {"success": False, "summary": f"风险评估失败: {e}", "data": {}}
-
     _REVERSE_ALIAS = {v: k for k, v in _ENTITY_ALIAS.items()}
-    rule_results = []
-    for r in eval_result.get("results", []):
-        conditions = []
-        for c in r.get("conditions", []):
-            field = c.get("field", "")
-            parts = field.split(".", 1) if "." in field else [field, ""]
-            db_entity = parts[0]
-            frontend_entity = _REVERSE_ALIAS.get(db_entity, db_entity)
-            conditions.append({
-                "condition": c.get("display", field),
-                "sourceEntity": frontend_entity,
-                "sourceAttribute": parts[1] if len(parts) > 1 else "",
-                "operator": c.get("operator", ""),
-                "threshold": str(c.get("expected", "")),
-                "actual": str(c.get("actual", "")),
-                "matched": c.get("matched", False),
-            })
-        rule_results.append({
-            "ruleName": r.get("rule_name", ""),
-            "riskLevel": r.get("risk_level"),
-            "triggered": r.get("triggered", False),
-            "matchedCount": r.get("matched_count", 0),
-            "totalCount": r.get("total_count", 0),
-            "conditions": conditions,
-        })
+    rule_results: list[dict] = []
 
-    risk_score = _calc_risk_score(eval_result)
+    risk_score = _calc_risk_score({"results": [], "triggered_count": 0, "evaluated_count": 0})
     if risk_score >= 65:
         final_risk = "high"
     elif risk_score >= 40:
@@ -295,7 +263,7 @@ def mnp_risk_evaluate(params: dict, db: Session) -> dict:
         "recommendedActions": recommended_actions,
         "assignedChannel": channel_map.get(final_risk, "短信触达"),
     }
-    summary = f"用户 {user_id} 风险等级: {final_risk}，评分: {risk_score}，触发 {len([r for r in rule_results if r['triggered']])} 条规则"
+    summary = f"用户 {user_id} 风险等级: {final_risk}，评分: {risk_score}"
     return {"success": True, "summary": summary, "data": data}
 
 
@@ -566,31 +534,8 @@ def broadband_audit_stream(params: dict, db: Session):
 
 
 def execute_skill_tool_call(tool_type: str, tool_config: dict, params: dict, db: Session) -> dict:
-    """Execute a rule or function tool referenced by a skill."""
-    if tool_type == "rule":
-        rule_id = tool_config.get("rule_id")
-        if not rule_id:
-            return {"success": False, "summary": "Missing rule_id", "data": {}}
-        rule = db.query(BusinessRule).get(rule_id)
-        if not rule:
-            return {"success": False, "summary": f"Rule {rule_id} not found", "data": {}}
-        user_id = params.get("user_id", "")
-        evaluator = RuleEvaluator(db)
-        result = evaluator.evaluate(rule, user_id)
-        db.commit()
-        return {
-            "success": True,
-            "summary": f"Rule '{result.rule_name}' {'triggered' if result.triggered else 'not triggered'}",
-            "data": {
-                "triggered": result.triggered,
-                "confidence": result.confidence,
-                "risk_level": result.risk_level,
-                "matched_count": result.matched_count,
-                "total_count": result.total_count,
-            },
-        }
-
-    elif tool_type == "function":
+    """Execute a function tool referenced by a skill."""
+    if tool_type == "function":
         from app.services.function_executor import FunctionExecutor
         callable_name = tool_config.get("callable_name")
         func_id = tool_config.get("function_id")
@@ -642,7 +587,6 @@ def build_ontology_tools(skill_id: str, db: Session) -> list[dict]:
     from app.models.version_components import (
         OntologyVersionAction,
         OntologyVersionFunction,
-        OntologyVersionRule,
     )
 
     refs = db.query(SkillToolRef).filter(SkillToolRef.skill_id == skill_id).all()
@@ -656,13 +600,6 @@ def build_ontology_tools(skill_id: str, db: Session) -> list[dict]:
             if not comp:
                 continue
             params_list = comp.input_schema or []
-        elif ref.ref_type == "rule":
-            comp = db.query(OntologyVersionRule).filter(
-                OntologyVersionRule.id == ref.ref_id
-            ).first()
-            if not comp:
-                continue
-            params_list = comp.input_params or []
         elif ref.ref_type == "action":
             comp = db.query(OntologyVersionAction).filter(
                 OntologyVersionAction.id == ref.ref_id

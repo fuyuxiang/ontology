@@ -9,8 +9,8 @@ import logging
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.models import BusinessRule, EntityRelation, OntologyEntity
-from app.models.rule import EntityAction
+from app.models import EntityRelation, OntologyEntity
+from app.models.action import EntityAction
 from app.services.data_plane.entity_data_service import EntityDataService
 
 logger = logging.getLogger(__name__)
@@ -36,10 +36,6 @@ def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
         r for r in db.query(EntityRelation).all()
         if r.from_entity_id in published_ids and r.to_entity_id in published_ids
     ]
-    rules = db.query(BusinessRule).filter(
-        BusinessRule.status == "active",
-        BusinessRule.entity_id.in_(published_ids),
-    ).all() if published_ids else []
 
     ctx_parts = ["## 本体模型概览\n"]
 
@@ -61,19 +57,6 @@ def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
         to_e = next((e for e in entities if e.id == r.to_entity_id), None)
         if from_e and to_e:
             ctx_parts.append(f"- {from_e.name} --[{r.name} ({r.cardinality})]-> {to_e.name}")
-
-    # 活跃规则（包含结构化信息）
-    ctx_parts.append(f"\n### 活跃业务规则 ({len(rules)} 条)")
-    for r in rules[:10]:
-        entity = next((e for e in entities if e.id == r.entity_id), None)
-        has_conditions = "可评估" if r.conditions_json else "仅描述"
-        meta = r.rule_meta_json or {}
-        risk = meta.get("risk_level", "")
-        rule_id = meta.get("rule_id", "")
-        ctx_parts.append(
-            f"- [{has_conditions}] {r.name} (ID: {rule_id}, 风险级别: {risk}): "
-            f"当 `{r.condition_expr}` 时 → {r.action_desc} (关联: {entity.name if entity else '?'})"
-        )
 
     # 实体→数据源映射
     ctx_parts.append("\n### 实体数据源映射")
@@ -114,8 +97,8 @@ SYSTEM_PROMPT = """你是"本体智能副驾"，一个专注于电信业务本�
 
 你的能力：
 1. 解释本体模型中的实体、属性、关系
-2. 分析业务规则的触发条件和影响范围
-3. 推荐策略并生成推理链（本体查询 → ML预测 → 规则匹配 → 策略输出）
+2. 分析业务场景和数据资产
+3. 推荐策略并生成推理链（本体查询 → ML预测 → 策略输出）
 4. 回答关于客户分群、FTTR订阅、营销活动等业务问题
 
 回答规则：

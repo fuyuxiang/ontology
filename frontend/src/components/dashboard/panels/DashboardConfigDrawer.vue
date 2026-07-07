@@ -33,7 +33,7 @@
                 <span class="dc-item__type">{{ itemTypeLabel(item) }}</span>
                 <input v-if="item.type === 'static'" v-model="item.text" class="dc-input dc-input--sm" placeholder="显示文字" />
                 <input v-if="item.type === 'dynamic'" v-model="item.label" class="dc-input dc-input--sm" placeholder="单位后缀" />
-                <input v-if="item.type === 'top_rules' || item.type === 'datasources' || item.type === 'recent_activities'"
+                <input v-if="item.type === 'datasources' || item.type === 'recent_activities'"
                   v-model.number="item.count" type="number" min="1" max="10" class="dc-input dc-input--sm dc-input--num" placeholder="条数" />
                 <button class="dc-item__del" @click="card.items.splice(j, 1)">×</button>
               </div>
@@ -74,8 +74,8 @@ watch(() => props.config, (v) => {
 
 function itemTypeLabel(item: CardItemConfig) {
   const map: Record<string, string> = {
-    dynamic: '动态', static: '静态', top_rules: '规则TOP', datasources: '数据源',
-    rule_priority: '规则优先级', recent_activities: '近期活动',
+    dynamic: '动态', static: '静态', datasources: '数据源',
+    recent_activities: '近期活动',
   }
   return map[item.type] || item.type
 }

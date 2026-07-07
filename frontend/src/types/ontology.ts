@@ -2,7 +2,6 @@
 
 export type Tier = 1 | 2 | 3
 export type EntityStatus = 'active' | 'warning' | 'error'
-export type RuleStatus = 'active' | 'warning' | 'disabled'
 export type Priority = 'high' | 'medium' | 'low'
 export type Cardinality = '1:1' | '1:N' | 'N:1' | 'N:N'
 export type RelationType = 'has_one' | 'has_many' | 'belongs_to' | 'many_to_many'
@@ -46,21 +45,6 @@ export interface EntityRelation {
   description?: string
 }
 
-export interface BusinessRule {
-  id: string
-  name: string
-  entityId: string
-  entityName: string
-  condition: string
-  action: string
-  status: RuleStatus
-  priority: Priority
-  triggerCount: number
-  lastTriggered: string | null
-  createdAt: string
-  updatedAt: string
-}
-
 export interface EntityAction {
   id: string
   name: string
@@ -81,7 +65,6 @@ export interface OntologyEntity {
   schema_json?: Record<string, unknown>
   attributes: EntityAttribute[]
   relations: EntityRelationDetail[]
-  rules: RuleDetail[]
   actions: ActionDetail[]
   functions: FunctionDetail[]
   created_at: string
@@ -103,20 +86,6 @@ export interface EntityRelationDetail {
   cardinality: Cardinality
   acyclic: boolean
   description?: string
-}
-
-// 后端返回的规则详情
-export interface RuleDetail {
-  id: string
-  name: string
-  entity_id: string
-  entity_name: string
-  condition_expr: string
-  action_desc: string
-  status: string
-  priority: string
-  trigger_count: number
-  last_triggered: string | null
 }
 
 // 后端返回的动作详情
@@ -153,7 +122,6 @@ export interface EntityListItem {
   status: EntityStatus
   attr_count: number
   relation_count: number
-  rule_count: number
   datasource_name: string | null
   scenario_codes?: string[]
 }
@@ -167,7 +135,6 @@ export interface GraphNode {
   status: EntityStatus
   relation_count: number
   action_count: number
-  rule_count: number
   function_count: number
 }
 
@@ -191,7 +158,6 @@ export interface FileImportResult {
   entities_skipped: number
   attributes_created: number
   relations_created: number
-  rules_created: number
   actions_created: number
   errors: string[]
 }
@@ -200,8 +166,6 @@ export interface FileImportResult {
 export interface DashboardStats {
   entity_count: number
   relation_count: number
-  rule_count: number
-  active_rule_count: number
   tier_distribution: { tier: Tier; name: string; count: number; pct: number }[]
   recent_activities: ActivityItem[]
   health_status: { id: string; name: string; tier: Tier; status: EntityStatus }[]

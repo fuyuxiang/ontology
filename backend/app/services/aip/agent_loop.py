@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.function import OntologyFunction
-from app.models.rule import BusinessRule, EntityAction
+from app.models.action import EntityAction
 from app.models.skill import Skill
 from app.services.agent.tool_router import ToolRouter
 from app.services.copilot import get_llm_client
@@ -91,29 +91,7 @@ class AgentNodeRunner:
         self._register_builtin_tools()
 
     def _register_entity_tools(self, entity: OntologyEntity):
-        """将实体下的规则/函数/动作注册为 Tool。"""
-        # 规则
-        rules = self.db.query(BusinessRule).filter(
-            BusinessRule.entity_id == entity.id
-        ).all()
-        for rule in rules:
-            tool_name = f"evaluate_rule_{rule.name}"
-            self.tools_schema.append({
-                "type": "function",
-                "function": {
-                    "name": tool_name,
-                    "description": f"执行规则「{rule.name}」: {rule.description or rule.condition_expr or ''}",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "user_id": {"type": "string", "description": "目标用户/实例 ID"},
-                        },
-                        "required": [],
-                    },
-                },
-            })
-            self._tool_dispatch[tool_name] = lambda params, _r=rule: self._exec_rule(_r, params)
-
+        """将实体下的函数/动作注册为 Tool。"""
         # 函数
         functions = self.db.query(OntologyFunction).filter(
             OntologyFunction.entity_id == entity.id
@@ -192,14 +170,6 @@ class AgentNodeRunner:
         self._tool_dispatch["query_ontology_data"] = self._exec_query_ontology
 
     # ─── Tool 执行器 ─────────────────────────────────────────
-
-    def _exec_rule(self, rule: BusinessRule, params: dict) -> dict:
-        user_id = params.get("user_id", "")
-        if user_id:
-            result, _, _ = self._tool_router.execute("evaluate_rule", {"rule_name": rule.name, "user_id": user_id})
-        else:
-            result, _, _ = self._tool_router.execute("screen_users_by_rule", {"rule_name": rule.name})
-        return result if isinstance(result, dict) else {"result": result}
 
     def _exec_function(self, func: OntologyFunction, params: dict) -> dict:
         try:

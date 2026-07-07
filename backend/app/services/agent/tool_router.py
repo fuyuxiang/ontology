@@ -6,10 +6,9 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import BusinessRule, EntityRelation, OntologyEntity
+from app.models import EntityRelation, OntologyEntity
 from app.services.action_executors import run_executor_sync
 from app.services.data_plane.entity_data_service import EntityDataService
-from app.services.rule_engine import RuleEvaluator, RuleScreener
 
 logger = logging.getLogger(__name__)
 
@@ -26,10 +25,6 @@ class ToolRouter:
             "query_datasource": self._tool_query_datasource,
             "get_entity_detail": self._tool_get_entity_detail,
             "query_entity_data": self._tool_query_entity_data,
-            "get_business_rules": self._tool_get_business_rules,
-            "evaluate_rule": self._tool_evaluate_rule,
-            "evaluate_all_rules": self._tool_evaluate_all_rules,
-            "screen_users_by_rule": self._tool_screen_users_by_rule,
             "execute_action": self._tool_execute_action,
             # 本体构建器（chat 模式）三件套
             "list_business_datasources": self._tool_list_business_datasources,
@@ -53,10 +48,6 @@ class ToolRouter:
             r for r in self.db.query(EntityRelation).all()
             if r.from_entity_id in entity_ids and r.to_entity_id in entity_ids
         ]
-        rules = self.db.query(BusinessRule).filter(
-            BusinessRule.status == "active",
-            BusinessRule.entity_id.in_(entity_ids),
-        ).all() if entity_ids else []
 
         tier_names = {1: "核心", 2: "领域", 3: "场景"}
         entity_list = []
@@ -75,12 +66,8 @@ class ToolRouter:
                 "to": entity_map.get(r.to_entity_id, "?"),
                 "name": r.name, "cardinality": r.cardinality,
             })
-        rule_list = [{
-            "name": r.name, "condition": r.condition_expr, "action": r.action_desc,
-            "entity": entity_map.get(r.entity_id, "?"),
-        } for r in rules[:10]]
-        result = {"entities": entity_list, "relations": rel_list, "rules": rule_list}
-        return result, f"本体模型: {len(entity_list)} 实体, {len(rel_list)} 关系, {len(rules)} 规则", len(entity_list)
+        result = {"entities": entity_list, "relations": rel_list}
+        return result, f"本体模型: {len(entity_list)} 实体, {len(rel_list)} 关系", len(entity_list)
 
     def _tool_list_datasources(self, args: dict) -> tuple[Any, str, int]:
         svc = EntityDataService(self.db)
@@ -126,11 +113,11 @@ class ToolRouter:
             relations.append({"direction": "out", "name": r.name, "target": all_entities.get(r.to_entity_id, "?"), "cardinality": r.cardinality})
         for r in rels_to:
             relations.append({"direction": "in", "name": r.name, "source": all_entities.get(r.from_entity_id, "?"), "cardinality": r.cardinality})
-        rules = [{"name": r.name, "condition": r.condition_expr, "action": r.action_desc, "status": r.status} for r in entity.rules]
+        rules = []
         result = {
             "name": entity.name, "name_cn": entity.name_cn, "tier": entity.tier,
             "description": entity.description or "",
-            "attributes": attrs, "relations": relations, "rules": rules,
+            "attributes": attrs, "relations": relations,
         }
         return result, f"返回实体 {entity.name_cn} 的详情", 1
 
@@ -162,79 +149,6 @@ class ToolRouter:
         result["entity_cn"] = entity.name_cn
         return result, f"通过本体 {entity.name_cn} 查询到 {result.get('rowCount', 0)} 条记录", result.get("rowCount", 0)
 
-    def _tool_get_business_rules(self, args: dict) -> tuple[Any, str, int]:
-        entity_name = str(args.get("entity_name", "")).strip()
-        status = str(args.get("status", "active")).strip()
-        query = self.db.query(BusinessRule)
-        if status != "all":
-            query = query.filter(BusinessRule.status == status)
-        if entity_name:
-            entity = self.db.query(OntologyEntity).filter(OntologyEntity.name == entity_name).first()
-            if entity:
-                query = query.filter(BusinessRule.entity_id == entity.id)
-            else:
-                return {"error": f"实体 '{entity_name}' 不存在"}, f"实体不存在", 0
-        rules = query.all()
-        all_entities = {e.id: e.name for e in self.db.query(OntologyEntity).all()}
-        rule_list = [{
-            "name": r.name, "condition": r.condition_expr, "action": r.action_desc,
-            "status": r.status, "priority": r.priority,
-            "entity": all_entities.get(r.entity_id, "?"),
-            "triggerCount": r.trigger_count,
-            "has_structured_conditions": r.conditions_json is not None,
-        } for r in rules]
-        return rule_list, f"返回 {len(rule_list)} 条业务规则", len(rule_list)
-
-    def _tool_evaluate_rule(self, args: dict) -> tuple[Any, str, int]:
-        rule_name = str(args.get("rule_name", "")).strip()
-        user_id = str(args.get("user_id", "")).strip()
-        if not rule_name or not user_id:
-            return {"error": "需要提供 rule_name 和 user_id"}, "参数不完整", 0
-
-        rule = self.db.query(BusinessRule).filter(
-            BusinessRule.name == rule_name,
-            BusinessRule.status == "active",
-        ).first()
-        if not rule:
-            return {"error": f"规则 '{rule_name}' 不存在或未激活"}, "规则不存在", 0
-        if not rule.conditions_json:
-            return {"error": f"规则 '{rule_name}' 没有结构化条件，无法评估"}, "无结构化条件", 0
-
-        evaluator = RuleEvaluator(self.db)
-        result = evaluator.evaluate(rule, user_id)
-        self.db.commit()
-        result_dict = RuleEvaluator._result_to_dict(result)
-        summary = f"规则 '{rule_name}' {'触发' if result.triggered else '未触发'} (匹配 {result.matched_count}/{result.total_count})"
-        return result_dict, summary, 1
-
-    def _tool_evaluate_all_rules(self, args: dict) -> tuple[Any, str, int]:
-        user_id = str(args.get("user_id", "")).strip()
-        if not user_id:
-            return {"error": "需要提供 user_id"}, "参数不完整", 0
-
-        evaluator = RuleEvaluator(self.db)
-        result = evaluator.evaluate_all(user_id)
-        triggered = result["triggered_count"]
-        total = result["evaluated_count"]
-        risk = result["overall_risk"]
-        summary = f"评估 {total} 条规则，{triggered} 条触发，综合风险: {risk}"
-        return result, summary, total
-
-    def _tool_screen_users_by_rule(self, args: dict) -> tuple[Any, str, int]:
-        rule_name = str(args.get("rule_name", "")).strip()
-        limit = int(args.get("limit", 50))
-        if not rule_name:
-            return {"error": "需要提供 rule_name"}, "参数不完整", 0
-
-        screener = RuleScreener(self.db)
-        result = screener.screen_by_name(rule_name, limit)
-        if result.get("error"):
-            return result, f"筛选失败: {result['error']}", 0
-        matched = result.get("matched_users", 0)
-        risk = result.get("risk_level", "")
-        summary = f"根据规则 '{rule_name}' 筛选出 {matched} 个{risk}风险用户"
-        return result, summary, matched
-
     def _tool_execute_action(self, args: dict) -> tuple[Any, str, int]:
         action_name = str(args.get("action_name", "")).strip()
         params = args.get("params", {})
@@ -242,7 +156,7 @@ class ToolRouter:
         if not action_name:
             return {"error": "需要提供 action_name"}, "参数不完整", 0
 
-        from app.models.rule import EntityAction
+        from app.models.action import EntityAction
         action = self.db.query(EntityAction).filter(
             EntityAction.name == action_name,
             EntityAction.status == "active",

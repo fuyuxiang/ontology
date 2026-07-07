@@ -20,7 +20,7 @@ from app.models.prompt_template import PromptTemplate
 from app.models.quality_metric import QualityMetric
 from app.models.quality_rule import HealthStatus, QualityRule
 from app.models.relation import EntityRelation
-from app.models.rule import BusinessRule, EntityAction
+from app.models.action import EntityAction
 from app.models.scenario import ScenarioDict
 from app.models.scene import (
     AipScene,
@@ -43,19 +43,18 @@ from app.models.version import (
 from app.models.version_components import (
     OntologyVersionAction,
     OntologyVersionFunction,
-    OntologyVersionRule,
 )
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
-    "BusinessRule", "EntityAction", "OntologyFunction",
+    "EntityAction", "OntologyFunction",
     "AuditLog", "User",
     "DashboardConfig",
     "ModelRegistry", "Agent", "PromptTemplate",
     "AgentTrace", "EvalSuite", "EvalCase", "EvalRun", "EvalResult",
     "OntologyVersion", "OntologyVersionEntity",
     "OntologyVersionAttribute", "OntologyVersionRelation",
-    "OntologyVersionFunction", "OntologyVersionRule", "OntologyVersionAction",
+    "OntologyVersionFunction", "OntologyVersionAction",
     "AipScene", "AipSceneVersion", "AipSceneExecution", "AipSceneTrigger",
     "ScenarioDict",
     "BusinessDocument",

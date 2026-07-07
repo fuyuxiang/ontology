@@ -10,9 +10,9 @@ from collections.abc import Generator
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
+from app.models.action import EntityAction
 from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.function import OntologyFunction
-from app.models.rule import BusinessRule, EntityAction
 from app.services.skill_sandbox import validate_code
 
 logger = logging.getLogger(__name__)
@@ -216,12 +216,6 @@ def _load_assets_context(asset_ids: dict, db: Session) -> str:
             attrs = db.query(EntityAttribute).filter(EntityAttribute.entity_id == e.id).all()
             attr_lines = "\n".join(f"  - {a.name}({a.name_zh}): {a.data_type}" for a in attrs)
             parts.append(f"### 实体: {e.name}({e.name_zh})\n{attr_lines}")
-
-    rule_ids = asset_ids.get("rules", [])
-    if rule_ids:
-        rules = db.query(BusinessRule).filter(BusinessRule.id.in_(rule_ids)).all()
-        for r in rules:
-            parts.append(f"### 规则: {r.name}\n条件: {r.condition}\n动作: {r.action_expr}")
 
     func_ids = asset_ids.get("functions", [])
     if func_ids:

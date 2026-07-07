@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.relation import EntityRelation
-from app.models.rule import BusinessRule, EntityAction
+from app.models.action import EntityAction
 
 
 @dataclass
@@ -218,111 +218,6 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
             )
             db.add(action)
             result.actions_created += 1
-
-    # ── business_rules → BusinessRule ──
-    for rule in data.get("business_rules", []):
-        entity_id = None
-        # v3 格式用 applicable_objects，v2 用 applies_to_objects
-        applies_to = rule.get("applicable_objects", rule.get("applies_to_objects", []))
-        if applies_to:
-            for obj_name in applies_to:
-                if obj_name in entity_map:
-                    entity_id = entity_map[obj_name]
-                    break
-        # 如果 applicable_objects 没匹配到，从 conditions 字段前缀解析
-        if not entity_id:
-            entity_id = _resolve_entity_from_conditions(rule.get("conditions", []), entity_map, namespace)
-        if not entity_id:
-            entity_id = list(entity_map.values())[0] if entity_map else None
-        if not entity_id:
-            continue
-
-        # 条件：v3 用 conditions（数组），v2 用 condition（对象）
-        conditions = rule.get("conditions", [])
-        condition_obj = rule.get("condition", {})
-        if conditions:
-            condition_expr = rule.get("description", "")
-        elif condition_obj:
-            condition_expr = json.dumps(condition_obj, ensure_ascii=False)
-        else:
-            condition_expr = rule.get("description", "")
-
-        # 动作描述：v3 用 action（对象），v2 用 actions（数组）
-        action_obj = rule.get("action", {})
-        actions_arr = rule.get("actions", [])
-        if action_obj:
-            action_desc = action_obj.get("reason", action_obj.get("value", ""))
-        elif actions_arr:
-            action_desc = "; ".join(
-                a.get("description", a.get("action", "")) for a in actions_arr
-            )
-        else:
-            action_desc = rule.get("description", "")
-
-        priority_val = rule.get("priority", 5)
-        if isinstance(priority_val, int):
-            priority = "high" if priority_val <= 2 else "medium" if priority_val <= 5 else "low"
-        else:
-            priority = str(priority_val)
-
-        # match_mode 和 risk_level
-        match_mode = rule.get("match_mode", "all")
-        risk_level = None
-        if action_obj and action_obj.get("target", "").endswith("risk_level"):
-            risk_level = action_obj.get("value")
-        if not risk_level:
-            risk_level = rule.get("risk_level")
-
-        br = BusinessRule(
-            entity_id=entity_id,
-            name=rule.get("display_name", rule.get("rule_id", "")),
-            condition_expr=condition_expr,
-            action_desc=action_desc,
-            status="active",
-            priority=priority,
-            conditions_json=conditions if conditions else None,
-            rule_meta_json={
-                "rule_id": rule.get("rule_id"),
-                "match_mode": match_mode,
-                "risk_level": risk_level,
-                "category": rule.get("category"),
-                "source": rule.get("source"),
-            } if conditions else None,
-        )
-        db.add(br)
-        result.rules_created += 1
-
-    # ── rule_types → BusinessRule（结构化规则）──
-    for rt in data.get("rule_types", []):
-        # 从条件字段前缀解析关联实体
-        entity_id = _resolve_entity_from_conditions(rt.get("conditions", []), entity_map, namespace)
-        if not entity_id:
-            entity_id = list(entity_map.values())[0] if entity_map else None
-        if not entity_id:
-            continue
-
-        priority_val = rt.get("priority", 5)
-        if isinstance(priority_val, int):
-            priority = "high" if priority_val <= 2 else "medium" if priority_val <= 5 else "low"
-        else:
-            priority = str(priority_val)
-
-        br = BusinessRule(
-            entity_id=entity_id,
-            name=rt.get("display_name", rt.get("rule_id", "")),
-            condition_expr=rt.get("description", ""),
-            action_desc=f"触发{rt.get('risk_level', 'unknown')}级预警",
-            conditions_json=rt.get("conditions"),
-            rule_meta_json={
-                "rule_id": rt.get("rule_id"),
-                "match_mode": rt.get("match_mode", "all"),
-                "risk_level": rt.get("risk_level"),
-            },
-            status="active",
-            priority=priority,
-        )
-        db.add(br)
-        result.rules_created += 1
 
     return result
 

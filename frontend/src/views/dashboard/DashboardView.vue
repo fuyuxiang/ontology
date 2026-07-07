@@ -83,7 +83,7 @@
                   <div class="platform-tooltip">
                     <div class="platform-tooltip-name">{{ node.label }}</div>
                     <div class="platform-tooltip-desc">{{ node.desc }}</div>
-                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }} · 动作 {{ node.actionCount }}</div>
+                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 动作 {{ node.actionCount }}</div>
                   </div>
                 </div>
               </div>
@@ -102,7 +102,7 @@
                   <div class="platform-tooltip">
                     <div class="platform-tooltip-name">{{ node.label }}</div>
                     <div class="platform-tooltip-desc">{{ node.desc }}</div>
-                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 规则 {{ node.ruleCount }} · 动作 {{ node.actionCount }}</div>
+                    <div class="platform-tooltip-row">关系 {{ node.relationCount }} · 动作 {{ node.actionCount }}</div>
                   </div>
                 </div>
               </div>
@@ -166,7 +166,7 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null
 interface OntologyNode {
   id: string; label: string; desc: string; icon: string
   tier: number; status: string
-  relationCount: number; ruleCount: number; attrCount: number; actionCount: number
+  relationCount: number; attrCount: number; actionCount: number
   isCore: boolean
 }
 
@@ -229,7 +229,6 @@ function toNode(e: EntityListItem): OntologyNode {
     tier: e.tier,
     status: e.status,
     relationCount: e.relation_count,
-    ruleCount: e.rule_count,
     attrCount: e.attr_count ?? 0,
     actionCount: 0,
     isCore,
@@ -645,7 +644,6 @@ const DATASOURCE_ICON_ITEMS = [
 const LOGIC_ICON_ITEMS = [
   { icon: WORKFLOW_ICON, label: 'Actions' },
   { icon: WORKFLOW_ICON, label: 'Functions' },
-  { icon: WORKFLOW_ICON, label: 'Rules' },
 ]
 const ACTIONS_ICON_ITEMS = [
   { icon: WORKFLOW_ICON, label: '二次营销外呼' },
@@ -675,9 +673,6 @@ function resolveCardItems(card: any): string[] {
     } else if (item.type === 'dynamic') {
       const val = s[item.field] ?? ''
       items.push(`${val} ${item.label || ''}`.trim())
-    } else if (item.type === 'top_rules') {
-      const rules = s.top_rules?.slice(0, item.count ?? 4) ?? []
-      items.push(...(rules.length ? rules.map((r: any) => r.name) : ['暂无规则']))
     } else if (item.type === 'datasources') {
       const dsList = s.datasources ?? []
       const bb = dsList.filter((d: any) => d.name.startsWith('bb_'))
@@ -685,15 +680,10 @@ function resolveCardItems(card: any): string[] {
       if (bb.length) items.push(`宽带退单(${bb.length}表)`, ...bb.slice(0, 4).map((d: any) => d.name.replace('bb_', '')))
       if (other.length) items.push(`携号转网(${other.length}表)`, ...other.slice(0, 3).map((d: any) => d.name))
       if (!dsList.length) items.push('暂无数据源')
-    } else if (item.type === 'rule_priority') {
-      const rp = s.rule_priority ?? []
-      if (rp.length) {
-        items.push(...rp.map((r: any) => `${r.priority} 优先级: ${r.count}`))
-      } else {
-        items.push(`Actions: ${s.action_count ?? 0} (今日${s.today_action_executions ?? 0}次)`)
-        items.push(`Functions: ${s.function_count ?? 0} (今日${s.today_function_calls ?? 0}次)`)
-        items.push(`Rules: ${s.rule_count ?? 0} (告警${s.today_rule_alerts ?? 0}次)`)
-      }
+    } else if (item.type === 'rule_priority' || (item as any).type === 'logic_stats') {
+      // legacy card type compatibility: show actions/functions instead
+      items.push(`Actions: ${s.action_count ?? 0} (今日${s.today_action_executions ?? 0}次)`)
+      items.push(`Functions: ${s.function_count ?? 0} (今日${s.today_function_calls ?? 0}次)`)
     } else if (item.type === 'recent_activities') {
       const acts = s.recent_activities?.slice(0, item.count ?? 5) ?? []
       items.push(...(acts.length ? acts.map((a: any) => `${a.user_name || '系统'} ${a.action} ${a.target_name || a.target_type}`) : ['暂无动态']))

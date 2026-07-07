@@ -9,7 +9,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.models import Agent, BusinessRule, OntologyEntity
+from app.models import Agent, OntologyEntity
 from app.models.asset import Asset
 from app.models.skill import Skill
 from app.repositories.monitor_repo import MonitorRepository
@@ -153,10 +153,9 @@ def get_platform_stats(db: Session = Depends(get_db)):
     total_datasources = db.scalar(
         select(func.count(Asset.id)).where(Asset.status == "active")
     ) or 0
-    total_rules = db.scalar(select(func.count(BusinessRule.id))) or 0
     return PlatformStatsResponse(
         total_datasources=total_datasources,
-        total_rules=total_rules,
+        total_rules=0,
     )
 
 

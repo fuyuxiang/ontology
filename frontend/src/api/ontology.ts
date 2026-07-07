@@ -107,7 +107,7 @@ export const entityApi = {
   },
 
   sceneLayerStats(namespace: string) {
-    return get<{ key: string; label: string; entityCount: number; attrCount: number; relationCount: number; ruleCount: number; actionCount: number }[]>(
+    return get<{ key: string; label: string; entityCount: number; attrCount: number; relationCount: number; actionCount: number }[]>(
       '/entities/scene-layer-stats', { params: { namespace } },
     )
   },

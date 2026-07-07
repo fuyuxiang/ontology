@@ -9,7 +9,7 @@ from sqlalchemy import inspect as sa_inspect, Engine
 from .schema_compat import (
     _migrate_rename_schema_json,
     _migrate_datasources,
-    _migrate_business_rules,
+    _drop_business_rules,
     _migrate_entity_actions,
     _migrate_entity_attributes,
     _migrate_agents,
@@ -32,7 +32,7 @@ def run_startup_migrations(engine: Engine) -> None:
     with engine.connect() as conn:
         _migrate_rename_schema_json(conn, inspector, tables)
         _migrate_datasources(conn, inspector, tables)
-        _migrate_business_rules(conn, inspector, tables)
+        _drop_business_rules(conn, inspector, tables)
         _migrate_entity_actions(conn, inspector, tables)
         _migrate_entity_attributes(conn, inspector, tables)
         _migrate_agents(conn, inspector, tables)

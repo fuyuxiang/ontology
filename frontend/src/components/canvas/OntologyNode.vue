@@ -25,7 +25,6 @@
           <span v-if="data.attrCount"><strong>{{ data.attrCount }}</strong> 属性</span>
           <span v-if="data.relCount"><strong>{{ data.relCount }}</strong> 关系</span>
           <span v-if="data.actionCount"><strong>{{ data.actionCount }}</strong> 动作</span>
-          <span v-if="data.ruleCount"><strong>{{ data.ruleCount }}</strong> 规则</span>
           <span v-if="data.functionCount"><strong>{{ data.functionCount }}</strong> 函数</span>
         </div>
       </div>
@@ -38,7 +37,7 @@ import { ref, computed } from 'vue'
 import { Handle, Position } from '@vue-flow/core'
 
 const props = defineProps<{
-  data: { name: string; nameCn: string; tier: 1 | 2 | 3; status: string; relCount: number; attrCount?: number; actionCount?: number; ruleCount?: number; functionCount?: number; _dimmed?: boolean; _highlight?: boolean }
+  data: { name: string; nameCn: string; tier: 1 | 2 | 3; status: string; relCount: number; attrCount?: number; actionCount?: number; functionCount?: number; _dimmed?: boolean; _highlight?: boolean }
   selected?: boolean
   sourcePosition?: Position
   targetPosition?: Position

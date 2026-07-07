@@ -42,7 +42,7 @@ class AgentToolSpec:
 AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
     AgentToolSpec(
         name="describe_ontology_model",
-        description="返回系统中所有本体实体、关系和业务规则的概览。用于了解数据模型结构。",
+        description="返回系统中所有本体实体和关系的概览。用于了解数据模型结构。",
     ),
     AgentToolSpec(
         name="list_datasources",
@@ -68,7 +68,7 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
     ),
     AgentToolSpec(
         name="get_entity_detail",
-        description="获取本体实体的详细信息，包括属性列表、关联关系和相关规则。",
+        description="获取本体实体的详细信息，包括属性列表和关联关系。",
         parameters={
             "entity_name": {"type": "string", "description": "实体英文名称"},
         },
@@ -84,40 +84,6 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
             "limit": {"type": "integer", "description": "最大返回行数，默认 20，最大 200"},
         },
         required=("entity_name",),
-    ),
-    AgentToolSpec(
-        name="get_business_rules",
-        description="查询业务规则列表，可按关联实体和状态过滤。",
-        parameters={
-            "entity_name": {"type": "string", "description": "按关联实体名称过滤（可选）"},
-            "status": {"type": "string", "description": "规则状态过滤，默认 active", "enum": ["active", "inactive", "all"]},
-        },
-    ),
-    AgentToolSpec(
-        name="evaluate_rule",
-        description="对指定用户评估一条业务规则，基于真实数据源查询条件并返回是否触发、匹配条件明细和置信度。",
-        parameters={
-            "rule_name": {"type": "string", "description": "规则名称（如'高风险携转预警规则'）"},
-            "user_id": {"type": "string", "description": "待评估的用户ID"},
-        },
-        required=("rule_name", "user_id"),
-    ),
-    AgentToolSpec(
-        name="evaluate_all_rules",
-        description="对指定用户评估所有活跃的结构化规则，返回每条规则的触发结果和综合风险等级。",
-        parameters={
-            "user_id": {"type": "string", "description": "待评估的用户ID"},
-        },
-        required=("user_id",),
-    ),
-    AgentToolSpec(
-        name="screen_users_by_rule",
-        description="根据规则批量筛选用户。先找到规则，再根据规则条件自动构建SQL查询数据源，返回命中规则的用户列表。用于回答'有哪些高风险用户'等批量筛选类问题。",
-        parameters={
-            "rule_name": {"type": "string", "description": "规则名称（如'高风险携转预警规则'）"},
-            "limit": {"type": "integer", "description": "最大返回用户数，默认 50"},
-        },
-        required=("rule_name",),
     ),
     AgentToolSpec(
         name="execute_action",
@@ -151,7 +117,7 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
     ),
     AgentToolSpec(
         name="analyze_assets_for_ontology",
-        description="基于选中的数据源（表结构）+ 业务文档（解析文本）+ 业务上下文，让 LLM 抽取本体对象/属性/关系，并产出规则/动作建议。返回 entities[]/relations[]/suggested_rules[]/suggested_actions[]。仅在用户选完资产和文档后调用。",
+        description="基于选中的数据源（表结构）+ 业务文档（解析文本）+ 业务上下文，让 LLM 抽取本体对象/属性/关系，并产出动作建议。返回 entities[]/relations[]/suggested_actions[]。仅在用户选完资产和文档后调用。",
         parameters={
             "datasource_ids": {"type": "array", "items": {"type": "string"}, "description": "选中的数据源 id 数组"},
             "document_ids": {"type": "array", "items": {"type": "string"}, "description": "选中的业务文档 id 数组"},

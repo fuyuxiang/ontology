@@ -459,9 +459,6 @@ class GraphEngine(NodeHandlersMixin):
             "ontology-query": self._exec_ontology_query,
             "ontologyQuery": self._exec_ontology_query,  # AIP 别名
             "ontology-relation": self._exec_ontology_relation,
-            "rule-evaluate": self._exec_rule_evaluate,
-            "rule-engine": self._exec_rule_engine,
-            "ruleEngine": self._exec_rule_engine,        # AIP 别名
             "datasource": self._exec_datasource,
             "llm-inference": self._exec_llm_inference,
             "llmAgent": self._exec_llm_inference,        # AIP 别名

@@ -1,5 +1,5 @@
 """
-Snapshot service: copies active Function/Rule/Action records into versioned
+Snapshot service: copies active Function/Action records into versioned
 snapshot tables when a version is published.
 """
 from __future__ import annotations
@@ -10,12 +10,11 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.models.action import EntityAction
 from app.models.function import OntologyFunction
-from app.models.rule import BusinessRule, EntityAction
 from app.models.version_components import (
     OntologyVersionAction,
     OntologyVersionFunction,
-    OntologyVersionRule,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,7 +41,7 @@ def _remap_attr_ids(items: list[dict] | None, attr_map: dict[str, str]) -> list[
 
 
 def snapshot_components_for_version(db: Session, version: Any) -> dict:
-    """Create snapshot records for all active Functions/Rules/Actions in *version*.
+    """Create snapshot records for all active Functions/Actions in *version*.
 
     Parameters
     ----------
@@ -55,10 +54,9 @@ def snapshot_components_for_version(db: Session, version: Any) -> dict:
     Returns
     -------
     dict
-        ``{"functions_count": N, "rules_count": N, "actions_count": N}``
+        ``{"functions_count": N, "actions_count": N}``
     """
     functions_count = 0
-    rules_count = 0
     actions_count = 0
 
     for version_entity in version.entities:
@@ -95,32 +93,6 @@ def snapshot_components_for_version(db: Session, version: Any) -> dict:
             )
             db.add(snap)
             functions_count += 1
-
-        # --- Rules -----------------------------------------------------------
-        rules = (
-            db.query(BusinessRule)
-            .filter(
-                BusinessRule.entity_id == entity_id,
-                BusinessRule.status == "active",
-            )
-            .all()
-        )
-        for rule in rules:
-            snap = OntologyVersionRule(
-                version_id=version.id,
-                source_rule_id=rule.id,
-                version_entity_id=version_entity.id,
-                name=rule.name,
-                description=rule.description,
-                condition_expr=rule.condition_expr,
-                conditions_json=_remap_attr_ids(rule.conditions_json, attr_map),
-                priority=rule.priority,
-                input_params=_remap_attr_ids(rule.input_params, attr_map),
-                output_schema=rule.output_schema,
-                tags=rule.tags,
-            )
-            db.add(snap)
-            rules_count += 1
 
         # --- Domain actions --------------------------------------------------
         actions = (
@@ -175,14 +147,12 @@ def snapshot_components_for_version(db: Session, version: Any) -> dict:
 
     db.flush()
     logger.info(
-        "Version %s snapshot: %d functions, %d rules, %d actions",
+        "Version %s snapshot: %d functions, %d actions",
         version.id,
         functions_count,
-        rules_count,
         actions_count,
     )
     return {
         "functions_count": functions_count,
-        "rules_count": rules_count,
         "actions_count": actions_count,
     }
