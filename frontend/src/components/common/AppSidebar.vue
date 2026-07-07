@@ -130,7 +130,6 @@ const navGroups: NavGroup[] = [
     ]},
     { path: '/logic/functions', label: '逻辑建模', icon: ico.rule, children: [
       { path: '/logic/functions', label: '函数' },
-      { path: '/logic/rules', label: '规则' },
     ]},
     { path: '/logic/actions', label: '行动建模', icon: ico.action },
     { path: '/browser', label: '本体管理', icon: ico.ontologyMgr },
