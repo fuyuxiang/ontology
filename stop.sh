@@ -6,6 +6,7 @@ cd "$(dirname "$0")"
 
 BACKEND_PORT="${BACKEND_PORT:-8001}"
 FRONTEND_PORT="${FRONTEND_PORT:-5177}"
+CODE_SERVER_PORT="${CODE_SERVER_PORT:-8443}"
 
 stop_port() {
     local port="$1"
@@ -32,7 +33,8 @@ echo "Stopping services..."
 
 stop_port "$BACKEND_PORT" "backend"
 stop_port "$FRONTEND_PORT" "frontend"
+stop_port "$CODE_SERVER_PORT" "code-server"
 
-rm -f .backend.pid .frontend.pid
+rm -f .backend.pid .frontend.pid .code-server.pid
 
 echo "Done."

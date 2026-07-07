@@ -1,6 +1,8 @@
 from datetime import datetime
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
@@ -167,3 +169,44 @@ def test_function(
         error=result.error,
         execution_ms=result.execution_ms,
     )
+
+
+WORKSPACE_DIR = Path(__file__).resolve().parents[3] / ".." / "workspace"
+CODE_SERVER_PORT = int(__import__("os").environ.get("CODE_SERVER_PORT", "8443"))
+
+LOGIC_TYPE_EXT = {
+    "expression": ".js",
+    "sql": ".sql",
+    "python": ".py",
+}
+
+
+class WorkspaceOut(BaseModel):
+    url: str
+    folder: str
+
+
+@router.post("/{func_id}/workspace", response_model=WorkspaceOut)
+def open_workspace(
+    func_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    repo = FunctionRepository(db)
+    func = repo.get_by_id(func_id)
+    if not func:
+        raise HTTPException(status_code=404, detail="函数不存在")
+
+    func_dir = (WORKSPACE_DIR / func.callable_name).resolve()
+    func_dir.mkdir(parents=True, exist_ok=True)
+
+    ext = LOGIC_TYPE_EXT.get(func.logic_type, ".txt")
+    main_file = func_dir / f"main{ext}"
+    if not main_file.exists():
+        main_file.write_text(func.logic_body or "", encoding="utf-8")
+
+    host = request.headers.get("host", "localhost").split(":")[0]
+    folder_path = str(func_dir)
+    url = f"http://{host}:{CODE_SERVER_PORT}/?folder={folder_path}"
+    return WorkspaceOut(url=url, folder=folder_path)
