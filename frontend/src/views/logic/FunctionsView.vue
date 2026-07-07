@@ -206,8 +206,7 @@ function onFuncSaved(fn: { id: string; name: string }) {
 }
 
 function handleEdit(fn: FunctionItem) {
-  editingFuncId.value = fn.id
-  showAdd.value = true
+  router.push(`/logic/functions/${fn.id}/code`)
 }
 
 async function handleDelete(fn: FunctionItem) {
