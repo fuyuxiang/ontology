@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import BusinessRule, OntologyEntity
+from app.models import OntologyEntity
 from app.services.agent.prompt_builder import build_system_prompt
 from app.services.agent.tool_router import ToolRouter
 from app.services.agent_tools import agent_tool_definitions
@@ -366,26 +366,6 @@ class AgentService:
 
             elif tool_name == "screen_users_by_rule":
                 if isinstance(result, dict) and not result.get("error"):
-                    rule_name = args.get("rule_name", "")
-                    rule = self.db.query(BusinessRule).filter(BusinessRule.name == rule_name).first()
-                    entities_involved = []
-                    if rule and rule.conditions_json:
-                        seen = set()
-                        for cond in rule.conditions_json:
-                            field = cond.get("field", "")
-                            if "." in field:
-                                ename = field.split(".")[0]
-                                if ename not in seen:
-                                    seen.add(ename)
-                                    entity = self.db.query(OntologyEntity).filter(OntologyEntity.name == ename).first()
-                                    if entity:
-                                        asset_result = EntityDataService(self.db).resolve_entity_asset(entity.id)
-                                        ds_name = asset_result[0].name if asset_result else ""
-                                        entities_involved.append({
-                                            "entity": ename,
-                                            "entity_cn": entity.name_cn,
-                                            "datasource": ds_name,
-                                        })
                     return {
                         "type": "screen",
                         "rule_name": result.get("rule_name", ""),
@@ -393,8 +373,8 @@ class AgentService:
                         "match_mode": result.get("match_mode", ""),
                         "conditions_count": result.get("conditions_count", 0),
                         "matched_users": result.get("matched_users", 0),
-                        "entities_involved": entities_involved,
-                        "conditions": [c.get("display", "") for c in (rule.conditions_json or [])] if rule else [],
+                        "entities_involved": [],
+                        "conditions": [],
                     }
 
             elif tool_name == "evaluate_all_rules":

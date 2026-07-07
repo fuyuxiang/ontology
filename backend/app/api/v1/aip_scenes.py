@@ -149,7 +149,7 @@ def _validate_scene_payload(s: AipScene) -> dict:
     from app.models.agent import Agent
     from app.models.entity import OntologyEntity
     from app.models.function import OntologyFunction
-    from app.models.rule import BusinessRule, EntityAction
+    from app.models.action import EntityAction
     from app.models.skill import Skill
 
     db = SessionLocal()
@@ -164,13 +164,6 @@ def _validate_scene_payload(s: AipScene) -> dict:
                     warnings.append(f"节点 {label} 未指定本体对象")
                 elif not db.query(OntologyEntity).filter(OntologyEntity.name == ref).first():
                     errors.append(f"节点 {label} 引用的本体 {ref} 不存在")
-            elif ntype in ("ruleEngine", "rule-engine"):
-                rid = data.get("rule_id")
-                rname = data.get("rule_expr") or data.get("rule_name")
-                if rid and not db.get(BusinessRule, rid):
-                    errors.append(f"节点 {label} 引用的规则 {rid} 不存在")
-                elif not (rid or rname):
-                    warnings.append(f"节点 {label} 未指定规则")
             elif ntype in ("skill", "skillNode"):
                 sid = data.get("skill_id")
                 if sid and not db.get(Skill, sid):

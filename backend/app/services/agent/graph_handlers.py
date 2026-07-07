@@ -8,11 +8,56 @@ import logging
 from typing import Any
 
 from app.models.function import OntologyFunction
-from app.models.rule import BusinessRule, EntityAction
+from app.models.action import EntityAction
 from app.models.skill import Skill
 from app.services.skill_executor import execute_skill
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize(val):
+    if isinstance(val, str):
+        low = val.lower()
+        if low in ("true", "1", "yes"):
+            return True
+        if low in ("false", "0", "no"):
+            return False
+    if isinstance(val, (int, float)):
+        if val == 0:
+            return False
+        if val == 1:
+            return True
+    return val
+
+
+def _compare(actual, operator: str, expected) -> bool:
+    if expected is None:
+        if operator == "==":
+            return actual is None
+        elif operator == "!=":
+            return actual is not None
+    if actual is None:
+        return False
+    try:
+        if operator == "==":
+            return _normalize(actual) == _normalize(expected)
+        elif operator == "!=":
+            return _normalize(actual) != _normalize(expected)
+        elif operator == ">=":
+            return float(actual) >= float(expected)
+        elif operator == ">":
+            return float(actual) > float(expected)
+        elif operator == "<=":
+            return float(actual) <= float(expected)
+        elif operator == "<":
+            return float(actual) < float(expected)
+        elif operator.lower() == "in":
+            return actual in expected
+        elif operator.lower() == "not_in":
+            return actual not in expected
+    except (ValueError, TypeError):
+        pass
+    return False
 
 
 def _safe_jsonable(value: Any, depth: int = 0) -> Any:
@@ -97,39 +142,7 @@ class NodeHandlersMixin:
         result, summary, _ = self._tool_router.execute("describe_ontology_model", {})
         return result, summary
 
-    def _exec_rule_evaluate(self, data: dict, context: dict, question: str):
-        user_id = self._extract_user_id(context)
-        if user_id:
-            result, summary, _ = self._tool_router.execute("evaluate_all_rules", {"user_id": user_id})
-        else:
-            result, summary, _ = self._tool_router.execute("get_business_rules", {})
-        return result, summary
-
     # PLACEHOLDER_MORE_HANDLERS
-
-    def _exec_rule_engine(self, data: dict, context: dict, question: str):
-        # 优先 rule_id（AIP 标准），其次 rule_expr / rule_name
-        rule_id = data.get("rule_id") or ""
-        rule_name = data.get("rule_expr") or data.get("rule_name") or ""
-        if rule_id:
-            rule = self.db.get(BusinessRule, rule_id)
-            if not rule:
-                return {"error": f"规则 {rule_id} 不存在"}, "规则不存在"
-            rule_name = rule.name
-        if rule_name:
-            user_id = self._extract_user_id(context)
-            if user_id:
-                result, summary, _ = self._tool_router.execute(
-                    "evaluate_rule", {"rule_name": rule_name, "user_id": user_id}
-                )
-            else:
-                result, summary, _ = self._tool_router.execute(
-                    "screen_users_by_rule", {"rule_name": rule_name}
-                )
-            return result, summary
-        # 没指定规则 → 退化为列出全部规则
-        result, summary, _ = self._tool_router.execute("get_business_rules", {})
-        return result, summary
 
     def _exec_datasource(self, data: dict, context: dict, question: str):
         sql = data.get("sql", "")
@@ -314,7 +327,6 @@ class NodeHandlersMixin:
         value = expr.get("value", "")
         actual = self._lookup_in_context(field, context) if field else None
         try:
-            from app.services.rule_engine import _compare  # type: ignore
             triggered = _compare(actual, operator, value)
         except Exception:
             triggered = (str(actual) == str(value))
@@ -377,7 +389,7 @@ class NodeHandlersMixin:
         target = data.get("target") or data.get("targetObjectType") or ""
         msg = data.get("message", "")
         msg = self._resolve_template(msg, context) if msg else ""
-        from app.models.rule import EntityAction
+        from app.models.action import EntityAction
         from app.services.action_executors import run_executor_sync
         act = (
             self.db.query(EntityAction)

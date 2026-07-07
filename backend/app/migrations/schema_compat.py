@@ -55,22 +55,10 @@ def _migrate_datasources(conn, inspector, tables):
     conn.commit()
 
 
-def _migrate_business_rules(conn, inspector, tables):
-    if "business_rules" not in tables:
-        return
-    cols = _get_cols(inspector, "business_rules")
-    _add = []
-    for col in ("conditions_json", "rule_meta_json", "input_params", "output_schema"):
-        if col not in cols:
-            _add.append(f"ALTER TABLE business_rules ADD COLUMN {col} JSON")
-    if "description" not in cols:
-        _add.append("ALTER TABLE business_rules ADD COLUMN description TEXT")
-    if "tags" not in cols:
-        _add.append("ALTER TABLE business_rules ADD COLUMN tags JSON")
-    if "action_id" not in cols:
-        _add.append("ALTER TABLE business_rules ADD COLUMN action_id VARCHAR(36)")
-    for stmt in _add:
-        conn.execute(text(stmt))
+def _drop_business_rules(conn, inspector, tables):
+    for tbl in ("business_rules", "ontology_version_rules"):
+        if tbl in tables:
+            conn.execute(text(f"DROP TABLE IF EXISTS {tbl}"))
     conn.commit()
 
 

@@ -23,7 +23,7 @@ function uid(prefix = 'id') {
 }
 
 function emptyHints(): OntologyHints {
-  return { suggested_rules: [], suggested_actions: [] }
+  return { suggested_actions: [] }
 }
 
 function migrateSession(s: any): BuilderSession {
@@ -47,7 +47,6 @@ function migrateSession(s: any): BuilderSession {
     instanceCount: c.instanceCount || 0,
     properties: c.properties || [],
     derivedProperties: c.derivedProperties || [],
-    rules: c.rules || [],
     actions: c.actions || [],
     approved: c.approved ?? false,
   }))
@@ -97,7 +96,6 @@ export function buildPresetClasses(scenarioId: string): OntologyObjectDraft[] {
       { id: uid('prop'), name: 'updated_at', displayName: '更新时间', type: 'date', required: false },
     ],
     derivedProperties: [],
-    rules: [],
     actions: [],
     approved: false,
   }))

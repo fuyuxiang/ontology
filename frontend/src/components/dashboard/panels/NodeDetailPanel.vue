@@ -27,10 +27,6 @@
             <div class="stat-lbl">关系</div>
           </div>
           <div class="node-panel__stat">
-            <div class="stat-val">{{ node.ruleCount }}</div>
-            <div class="stat-lbl">规则</div>
-          </div>
-          <div class="node-panel__stat">
             <div class="stat-val">{{ node.attrCount }}</div>
             <div class="stat-lbl">属性</div>
           </div>
@@ -141,7 +137,7 @@ import type { RelationData } from '../../../api/relations'
 import type { Tier, EntityStatus } from '../../../types'
 
 const props = defineProps<{
-  node: { id: string; label: string; desc: string; icon: string; tier: number; status: string; relationCount: number; ruleCount: number; attrCount: number; actionCount: number }
+  node: { id: string; label: string; desc: string; icon: string; tier: number; status: string; relationCount: number; attrCount: number; actionCount: number }
   relations: RelationData[]
 }>()
 const emit = defineEmits<{ close: []; updated: []; created: []; deleted: [] }>()

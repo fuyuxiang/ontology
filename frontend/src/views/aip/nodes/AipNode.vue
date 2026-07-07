@@ -77,16 +77,6 @@
           </div>
         </template>
 
-        <!-- ruleEngine -->
-        <template v-else-if="type === 'ruleEngine'">
-          <div class="aip-field"><span class="aip-field__label">规则引用</span>
-            <div class="aip-tag-row">
-              <span v-for="r in (data.ruleRefs || [data.ruleRef].filter(Boolean))" :key="r" class="aip-tag aip-tag--orange">{{ r }}</span>
-              <span v-if="!(data.ruleRefs || data.ruleRef)" class="aip-field__empty">未配置规则</span>
-            </div>
-          </div>
-        </template>
-
         <!-- writebackOntology -->
         <template v-else-if="type === 'writebackOntology'">
           <div class="aip-field"><span class="aip-field__label">写回对象</span><span class="aip-field__value">{{ data.targetObjectType || '—' }}</span></div>

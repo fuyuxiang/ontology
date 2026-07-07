@@ -51,9 +51,6 @@
       <a-col :xs="12" :sm="8" :lg="4">
         <DataStats :data="platformStats" />
       </a-col>
-      <a-col :xs="12" :sm="8" :lg="4">
-        <RuleStats :data="platformStats" />
-      </a-col>
     </a-row>
 
     <!-- Alerts + Events -->
@@ -85,7 +82,6 @@ import OntologyStats from './components/OntologyStats.vue'
 import LLMCallStats from './components/LLMCallStats.vue'
 import AgentActivity from './components/AgentActivity.vue'
 import DataStats from './components/DataStats.vue'
-import RuleStats from './components/RuleStats.vue'
 
 const loading = ref(false)
 const resources = ref<ResourceMetrics | null>(null)

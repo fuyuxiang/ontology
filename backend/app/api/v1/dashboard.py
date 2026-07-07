@@ -9,7 +9,6 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
     AuditLog,
-    BusinessRule,
     EntityAction,
     EntityRelation,
     OntologyEntity,
@@ -26,11 +25,9 @@ DEFAULT_CARDS = [
      "items": [
          {"type": "dynamic", "field": "entity_count", "label": "个实体"},
          {"type": "dynamic", "field": "relation_count", "label": "条关系"},
-         {"type": "dynamic", "field": "rule_count", "label": "条规则"},
-         {"type": "dynamic", "field": "active_rule_count", "label": "条活跃规则"},
+         {"type": "dynamic", "field": "function_count", "label": "个函数"},
+         {"type": "dynamic", "field": "action_count", "label": "个动作"},
      ]},
-    {"key": "automations", "title": "AUTOMATIONS", "enabled": True,
-     "items": [{"type": "top_rules", "count": 4}]},
     {"key": "products", "title": "PRODUCTS & SDKs", "enabled": True,
      "items": [
          {"type": "static", "text": "Ontology Center"},
@@ -40,8 +37,6 @@ DEFAULT_CARDS = [
      ]},
     {"key": "datasources", "title": "DATA SOURCES", "enabled": True,
      "items": [{"type": "datasources", "count": 8}]},
-    {"key": "logic", "title": "LOGIC SOURCES", "enabled": True,
-     "items": [{"type": "rule_priority"}]},
     {"key": "actions", "title": "SYSTEMS OF ACTION", "enabled": True,
      "items": [{"type": "recent_activities", "count": 5}]},
 ]
@@ -80,8 +75,6 @@ class DashboardRepository:
         db = self.db
         entity_count = db.query(func.count(OntologyEntity.id)).scalar() or 0
         relation_count = db.query(func.count(EntityRelation.id)).scalar() or 0
-        rule_count = db.query(func.count(BusinessRule.id)).scalar() or 0
-        active_rule_count = db.query(func.count(BusinessRule.id)).filter(BusinessRule.status == 'active').scalar() or 0
         action_count = db.query(func.count(EntityAction.id)).scalar() or 0
         function_count = db.query(func.count(OntologyFunction.id)).scalar() or 0
         datasource_count = db.query(func.count(Asset.id)).filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"])).scalar() or 0
@@ -94,12 +87,6 @@ class DashboardRepository:
             AuditLog.timestamp >= today_start,
         ).scalar() or 0
 
-        today_rule_alerts = db.query(func.count(AuditLog.id)).filter(
-            AuditLog.target_type == "rule",
-            AuditLog.action.in_(["execute", "evaluate"]),
-            AuditLog.timestamp >= today_start,
-        ).scalar() or 0
-
         today_function_calls = db.query(func.count(AuditLog.id)).filter(
             AuditLog.target_type == "function",
             AuditLog.timestamp >= today_start,
@@ -108,27 +95,19 @@ class DashboardRepository:
         agent_count = db.query(func.count(Agent.id)).scalar() or 0
         agent_active = db.query(func.count(Agent.id)).filter(Agent.status == "published").scalar() or 0
 
-        top_rules = db.query(BusinessRule).order_by(BusinessRule.priority.desc()).limit(4).all()
         datasources = db.query(Asset).filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"])).limit(8).all()
         recent_logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(10).all()
 
         return {
             "entity_count": entity_count,
             "relation_count": relation_count,
-            "rule_count": rule_count,
-            "active_rule_count": active_rule_count,
             "action_count": action_count,
             "function_count": function_count,
             "datasource_count": datasource_count,
             "today_action_executions": today_action_executions,
-            "today_rule_alerts": today_rule_alerts,
             "today_function_calls": today_function_calls,
             "agent_count": agent_count,
             "agent_active": agent_active,
-            "top_rules": [
-                {"id": r.id, "name": r.name, "priority": r.priority, "status": r.status}
-                for r in top_rules
-            ],
             "datasources": [
                 {"id": d.id, "name": d.name, "type": d.type, "status": d.status}
                 for d in datasources

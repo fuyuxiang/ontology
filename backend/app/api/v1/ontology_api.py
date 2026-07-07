@@ -123,17 +123,3 @@ def ontology_query(req: OntologyQueryRequest, db: Session = Depends(get_db)):
     return result
 
 
-class RuleExecuteRequest(BaseModel):
-    rule_id: str
-    entity_id: str
-    context: dict | None = None
-
-
-@router.post("/execute-rule")
-def execute_rule(req: RuleExecuteRequest, db: Session = Depends(get_db)):
-    from app.models.rule import BusinessRule
-    rule = db.query(BusinessRule).filter(BusinessRule.id == req.rule_id).first()
-    if not rule:
-        from fastapi import HTTPException
-        raise HTTPException(404, "规则不存在")
-    return {"rule": rule.name, "entity_id": req.entity_id, "result": "executed", "output": {}}

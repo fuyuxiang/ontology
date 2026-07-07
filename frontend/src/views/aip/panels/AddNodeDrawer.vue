@@ -90,12 +90,10 @@ const RAW_GROUPS: Array<{ label: string; color: string; nodes: NodeItem[] }> = [
     { type: 'ontologyQuery', label: '本体查询', icon: 'database', description: '查询本体对象实例' },
   ] },
   { label: '逻辑节点', color: '#FF8900', nodes: [
-    { type: 'ruleEngine', label: '规则引擎', icon: 'filter', description: '执行业务规则' },
     { type: 'llmAgent', label: '模型节点', icon: 'brain', description: 'AI 智能推理' },
   ] },
   { label: '本体组件', color: '#0D9488', nodes: [
     { type: 'functionCall', label: '函数调用', icon: 'tool', description: '调用已发布的本体函数，返回计算结果' },
-    { type: 'ruleEvaluate', label: '规则评估', icon: 'filter', description: '评估已发布的业务规则，输出 true/false 分支' },
     { type: 'actionExecute', label: '行动执行', icon: 'send', description: '执行已发布的行动（API调用/通知/写回等）' },
   ] },
   { label: 'Agent 节点', color: '#10B981', nodes: [
@@ -112,7 +110,6 @@ const RAW_GROUPS: Array<{ label: string; color: string; nodes: NodeItem[] }> = [
   ] },
   { label: 'Function 节点', color: '#0EA5E9', nodes: [
     { type: 'function', label: '函数计算', icon: 'tool', description: '调用 OntologyFunction（表达式 / SQL / Python 计算）' },
-    { type: 'ruleEngine', label: 'Function (规则版)', icon: 'filter', description: 'Stateless 纯规则节点（如 ③ 触点选择）' },
     { type: 'writebackOntology', label: 'Function (写回)', icon: 'save', description: 'Stateless 写回节点（如 ⑤ 结果输出）' },
   ] },
   { label: '动作节点', color: '#059669', nodes: [

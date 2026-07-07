@@ -16,7 +16,7 @@ from app.models.asset import Asset
 from app.models.connection import Connection
 from app.models.entity import OntologyEntity
 from app.models.lineage_edge import LineageEdge
-from app.models.rule import EntityAction
+from app.models.action import EntityAction
 from app.repositories.lineage_edge_repo import LineageEdgeRepository
 
 logger = logging.getLogger(__name__)

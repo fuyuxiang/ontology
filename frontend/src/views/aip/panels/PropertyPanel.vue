@@ -131,22 +131,6 @@
         </div>
       </template>
 
-      <!-- ruleEngine -->
-      <template v-else-if="node.type === 'ruleEngine'">
-        <div class="aip-field">
-          <label>关联规则</label>
-          <ResourcePicker type="rule" :model-value="node.data.rule_id || ''"
-            @update:model-value="(v: string) => onPick('rule_id', v)" placeholder="选择规则" />
-        </div>
-        <div class="aip-field"><label>表达式字段</label><input class="aip-input" v-model="node.data.expressionField" @input="touch" /></div>
-        <div class="aip-field"><label>操作符</label>
-          <select class="aip-input" v-model="node.data.operator" @change="touch">
-            <option v-for="op in OPERATORS" :key="op">{{ op }}</option>
-          </select>
-        </div>
-        <div class="aip-field"><label>比较值</label><input class="aip-input" v-model="node.data.expressionValue" @input="touch" /></div>
-      </template>
-
       <!-- writebackOntology -->
       <template v-else-if="node.type === 'writebackOntology'">
         <div class="aip-field">
@@ -311,28 +295,6 @@
         </div>
       </template>
 
-      <!-- ruleEvaluate -->
-      <template v-else-if="node.type === 'ruleEvaluate'">
-        <div class="aip-field">
-          <label>选择规则（已发布版本）</label>
-          <ResourcePicker type="rule" :model-value="node.data.ref_id || ''"
-            @update:model-value="(v: string) => onPick('ref_id', v)" placeholder="选择已发布规则" />
-        </div>
-        <div class="aip-field" v-if="node.data.ref_id">
-          <label>参数映射</label>
-          <ParamMappingEditor
-            :params="node.data._input_params || []"
-            :model-value="node.data.param_mapping || {}"
-            :upstream-nodes="store.currentNodes.filter((n: any) => n.id !== node.id)"
-            @update:model-value="(v: any) => { node.data.param_mapping = v; touch() }" />
-        </div>
-        <div class="aip-field">
-          <div class="aip-hint" style="font-size: 11px; color: #64748b;">
-            规则评估输出 true/false，分别从右侧和下方端口连出
-          </div>
-        </div>
-      </template>
-
       <!-- actionExecute -->
       <template v-else-if="node.type === 'actionExecute'">
         <div class="aip-field">
@@ -421,7 +383,6 @@ const iconSvg = computed(() => {
     skillNode: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M9 1L3 9h4l-1 6 6-8H8l1-6z" fill="#fff"/></svg>',
     memoryNode: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="10" rx="2" stroke="#fff" stroke-width="1.5"/></svg>',
     toolNode: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M10 2a3 3 0 00-2.83 4L3 10.17V13h2.83L10 8.83A3 3 0 1010 2z" stroke="#fff" stroke-width="1.5"/></svg>',
-    ruleEngine: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 3h10M3 8h7M3 13h10" stroke="#fff" stroke-width="1.5"/></svg>',
     writebackOntology: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M3 2h7l3 3v9H3V2z" stroke="#fff" stroke-width="1.5"/></svg>',
     actionSystem: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M2 8l11-5-3 12-3-5-5-2z" stroke="#fff" stroke-width="1.5"/></svg>',
     condition: '<svg width="18" height="18" viewBox="0 0 16 16" fill="none"><path d="M8 2l6 6-6 6-6-6 6-6z" stroke="#fff" stroke-width="1.5"/></svg>',

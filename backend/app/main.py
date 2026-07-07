@@ -345,7 +345,6 @@ from app.api.v1.prompt_templates import router as prompt_templates_router
 from app.api.v1.registry import router as registry_router
 from app.api.v1.relations import router as relations_router
 from app.api.v1.resolution import router as resolution_router
-from app.api.v1.rules import router as rules_router
 from app.api.v1.scenarios import router as scenarios_router
 from app.api.v1.scenes import router as scenes_router
 from app.api.v1.skill_gen import router as skill_gen_router
@@ -455,7 +454,6 @@ app.add_middleware(
 install_compat_middleware(app)
 
 app.include_router(entities_router, prefix="/api/v1")
-app.include_router(rules_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
 app.include_router(copilot_router, prefix="/api/v1")
 app.include_router(relations_router, prefix="/api/v1")

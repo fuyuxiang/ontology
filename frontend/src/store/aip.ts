@@ -47,7 +47,7 @@ export const useAipStore = defineStore('aip', () => {
   const progress = ref(0)
   const currentExecutionId = ref<string>('')
   const logs = ref<Array<{ time: string; level: 'info' | 'warn' | 'error' | 'success'; message: string; nodeId?: string }>>([])
-  const reasoning = ref<Array<{ nodeId: string; nodeName: string; status: string; durationMs: number; consumed: string[]; rules: string[]; models: string[]; writeback: string[]; output: string; raw?: any }>>([])
+  const reasoning = ref<Array<{ nodeId: string; nodeName: string; status: string; durationMs: number; consumed: string[]; models: string[]; writeback: string[]; output: string; raw?: any }>>([])
   const finalOutput = ref<Record<string, any>>({})
   let cancelStream: (() => void) | null = null
 
@@ -348,7 +348,6 @@ export const useAipStore = defineStore('aip', () => {
     reasoning.value.push({
       nodeId, nodeName: name, status, durationMs,
       consumed: extractStrings(output, ['input', 'objectTypes', 'objectType', 'consumed']),
-      rules: extractStrings(output, ['rules', 'rule_name']),
       models: extractStrings(output, ['model', 'mlModelRef']),
       writeback: extractStrings(output, ['target', 'targetObjectType']),
       output: summary || (typeof output === 'string' ? output : JSON.stringify(output).slice(0, 200)),

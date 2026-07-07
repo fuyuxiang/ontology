@@ -59,7 +59,6 @@ export function useGraphLayout() {
         relCount: n.relation_count,
         attrCount: (n as any).attr_count ?? 0,
         actionCount: (n as any).action_count ?? 0,
-        ruleCount: (n as any).rule_count ?? 0,
         functionCount: (n as any).function_count ?? 0,
       },
       sourcePosition: Position.Right,

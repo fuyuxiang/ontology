@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy import func
 
-from app.models import BusinessRule, EntityAction, EntityAttribute, EntityRelation, OntologyEntity
+from app.models import EntityAttribute, EntityRelation, OntologyEntity
+from app.models.action import EntityAction
 from app.repositories.base import BaseRepository
 
 
@@ -45,15 +46,11 @@ class EntityRepository(BaseRepository[OntologyEntity]):
         rel_count = self.db.query(func.count(EntityRelation.id)).filter(
             EntityRelation.from_entity_id.in_(entity_ids) | EntityRelation.to_entity_id.in_(entity_ids)
         ).scalar() or 0
-        rule_count = self.db.query(func.count(BusinessRule.id)).filter(
-            BusinessRule.entity_id.in_(entity_ids)
-        ).scalar() or 0
         action_count = self.db.query(func.count(EntityAction.id)).filter(
             EntityAction.entity_id.in_(entity_ids)
         ).scalar() or 0
         return {
             "attrCount": attr_count,
             "relationCount": rel_count,
-            "ruleCount": rule_count,
             "actionCount": action_count,
         }

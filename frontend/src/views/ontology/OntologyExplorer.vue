@@ -240,31 +240,6 @@
               </ModalDialog>
             </template>
 
-            <template v-else-if="activeTab === '规则'">
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>规则ID</th>
-                    <th>规则名称</th>
-                    <th>触发条件</th>
-                    <th>执行动作</th>
-                    <th>状态</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="rule in selectedRules" :key="rule.id">
-                    <td><code class="text-code">{{ rule.id }}</code></td>
-                    <td class="text-body-medium">{{ rule.name }}</td>
-                    <td><code class="text-code">{{ rule.condition }}</code></td>
-                    <td class="text-body">{{ rule.action }}</td>
-                    <td>
-                      <span class="status-dot" :class="rule.status === 'active' ? 'status-dot--success' : 'status-dot--warning'"></span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </template>
-
             <template v-else-if="activeTab === '动作'">
               <div class="action-list">
                 <div class="action-item" v-for="act in selectedActions" :key="act.id">
@@ -378,7 +353,7 @@ const UNCATEGORIZED = '__uncategorized__'
 const activeScenarioFilter = ref<string | null>(null)
 const selectedId = ref<string | null>(null)
 const activeTab = ref('属性')
-const tabs = ['属性', '关系', '规则', '动作', '数据绑定', '版本', '血缘']
+const tabs = ['属性', '关系', '动作', '数据绑定', '版本', '血缘']
 
 const relForm = reactive({
   name: '',
@@ -400,7 +375,6 @@ const allEntities = computed<Entity[]>(() =>
     tier: e.tier as 1 | 2 | 3,
     attrs: e.attr_count,
     relations: e.relation_count,
-    rules: e.rule_count,
     status: e.status as 'active' | 'warning' | 'error',
     datasource: e.datasource_name || null,
     scenarioCodes: e.scenario_codes || [],
@@ -510,14 +484,12 @@ const metrics = computed(() => {
     return selected.value ? [
       { label: '属性', value: selected.value.attrs },
       { label: '关系', value: selected.value.relations },
-      { label: '规则', value: selected.value.rules },
       { label: '动作', value: 0 },
     ] : []
   }
   return [
     { label: '属性', value: detail.value.attributes.length },
     { label: '关系', value: detail.value.relations.length },
-    { label: '规则', value: detail.value.rules.length },
     { label: '动作', value: detail.value.actions.length },
   ]
 })
@@ -551,16 +523,6 @@ const selectedRelations = computed(() =>
         selfLoop,
       }
     }) ?? []
-)
-
-const selectedRules = computed(() =>
-  detail.value?.rules.map(r => ({
-    id: r.id,
-    name: r.name,
-    condition: r.condition_expr,
-    action: r.action_desc,
-    status: r.status,
-  })) ?? []
 )
 
 const selectedActions = computed(() =>

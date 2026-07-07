@@ -174,24 +174,6 @@
         </div>
       </template>
 
-      <!-- 规则 -->
-      <template v-else-if="activeTab === '规则'">
-        <table class="data-table">
-          <thead>
-            <tr><th>规则ID</th><th>规则名称</th><th>触发条件</th><th>执行动作</th><th>状态</th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="rule in rules" :key="rule.id">
-              <td><code class="text-code">{{ rule.id }}</code></td>
-              <td class="text-body-medium">{{ rule.name }}</td>
-              <td><code class="text-code">{{ rule.condition }}</code></td>
-              <td class="text-body">{{ rule.action }}</td>
-              <td><span class="status-dot" :class="rule.status === 'active' ? 'status-dot--success' : 'status-dot--warning'"></span></td>
-            </tr>
-          </tbody>
-        </table>
-      </template>
-
       <!-- 动作 -->
       <template v-else-if="activeTab === '动作'">
         <div class="action-list">
@@ -399,7 +381,7 @@ import type { SourceDataPreview, SourceField } from '../../api/resolution'
 const route = useRoute()
 const store = useOntologyStore()
 const activeTab = ref('属性')
-const tabs = ['属性', '关系', '规则', '动作', '函数', '数据实例', '智能体', '血缘', '绑定数据']
+const tabs = ['属性', '关系', '动作', '函数', '数据实例', '智能体', '血缘', '绑定数据']
 
 const entityId = computed(() => route.params.id as string)
 
@@ -415,11 +397,10 @@ const entity = computed(() => detail.value ? {
   tier: detail.value.tier as 1 | 2 | 3,
   attrs: detail.value.attributes.length,
   relations: detail.value.relations.length,
-  rules: detail.value.rules.length,
   actions: detail.value.actions.length,
   functions: detail.value.functions?.length ?? 0,
   status: detail.value.status as 'active' | 'warning' | 'error',
-} : { id: '', name: '加载中...', nameCn: '', tier: 1 as const, attrs: 0, relations: 0, rules: 0, actions: 0, functions: 0, status: 'active' as const })
+} : { id: '', name: '加载中...', nameCn: '', tier: 1 as const, attrs: 0, relations: 0, actions: 0, functions: 0, status: 'active' as const })
 
 const tierLabel = computed(() => ({ 1: '核心对象', 2: '领域对象', 3: '场景对象' }[entity.value.tier]))
 const statusLabel = computed(() => ({ active: '活跃', warning: '警告', error: '异常' }[entity.value.status]))
@@ -440,7 +421,6 @@ const breadcrumbs = computed(() => [
 const metrics = computed(() => [
   { label: '属性', value: entity.value.attrs, trend: 0 },
   { label: '关系', value: entity.value.relations, trend: 0 },
-  { label: '规则', value: entity.value.rules, trend: 0 },
   { label: '动作', value: entity.value.actions, trend: 0 },
   { label: '函数', value: entity.value.functions, trend: 0 },
 ])
@@ -575,13 +555,6 @@ const relations = computed(() =>
     name: r.name, type: r.rel_type,
     target: r.to_entity_name || r.from_entity_name,
     cardinality: r.cardinality,
-  })) ?? []
-)
-
-const rules = computed(() =>
-  detail.value?.rules.map(r => ({
-    id: r.id, name: r.name,
-    condition: r.condition_expr, action: r.action_desc, status: r.status,
   })) ?? []
 )
 

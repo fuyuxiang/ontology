@@ -1,7 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.rule import EntityAction
+from app.models.action import EntityAction
 from app.repositories.base import BaseRepository
 
 

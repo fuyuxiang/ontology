@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.core.deps import require_user
 from app.database import get_db
 from app.models import OntologyEntity
-from app.models.rule import EntityAction
+from app.models.action import EntityAction
 from app.models.user import User
 from app.repositories.action_repo import ActionRepository
 from app.schemas.action import (

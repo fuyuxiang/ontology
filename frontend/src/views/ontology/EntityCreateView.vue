@@ -398,7 +398,6 @@
             <div class="schema-field"><code>object_types</code><span>实体定义列表，含 tier、properties、datasource_ref</span></div>
             <div class="schema-field"><code>link_types</code><span>关系定义列表，含 source_type、target_type、cardinality</span></div>
             <div class="schema-field"><code>action_types</code><span>动作定义列表，含 trigger、parameters、effects</span></div>
-            <div class="schema-field"><code>business_rules</code><span>业务规则列表，含 conditions、applicable_objects</span></div>
           </div>
         </div>
 
@@ -430,7 +429,6 @@
             <span>{{ jsonPreview.objectCount }} 个对象</span>
             <span>{{ jsonPreview.linkCount }} 个关系</span>
             <span>{{ jsonPreview.actionCount }} 个动作</span>
-            <span>{{ jsonPreview.ruleCount }} 个规则</span>
           </div>
         </div>
         <div v-if="importResult" class="import-result">
@@ -563,7 +561,7 @@ const fileFormat = ref<'json' | 'owl' | 'ttl'>('json')
 const selectedFile = ref<File | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const fileNamespace = ref('')
-const jsonPreview = ref<{ scenario: string; objectCount: number; linkCount: number; actionCount: number; ruleCount: number } | null>(null)
+const jsonPreview = ref<{ scenario: string; objectCount: number; linkCount: number; actionCount: number } | null>(null)
 const importResult = ref<FileImportResult | null>(null)
 const fileAccept = computed(() => ({ json: '.json', owl: '.owl,.rdf,.xml', ttl: '.ttl' }[fileFormat.value]))
 
@@ -576,7 +574,7 @@ function onFileChange(e: Event) {
       try {
         const data = JSON.parse(reader.result as string)
         const scenario = data.scenario
-        jsonPreview.value = { scenario: scenario?.scenario_name || scenario?.scenario_short_name || '未知', objectCount: data.object_types?.length || 0, linkCount: data.link_types?.length || 0, actionCount: data.action_types?.length || 0, ruleCount: data.business_rules?.length || 0 }
+        jsonPreview.value = { scenario: scenario?.scenario_name || scenario?.scenario_short_name || '未知', objectCount: data.object_types?.length || 0, linkCount: data.link_types?.length || 0, actionCount: data.action_types?.length || 0 }
         if (scenario?.namespace && !fileNamespace.value) fileNamespace.value = scenario.namespace
       } catch { jsonPreview.value = null }
     }
