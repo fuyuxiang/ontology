@@ -189,8 +189,6 @@ async function fetchFunctions() {
 
 function onFuncCreated(fn: { id: string; name: string }) {
   showCreateModal.value = false
-  editingFuncId.value = fn.id
-  showAdd.value = true
   fetchFunctions()
 }
 

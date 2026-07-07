@@ -10,8 +10,13 @@ BACKEND_LOG="$ROOT_DIR/backend.log"
 FRONTEND_LOG="$ROOT_DIR/frontend.log"
 BACKEND_PID_FILE="$ROOT_DIR/.backend.pid"
 FRONTEND_PID_FILE="$ROOT_DIR/.frontend.pid"
+CODE_SERVER_PID_FILE="$ROOT_DIR/.code-server.pid"
+CODE_SERVER_LOG="$ROOT_DIR/code-server.log"
+CODE_SERVER_CONFIG="$ROOT_DIR/code-server/config.yaml"
+WORKSPACE_DIR="$ROOT_DIR/workspace"
 BACKEND_PORT="${BACKEND_PORT:-8001}"
 FRONTEND_PORT="${FRONTEND_PORT:-5177}"
+CODE_SERVER_PORT="${CODE_SERVER_PORT:-8443}"
 BACKEND_RELOAD="${BACKEND_RELOAD:-0}"
 VITE_PROXY_TARGET="${VITE_PROXY_TARGET:-http://127.0.0.1:$BACKEND_PORT}"
 
@@ -58,6 +63,7 @@ echo
 echo "Backend Python: $BACKEND_PYTHON"
 echo "Backend Port:   $BACKEND_PORT"
 echo "Frontend Port:  $FRONTEND_PORT"
+echo "Code Server:    $CODE_SERVER_PORT"
 echo "Backend Reload: $BACKEND_RELOAD"
 echo
 
@@ -65,6 +71,16 @@ if [ ! -d "$FRONTEND_DIR/node_modules" ]; then
     echo "Frontend dependencies are not installed."
     echo "Run: cd frontend && npm install"
     exit 1
+fi
+
+if ! command -v code-server >/dev/null 2>&1; then
+    echo "code-server not found. Installing..."
+    curl -fsSL https://code-server.dev/install.sh | sh
+    if ! command -v code-server >/dev/null 2>&1; then
+        echo "code-server installation failed."
+        exit 1
+    fi
+    echo "code-server installed."
 fi
 
 if backend_pids="$(port_pids "$BACKEND_PORT")" && [ -n "$backend_pids" ]; then
@@ -81,7 +97,14 @@ if frontend_pids="$(port_pids "$FRONTEND_PORT")" && [ -n "$frontend_pids" ]; the
     exit 1
 fi
 
-echo "[1/3] Installing backend dependencies..."
+if cs_pids="$(port_pids "$CODE_SERVER_PORT")" && [ -n "$cs_pids" ]; then
+    echo "Code-server port $CODE_SERVER_PORT is already in use by PID(s):"
+    echo "$cs_pids"
+    echo "Run ./stop.sh or choose another CODE_SERVER_PORT."
+    exit 1
+fi
+
+echo "[1/4] Installing backend dependencies..."
 cd "$BACKEND_DIR"
 "$BACKEND_PYTHON" -m pip install -r requirements.txt --quiet 2>&1 | tail -1
 echo "Dependencies ready."
@@ -93,7 +116,7 @@ if [ -f "$ROOT_DIR/.env" ]; then
     set +a
 fi
 
-echo "[2/3] Starting backend (port $BACKEND_PORT)..."
+echo "[2/4] Starting backend (port $BACKEND_PORT)..."
 cd "$BACKEND_DIR"
 backend_args=(app.main:app --host 0.0.0.0 --port "$BACKEND_PORT" --log-level info)
 if [ "$BACKEND_RELOAD" = "1" ]; then
@@ -119,7 +142,7 @@ echo "Backend running with PID(s):"
 echo "$backend_pids"
 echo
 
-echo "[3/3] Starting frontend (port $FRONTEND_PORT)..."
+echo "[3/4] Starting frontend (port $FRONTEND_PORT)..."
 cd "$FRONTEND_DIR"
 nohup env VITE_PROXY_TARGET="$VITE_PROXY_TARGET" npx vite --host 0.0.0.0 --port "$FRONTEND_PORT" > "$FRONTEND_LOG" 2>&1 &
 echo $! > "$FRONTEND_PID_FILE"
@@ -141,12 +164,35 @@ echo "Frontend running with PID(s):"
 echo "$frontend_pids"
 echo
 
+echo "[4/4] Starting code-server (port $CODE_SERVER_PORT)..."
+mkdir -p "$WORKSPACE_DIR"
+nohup code-server --config "$CODE_SERVER_CONFIG" "$WORKSPACE_DIR" > "$CODE_SERVER_LOG" 2>&1 &
+echo $! > "$CODE_SERVER_PID_FILE"
+
+cs_pids=""
+for i in $(seq 1 15); do
+    sleep 1
+    if cs_pids="$(port_pids "$CODE_SERVER_PORT")" && [ -n "$cs_pids" ]; then
+        break
+    fi
+    printf "  waiting... (%ds)\n" "$i"
+done
+
+if [ -z "$cs_pids" ]; then
+    echo "code-server failed to start after 15s. Check code-server.log"
+    exit 1
+fi
+echo "code-server running with PID(s):"
+echo "$cs_pids"
+echo
+
 echo "========================================"
 echo "  Ready!"
-echo "  Frontend: http://0.0.0.0:$FRONTEND_PORT"
-echo "  Backend:  http://0.0.0.0:$BACKEND_PORT"
-echo "  API Docs: http://0.0.0.0:$BACKEND_PORT/docs"
+echo "  Frontend:    http://0.0.0.0:$FRONTEND_PORT"
+echo "  Backend:     http://0.0.0.0:$BACKEND_PORT"
+echo "  API Docs:    http://0.0.0.0:$BACKEND_PORT/docs"
+echo "  Code Server: http://0.0.0.0:$CODE_SERVER_PORT"
 echo "========================================"
 echo
-echo "Logs: backend.log / frontend.log"
+echo "Logs: backend.log / frontend.log / code-server.log"
 echo "Stop: ./stop.sh"

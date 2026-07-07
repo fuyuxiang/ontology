@@ -34,6 +34,11 @@ export interface FunctionTestResult {
   execution_ms: number
 }
 
+export interface WorkspaceResult {
+  url: string
+  folder: string
+}
+
 export const functionApi = {
   list(query?: FunctionQuery) {
     return get<FunctionItem[]>('/functions', { params: query })
@@ -57,5 +62,9 @@ export const functionApi = {
 
   test(id: string, params: Record<string, any> = {}) {
     return post<FunctionTestResult>(`/functions/${id}/test`, { params })
+  },
+
+  openWorkspace(id: string) {
+    return post<WorkspaceResult>(`/functions/${id}/workspace`)
   },
 }
