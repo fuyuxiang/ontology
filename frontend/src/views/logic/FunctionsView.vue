@@ -1,9 +1,9 @@
 <template>
   <div class="logic-page" :class="{ 'logic-page--embedded': embedded }">
-    <BuilderReturnBanner kind-label="函数" />
+    <BuilderReturnBanner kind-label="逻辑" />
     <div class="logic-page__header">
       <div v-if="!embedded">
-        <h1 class="text-display">函数管理</h1>
+        <h1 class="text-display">逻辑管理</h1>
         <p class="text-caption" style="margin-top: 4px;">计算逻辑管理</p>
       </div>
       <div class="logic-page__actions">
@@ -11,7 +11,7 @@
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          新建函数
+          新建逻辑
         </button>
       </div>
     </div>
@@ -19,22 +19,18 @@
     <div class="logic-page__stats">
       <div class="stat-card stat-card--semantic">
         <div class="stat-card__value">{{ stats.total }}</div>
-        <div class="stat-card__label">总函数数</div>
+        <div class="stat-card__label">总数</div>
       </div>
       <div class="stat-card stat-card--dynamic">
         <div class="stat-card__value">{{ stats.active }}</div>
         <div class="stat-card__label">已激活</div>
-      </div>
-      <div class="stat-card stat-card--error">
-        <div class="stat-card__value">{{ stats.standalone }}</div>
-        <div class="stat-card__label">独立函数</div>
       </div>
     </div>
 
     <div class="master-detail">
       <div class="master-detail__list">
         <div class="master-detail__toolbar">
-          <input v-model="search" class="logic-search" placeholder="搜索函数名称..." />
+          <input v-model="search" class="logic-search" placeholder="搜索逻辑名称..." />
           <div class="logic-filter-tags">
             <button
               v-for="f in filters" :key="f.value"
@@ -55,10 +51,10 @@
             <span class="list-item__status" :class="`list-item__status--${fn.status}`"></span>
             <span class="list-item__name">{{ fn.name }}</span>
             <span class="list-item__badge priority--medium">{{ fn.logic_type }}</span>
-            <span class="list-item__meta">{{ fn.entity_name || '独立' }}</span>
+            <span class="list-item__meta">{{ fn.entity_name || '—' }}</span>
           </div>
           <div v-if="filteredFunctions.length === 0" class="logic-empty">
-            <p class="text-caption">无匹配函数</p>
+            <p class="text-caption">无匹配逻辑</p>
           </div>
         </div>
       </div>
@@ -80,7 +76,7 @@
             </div>
             <div class="detail-meta-item">
               <span class="detail-meta-label">关联实体</span>
-              <span class="detail-meta-value">{{ selectedFn.entity_name || '独立函数' }}</span>
+              <span class="detail-meta-value">{{ selectedFn.entity_name || '—' }}</span>
             </div>
             <div class="detail-meta-item">
               <span class="detail-meta-label">返回类型</span>
@@ -114,7 +110,7 @@
           </div>
         </template>
         <div v-else class="detail-panel__empty">
-          <p class="text-caption">选择一个函数查看详情</p>
+          <p class="text-caption">选择一个逻辑查看详情</p>
         </div>
       </div>
     </div>
@@ -160,7 +156,6 @@ const selectedFn = computed(() => filteredFunctions.value.find(f => f.id === sel
 const filters = [
   { label: '全部', value: 'all' },
   { label: '已激活', value: 'active' },
-  { label: '独立函数', value: 'standalone' },
 ]
 
 const stats = computed(() => {
@@ -168,14 +163,12 @@ const stats = computed(() => {
   return {
     total: all.length,
     active: all.filter(f => f.status === 'active').length,
-    standalone: all.filter(f => !f.entity_id).length,
   }
 })
 
 const filteredFunctions = computed(() => {
   let list = functions.value
   if (activeFilter.value === 'active') list = list.filter(f => f.status === 'active')
-  else if (activeFilter.value === 'standalone') list = list.filter(f => !f.entity_id)
   if (search.value) {
     const s = search.value.toLowerCase()
     list = list.filter(f => f.name.toLowerCase().includes(s) || f.description.toLowerCase().includes(s))
@@ -210,7 +203,7 @@ function handleEdit(fn: FunctionItem) {
 }
 
 async function handleDelete(fn: FunctionItem) {
-  if (!confirm(`确定删除函数「${fn.name}」？`)) return
+  if (!confirm(`确定删除逻辑「${fn.name}」？`)) return
   await functionApi.remove(fn.id)
   if (selectedId.value === fn.id) selectedId.value = null
   await fetchFunctions()
