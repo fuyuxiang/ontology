@@ -166,6 +166,7 @@ echo
 
 echo "[4/4] Starting code-server (port $CODE_SERVER_PORT)..."
 mkdir -p "$WORKSPACE_DIR"
+code-server --install-extension ms-python.python > /dev/null 2>&1 || true
 nohup code-server --config "$CODE_SERVER_CONFIG" "$WORKSPACE_DIR" > "$CODE_SERVER_LOG" 2>&1 &
 echo $! > "$CODE_SERVER_PID_FILE"
 
