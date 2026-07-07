@@ -7,7 +7,7 @@
         <p class="text-caption" style="margin-top: 4px;">计算逻辑管理</p>
       </div>
       <div class="logic-page__actions">
-        <button class="btn-primary" @click="showAdd = true">
+        <button class="btn-primary" @click="showCreateModal = true">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
@@ -119,6 +119,12 @@
       </div>
     </div>
 
+    <FunctionCreateModal
+      :visible="showCreateModal"
+      @close="showCreateModal = false"
+      @created="onFuncCreated"
+    />
+
     <FunctionBuilderDrawer
       :visible="showAdd"
       :edit-id="editingFuncId"
@@ -133,6 +139,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi, type FunctionItem } from '../../api/functions'
 import FunctionBuilderDrawer from '../../components/logic/FunctionBuilderDrawer.vue'
+import FunctionCreateModal from '../../components/logic/FunctionCreateModal.vue'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 
 defineProps<{ embedded?: boolean }>()
@@ -145,6 +152,7 @@ const search = ref('')
 const activeFilter = ref('all')
 const selectedId = ref<string | null>(null)
 const showAdd = ref(false)
+const showCreateModal = ref(false)
 const editingFuncId = ref<string | undefined>()
 
 const selectedFn = computed(() => filteredFunctions.value.find(f => f.id === selectedId.value) || null)
@@ -177,6 +185,13 @@ const filteredFunctions = computed(() => {
 
 async function fetchFunctions() {
   functions.value = await functionApi.list()
+}
+
+function onFuncCreated(fn: { id: string; name: string }) {
+  showCreateModal.value = false
+  editingFuncId.value = fn.id
+  showAdd.value = true
+  fetchFunctions()
 }
 
 function onFuncSaved(fn: { id: string; name: string }) {
