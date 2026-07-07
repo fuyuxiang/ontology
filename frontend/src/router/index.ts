@@ -15,6 +15,8 @@ const router = createRouter({
     { path: '/data/assets', name: 'data-assets', component: () => import('../views/datasource/AssetsPage.vue'), meta: { title: '资产目录' } },
 
     // 本体中心 — 本体构建
+    { path: '/ontology/list', name: 'ontology-list', component: () => import('../views/ontology/OntologyListView.vue'), meta: { title: '本体列表' } },
+    { path: '/ontology/list/:code', name: 'ontology-scenario-detail', component: () => import('../views/ontology/OntologyDetailView.vue'), meta: { title: '本体详情' } },
     { path: '/builder', name: 'ontology-builder', component: () => import('../views/builder/OntologyBuilderView.vue'), meta: { title: '手动构建' } },
     { path: '/builder/template', name: 'ontology-builder-template', component: () => import('../views/builder/TemplateBuilderView.vue'), meta: { title: '模板构建' } },
     { path: '/builder/doc', name: 'ontology-builder-doc', component: () => import('../views/builder/DocBuilderView.vue'), meta: { title: '文档构建' } },
