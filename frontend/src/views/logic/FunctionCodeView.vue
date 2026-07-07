@@ -5,9 +5,9 @@
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        返回函数列表
+        返回逻辑列表
       </button>
-      <span class="code-server-page__title">{{ funcName || '代码编辑' }}</span>
+      <span class="code-server-page__title">{{ funcName || '逻辑编辑' }}</span>
     </div>
     <div v-if="loading" class="code-server-page__loading">
       <p>正在准备工作区…</p>
@@ -65,7 +65,8 @@ onMounted(async () => {
 .code-server-page {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
+  margin: -24px -32px;
   background: var(--neutral-50, #fafafa);
 }
 
