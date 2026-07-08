@@ -121,9 +121,9 @@
                 <thead><tr><th>名称</th><th>中文名</th><th>属性</th></tr></thead>
                 <tbody>
                   <tr v-for="e in scenarioEntities.slice(0, 5)" :key="e.id">
-                    <td class="link-cell">{{ e.className }}</td>
-                    <td>{{ e.label }}</td>
-                    <td>{{ e.attributeCount || 0 }}</td>
+                    <td class="link-cell">{{ e.name }}</td>
+                    <td>{{ e.name_cn }}</td>
+                    <td>{{ e.attr_count || 0 }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -206,8 +206,8 @@
               <tbody>
                 <tr v-for="e in filteredEntities" :key="e.id">
                   <td class="entities-table__check"><input type="checkbox" :checked="selectedIds.includes(e.id)" @change="toggleSelect(e.id)" /></td>
-                  <td class="link-cell" @click="router.push(`/ontology/${e.id}`)">{{ e.label || '—' }}</td>
-                  <td>{{ e.className }}</td>
+                  <td class="link-cell" @click="router.push(`/ontology/${e.id}`)">{{ e.name_cn || '—' }}</td>
+                  <td>{{ e.name }}</td>
                   <td><span class="badge" :class="e.status === 'active' ? 'badge--active' : 'badge--draft'">{{ e.status === 'active' ? '已激活' : '草稿' }}</span></td>
                   <td class="entities-table__actions">
                     <button class="entities-table__action-btn" @click="router.push(`/ontology/${e.id}`)">编辑</button>
@@ -297,7 +297,7 @@ const filteredEntities = computed(() => {
   const q = entitySearch.value.trim().toLowerCase()
   if (!q) return scenarioEntities.value
   return scenarioEntities.value.filter(
-    (e: any) => (e.label || '').toLowerCase().includes(q) || (e.className || '').toLowerCase().includes(q)
+    (e: any) => (e.name_cn || '').toLowerCase().includes(q) || (e.name || '').toLowerCase().includes(q)
   )
 })
 
