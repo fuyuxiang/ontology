@@ -199,7 +199,12 @@ function onFuncSaved(fn: { id: string; name: string }) {
 }
 
 function handleEdit(fn: FunctionItem) {
-  router.push(`/logic/functions/${fn.id}/code`)
+  const query: Record<string, string> = {}
+  if (route.params.code) {
+    query.from = 'ontology'
+    query.code = route.params.code as string
+  }
+  router.push({ path: `/logic/functions/${fn.id}/code`, query })
 }
 
 async function handleDelete(fn: FunctionItem) {

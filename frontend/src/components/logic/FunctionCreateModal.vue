@@ -44,7 +44,7 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { functionApi } from '../../api/functions'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
@@ -57,6 +57,7 @@ const emit = defineEmits<{
   (e: 'created', val: { id: string; name: string }): void
 }>()
 
+const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const entities = ref<EntityListItem[]>([])
@@ -103,7 +104,12 @@ async function handleCreate() {
     })
     toast.success('函数创建成功')
     emit('created', { id: result.id, name: result.name })
-    router.push(`/logic/functions/${result.id}/code`)
+    const query: Record<string, string> = {}
+    if (route.params.code) {
+      query.from = 'ontology'
+      query.code = route.params.code as string
+    }
+    router.push({ path: `/logic/functions/${result.id}/code`, query })
   } catch (err: any) {
     toast.error(err?.message || '创建失败')
   } finally {
