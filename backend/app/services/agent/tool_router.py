@@ -14,8 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class ToolRouter:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, runtime_executor=None):
         self.db = db
+        self.runtime_executor = runtime_executor
 
     def execute(self, tool_name: str, args: dict) -> tuple[Any, str, int]:
         handlers = {
@@ -30,6 +31,14 @@ class ToolRouter:
             "list_business_datasources": self._tool_list_business_datasources,
             "list_business_documents": self._tool_list_business_documents,
             "analyze_assets_for_ontology": self._tool_analyze_assets_for_ontology,
+            # Tier 1: 数据查询（重构）
+            "ontology_query_instances": self._tool_query_instances,
+            "ontology_get_attr_mapping": self._tool_get_attr_mapping,
+            "ontology_complex_sql": self._tool_complex_sql,
+            # Tier 2: 逻辑/动作调用
+            "ontology_list_capabilities": self._tool_list_capabilities,
+            "ontology_run_logic": self._tool_run_logic,
+            "ontology_run_action": self._tool_run_action,
         }
         handler = handlers.get(tool_name)
         if not handler:
@@ -401,6 +410,119 @@ class ToolRouter:
         }
         summary = f"产出 {len(ents)} 对象 / {len(rels)} 关系 / {len(s_rules)} 规则建议 / {len(s_actions)} 动作建议（已自动绑定 backing）"
         return result, summary, len(ents)
+
+    # ── Tier 1: 数据查询（重构） ────────────────────────────────
+
+    def _tool_query_instances(self, args: dict) -> tuple[Any, str, int]:
+        entity_name = str(args.get("entity_name", "")).strip()
+        filters = args.get("filters") or {}
+        page = int(args.get("page", 1))
+        page_size = min(int(args.get("page_size", 50)), 200)
+        if not entity_name:
+            return {"error": "需要提供 entity_name"}, "参数不完整", 0
+
+        entity = self.db.query(OntologyEntity).filter(OntologyEntity.name == entity_name).first()
+        if not entity:
+            return {"error": f"本体中不存在实体 '{entity_name}'"}, "实体不存在", 0
+
+        valid_attrs = {a.name for a in entity.attributes}
+        svc = EntityDataService(self.db)
+        result = svc.query_entity_data(
+            entity.id, filters=filters, fields=[], limit=page_size,
+            purpose="agent.query_instances", valid_attrs=valid_attrs,
+        )
+        if "error" in result:
+            return result, f"查询失败: {result['error']}", 0
+        result["entity"] = entity_name
+        result["page"] = page
+        return result, f"查询 {entity.name_cn} 第{page}页，返回 {result.get('rowCount', 0)} 条", result.get("rowCount", 0)
+
+    def _tool_get_attr_mapping(self, args: dict) -> tuple[Any, str, int]:
+        entity_names = args.get("entity_names", [])
+        if not entity_names:
+            return {"error": "需要提供 entity_names"}, "参数不完整", 0
+
+        mapping = {}
+        for name in entity_names:
+            entity = self.db.query(OntologyEntity).filter(OntologyEntity.name == name).first()
+            if not entity:
+                mapping[name] = {"error": f"实体 '{name}' 不存在"}
+                continue
+            svc = EntityDataService(self.db)
+            resolved = svc.resolve_entity_asset(entity.id)
+            if not resolved:
+                mapping[name] = {"error": "未绑定数据源"}
+                continue
+            asset, binding = resolved
+            table_name = svc.get_table_name(asset)
+            attrs = {}
+            for a in entity.attributes:
+                attrs[a.name] = a.name
+            mapping[name] = {"table": table_name, "attributes": attrs}
+        return mapping, f"返回 {len(entity_names)} 个实体的映射", len(entity_names)
+
+    def _tool_complex_sql(self, args: dict) -> tuple[Any, str, int]:
+        sql = str(args.get("sql", "")).strip()
+        if not sql:
+            return {"error": "需要提供 sql"}, "参数不完整", 0
+        sql_upper = sql.upper().strip()
+        if not sql_upper.startswith("SELECT") and not sql_upper.startswith("WITH"):
+            return {"error": "只允许 SELECT/WITH 语句"}, "非法 SQL", 0
+
+        svc = EntityDataService(self.db)
+        assets = svc.list_assets()
+        if not assets:
+            return {"error": "没有可用数据源"}, "无数据源", 0
+        first_asset_name = assets[0].get("name", "")
+        result = svc.execute_sql_on_asset(first_asset_name, sql, purpose="agent.complex_sql")
+        if "error" in result:
+            return result, f"SQL 执行失败: {result['error']}", 0
+        return result, f"SQL 查询返回 {result.get('rowCount', 0)} 行", result.get("rowCount", 0)
+
+    # ── Tier 2: 逻辑/动作调用 ──────────────────────────────────
+
+    def _tool_list_capabilities(self, args: dict) -> tuple[Any, str, int]:
+        if not self.runtime_executor:
+            return {"error": "Function runtime not initialized"}, "运行时未就绪", 0
+        type_filter = args.get("type", "all")
+        caps = self.runtime_executor.registry.list_capabilities()
+        if type_filter != "all":
+            caps = [c for c in caps if c["type"] == type_filter]
+        return caps, f"找到 {len(caps)} 个可用函数", len(caps)
+
+    def _tool_run_logic(self, args: dict) -> tuple[Any, str, int]:
+        if not self.runtime_executor:
+            return {"error": "Function runtime not initialized"}, "运行时未就绪", 0
+        callable_name = args.get("callable_name", "")
+        params = args.get("params", {})
+        meta = self.runtime_executor.registry.get(callable_name)
+        if meta and meta.type != "logic":
+            return {"success": False, "error": f"'{callable_name}' 类型为 {meta.type}，不是 logic"}, "类型不匹配", 0
+        result = self.runtime_executor.execute(callable_name, params)
+        return {
+            "success": result.success,
+            "result": result.result,
+            "error": result.error,
+            "execution_ms": result.execution_ms,
+            "call_trace": result.call_trace,
+        }, f"逻辑函数{'成功' if result.success else '失败'}: {callable_name}", 1
+
+    def _tool_run_action(self, args: dict) -> tuple[Any, str, int]:
+        if not self.runtime_executor:
+            return {"error": "Function runtime not initialized"}, "运行时未就绪", 0
+        callable_name = args.get("callable_name", "")
+        params = args.get("params", {})
+        meta = self.runtime_executor.registry.get(callable_name)
+        if meta and meta.type != "action":
+            return {"success": False, "error": f"'{callable_name}' 类型为 {meta.type}，不是 action"}, "类型不匹配", 0
+        result = self.runtime_executor.execute(callable_name, params)
+        return {
+            "success": result.success,
+            "result": result.result,
+            "error": result.error,
+            "execution_ms": result.execution_ms,
+            "call_trace": result.call_trace,
+        }, f"动作函数{'成功' if result.success else '失败'}: {callable_name}", 1
 
     # ── 启发式：guess backing / source 列 ────────────────────
 
