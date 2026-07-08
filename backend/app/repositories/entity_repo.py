@@ -4,6 +4,7 @@ from sqlalchemy import func
 
 from app.models import EntityAttribute, EntityRelation, OntologyEntity
 from app.models.action import EntityAction
+from app.models.shared_ref import OntologySharedRef
 from app.repositories.base import BaseRepository
 
 
@@ -16,8 +17,19 @@ class EntityRepository(BaseRepository[OntologyEntity]):
         status: str | None = None,
         search: str | None = None,
         namespace: str | None = None,
+        ontology_id: str | None = None,
     ) -> list[OntologyEntity]:
         q = self.db.query(OntologyEntity)
+        if ontology_id:
+            # 自有实体
+            owned_ids = self.db.query(OntologyEntity.id).filter(
+                OntologyEntity.ontology_id == ontology_id
+            )
+            # 共享进来的实体
+            shared_ids = self.db.query(OntologySharedRef.entity_id).filter(
+                OntologySharedRef.target_ontology_id == ontology_id
+            )
+            q = q.filter(OntologyEntity.id.in_(owned_ids.union(shared_ids)))
         if tier:
             q = q.filter(OntologyEntity.tier == tier)
         if status:
@@ -30,6 +42,13 @@ class EntityRepository(BaseRepository[OntologyEntity]):
                 OntologyEntity.name.ilike(pattern) | OntologyEntity.name_cn.ilike(pattern)
             )
         return q.order_by(OntologyEntity.tier, OntologyEntity.name).all()
+
+    def get_shared_entity_ids(self, ontology_id: str) -> set[str]:
+        """返回被共享进当前本体的实体 ID 集合。"""
+        rows = self.db.query(OntologySharedRef.entity_id).filter(
+            OntologySharedRef.target_ontology_id == ontology_id
+        ).all()
+        return {r[0] for r in rows}
 
     def get_relation_count(self, entity_id: str) -> int:
         return self.db.query(func.count(EntityRelation.id)).filter(

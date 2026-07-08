@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.models import OntologyEntity
 from app.models.function import OntologyFunction
+from app.models.shared_ref import OntologySharedRef
 from app.repositories.base import BaseRepository
 
 
@@ -13,8 +14,22 @@ class FunctionRepository(BaseRepository[OntologyFunction]):
         entity_id: str | None = None,
         status: str | None = None,
         search: str | None = None,
+        ontology_id: str | None = None,
     ) -> list[OntologyFunction]:
         q = self.db.query(OntologyFunction)
+        if ontology_id:
+            # 直接归属 + 通过 entity 归属
+            entity_ids_in_scope = self.db.query(OntologyEntity.id).filter(
+                OntologyEntity.ontology_id == ontology_id
+            )
+            shared_entity_ids = self.db.query(OntologySharedRef.entity_id).filter(
+                OntologySharedRef.target_ontology_id == ontology_id
+            )
+            all_entity_ids = entity_ids_in_scope.union(shared_entity_ids)
+            q = q.filter(
+                (OntologyFunction.ontology_id == ontology_id) |
+                (OntologyFunction.entity_id.in_(all_entity_ids))
+            )
         if entity_id:
             q = q.filter(OntologyFunction.entity_id == entity_id)
         if status:
