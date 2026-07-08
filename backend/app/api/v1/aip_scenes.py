@@ -6,7 +6,7 @@ import secrets
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -444,6 +444,7 @@ async def execute_scene(
 @router.post("/{sid}/test")
 def test_node(
     sid: str,
+    request: Request,
     node_id: str = Query(...),
     db: Session = Depends(get_db),
 ):
@@ -467,6 +468,7 @@ def test_node(
         model_name=model_name,
         model_config=model_config,
         emit_node_io=True,
+        runtime_executor=getattr(request.app.state, "runtime_executor", None),
     )
     out: dict = {}
     for ev in engine.run_for_scene({}):

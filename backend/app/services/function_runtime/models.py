@@ -32,6 +32,7 @@ class ExecContext:
     timeout_sec: int = 30
     total_timeout_sec: int = 120
     ontology_id: int | None = None
+    _chain_start: float | None = None
 
 
 @dataclass

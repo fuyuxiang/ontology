@@ -70,6 +70,7 @@ def run_scene_stream(
     scene: AipScene,
     execution: AipSceneExecution,
     input_params: dict | None = None,
+    runtime_executor=None,
 ) -> Generator[dict, None, None]:
     """阻塞式生成器：跑场景 + 落库 + yield 事件。"""
     if not scene.nodes_json:
@@ -90,6 +91,7 @@ def run_scene_stream(
         model_name=model_name,
         model_config=model_config,
         emit_node_io=True,
+        runtime_executor=runtime_executor,
     )
 
     yield {"type": "execution_started", "execution_id": execution.id, "scene_id": scene.id, "scene_name": scene.name}

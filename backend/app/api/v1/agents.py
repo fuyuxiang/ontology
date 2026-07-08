@@ -1,6 +1,6 @@
 import secrets
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -247,6 +247,7 @@ def _writeback_conversation(db: Session, conv, question: str, answer: str) -> No
 async def chat_with_agent(
     aid: str,
     body: ChatRequest,
+    request: Request,
     db: Session = Depends(get_db),
     user: User | None = Depends(get_current_user),
 ):
@@ -317,6 +318,7 @@ async def chat_with_agent(
             system_prompt=a.system_prompt or "",
             model_name=model_name,
             model_config=model_config or None,
+            runtime_executor=getattr(request.app.state, "runtime_executor", None),
         )
 
         def event_stream():
@@ -353,6 +355,7 @@ async def chat_with_agent(
             system_prompt_prefix=a.system_prompt or None,
             model_name=model_name,
             model_config=model_config or None,
+            runtime_executor=getattr(request.app.state, "runtime_executor", None),
         )
 
         def event_stream():

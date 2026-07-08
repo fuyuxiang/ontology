@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import ast
+import logging
 import signal
 from dataclasses import dataclass, field
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 FORBIDDEN_IMPORTS = frozenset([
@@ -24,6 +27,14 @@ FORBIDDEN_CALLS = frozenset([
     "open", "eval", "exec", "__import__", "compile",
     "globals", "locals", "getattr", "setattr", "delattr",
     "breakpoint", "exit", "quit",
+])
+
+# Dunder attributes that are safe to access (common Python protocols)
+ALLOWED_DUNDERS = frozenset([
+    "__init__", "__str__", "__repr__", "__len__", "__iter__",
+    "__next__", "__getitem__", "__setitem__", "__contains__",
+    "__eq__", "__ne__", "__lt__", "__gt__", "__le__", "__ge__",
+    "__hash__", "__bool__",
 ])
 
 SAFE_BUILTINS = {
@@ -79,6 +90,11 @@ class UnifiedSandbox:
                 elif mod not in ALLOWED_IMPORTS:
                     errors.append(f"不允许的模块: {mod} (line {node.lineno})")
 
+            elif isinstance(node, ast.Attribute):
+                attr = node.attr
+                if attr.startswith("__") and attr.endswith("__") and attr not in ALLOWED_DUNDERS:
+                    errors.append(f"禁止访问 dunder 属性: {attr} (line {node.lineno})")
+
             elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
                 if node.func.id in FORBIDDEN_CALLS:
                     errors.append(f"禁止调用: {node.func.id} (line {node.lineno})")
@@ -120,9 +136,17 @@ class UnifiedSandbox:
         # Inject namespace items (call_function, etc.) into execution scope
         sandbox_globals.update(namespace)
 
-        old_handler = signal.getsignal(signal.SIGALRM)
-        signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(timeout)
+        old_handler = None
+        use_alarm = True
+        try:
+            old_handler = signal.getsignal(signal.SIGALRM)
+            signal.signal(signal.SIGALRM, _timeout_handler)
+            signal.alarm(timeout)
+        except ValueError:
+            # Not in main thread — SIGALRM unavailable, degrade gracefully
+            use_alarm = False
+            logger.warning("sandbox: SIGALRM 不可用（非主线程），超时保护已降级")
+
         try:
             exec(code, sandbox_globals)  # noqa: S102
             if func_name not in sandbox_globals:
@@ -132,8 +156,9 @@ class UnifiedSandbox:
         except _SandboxTimeout:
             raise TimeoutError(f"函数执行超时 (>{timeout}s)")
         finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
+            if use_alarm:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
 
 
 def _build_ontology_runtime_shim(call_function=None):

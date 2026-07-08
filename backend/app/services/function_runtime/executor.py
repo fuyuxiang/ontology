@@ -36,6 +36,21 @@ class FunctionRuntimeExecutor:
         if context is None:
             context = ExecContext(call_stack=[])
 
+        # Initialize chain start time on first call
+        if context._chain_start is None:
+            context._chain_start = time.time()
+
+        # Enforce total chain timeout
+        elapsed_chain = time.time() - context._chain_start
+        if elapsed_chain > context.total_timeout_sec:
+            return ExecResult(
+                success=False,
+                result=None,
+                error=f"调用链总超时 (>{context.total_timeout_sec}s)",
+                execution_ms=int((time.time() - start) * 1000),
+                call_trace=list(context.call_stack),
+            )
+
         meta = self.registry.get(callable_name)
         if meta is None:
             return ExecResult(
@@ -76,8 +91,11 @@ class FunctionRuntimeExecutor:
                 "params": params,
                 "call_function": call_fn,
             }
+            # Calculate remaining time for this individual call
+            remaining = context.total_timeout_sec - (time.time() - context._chain_start)
+            effective_timeout = max(1, int(min(context.timeout_sec, remaining)))
             result = self.sandbox.execute(
-                code, meta.func_name, namespace, timeout=context.timeout_sec
+                code, meta.func_name, namespace, timeout=effective_timeout
             )
             elapsed = int((time.time() - start) * 1000)
             return ExecResult(

@@ -165,3 +165,62 @@ def simple(params):
         ))
         result = executor.execute("simple", {})
         assert "simple" in result.call_trace
+
+
+class TestTotalTimeout:
+    def test_total_timeout_enforced(self, setup, tmp_path):
+        """Verify that total_timeout_sec is enforced across the call chain."""
+        registry, executor = setup
+        code = '''
+def slow(params):
+    import time
+    time.sleep(0.1)
+    return call_function("slow2", {})
+'''
+        code2 = '''
+def slow2(params):
+    import time
+    time.sleep(0.1)
+    return "done"
+'''
+        os.makedirs(tmp_path / "a", exist_ok=True)
+        os.makedirs(tmp_path / "b", exist_ok=True)
+        path = _write_function_file(tmp_path / "a", code)
+        path2 = _write_function_file(tmp_path / "b", code2)
+        registry.register(FunctionMeta(
+            callable_name="slow", description="", type="logic",
+            params=[], return_type="string",
+            source_path=path, func_name="slow", ontology_id=1, checksum="x",
+        ))
+        registry.register(FunctionMeta(
+            callable_name="slow2", description="", type="logic",
+            params=[], return_type="string",
+            source_path=path2, func_name="slow2", ontology_id=1, checksum="x",
+        ))
+
+        # Set a very short total timeout that should be exceeded
+        import time
+        ctx = ExecContext(call_stack=[], total_timeout_sec=0, timeout_sec=30)
+        ctx._chain_start = time.time() - 1  # pretend chain started 1s ago
+        result = executor.execute("slow", {}, context=ctx)
+        assert result.success is False
+        assert "总超时" in result.error
+
+    def test_chain_start_initialized_on_first_call(self, setup, tmp_path):
+        """Verify _chain_start is auto-set on first execute call."""
+        registry, executor = setup
+        code = '''
+def quick(params):
+    return 1
+'''
+        path = _write_function_file(tmp_path, code)
+        registry.register(FunctionMeta(
+            callable_name="quick", description="", type="logic",
+            params=[], return_type="number",
+            source_path=path, func_name="quick", ontology_id=1, checksum="x",
+        ))
+        ctx = ExecContext(call_stack=[])
+        assert ctx._chain_start is None
+        result = executor.execute("quick", {}, context=ctx)
+        assert result.success is True
+        assert ctx._chain_start is not None

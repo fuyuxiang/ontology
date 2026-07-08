@@ -33,6 +33,7 @@ class GraphEngine(NodeHandlersMixin):
         model_name: str | None = None,
         model_config: dict | None = None,
         emit_node_io: bool = False,
+        runtime_executor=None,
     ):
         self.db = db
         self.nodes = {n["id"]: n for n in nodes_json}
@@ -40,7 +41,7 @@ class GraphEngine(NodeHandlersMixin):
         self.system_prompt = system_prompt
         self.model_name = model_name or settings.LLM_MODEL
         self.model_config = model_config or {}
-        self._tool_router = ToolRouter(db)
+        self._tool_router = ToolRouter(db, runtime_executor=runtime_executor)
         self._client = get_llm_client(
             api_key=self.model_config.get("api_key"),
             api_base=self.model_config.get("api_base"),
