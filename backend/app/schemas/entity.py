@@ -67,6 +67,8 @@ class EntityListItem(BaseModel):
     status: str
     attr_count: int = 0
     relation_count: int = 0
+    function_count: int = 0
+    action_count: int = 0
     rule_count: int = 0
     datasource_name: str | None = None
     scenario_codes: list[str] | None = None

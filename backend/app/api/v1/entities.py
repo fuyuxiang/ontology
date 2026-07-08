@@ -56,6 +56,8 @@ def list_entities(
             tier=e.tier, status=e.status,
             attr_count=len(e.attributes),
             relation_count=rel_count,
+            function_count=len(e.functions),
+            action_count=len(e.actions),
             rule_count=0,
             datasource_name=(e.config_json or {}).get("datasource_name"),
             scenario_codes=e.scenario_codes,

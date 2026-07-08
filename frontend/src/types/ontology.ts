@@ -123,6 +123,8 @@ export interface EntityListItem {
   status: EntityStatus
   attr_count: number
   relation_count: number
+  function_count: number
+  action_count: number
   datasource_name: string | null
   scenario_codes?: string[]
   ontology_id?: string
