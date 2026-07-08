@@ -1,21 +1,6 @@
 <template>
-  <ModalDialog :visible="visible" title="创建逻辑类型" width="560px" @close="$emit('close')">
+  <ModalDialog :visible="visible" title="创建逻辑" width="560px" @close="$emit('close')">
     <div class="create-form">
-      <div class="form-section">
-        <label class="form-label">选择逻辑类型</label>
-        <div class="type-selector">
-          <button
-            v-for="t in logicTypes" :key="t.value"
-            class="type-option"
-            :class="{ 'type-option--active': form.logic_type === t.value }"
-            @click="form.logic_type = t.value"
-          >
-            <span class="type-radio" :class="{ 'type-radio--checked': form.logic_type === t.value }"></span>
-            {{ t.label }}
-          </button>
-        </div>
-      </div>
-
       <div class="form-section">
         <label class="form-label form-label--required">中文名称</label>
         <div class="input-wrap">
@@ -77,22 +62,16 @@ const toast = useToast()
 const entities = ref<EntityListItem[]>([])
 const saving = ref(false)
 
-const logicTypes = [
-  { value: 'expression', label: 'Function' },
-  { value: 'sql', label: 'API' },
-  { value: 'python', label: 'Link' },
-]
-
 const form = ref({
   name: '',
   callable_name: '',
   description: '',
   entity_id: '',
-  logic_type: 'expression',
+  logic_type: 'python',
 })
 
 function resetForm() {
-  form.value = { name: '', callable_name: '', description: '', entity_id: '', logic_type: 'expression' }
+  form.value = { name: '', callable_name: '', description: '', entity_id: '', logic_type: 'python' }
 }
 
 async function loadEntities() {

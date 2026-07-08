@@ -121,11 +121,6 @@ class FunctionWatcher:
             self._file_functions[path].append(callable_name)
 
     def _extract_ontology_id(self, path: str) -> int:
-        rel = os.path.relpath(path, self.workspace_root)
-        parts = Path(rel).parts
-        for part in parts:
-            if part.isdigit():
-                return int(part)
         return 0
 
     def _extract_function_meta(
