@@ -7,10 +7,6 @@
         <p class="page-banner__desc">提供本体设计器，支持以人机协同方式，基于 AI 快速自动化构建本体；也支持通过手动定义的形式自顶向...</p>
       </div>
       <div class="page-banner__actions">
-        <button class="btn-outline" @click="showCreate = true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          手动构建
-        </button>
         <button class="btn-filled" @click="showCreate = true">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           新建本体
