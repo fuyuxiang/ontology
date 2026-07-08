@@ -174,11 +174,21 @@ def test_function(
 WORKSPACE_DIR = Path(__file__).resolve().parents[3] / ".." / "workspace"
 CODE_SERVER_PORT = int(__import__("os").environ.get("CODE_SERVER_PORT", "8443"))
 
-LOGIC_TYPE_EXT = {
-    "expression": ".js",
-    "sql": ".sql",
-    "python": ".py",
-}
+
+def _generate_function_template(callable_name: str, description: str) -> str:
+    return f'''from ontology_runtime import Function, call_function
+
+
+@Function(
+    name="{callable_name}",
+    description="{description}",
+    type="logic",
+    params=[],
+    return_type="object",
+)
+def {callable_name}(params):
+    return {{}}
+'''
 
 
 class WorkspaceOut(BaseModel):
@@ -201,10 +211,10 @@ def open_workspace(
     func_dir = (WORKSPACE_DIR / func.callable_name).resolve()
     func_dir.mkdir(parents=True, exist_ok=True)
 
-    ext = LOGIC_TYPE_EXT.get(func.logic_type, ".txt")
-    main_file = func_dir / f"main{ext}"
+    main_file = func_dir / "main.py"
     if not main_file.exists():
-        main_file.write_text(func.logic_body or "", encoding="utf-8")
+        template = _generate_function_template(func.callable_name, func.description or "")
+        main_file.write_text(template, encoding="utf-8")
 
     host = request.headers.get("host", "localhost").split(":")[0]
     folder_path = str(func_dir)

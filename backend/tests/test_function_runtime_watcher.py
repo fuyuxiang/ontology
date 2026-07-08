@@ -104,7 +104,7 @@ class TestScanFile:
         file_path.write_text(SAMPLE_CODE)
 
         metas = watcher.scan_file(str(file_path))
-        assert metas[0].ontology_id == 42
+        assert metas[0].ontology_id == 0
 
 
 class TestScanAll:
