@@ -22,15 +22,7 @@ const router = createRouter({
     { path: '/builder/doc', name: 'ontology-builder-doc', component: () => import('../views/builder/DocBuilderView.vue'), meta: { title: '文档构建' } },
     { path: '/builder/ai', name: 'ontology-builder-ai', component: () => import('../views/builder/AiBuilderView.vue'), meta: { title: '资产构建' } },
 
-    // 本体中心 — 本体管理
-    {
-      path: '/browser',
-      component: () => import('../views/browser/OntologyBrowser.vue'),
-      meta: { title: '对象与关系管理' },
-      children: [
-        { path: '', name: 'browser-objects', component: () => import('../views/ontology/OntologyExplorer.vue'), meta: { title: '对象与关系管理' } },
-      ]
-    },
+    // 数据映射与逻辑建模
     { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '数据映射' } },
     { path: '/logic', redirect: '/logic/functions' },
     { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
