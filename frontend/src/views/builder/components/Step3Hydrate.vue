@@ -300,11 +300,7 @@ const store = useBuilderStore()
 const scenarioStore = useScenarioStore()
 
 const ontologyId = computed(() => {
-  if (route.query.from === 'ontology-detail' && route.query.code) {
-    const sc = scenarioStore.byCode(route.query.code as string)
-    return sc?.id || null
-  }
-  return null
+  return (route.query.ontology_id as string) || null
 })
 
 // ── 状态 ──
