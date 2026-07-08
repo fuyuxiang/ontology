@@ -138,6 +138,16 @@
 
         <!-- 对象定义 -->
         <div v-else-if="activeTab === 'entities'" class="tab-entities">
+          <!-- 对象详情内嵌视图 -->
+          <EntityDetail
+            v-if="selectedEntityId"
+            :embedded-id="selectedEntityId"
+            :embedded="true"
+            @back="selectedEntityId = null"
+          />
+
+          <!-- 对象列表 -->
+          <template v-else>
           <div class="entities-toolbar">
             <div class="entities-toolbar__left">
               <span class="entities-toolbar__title">
@@ -206,11 +216,11 @@
               <tbody>
                 <tr v-for="e in filteredEntities" :key="e.id">
                   <td class="entities-table__check"><input type="checkbox" :checked="selectedIds.includes(e.id)" @change="toggleSelect(e.id)" /></td>
-                  <td class="link-cell" @click="router.push(`/ontology/${e.id}`)">{{ e.name_cn || '—' }}</td>
+                  <td class="link-cell" @click="selectedEntityId = e.id">{{ e.name_cn || '—' }}</td>
                   <td>{{ e.name }}</td>
                   <td><span class="badge" :class="e.status === 'active' ? 'badge--active' : 'badge--draft'">{{ e.status === 'active' ? '已激活' : '草稿' }}</span></td>
                   <td class="entities-table__actions">
-                    <button class="entities-table__action-btn" @click="router.push(`/ontology/${e.id}`)">编辑</button>
+                    <button class="entities-table__action-btn" @click="selectedEntityId = e.id">编辑</button>
                     <button class="entities-table__action-btn entities-table__action-btn--danger" @click="deleteEntity(e.id)">删除</button>
                   </td>
                 </tr>
@@ -226,6 +236,7 @@
               <p class="entities-empty__text">暂无数据</p>
             </div>
           </div>
+          </template>
         </div>
 
         <!-- 逻辑定义 -->
@@ -254,6 +265,7 @@ import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
 import FunctionsView from '../logic/FunctionsView.vue'
 import ActionsView from '../logic/ActionsView.vue'
+import EntityDetail from '../detail/EntityDetail.vue'
 
 const vClickOutside = {
   mounted(el: any, binding: any) {
@@ -292,6 +304,7 @@ const entitySearch = ref('')
 const selectedIds = ref<string[]>([])
 const showBatchMenu = ref(false)
 const showCreateMenu = ref(false)
+const selectedEntityId = ref<string | null>(null)
 
 const filteredEntities = computed(() => {
   const q = entitySearch.value.trim().toLowerCase()
@@ -369,6 +382,7 @@ onMounted(loadData)
 onActivated(loadData)
 
 watch(code, loadData)
+watch(activeTab, () => { selectedEntityId.value = null })
 </script>
 
 <!-- STYLE_SECTION -->
