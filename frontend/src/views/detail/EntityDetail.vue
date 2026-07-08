@@ -1,6 +1,16 @@
 <template>
   <div class="detail">
-    <OntologyBreadcrumb :items="breadcrumbs" />
+    <OntologyBreadcrumb v-if="!embedded" :items="breadcrumbs" />
+
+    <div v-if="embedded" class="detail__back-row">
+      <button class="detail__back-btn" @click="emit('back')">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        返回对象列表
+      </button>
+      <span class="detail__back-name">{{ entity.nameCn || entity.name }}</span>
+    </div>
 
     <div class="detail__header">
       <div class="detail__title-row">
@@ -378,14 +388,23 @@ import { resolutionApi } from '../../api/resolution'
 import { get } from '../../api/client'
 import type { SourceDataPreview, SourceField } from '../../api/resolution'
 
+const props = defineProps<{
+  embeddedId?: string
+  embedded?: boolean
+}>()
+
+const emit = defineEmits<{
+  back: []
+}>()
+
 const route = useRoute()
 const store = useOntologyStore()
 const activeTab = ref('属性')
 const tabs = ['属性', '关系', '动作', '函数', '数据实例', '智能体', '血缘', '绑定数据']
 
-const entityId = computed(() => route.params.id as string)
+const entityId = computed(() => props.embeddedId || route.params.id as string)
 
-onMounted(() => { store.fetchEntity(entityId.value) })
+onMounted(() => { if (entityId.value) store.fetchEntity(entityId.value) })
 watch(entityId, (id) => { if (id) store.fetchEntity(id) })
 
 const detail = computed(() => store.currentEntity)
@@ -663,6 +682,35 @@ watch(activeTab, (tab) => {
 .detail {
   padding: 24px;
   max-width: 1000px;
+}
+
+.detail__back-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.detail__back-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: 6px;
+  background: var(--neutral-0, #fff);
+  color: var(--neutral-700, #333);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.detail__back-btn:hover { background: var(--neutral-50, #fafafa); }
+
+.detail__back-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--neutral-700, #333);
 }
 
 .detail__header { margin: 16px 0 20px; }
