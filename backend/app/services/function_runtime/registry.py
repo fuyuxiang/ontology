@@ -95,6 +95,7 @@ class FunctionRegistry:
             OntologyFunction.callable_name == meta.callable_name,
         ).first()
         if row:
+            row.name = meta.callable_name
             row.description = meta.description
             row.input_schema = [
                 {"name": p.name, "type": p.type, "required": p.required, "description": p.description}
