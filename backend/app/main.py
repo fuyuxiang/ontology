@@ -347,6 +347,8 @@ from app.api.v1.relations import router as relations_router
 from app.api.v1.resolution import router as resolution_router
 from app.api.v1.scenarios import router as scenarios_router
 from app.api.v1.scenes import router as scenes_router
+from app.api.v1.shared_attributes import router as shared_attrs_router
+from app.api.v1.shared_refs import router as shared_refs_router
 from app.api.v1.skill_gen import router as skill_gen_router
 from app.api.v1.skills import router as skills_router
 from app.api.v1.system_config import router as system_config_router
@@ -513,6 +515,8 @@ app.include_router(aip_executions_router, prefix="/api/v1")
 app.include_router(aip_webhooks_router, prefix="/api/v1")
 app.include_router(builder_router, prefix="/api/v1")
 app.include_router(business_documents_router, prefix="/api/v1")
+app.include_router(shared_refs_router, prefix="/api/v1")
+app.include_router(shared_attrs_router, prefix="/api/v1")
 
 # ── Data Plane router 挂载 ──
 app.include_router(dp_connections_router, prefix="/api/v1")
