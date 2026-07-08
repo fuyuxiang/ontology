@@ -33,12 +33,14 @@ def list_actions(
     action_type: str | None = Query(None),
     category: str | None = Query(None),
     search: str | None = Query(None),
+    ontology_id: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     repo = ActionRepository(db)
     actions = repo.list_with_filters(
         entity_id=entity_id, status=status,
-        action_type=action_type, category=category, search=search,
+        action_type=action_type, category=category,
+        search=search, ontology_id=ontology_id,
     )
     results = []
     for a in actions:
