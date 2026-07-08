@@ -5,6 +5,14 @@
         <h1 class="text-display">本体列表</h1>
         <p class="text-caption" style="margin-top: 4px;">按场景管理本体</p>
       </div>
+      <div class="ontology-list-page__actions">
+        <button class="btn-primary" @click="showCreate = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          新建本体
+        </button>
+      </div>
     </div>
 
     <div class="ontology-list-page__stats">
@@ -42,15 +50,41 @@
         <p class="text-caption">无匹配本体</p>
       </div>
     </div>
+
+    <!-- 新建本体弹窗 -->
+    <Teleport to="body">
+      <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
+        <div class="modal-box">
+          <h3 class="modal-title">新建本体</h3>
+          <div class="modal-field">
+            <label class="modal-label">本体名称</label>
+            <input v-model="createForm.name" class="modal-input" placeholder="输入本体名称" />
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">编码 (code)</label>
+            <input v-model="createForm.code" class="modal-input" placeholder="英文编码，如 revenue_analysis" />
+          </div>
+          <div class="modal-field">
+            <label class="modal-label">描述</label>
+            <textarea v-model="createForm.description" class="modal-input modal-textarea" placeholder="本体描述（可选）" />
+          </div>
+          <div class="modal-actions">
+            <button class="btn-cancel" @click="showCreate = false">取消</button>
+            <button class="btn-primary" :disabled="!createForm.name || !createForm.code" @click="handleCreate">创建</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
 import { functionApi, type FunctionItem } from '../../api/functions'
+import { scenarioApi } from '../../api/scenarios'
 
 const router = useRouter()
 const scenarioStore = useScenarioStore()
@@ -58,6 +92,8 @@ const ontologyStore = useOntologyStore()
 
 const search = ref('')
 const functions = ref<FunctionItem[]>([])
+const showCreate = ref(false)
+const createForm = reactive({ name: '', code: '', description: '' })
 
 const scenarios = computed(() => scenarioStore.scenarios)
 const totalEntities = computed(() => ontologyStore.entities.length)
@@ -79,6 +115,19 @@ const filteredList = computed(() => {
 
 function goDetail(code: string) {
   router.push(`/ontology/list/${code}`)
+}
+
+async function handleCreate() {
+  await scenarioApi.create({
+    code: createForm.code,
+    name: createForm.name,
+    description: createForm.description || null,
+  })
+  showCreate.value = false
+  createForm.name = ''
+  createForm.code = ''
+  createForm.description = ''
+  await scenarioStore.fetchScenarios(true)
 }
 
 onMounted(async () => {
@@ -103,6 +152,29 @@ onMounted(async () => {
   justify-content: space-between;
   margin-bottom: 24px;
 }
+
+.ontology-list-page__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--primary, #2563eb);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .ontology-list-page__stats {
   display: flex;
@@ -217,4 +289,81 @@ onMounted(async () => {
   padding: 48px 0;
   color: var(--neutral-400, #aaa);
 }
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: var(--neutral-0, #fff);
+  border-radius: var(--radius-lg, 12px);
+  padding: 24px;
+  width: 420px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 20px;
+  color: var(--neutral-900, #111);
+}
+
+.modal-field {
+  margin-bottom: 16px;
+}
+
+.modal-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--neutral-600, #666);
+  margin-bottom: 4px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.modal-input:focus {
+  border-color: var(--primary, #2563eb);
+}
+
+.modal-textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.btn-cancel {
+  padding: 8px 16px;
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: 6px;
+  background: var(--neutral-0, #fff);
+  color: var(--neutral-700, #333);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-cancel:hover { background: var(--neutral-50, #fafafa); }
 </style>
