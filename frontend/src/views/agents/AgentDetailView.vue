@@ -60,10 +60,6 @@
           <textarea class="agent-detail__textarea" v-model="form.description" rows="2" placeholder="智能体描述"></textarea>
         </div>
         <div class="agent-detail__form-group">
-          <label class="agent-detail__label">标签</label>
-          <input class="agent-detail__input" v-model="form.tagsStr" placeholder="多个标签用逗号分隔" />
-        </div>
-        <div class="agent-detail__form-group">
           <label class="agent-detail__label">关联本体</label>
           <select class="agent-detail__select" v-model="selectedOntologyId" @change="onOntologyChange">
             <option value="">请选择本体</option>
