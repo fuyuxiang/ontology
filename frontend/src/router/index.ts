@@ -36,6 +36,7 @@ const router = createRouter({
     { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
     { path: '/logic/functions/:id/code', name: 'logic-function-code', component: () => import('../views/logic/FunctionCodeView.vue'), meta: { title: '函数编辑' } },
     { path: '/logic/actions', name: 'logic-actions', component: () => import('../views/logic/ActionsView.vue'), meta: { title: '行动建模' } },
+    { path: '/logic/actions/:id/code', name: 'logic-action-code', component: () => import('../views/logic/ActionCodeView.vue'), meta: { title: '动作编辑' } },
 
     // 本体中心 — 本体发布
     { path: '/ontology/publish', name: 'ontology-publish', component: () => import('../views/ontology/OntologyPublishView.vue'), meta: { title: '本体发布' } },

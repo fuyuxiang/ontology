@@ -1,4 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import re
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
@@ -182,3 +186,60 @@ async def execute_action(
         repo.commit()
 
     return ActionExecuteResult(success=result.success, message=result.message, output=result.output)
+
+
+WORKSPACE_DIR = Path(__file__).resolve().parents[3] / ".." / "workspace"
+CODE_SERVER_PORT = int(__import__("os").environ.get("CODE_SERVER_PORT", "8443"))
+
+
+def _sanitize_dirname(name: str) -> str:
+    return re.sub(r'[^\w\-.]', '_', name)
+
+
+def _generate_action_template(name: str, description: str) -> str:
+    safe_name = re.sub(r'\W', '_', name)
+    return f'''from ontology_runtime import Function, call_function
+
+
+@Function(
+    name="{safe_name}",
+    description="{description}",
+    type="action",
+    params=[],
+    return_type="object",
+)
+def {safe_name}(params):
+    return {{}}
+'''
+
+
+class WorkspaceOut(BaseModel):
+    url: str
+    folder: str
+
+
+@router.post("/{action_id}/workspace", response_model=WorkspaceOut)
+def open_action_workspace(
+    action_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_user),
+):
+    repo = ActionRepository(db)
+    action = repo.get_by_id(action_id)
+    if not action:
+        raise HTTPException(status_code=404, detail="动作不存在")
+
+    dir_name = _sanitize_dirname(action.name)
+    action_dir = (WORKSPACE_DIR / dir_name).resolve()
+    action_dir.mkdir(parents=True, exist_ok=True)
+
+    main_file = action_dir / "main.py"
+    if not main_file.exists():
+        template = _generate_action_template(action.name, action.description or "")
+        main_file.write_text(template, encoding="utf-8")
+
+    host = request.headers.get("host", "localhost").split(":")[0]
+    folder_path = str(action_dir)
+    url = f"http://{host}:{CODE_SERVER_PORT}/?folder={folder_path}"
+    return WorkspaceOut(url=url, folder=folder_path)

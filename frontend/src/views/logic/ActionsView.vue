@@ -124,26 +124,34 @@
       </div>
     </div>
 
+    <ActionCreateModal
+      :visible="showCreateModal"
+      @close="showCreateModal = false"
+      @created="onActionCreated"
+    />
+
     <ActionBuilderDrawer
       :visible="drawerVisible"
       :edit-id="drawerEditId"
       @close="drawerVisible = false"
-      @saved="onDrawerSaved"
+      @saved="drawerVisible = false; fetchActions()"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { actionApi, type ActionItem, type ActionTypeInfo } from '../../api/actions'
 import { useOntologyStore } from '../../store/ontology'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 import ActionBuilderDrawer from '../../components/logic/ActionBuilderDrawer.vue'
+import ActionCreateModal from '../../components/logic/ActionCreateModal.vue'
 
 const props = defineProps<{ embedded?: boolean }>()
 
 const route = useRoute()
+const router = useRouter()
 
 const actions = ref<ActionItem[]>([])
 const actionTypes = ref<ActionTypeInfo[]>([])
@@ -152,6 +160,7 @@ const activeFilter = ref('all')
 const selectedId = ref<string | null>(null)
 const drawerVisible = ref(false)
 const drawerEditId = ref<string | undefined>(undefined)
+const showCreateModal = ref(false)
 
 const filterOptions = [
   { label: '全部', value: 'all' },
@@ -194,17 +203,20 @@ function setFilter(value: string) {
 }
 
 function openCreate() {
-  drawerEditId.value = undefined
-  drawerVisible.value = true
+  showCreateModal.value = true
 }
 
 function openEdit(id: string) {
-  drawerEditId.value = id
-  drawerVisible.value = true
+  const query: Record<string, string> = {}
+  if (route.params.code) {
+    query.from = 'ontology'
+    query.code = route.params.code as string
+  }
+  router.push({ path: `/logic/actions/${id}/code`, query })
 }
 
-function onDrawerSaved() {
-  drawerVisible.value = false
+function onActionCreated() {
+  showCreateModal.value = false
   fetchActions()
 }
 
@@ -238,7 +250,7 @@ onMounted(() => {
   fetchActions()
   fetchActionTypes()
   if (route.query.from === 'builder') {
-    drawerVisible.value = true
+    showCreateModal.value = true
   }
 })
 </script>
