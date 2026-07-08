@@ -1,53 +1,84 @@
 <template>
   <div class="ontology-list-page">
-    <div class="ontology-list-page__header">
-      <div>
-        <h1 class="text-display">本体列表</h1>
-        <p class="text-caption" style="margin-top: 4px;">按场景管理本体</p>
+    <!-- 顶部 Banner -->
+    <div class="page-banner">
+      <div class="page-banner__content">
+        <h1 class="page-banner__title">本体列表</h1>
+        <p class="page-banner__desc">提供本体设计器，支持以人机协同方式，基于 AI 快速自动化构建本体；也支持通过手动定义的形式自顶向...</p>
       </div>
-      <div class="ontology-list-page__actions">
-        <button class="btn-primary" @click="showCreate = true">
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+      <div class="page-banner__actions">
+        <button class="btn-outline" @click="showCreate = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          手动构建
+        </button>
+        <button class="btn-filled" @click="showCreate = true">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           新建本体
         </button>
       </div>
     </div>
 
-    <div class="ontology-list-page__stats">
-      <div class="stat-card stat-card--semantic">
-        <div class="stat-card__value">{{ scenarios.length }}</div>
-        <div class="stat-card__label">本体总数</div>
-      </div>
-      <div class="stat-card stat-card--dynamic">
-        <div class="stat-card__value">{{ totalEntities }}</div>
-        <div class="stat-card__label">对象总数</div>
+    <!-- 搜索筛选区 -->
+    <div class="filter-bar">
+      <div class="filter-bar__search">
+        <svg class="filter-bar__search-icon" width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" stroke-width="1.3"/><path d="M9.5 9.5L12.5 12.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+        <input v-model="search" class="filter-bar__input" placeholder="搜索本体" />
       </div>
     </div>
 
-    <div class="ontology-list-page__toolbar">
-      <input v-model="search" class="ontology-search" placeholder="搜索本体名称..." />
-    </div>
-
-    <div class="ontology-list-page__grid">
+    <!-- 卡片网格 -->
+    <div class="card-grid">
       <div
         v-for="item in filteredList" :key="item.code"
-        class="ontology-card"
-        @click="goDetail(item.code)"
+        class="onto-card"
       >
-        <div class="ontology-card__header">
-          <span class="ontology-card__dot" :style="{ background: item.color || '#94a3b8' }"></span>
-          <span class="ontology-card__name">{{ item.name }}</span>
+        <div class="onto-card__top">
+          <div class="onto-card__icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="8" r="4" stroke="#2563eb" stroke-width="1.5"/>
+              <circle cx="8" cy="24" r="4" stroke="#2563eb" stroke-width="1.5"/>
+              <circle cx="24" cy="24" r="4" stroke="#2563eb" stroke-width="1.5"/>
+              <path d="M16 12v4M12 20l-2 2M20 20l2 2" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/>
+              <path d="M16 16l-4 4M16 16l4 4" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="onto-card__info">
+            <div class="onto-card__name-row">
+              <span class="onto-card__name">{{ item.name }}</span>
+            </div>
+            <span class="onto-card__code">{{ item.code }}</span>
+          </div>
+          <span class="onto-card__badge">已构建</span>
         </div>
-        <p class="ontology-card__desc">{{ item.description || '暂无描述' }}</p>
-        <div class="ontology-card__stats">
-          <span class="ontology-card__stat">对象 <b>{{ item.entityCount }}</b></span>
-          <span class="ontology-card__stat">逻辑 <b>{{ item.logicCount }}</b></span>
+
+        <p class="onto-card__desc">{{ item.description || '暂无描述' }}</p>
+
+        <div class="onto-card__stats">
+          <span class="onto-card__stat-item" title="对象">&#x1F4C4; {{ item.entityCount }}</span>
+          <span class="onto-card__stat-item" title="逻辑">&#x26A1; {{ item.logicCount }}</span>
+          <span class="onto-card__stat-item" title="关系">&#x1F517; {{ item.relationCount }}</span>
+        </div>
+
+        <div class="onto-card__meta">
+          <div class="onto-card__meta-item">
+            <span class="onto-card__meta-label">更新</span>
+            <span class="onto-card__meta-value">{{ item.updated_at?.slice(0, 10) || '—' }}</span>
+          </div>
+        </div>
+
+        <div class="onto-card__footer">
+          <span class="onto-card__status onto-card__status--active">已启用</span>
+          <div class="onto-card__actions">
+            <button class="onto-card__action-btn" @click.stop="goDetail(item.code)">详情</button>
+            <button class="onto-card__action-btn onto-card__action-btn--del" @click.stop="handleDelete(item)">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5 4V3h4v1M4 4v7h6V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
         </div>
       </div>
-      <div v-if="filteredList.length === 0" class="ontology-list-page__empty">
-        <p class="text-caption">无匹配本体</p>
+
+      <div v-if="filteredList.length === 0" class="card-grid__empty">
+        <p>无匹配本体</p>
       </div>
     </div>
 
@@ -70,7 +101,7 @@
           </div>
           <div class="modal-actions">
             <button class="btn-cancel" @click="showCreate = false">取消</button>
-            <button class="btn-primary" :disabled="!createForm.name || !createForm.code" @click="handleCreate">创建</button>
+            <button class="btn-filled" :disabled="!createForm.name || !createForm.code" @click="handleCreate">创建</button>
           </div>
         </div>
       </div>
@@ -96,7 +127,6 @@ const showCreate = ref(false)
 const createForm = reactive({ name: '', code: '', description: '' })
 
 const scenarios = computed(() => scenarioStore.scenarios)
-const totalEntities = computed(() => ontologyStore.entities.length)
 
 const filteredList = computed(() => {
   const items = scenarios.value.map(s => {
@@ -106,7 +136,8 @@ const filteredList = computed(() => {
     const logicCount = functions.value.filter(
       f => (f as any).scenario_code === s.code
     ).length
-    return { ...s, entityCount, logicCount }
+    const relationCount = 0
+    return { ...s, entityCount, logicCount, relationCount }
   })
   if (!search.value) return items
   const q = search.value.toLowerCase()
@@ -130,6 +161,12 @@ async function handleCreate() {
   await scenarioStore.fetchScenarios(true)
 }
 
+async function handleDelete(item: any) {
+  if (!confirm(`确定删除本体「${item.name}」？`)) return
+  await scenarioApi.remove(item.id)
+  await scenarioStore.fetchScenarios(true)
+}
+
 onMounted(async () => {
   await Promise.all([
     scenarioStore.fetchScenarios(),
@@ -139,155 +176,273 @@ onMounted(async () => {
 })
 </script>
 
-<!-- STYLE_PLACEHOLDER -->
+<!-- STYLES -->
 <style scoped>
 .ontology-list-page {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 
-.ontology-list-page__header {
+.page-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 32px 32px;
+  background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 50%, #eff6ff 100%);
+  border-radius: var(--radius-lg, 12px);
   margin-bottom: 24px;
 }
 
-.ontology-list-page__actions {
-  display: flex;
-  gap: 8px;
+.page-banner__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--neutral-900, #111);
+  margin: 0 0 8px;
 }
 
-.btn-primary {
+.page-banner__desc {
+  font-size: 13px;
+  color: var(--neutral-600, #555);
+  margin: 0;
+  max-width: 600px;
+  line-height: 1.5;
+}
+
+.page-banner__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn-outline {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 10px 20px;
+  border: 1px solid var(--neutral-300, #d1d5db);
+  border-radius: 8px;
+  background: var(--neutral-0, #fff);
+  color: var(--neutral-700, #333);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.btn-outline:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); }
+
+.btn-filled {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
   background: var(--primary, #2563eb);
   color: #fff;
-  border: none;
-  border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: opacity 0.15s;
 }
 
-.btn-primary:hover { opacity: 0.9; }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-filled:hover { opacity: 0.9; }
+.btn-filled:disabled { opacity: 0.5; cursor: not-allowed; }
 
-.ontology-list-page__stats {
+.filter-bar {
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 12px;
   margin-bottom: 24px;
 }
 
-.stat-card {
-  flex: 1;
-  padding: 20px 24px;
-  border-radius: var(--radius-lg, 12px);
-  border: 1px solid var(--neutral-100, #f0f0f0);
-  background: var(--neutral-0, #fff);
+.filter-bar__search {
+  position: relative;
+  width: 280px;
 }
 
-.stat-card__value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--neutral-900, #111);
+.filter-bar__search-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--neutral-400, #aaa);
 }
 
-.stat-card__label {
-  font-size: 12px;
-  color: var(--neutral-500, #888);
-  margin-top: 4px;
-}
-
-.ontology-list-page__toolbar {
-  margin-bottom: 20px;
-}
-
-.ontology-search {
+.filter-bar__input {
   width: 100%;
-  max-width: 320px;
-  padding: 8px 12px;
+  padding: 9px 12px 9px 32px;
   border: 1px solid var(--neutral-200, #e5e5e5);
   border-radius: 6px;
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
+  background: var(--neutral-0, #fff);
 }
 
-.ontology-search:focus {
-  border-color: var(--primary, #2563eb);
-}
+.filter-bar__input:focus { border-color: var(--primary, #2563eb); }
 
-.ontology-list-page__grid {
+.card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
 }
 
-.ontology-card {
-  padding: 20px;
+@media (max-width: 1100px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 700px) { .card-grid { grid-template-columns: 1fr; } }
+
+.onto-card {
   background: var(--neutral-0, #fff);
   border: 1px solid var(--neutral-100, #f0f0f0);
   border-radius: var(--radius-lg, 12px);
-  cursor: pointer;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
   transition: box-shadow 0.15s, border-color 0.15s;
 }
 
-.ontology-card:hover {
+.onto-card:hover {
   border-color: var(--primary, #2563eb);
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
 }
 
-.ontology-card__header {
+.onto-card__top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.onto-card__icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: #eff6ff;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.ontology-card__dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  justify-content: center;
   flex-shrink: 0;
 }
 
-.ontology-card__name {
+.onto-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.onto-card__name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.onto-card__name {
   font-size: 15px;
   font-weight: 600;
   color: var(--neutral-900, #111);
 }
 
-.ontology-card__desc {
+.onto-card__code {
+  font-size: 12px;
+  color: var(--neutral-400, #aaa);
+}
+
+.onto-card__badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.onto-card__desc {
   font-size: 12px;
   color: var(--neutral-500, #888);
   margin: 0 0 12px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
-.ontology-card__stats {
+.onto-card__stats {
   display: flex;
   gap: 16px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--neutral-100, #f0f0f0);
 }
 
-.ontology-card__stat {
+.onto-card__stat-item {
   font-size: 12px;
-  color: var(--neutral-500, #888);
+  color: var(--neutral-600, #555);
 }
 
-.ontology-card__stat b {
-  color: var(--neutral-800, #333);
-  font-weight: 600;
+.onto-card__meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
-.ontology-list-page__empty {
+.onto-card__meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.onto-card__meta-label {
+  font-size: 11px;
+  color: var(--neutral-400, #aaa);
+}
+
+.onto-card__meta-value {
+  font-size: 12px;
+  color: var(--neutral-700, #333);
+}
+
+.onto-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--neutral-100, #f0f0f0);
+}
+
+.onto-card__status {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.onto-card__status--active { color: #16a34a; }
+
+.onto-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.onto-card__action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--primary, #2563eb);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.onto-card__action-btn:hover { text-decoration: underline; }
+
+.onto-card__action-btn--del {
+  color: var(--neutral-400, #aaa);
+  padding: 4px;
+}
+
+.onto-card__action-btn--del:hover { color: #dc2626; }
+
+.card-grid__empty {
   grid-column: 1 / -1;
   text-align: center;
   padding: 48px 0;
   color: var(--neutral-400, #aaa);
+  font-size: 13px;
 }
 
 .modal-overlay {
@@ -316,9 +471,7 @@ onMounted(async () => {
   color: var(--neutral-900, #111);
 }
 
-.modal-field {
-  margin-bottom: 16px;
-}
+.modal-field { margin-bottom: 16px; }
 
 .modal-label {
   display: block;
@@ -339,14 +492,8 @@ onMounted(async () => {
   box-sizing: border-box;
 }
 
-.modal-input:focus {
-  border-color: var(--primary, #2563eb);
-}
-
-.modal-textarea {
-  min-height: 72px;
-  resize: vertical;
-}
+.modal-input:focus { border-color: var(--primary, #2563eb); }
+.modal-textarea { min-height: 72px; resize: vertical; }
 
 .modal-actions {
   display: flex;
