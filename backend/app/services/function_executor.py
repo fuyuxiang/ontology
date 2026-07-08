@@ -98,6 +98,20 @@ class FunctionExecutor:
         return {"error": "No entity_id for SQL execution", "rows": []}
 
     def _execute_python(self, func: OntologyFunction, params: dict) -> Any:
+        # Delegate to new runtime if function has source_path set (actual string path)
+        if getattr(func, "source_path", None) and isinstance(func.source_path, str) and func.callable_name and isinstance(func.callable_name, str):
+            from app.services.function_runtime.executor import FunctionRuntimeExecutor
+            from app.services.function_runtime.registry import FunctionRegistry
+            from app.services.function_runtime.sandbox import UnifiedSandbox
+            registry = FunctionRegistry(self.db)
+            sandbox = UnifiedSandbox()
+            runtime = FunctionRuntimeExecutor(registry=registry, sandbox=sandbox, db=self.db)
+            result = runtime.execute(func.callable_name, params)
+            if result.success:
+                return result.result
+            raise RuntimeError(result.error)
+
+        # Fallback: inline logic_body execution
         if not func.logic_body or not func.logic_body.strip():
             raise ValueError("Python body is empty")
         local_ns: dict = {"params": params, "result": None}
