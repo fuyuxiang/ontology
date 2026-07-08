@@ -22,3 +22,18 @@ def ensure_legacy_schema_compat(engine) -> None:
                     conn.execute(text(statement))
 
             conn.commit()
+
+        if "ontology_functions" in inspector.get_table_names():
+            cols = {c["name"] for c in inspector.get_columns("ontology_functions")}
+            additions = {
+                "source_path": "ALTER TABLE ontology_functions ADD COLUMN source_path VARCHAR(500) NULL",
+                "func_name": "ALTER TABLE ontology_functions ADD COLUMN func_name VARCHAR(100) NULL",
+                "checksum": "ALTER TABLE ontology_functions ADD COLUMN checksum VARCHAR(64) NULL",
+                "registered_by": "ALTER TABLE ontology_functions ADD COLUMN registered_by VARCHAR(20) DEFAULT 'ui'",
+            }
+
+            for name, statement in additions.items():
+                if name not in cols:
+                    conn.execute(text(statement))
+
+            conn.commit()
