@@ -10,7 +10,6 @@
       <div class="attr-panel__info">
         <span class="attr-panel__name">{{ entity.name }}</span>
         <span v-if="entity.name_cn" class="attr-panel__name-cn">{{ entity.name_cn }}</span>
-        <span class="attr-panel__tier" :class="`attr-panel__tier--${entity.tier}`">Tier {{ entity.tier }}</span>
       </div>
     </div>
 
