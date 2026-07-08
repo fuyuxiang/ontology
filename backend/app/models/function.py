@@ -25,6 +25,10 @@ class OntologyFunction(Base):
     is_derived_property: Mapped[bool] = mapped_column(Boolean, default=False)
     execution_count: Mapped[int] = mapped_column(Integer, default=0)
     last_executed: Mapped[datetime | None] = mapped_column(DateTime)
+    source_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    func_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    registered_by: Mapped[str] = mapped_column(String(20), default="ui")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
