@@ -17,6 +17,7 @@ FORBIDDEN_IMPORTS = frozenset([
 ALLOWED_IMPORTS = frozenset([
     "json", "re", "datetime", "math", "decimal", "collections",
     "typing", "functools", "itertools", "statistics", "copy", "dataclasses",
+    "ontology_runtime",
 ])
 
 FORBIDDEN_CALLS = frozenset([
@@ -98,11 +99,17 @@ class UnifiedSandbox:
             if _try_import(mod):
                 allowed_modules[mod] = __import__(mod)
 
+        # Build ontology_runtime shim (provides Function decorator and call_function)
+        ontology_shim = _build_ontology_runtime_shim(namespace.get("call_function"))
+        allowed_modules["ontology_runtime"] = ontology_shim
+
         # Build sandbox globals with restricted builtins
         def _safe_import(name, *args, **kwargs):
             top = name.split(".")[0]
             if top not in ALLOWED_IMPORTS:
                 raise ImportError(f"不允许导入模块: {name}")
+            if top == "ontology_runtime":
+                return ontology_shim
             return __import__(name, *args, **kwargs)
 
         builtins = SAFE_BUILTINS.copy()
@@ -127,6 +134,22 @@ class UnifiedSandbox:
         finally:
             signal.alarm(0)
             signal.signal(signal.SIGALRM, old_handler)
+
+
+def _build_ontology_runtime_shim(call_function=None):
+    """Build a fake ontology_runtime module for sandbox execution."""
+    import types
+    shim = types.ModuleType("ontology_runtime")
+
+    def Function(**kwargs):
+        """No-op decorator inside sandbox (metadata already extracted by watcher)."""
+        def wrapper(func):
+            return func
+        return wrapper
+
+    shim.Function = Function
+    shim.call_function = call_function or (lambda name, params: None)
+    return shim
 
 
 def _try_import(mod: str) -> bool:
