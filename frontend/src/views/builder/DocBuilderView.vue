@@ -1,5 +1,13 @@
 <template>
   <div class="ai-builder">
+    <div v-if="returnPath" class="ai-builder__back-bar">
+      <button class="ai-builder__back-btn" @click="router.push(returnPath)">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        返回对象定义
+      </button>
+    </div>
     <div class="ai-builder__steps">
       <div v-for="(s, i) in steps" :key="i" class="ai-builder__step" :class="{ 'ai-builder__step--active': step === i, 'ai-builder__step--done': step > i }">
         <div class="ai-builder__step-num">{{ step > i ? '✓' : i + 1 }}</div>
@@ -38,6 +46,13 @@ const router = useRouter()
 const route = useRoute()
 const store = useBuilderStore()
 const { sessions, activeSession } = storeToRefs(store)
+
+const returnPath = computed(() => {
+  if (route.query.from === 'ontology-detail' && route.query.code) {
+    return `/ontology/list/${route.query.code}`
+  }
+  return ''
+})
 
 const steps = ['需求与文档', 'AI对话抽取', '资产映射', '映射确认', '专家审核', '水合验证']
 const step = ref(0)
@@ -138,6 +153,9 @@ onMounted(() => {
 
 <style scoped>
 .ai-builder { height: 100%; display: flex; flex-direction: column; background: #fafafa; }
+.ai-builder__back-bar { padding: 10px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
+.ai-builder__back-btn { display: flex; align-items: center; gap: 4px; padding: 6px 12px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #334155; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+.ai-builder__back-btn:hover { background: #f8fafc; }
 .ai-builder__steps { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 16px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; flex-shrink: 0; }
 .ai-builder__step { display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12px; color: #999; }
 .ai-builder__step--active { color: #4a6fa5; font-weight: 600; }
