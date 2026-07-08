@@ -807,6 +807,8 @@ class FinalizeRequest(BaseModel):
     relations: list[_DraftRelation] = []
     # 本批发布对象统一归属的场景 code 列表（与已存在场景做并集写入）
     scenario_codes: list[str] = []
+    # 归属本体 ID（从本体详情新建对象时传入）
+    ontology_id: str | None = None
 
 
 @router.post("/finalize")
@@ -847,11 +849,15 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
         if existing:
             skipped += 1
             entity = existing
+            if body.ontology_id and not entity.ontology_id:
+                entity.ontology_id = body.ontology_id
+                db.flush()
         else:
             entity = OntologyEntity(
                 id=eid, name=obj.name, name_cn=obj.displayName or obj.name,
                 tier=int(obj.tier or 2), status="active",
                 description=obj.description,
+                ontology_id=body.ontology_id,
                 config_json={"primary_key": obj.primaryKey,
                              "backing_asset_ids": obj.backing_asset_ids},
             )

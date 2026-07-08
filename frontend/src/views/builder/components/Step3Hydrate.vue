@@ -284,6 +284,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
 import { useScenarioStore } from '../../../store/scenarios'
@@ -294,8 +295,17 @@ import type { BuilderSession, DrillLogLine, DrillPhase, DrillResult, PublishGate
 
 const props = defineProps<{ session: BuilderSession }>()
 defineEmits<{ (e: 'prev'): void; (e: 'goto-studio'): void }>()
+const route = useRoute()
 const store = useBuilderStore()
 const scenarioStore = useScenarioStore()
+
+const ontologyId = computed(() => {
+  if (route.query.from === 'ontology-detail' && route.query.code) {
+    const sc = scenarioStore.byCode(route.query.code as string)
+    return sc?.id || null
+  }
+  return null
+})
 
 // ── 状态 ──
 const drillStarted = ref(!!props.session.drillResult)
@@ -763,7 +773,7 @@ async function confirmPublish() {
   let result: FinalizeResult
   try {
     const { post } = await import('../../../api/client')
-    result = await post<FinalizeResult>('/builder/finalize', { objects, relations, scenario_codes: selectedScenarioCodes.value })
+    result = await post<FinalizeResult>('/builder/finalize', { objects, relations, scenario_codes: selectedScenarioCodes.value, ontology_id: ontologyId.value })
   } catch (e: any) {
     // finalize 失败：不得标记为已发布，必须让用户看到真实错误
     console.error('finalize failed', e)
