@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
 from app.database import get_db
-from app.models import EntityRelation
+from app.models import EntityRelation, OntologyEntity
+from app.models.shared_ref import OntologySharedRef
 from app.models.user import User
 from app.repositories import RelationRepository
 from app.schemas.relation import RelationCreate, RelationOut
@@ -14,9 +15,37 @@ router = APIRouter(prefix="/relations", tags=["relations"])
 
 
 @router.get("", response_model=list[RelationOut])
-def list_relations(entity_id: str | None = None, db: Session = Depends(get_db)):
+def list_relations(
+    entity_id: str | None = None,
+    ontology_id: str | None = None,
+    db: Session = Depends(get_db),
+):
     repo = RelationRepository(db)
-    rels = repo.list_by_entity(entity_id)
+
+    if ontology_id:
+        # 当前本体可见的实体 ID（自有 + 共享进来的）
+        owned_ids = db.query(OntologyEntity.id).filter(
+            OntologyEntity.ontology_id == ontology_id
+        )
+        shared_ids = db.query(OntologySharedRef.entity_id).filter(
+            OntologySharedRef.target_ontology_id == ontology_id
+        )
+        visible_ids = owned_ids.union(shared_ids)
+
+        q = db.query(EntityRelation)
+        if entity_id:
+            q = q.filter(
+                (EntityRelation.from_entity_id == entity_id) |
+                (EntityRelation.to_entity_id == entity_id)
+            )
+        q = q.filter(
+            (EntityRelation.from_entity_id.in_(visible_ids)) |
+            (EntityRelation.to_entity_id.in_(visible_ids))
+        )
+        rels = q.all()
+    else:
+        rels = repo.list_by_entity(entity_id)
+
     result = []
     for r in rels:
         result.append(RelationOut(

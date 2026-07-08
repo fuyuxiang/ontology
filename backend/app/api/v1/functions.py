@@ -42,10 +42,13 @@ def list_functions(
     entity_id: str | None = None,
     status: str | None = None,
     search: str | None = None,
+    ontology_id: str | None = None,
     db: Session = Depends(get_db),
 ):
     repo = FunctionRepository(db)
-    funcs = repo.list_with_filters(entity_id=entity_id, status=status, search=search)
+    funcs = repo.list_with_filters(
+        entity_id=entity_id, status=status, search=search, ontology_id=ontology_id
+    )
     return [_func_to_out(f, repo.get_entity_name(f.entity_id)) for f in funcs]
 
 

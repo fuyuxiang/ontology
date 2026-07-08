@@ -70,6 +70,7 @@ class EntityListItem(BaseModel):
     rule_count: int = 0
     datasource_name: str | None = None
     scenario_codes: list[str] | None = None
+    is_shared: bool = False
     model_config = {"from_attributes": True}
 
 

@@ -37,10 +37,16 @@ def list_entities(
     status: str | None = None,
     search: str | None = None,
     namespace: str | None = None,
+    ontology_id: str | None = None,
     db: Session = Depends(get_db),
 ):
     repo = EntityRepository(db)
-    entities = repo.list_with_filters(tier=tier, status=status, search=search, namespace=namespace)
+    entities = repo.list_with_filters(
+        tier=tier, status=status, search=search, namespace=namespace, ontology_id=ontology_id
+    )
+
+    # 标记共享实体
+    shared_ids = repo.get_shared_entity_ids(ontology_id) if ontology_id else set()
 
     result = []
     for e in entities:
@@ -53,6 +59,7 @@ def list_entities(
             rule_count=len(e.rules),
             datasource_name=(e.config_json or {}).get("datasource_name"),
             scenario_codes=e.scenario_codes,
+            is_shared=e.id in shared_ids,
         ))
     return result
 
@@ -603,6 +610,7 @@ def create_entity(
 @router.put("/{entity_id}", response_model=EntityDetail)
 def update_entity(
     entity_id: str, data: EntityUpdate,
+    ontology_id: str | None = Query(None),
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -610,6 +618,14 @@ def update_entity(
     entity = repo.get_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
+
+    # 写入保护：共享实体只读
+    if ontology_id:
+        shared_ids = repo.get_shared_entity_ids(ontology_id)
+        if entity.id in shared_ids:
+            raise HTTPException(status_code=403, detail="共享实体为只读，不可修改")
+        if entity.ontology_id and entity.ontology_id != ontology_id:
+            raise HTTPException(status_code=403, detail="无权修改其他本体的实体")
 
     changes = []
     for field, value in data.model_dump(exclude_unset=True).items():
@@ -665,6 +681,7 @@ def update_attribute_mappings(
 def delete_entity(
     entity_id: str,
     force: bool = Query(False),
+    ontology_id: str | None = Query(None),
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -672,6 +689,14 @@ def delete_entity(
     entity = repo.get_by_id(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="实体不存在")
+
+    # 写入保护：共享实体只读
+    if ontology_id:
+        shared_ids = repo.get_shared_entity_ids(ontology_id)
+        if entity.id in shared_ids:
+            raise HTTPException(status_code=403, detail="共享实体为只读，不可删除")
+        if entity.ontology_id and entity.ontology_id != ontology_id:
+            raise HTTPException(status_code=403, detail="无权删除其他本体的实体")
 
     if entity.status == "published":
         raise HTTPException(status_code=403, detail="已发布的对象不可删除，请先取消发布")
