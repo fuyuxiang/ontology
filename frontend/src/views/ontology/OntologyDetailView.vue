@@ -164,19 +164,7 @@
 
         <!-- 逻辑定义 -->
         <div v-else-if="activeTab === 'logic'" class="tab-logic">
-          <h2 class="tab-title">逻辑定义</h2>
-          <table class="data-table" v-if="scenarioFunctions.length">
-            <thead><tr><th>名称</th><th>关联对象</th><th>类型</th><th>状态</th></tr></thead>
-            <tbody>
-              <tr v-for="f in scenarioFunctions" :key="f.id">
-                <td class="link-cell" @click="router.push(`/logic/functions/${f.id}/code`)">{{ f.name }}</td>
-                <td>{{ f.entity_name || '—' }}</td>
-                <td>{{ f.logic_type }}</td>
-                <td><span class="badge" :class="f.status === 'active' ? 'badge--active' : 'badge--draft'">{{ f.status === 'active' ? '已激活' : '未激活' }}</span></td>
-              </tr>
-            </tbody>
-          </table>
-          <p v-else class="text-caption">该本体下暂无逻辑</p>
+          <FunctionsView :embedded="true" />
         </div>
 
         <!-- 其他 tab 占位 -->
@@ -194,6 +182,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
 import { functionApi, type FunctionItem } from '../../api/functions'
+import FunctionsView from '../logic/FunctionsView.vue'
 
 const route = useRoute()
 const router = useRouter()
