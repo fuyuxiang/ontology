@@ -3,7 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', redirect: '/dashboard' },
+    { path: '/', redirect: '/ontology/list' },
     { path: '/login', name: 'login', component: () => import('../views/auth/LoginView.vue'), meta: { title: '登录', public: true } },
 
     // 工作台

@@ -113,10 +113,6 @@ const ico = {
 }
 
 const navGroups: NavGroup[] = [
-  { label: '看板', items: [
-    { path: '/workspace/business', label: '业务总览', icon: ico.dashboard },
-    { path: '/dashboard', label: '系统看板', icon: ico.sysBoard, exact: true },
-  ]},
   { label: '数据集成', items: [
     { path: '/data/connections', label: '数据接入', icon: ico.datasource },
     { path: '/data/assets', label: '资产目录', icon: ico.catalog },
@@ -128,12 +124,8 @@ const navGroups: NavGroup[] = [
   ]},
   { label: '本体应用', items: [
     { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
-    { path: '/agent/toolbox', label: '技能管理', icon: ico.tool },
-    { path: '/aip', label: '流程编排', icon: ico.orchestrate },
   ]},
   { label: '运维与安全中心', items: [
-    { path: '/ops/log-audit', label: '日志与审计', icon: ico.audit },
-    { path: '/ops/permissions', label: '权限管理', icon: ico.permissions },
     { path: '/ops/config', label: '系统配置', icon: ico.config },
   ]},
 ]
