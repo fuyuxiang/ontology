@@ -155,7 +155,7 @@ import { looksLikeMarkdown, downloadHtml, copyText } from '@/utils/markdownExpor
 const route = useRoute()
 const router = useRouter()
 
-const isNew = computed(() => route.params.id === 'new')
+const isNew = computed(() => route.name === 'agent-new')
 
 const entities = ref<{ id: string; name: string; name_cn?: string }[]>([])
 const current = ref<AgentItem | null>(null)
