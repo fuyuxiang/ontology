@@ -83,7 +83,7 @@
       <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
         <div class="modal-box">
           <div class="modal-header">
-            <h3 class="modal-title">手动构建本体</h3>
+            <h3 class="modal-title">构建本体</h3>
             <button class="modal-close" @click="showCreate = false">&times;</button>
           </div>
 
@@ -114,24 +114,6 @@
               </div>
             </div>
 
-            <div class="modal-section-title"><span class="modal-section-bar"></span> 选择构建方式</div>
-
-            <div class="build-method-picker">
-              <label class="build-method-option" :class="{ active: createForm.method === 'custom' }">
-                <div class="build-method-option__icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#2563eb" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/></svg>
-                </div>
-                <span class="build-method-option__label">自定义构建</span>
-                <input type="radio" v-model="createForm.method" value="custom" class="build-method-option__radio" />
-              </label>
-              <label class="build-method-option" :class="{ active: createForm.method === 'import' }">
-                <div class="build-method-option__icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4z" stroke="#6366f1" stroke-width="1.5" rx="2"/><path d="M8 12l4 4 4-4M12 8v8" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                </div>
-                <span class="build-method-option__label">导入工程文件</span>
-                <input type="radio" v-model="createForm.method" value="import" class="build-method-option__radio" />
-              </label>
-            </div>
           </div>
 
           <div class="modal-footer">
@@ -159,7 +141,7 @@ const ontologyStore = useOntologyStore()
 const search = ref('')
 const functions = ref<FunctionItem[]>([])
 const showCreate = ref(false)
-const createForm = reactive({ name: '', code: '', description: '', method: 'custom' })
+const createForm = reactive({ name: '', code: '', description: '' })
 
 const scenarios = computed(() => scenarioStore.scenarios)
 
@@ -605,49 +587,6 @@ onMounted(async () => {
   padding-bottom: 24px;
 }
 
-.build-method-picker {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
-.build-method-option {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  border: 1.5px solid var(--neutral-200, #e5e5e5);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-  position: relative;
-}
-
-.build-method-option.active {
-  border-color: var(--primary, #2563eb);
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-}
-
-.build-method-option__icon {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.build-method-option__label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--neutral-800, #333);
-  flex: 1;
-}
-
-.build-method-option__radio {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--primary, #2563eb);
-}
 
 .modal-footer {
   display: flex;
