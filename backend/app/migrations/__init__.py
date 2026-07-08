@@ -19,6 +19,7 @@ from .schema_compat import (
     _migrate_ontology_entities,
     _migrate_users,
     _migrate_ontology_functions,
+    _migrate_ontology_isolation,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,5 +43,6 @@ def run_startup_migrations(engine: Engine) -> None:
         _migrate_ontology_entities(conn, inspector, tables)
         _migrate_users(conn, inspector, tables)
         _migrate_ontology_functions(conn, inspector, tables)
+        _migrate_ontology_isolation(conn, inspector, tables)
 
     logger.info("Schema 兼容迁移完成")
