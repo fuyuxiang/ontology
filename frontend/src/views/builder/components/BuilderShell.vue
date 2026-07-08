@@ -1,6 +1,12 @@
 <template>
   <div class="ob-shell">
     <header class="ob-shell-topbar">
+      <button v-if="returnPath" class="ob-shell-back" @click="goBack">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        返回对象定义
+      </button>
       <div class="ob-shell-title">
         <span class="name">{{ session.ontologyName }}</span>
         <span class="meta">{{ methodLabel }}<template v-if="session.scenarioName"> · {{ session.scenarioName }}</template></span>
@@ -58,6 +64,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import type { BuilderSession, BuildMethod } from '../../../types/builder'
 import Step1Manual from './Step1Manual.vue'
 import Step1Import from './Step1Import.vue'
@@ -72,6 +79,19 @@ defineEmits<{
   (e: 'goto-studio'): void
 }>()
 
+const route = useRoute()
+const router = useRouter()
+
+const returnPath = computed(() => {
+  if (route.query.from === 'ontology-detail' && route.query.code) {
+    return `/ontology/list/${route.query.code}`
+  }
+  return ''
+})
+
+function goBack() {
+  if (returnPath.value) router.push(returnPath.value)
+}
 const currentStep = ref(1)
 
 const stepOneCmp = computed(() => ({
@@ -145,6 +165,20 @@ function goPrev() { currentStep.value = Math.max(1, currentStep.value - 1) }
   background: #fff;
   border-bottom: 1px solid #e2e8f0;
 }
+.ob-shell-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #334155;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ob-shell-back:hover { background: #f8fafc; }
 .ob-shell-title {
   display: flex; flex-direction: column; gap: 2px;
 }

@@ -22,7 +22,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useBuilderStore } from '../../store/builder'
 import Step1Import from './components/Step1Import.vue'
@@ -30,6 +30,7 @@ import Step2Review from './components/Step2Review.vue'
 import Step3Hydrate from './components/Step3Hydrate.vue'
 
 const router = useRouter()
+const route = useRoute()
 const store = useBuilderStore()
 const { sessions, activeSession } = storeToRefs(store)
 
@@ -46,7 +47,11 @@ function onImportDone() {
 }
 
 function gotoStudio() {
-  router.push('/browser')
+  if (route.query.from === 'ontology-detail' && route.query.code) {
+    router.push(`/ontology/list/${route.query.code}`)
+  } else {
+    router.push('/ontology/list')
+  }
 }
 
 onMounted(() => {
