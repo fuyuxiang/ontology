@@ -86,22 +86,61 @@
     <Teleport to="body">
       <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
         <div class="modal-box">
-          <h3 class="modal-title">新建本体</h3>
-          <div class="modal-field">
-            <label class="modal-label">本体名称</label>
-            <input v-model="createForm.name" class="modal-input" placeholder="输入本体名称" />
+          <div class="modal-header">
+            <h3 class="modal-title">手动构建本体</h3>
+            <button class="modal-close" @click="showCreate = false">&times;</button>
           </div>
-          <div class="modal-field">
-            <label class="modal-label">编码 (code)</label>
-            <input v-model="createForm.code" class="modal-input" placeholder="英文编码，如 revenue_analysis" />
+
+          <div class="modal-body">
+            <div class="modal-section-title"><span class="modal-section-bar"></span> 基础信息填写</div>
+
+            <div class="modal-field">
+              <label class="modal-label"><span class="required">*</span> 本体名称</label>
+              <div class="modal-input-wrap">
+                <input v-model="createForm.name" class="modal-input" maxlength="50" placeholder="请输入中文名称" />
+                <span class="modal-input-count">{{ createForm.name.length }}/50</span>
+              </div>
+            </div>
+
+            <div class="modal-field">
+              <label class="modal-label"><span class="required">*</span> 本体标识</label>
+              <div class="modal-input-wrap">
+                <input v-model="createForm.code" class="modal-input" maxlength="100" placeholder="请输入英文标识" />
+                <span class="modal-input-count">{{ createForm.code.length }}/100</span>
+              </div>
+            </div>
+
+            <div class="modal-field">
+              <label class="modal-label">本体描述</label>
+              <div class="modal-input-wrap">
+                <textarea v-model="createForm.description" class="modal-input modal-textarea" maxlength="2000" placeholder="简要说明该本体的业务领域和设计目标..." />
+                <span class="modal-input-count modal-input-count--textarea">{{ createForm.description.length }}/2000</span>
+              </div>
+            </div>
+
+            <div class="modal-section-title"><span class="modal-section-bar"></span> 选择构建方式</div>
+
+            <div class="build-method-picker">
+              <label class="build-method-option" :class="{ active: createForm.method === 'custom' }">
+                <div class="build-method-option__icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="3" stroke="#2563eb" stroke-width="1.5"/><path d="M8 12h8M12 8v8" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <span class="build-method-option__label">自定义构建</span>
+                <input type="radio" v-model="createForm.method" value="custom" class="build-method-option__radio" />
+              </label>
+              <label class="build-method-option" :class="{ active: createForm.method === 'import' }">
+                <div class="build-method-option__icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 4h16v16H4z" stroke="#6366f1" stroke-width="1.5" rx="2"/><path d="M8 12l4 4 4-4M12 8v8" stroke="#6366f1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <span class="build-method-option__label">导入工程文件</span>
+                <input type="radio" v-model="createForm.method" value="import" class="build-method-option__radio" />
+              </label>
+            </div>
           </div>
-          <div class="modal-field">
-            <label class="modal-label">描述</label>
-            <textarea v-model="createForm.description" class="modal-input modal-textarea" placeholder="本体描述（可选）" />
-          </div>
-          <div class="modal-actions">
+
+          <div class="modal-footer">
             <button class="btn-cancel" @click="showCreate = false">取消</button>
-            <button class="btn-filled" :disabled="!createForm.name || !createForm.code" @click="handleCreate">创建</button>
+            <button class="btn-filled" :disabled="!createForm.name || !createForm.code" @click="handleCreate">确认并前往构建</button>
           </div>
         </div>
       </div>
@@ -124,7 +163,7 @@ const ontologyStore = useOntologyStore()
 const search = ref('')
 const functions = ref<FunctionItem[]>([])
 const showCreate = ref(false)
-const createForm = reactive({ name: '', code: '', description: '' })
+const createForm = reactive({ name: '', code: '', description: '', method: 'custom' })
 
 const scenarios = computed(() => scenarioStore.scenarios)
 
@@ -149,7 +188,7 @@ function goDetail(code: string) {
 }
 
 async function handleCreate() {
-  await scenarioApi.create({
+  const created = await scenarioApi.create({
     code: createForm.code,
     name: createForm.name,
     description: createForm.description || null,
@@ -158,7 +197,9 @@ async function handleCreate() {
   createForm.name = ''
   createForm.code = ''
   createForm.description = ''
+  createForm.method = 'custom'
   await scenarioStore.fetchScenarios(true)
+  router.push(`/ontology/list/${created.code}`)
 }
 
 async function handleDelete(item: any) {
@@ -458,52 +499,170 @@ onMounted(async () => {
 .modal-box {
   background: var(--neutral-0, #fff);
   border-radius: var(--radius-lg, 12px);
-  padding: 24px;
-  width: 420px;
+  width: 520px;
   max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
 }
 
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+
 .modal-title {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 20px;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
   color: var(--neutral-900, #111);
+}
+
+.modal-close {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  font-size: 22px;
+  color: var(--neutral-400, #aaa);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+}
+
+.modal-close:hover { background: var(--neutral-100, #f0f0f0); }
+
+.modal-body {
+  padding: 20px 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--neutral-800, #333);
+  margin-bottom: 16px;
+}
+
+.modal-section-bar {
+  width: 3px;
+  height: 14px;
+  background: var(--primary, #2563eb);
+  border-radius: 2px;
 }
 
 .modal-field { margin-bottom: 16px; }
 
 .modal-label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--neutral-600, #666);
-  margin-bottom: 4px;
+  color: var(--neutral-700, #333);
+  margin-bottom: 6px;
 }
+
+.required { color: #dc2626; margin-right: 2px; }
+
+.modal-input-wrap { position: relative; }
 
 .modal-input {
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 50px 10px 12px;
   border: 1px solid var(--neutral-200, #e5e5e5);
   border-radius: 6px;
   font-size: 13px;
   outline: none;
   transition: border-color 0.15s;
   box-sizing: border-box;
+  background: var(--neutral-50, #fafafa);
 }
 
-.modal-input:focus { border-color: var(--primary, #2563eb); }
-.modal-textarea { min-height: 72px; resize: vertical; }
+.modal-input:focus { border-color: var(--primary, #2563eb); background: #fff; }
 
-.modal-actions {
+.modal-input-count {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--neutral-400, #aaa);
+}
+
+.modal-input-count--textarea {
+  top: auto;
+  bottom: 10px;
+  transform: none;
+}
+
+.modal-textarea {
+  min-height: 80px;
+  resize: vertical;
+  padding-bottom: 24px;
+}
+
+.build-method-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.build-method-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--neutral-200, #e5e5e5);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  position: relative;
+}
+
+.build-method-option.active {
+  border-color: var(--primary, #2563eb);
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+}
+
+.build-method-option__icon {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.build-method-option__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--neutral-800, #333);
+  flex: 1;
+}
+
+.build-method-option__radio {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary, #2563eb);
+}
+
+.modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 20px;
+  gap: 10px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--neutral-100, #f0f0f0);
 }
 
 .btn-cancel {
-  padding: 8px 16px;
+  padding: 10px 20px;
   border: 1px solid var(--neutral-200, #e5e5e5);
   border-radius: 6px;
   background: var(--neutral-0, #fff);
