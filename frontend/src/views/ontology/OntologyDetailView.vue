@@ -327,10 +327,10 @@ const scenarioEntities = computed(() => ontologyStore.entities)
 
 const entityCount = computed(() => ontologyStore.entities.length)
 const relationCount = computed(() => {
-  return ontologyStore.entities.reduce((sum, e) => sum + ((e as any).relationCount || 0), 0)
+  return ontologyStore.entities.reduce((sum, e) => sum + (e.relation_count || 0), 0)
 })
-const logicCount = computed(() => ontologyStore.entities.reduce((sum, e) => sum + ((e as any).functionCount || 0), 0))
-const actionCount = computed(() => 0)
+const logicCount = computed(() => ontologyStore.entities.reduce((sum, e) => sum + (e.function_count || 0), 0))
+const actionCount = computed(() => ontologyStore.entities.reduce((sum, e) => sum + (e.action_count || 0), 0))
 
 // --- 对象定义 Tab 逻辑 ---
 const entitySearch = ref('')
