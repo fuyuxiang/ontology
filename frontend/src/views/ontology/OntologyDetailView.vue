@@ -131,16 +131,7 @@
             </div>
             <div class="overview-table-section">
               <h3 class="overview-section-title">逻辑 ({{ logicCount }})</h3>
-              <table class="mini-table" v-if="scenarioFunctions.length">
-                <thead><tr><th>名称</th><th>对象</th></tr></thead>
-                <tbody>
-                  <tr v-for="f in scenarioFunctions.slice(0, 5)" :key="f.id">
-                    <td class="link-cell">{{ f.callable_name }}</td>
-                    <td>{{ f.entity_name || '—' }}</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p v-else class="text-caption">暂无逻辑</p>
+              <p class="text-caption">详见逻辑定义 Tab</p>
             </div>
           </div>
         </div>
@@ -152,7 +143,10 @@
             <thead><tr><th>名称</th><th>中文名</th><th>属性数</th><th>状态</th></tr></thead>
             <tbody>
               <tr v-for="e in scenarioEntities" :key="e.id">
-                <td class="link-cell" @click="router.push(`/ontology/${e.id}`)">{{ e.className }}</td>
+                <td class="link-cell" @click="router.push(`/ontology/${e.id}`)">
+                  {{ e.className }}
+                  <a-tag v-if="e.is_shared" color="blue" style="margin-left: 8px">共享</a-tag>
+                </td>
                 <td>{{ e.label }}</td>
                 <td>{{ e.attributeCount || 0 }}</td>
                 <td><span class="badge" :class="e.status === 'active' ? 'badge--active' : 'badge--draft'">{{ e.status === 'active' ? '已激活' : '草稿' }}</span></td>
@@ -186,7 +180,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
-import { functionApi, type FunctionItem } from '../../api/functions'
 import FunctionsView from '../logic/FunctionsView.vue'
 import ActionsView from '../logic/ActionsView.vue'
 
@@ -197,26 +190,17 @@ const ontologyStore = useOntologyStore()
 
 const code = computed(() => route.params.code as string)
 const activeTab = ref('overview')
-const functions = ref<FunctionItem[]>([])
 
 const scenario = computed(() => scenarioStore.byCode(code.value))
 
-const scenarioEntities = computed(() =>
-  ontologyStore.entities.filter(e => (e.scenarioCodes || []).includes(code.value))
-)
+// Entities are now fetched by backend filtered by ontology_id via switchOntology
+const scenarioEntities = computed(() => ontologyStore.entities)
 
-const scenarioFunctions = computed(() =>
-  functions.value.filter(f => {
-    const ent = scenarioEntities.value.find(e => e.id === f.entity_id)
-    return !!ent
-  })
-)
-
-const entityCount = computed(() => scenarioEntities.value.length)
+const entityCount = computed(() => ontologyStore.entities.length)
 const relationCount = computed(() => {
-  return scenarioEntities.value.reduce((sum, e) => sum + ((e as any).relationCount || 0), 0)
+  return ontologyStore.entities.reduce((sum, e) => sum + ((e as any).relationCount || 0), 0)
 })
-const logicCount = computed(() => scenarioFunctions.value.length)
+const logicCount = computed(() => ontologyStore.entities.reduce((sum, e) => sum + ((e as any).functionCount || 0), 0))
 const actionCount = computed(() => 0)
 
 const activeTabLabel = computed(() => {
@@ -232,11 +216,11 @@ function goBack() {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    scenarioStore.fetchScenarios(),
-    ontologyStore.fetchEntities(),
-    functionApi.list().then(list => { functions.value = list }),
-  ])
+  await scenarioStore.fetchScenarios()
+  const sc = scenarioStore.byCode(code.value)
+  if (sc) {
+    await ontologyStore.switchOntology(sc.id)
+  }
 })
 </script>
 
