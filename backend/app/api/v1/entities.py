@@ -559,12 +559,7 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
         scenario_codes=entity.scenario_codes,
         attributes=[AttributeOut.model_validate(a) for a in entity.attributes],
         relations=rel_list,
-        rules=[RuleOut(
-            id=r.id, name=r.name, entity_id=r.entity_id, entity_name=entity.name,
-            condition_expr=r.condition_expr, action_desc=r.action_desc,
-            status=r.status, priority=r.priority,
-            trigger_count=r.trigger_count, last_triggered=r.last_triggered,
-        ) for r in entity.rules],
+        rules=[],
         actions=[ActionOut.model_validate(a) for a in entity.actions],
         functions=[FunctionBriefOut.model_validate(f) for f in entity.functions],
         created_at=entity.created_at, updated_at=entity.updated_at,
