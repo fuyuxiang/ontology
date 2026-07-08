@@ -87,9 +87,11 @@ class FunctionRuntimeExecutor:
         try:
             code = self._read_source(meta.source_path)
             call_fn = self._build_call_function(context)
+            ontology_helpers = self._build_ontology_helpers()
             namespace = {
                 "params": params,
                 "call_function": call_fn,
+                **ontology_helpers,
             }
             # Calculate remaining time for this individual call
             remaining = context.total_timeout_sec - (time.time() - context._chain_start)
@@ -125,6 +127,52 @@ class FunctionRuntimeExecutor:
                 raise RuntimeError(f"call_function('{name}') failed: {result.error}")
             return result.result
         return call_function
+
+    def _build_ontology_helpers(self) -> dict[str, Any]:
+        """Build query_object/query_objects/update_object helpers for sandbox."""
+        from app.models import OntologyEntity
+        from app.services.data_plane.entity_data_service import EntityDataService
+
+        db = self.db
+        svc = EntityDataService(db)
+
+        def _resolve_entity_id(entity_name: str) -> str | None:
+            entity = db.query(OntologyEntity).filter(
+                (OntologyEntity.name == entity_name) | (OntologyEntity.name_cn == entity_name)
+            ).first()
+            return entity.id if entity else None
+
+        def query_object(entity_name: str, filters: dict) -> dict | None:
+            entity_id = _resolve_entity_id(entity_name)
+            if not entity_id:
+                return None
+            result = svc.query_entity_data(entity_id, filters=filters, limit=1)
+            if result.get("error") or not result.get("rows"):
+                return None
+            columns = result["columns"]
+            row = result["rows"][0]
+            return dict(zip(columns, row))
+
+        def query_objects(entity_name: str, filters: dict, limit: int = 100) -> list[dict]:
+            entity_id = _resolve_entity_id(entity_name)
+            if not entity_id:
+                return []
+            result = svc.query_entity_data(entity_id, filters=filters, limit=limit)
+            if result.get("error") or not result.get("rows"):
+                return []
+            columns = result["columns"]
+            return [dict(zip(columns, row)) for row in result["rows"]]
+
+        def update_object(entity_name: str, record_id: str, updates: dict) -> bool:
+            # update_object is a no-op placeholder for now (would need write-back support)
+            logger.info(f"update_object({entity_name}, {record_id}, {updates}) — write-back not implemented")
+            return True
+
+        return {
+            "query_object": query_object,
+            "query_objects": query_objects,
+            "update_object": update_object,
+        }
 
     def _read_source(self, source_path: str) -> str:
         with open(source_path, "r", encoding="utf-8") as f:

@@ -116,7 +116,10 @@ class UnifiedSandbox:
                 allowed_modules[mod] = __import__(mod)
 
         # Build ontology_runtime shim (provides Function decorator and call_function)
-        ontology_shim = _build_ontology_runtime_shim(namespace.get("call_function"))
+        ontology_helpers = {
+            k: namespace[k] for k in ("query_object", "query_objects", "update_object") if k in namespace
+        }
+        ontology_shim = _build_ontology_runtime_shim(namespace.get("call_function"), ontology_helpers)
         allowed_modules["ontology_runtime"] = ontology_shim
 
         # Build sandbox globals with restricted builtins
@@ -161,7 +164,7 @@ class UnifiedSandbox:
                 signal.signal(signal.SIGALRM, old_handler)
 
 
-def _build_ontology_runtime_shim(call_function=None):
+def _build_ontology_runtime_shim(call_function=None, ontology_helpers=None):
     """Build a fake ontology_runtime module for sandbox execution."""
     import types
     shim = types.ModuleType("ontology_runtime")
@@ -174,6 +177,11 @@ def _build_ontology_runtime_shim(call_function=None):
 
     shim.Function = Function
     shim.call_function = call_function or (lambda name, params: None)
+
+    helpers = ontology_helpers or {}
+    shim.query_object = helpers.get("query_object", lambda *a, **kw: None)
+    shim.query_objects = helpers.get("query_objects", lambda *a, **kw: [])
+    shim.update_object = helpers.get("update_object", lambda *a, **kw: True)
     return shim
 
 
