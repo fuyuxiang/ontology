@@ -1,27 +1,23 @@
 from __future__ import annotations
 
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
-
-
-def _gen_uuid() -> str:
-    return uuid.uuid4().hex
+from app.utils.identifiers import gen_uuid
 
 
 class OntologySharedRef(Base):
     __tablename__ = "ontology_shared_refs"
 
-    id = Column(String(36), primary_key=True, default=_gen_uuid)
-    source_ontology_id = Column(String(36), ForeignKey("scenario_dict.id"), nullable=False, index=True)
-    target_ontology_id = Column(String(36), ForeignKey("scenario_dict.id"), nullable=False, index=True)
-    entity_id = Column(String(36), ForeignKey("ontology_entities.id", ondelete="CASCADE"), nullable=False, index=True)
-    shared_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    shared_by = Column(String(100), nullable=True)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    source_ontology_id: Mapped[str] = mapped_column(String(36), ForeignKey("scenario_dict.id"), nullable=False, index=True)
+    target_ontology_id: Mapped[str] = mapped_column(String(36), ForeignKey("scenario_dict.id"), nullable=False, index=True)
+    entity_id: Mapped[str] = mapped_column(String(36), ForeignKey("ontology_entities.id", ondelete="CASCADE"), nullable=False, index=True)
+    shared_at: Mapped[datetime | None] = mapped_column(DateTime, default=datetime.utcnow)
+    shared_by: Mapped[str | None] = mapped_column(String(100))
 
     __table_args__ = (
         UniqueConstraint("target_ontology_id", "entity_id", name="uq_shared_ref_target_entity"),
