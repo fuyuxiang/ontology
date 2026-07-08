@@ -432,7 +432,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"监控采集器启动失败: {e}")
 
+    # Function Runtime 初始化
+    _function_watcher = None
+    try:
+        from pathlib import Path
+
+        from app.services.function_runtime.executor import FunctionRuntimeExecutor
+        from app.services.function_runtime.registry import FunctionRegistry
+        from app.services.function_runtime.sandbox import UnifiedSandbox
+        from app.services.function_runtime.watcher import FunctionWatcher
+
+        workspace_root = str(Path(__file__).resolve().parent.parent.parent / "workspace")
+        rt_db = SessionLocal()
+        registry = FunctionRegistry(rt_db)
+        registry.sync_from_db()
+        sandbox = UnifiedSandbox()
+        runtime_executor = FunctionRuntimeExecutor(registry=registry, sandbox=sandbox, db=rt_db)
+        _function_watcher = FunctionWatcher(registry=registry, workspace_root=workspace_root)
+        _function_watcher.scan_all()
+        _function_watcher.start()
+        app.state.runtime_executor = runtime_executor
+        app.state.function_registry = registry
+        logger.info(f"Function Runtime 初始化完成，workspace={workspace_root}")
+    except Exception as e:
+        logger.warning(f"Function Runtime 初始化失败: {e}")
+
     yield
+
+    # Shutdown: stop function watcher
+    if _function_watcher:
+        _function_watcher.stop()
 
 
 app = FastAPI(
