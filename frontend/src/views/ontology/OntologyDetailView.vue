@@ -139,10 +139,9 @@
         <!-- 对象定义 -->
         <div v-else-if="activeTab === 'entities'" class="tab-entities">
           <!-- 对象详情内嵌视图 -->
-          <EntityDetail
-            v-if="selectedEntityId"
-            :embedded-id="selectedEntityId"
-            :embedded="true"
+          <EntityAttrPanel
+            v-if="selectedEntity"
+            :entity="selectedEntity"
             @back="selectedEntityId = null"
           />
 
@@ -239,6 +238,38 @@
           </template>
         </div>
 
+        <!-- 关系定义 -->
+        <div v-else-if="activeTab === 'relations'" class="tab-relations">
+          <div class="relations-header">
+            <span class="relations-title">关系定义</span>
+            <span class="relations-count">共 {{ allRelations.length }} 条</span>
+          </div>
+          <div v-if="relationsLoading" class="attr-panel__loading">加载中...</div>
+          <table v-else-if="allRelations.length" class="entities-table">
+            <thead>
+              <tr>
+                <th>源对象</th>
+                <th>关系类型</th>
+                <th>目标对象</th>
+                <th>基数</th>
+                <th>描述</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="rel in allRelations" :key="rel.id">
+                <td>{{ rel.from_entity_name }}</td>
+                <td><span class="rel-type-tag">{{ rel.rel_type }}</span></td>
+                <td>{{ rel.to_entity_name }}</td>
+                <td><code class="text-code">{{ rel.cardinality }}</code></td>
+                <td class="text-caption">{{ rel.description || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="entities-empty">
+            <p class="entities-empty__text">暂无关系数据</p>
+          </div>
+        </div>
+
         <!-- 逻辑定义 -->
         <div v-else-if="activeTab === 'logic'" class="tab-logic">
           <FunctionsView :embedded="true" />
@@ -263,9 +294,11 @@ import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
+import { entityApi } from '../../api/ontology'
+import type { EntityRelationDetail } from '../../types'
 import FunctionsView from '../logic/FunctionsView.vue'
 import ActionsView from '../logic/ActionsView.vue'
-import EntityDetail from '../detail/EntityDetail.vue'
+import EntityAttrPanel from './EntityAttrPanel.vue'
 
 const vClickOutside = {
   mounted(el: any, binding: any) {
@@ -305,6 +338,10 @@ const selectedIds = ref<string[]>([])
 const showBatchMenu = ref(false)
 const showCreateMenu = ref(false)
 const selectedEntityId = ref<string | null>(null)
+const selectedEntity = computed(() => {
+  if (!selectedEntityId.value) return null
+  return scenarioEntities.value.find((e: any) => e.id === selectedEntityId.value) || null
+})
 
 const filteredEntities = computed(() => {
   const q = entitySearch.value.trim().toLowerCase()
@@ -381,8 +418,37 @@ async function loadData() {
 onMounted(loadData)
 onActivated(loadData)
 
+// --- 关系定义 Tab ---
+const allRelations = ref<EntityRelationDetail[]>([])
+const relationsLoading = ref(false)
+
+async function loadRelations() {
+  relationsLoading.value = true
+  try {
+    const results: EntityRelationDetail[] = []
+    const seen = new Set<string>()
+    for (const e of scenarioEntities.value) {
+      const rels = await entityApi.relations(e.id)
+      for (const r of rels) {
+        if (!seen.has(r.id)) {
+          seen.add(r.id)
+          results.push(r)
+        }
+      }
+    }
+    allRelations.value = results
+  } finally {
+    relationsLoading.value = false
+  }
+}
+
 watch(code, loadData)
-watch(activeTab, () => { selectedEntityId.value = null })
+watch(activeTab, (tab) => {
+  selectedEntityId.value = null
+  if (tab === 'relations' && allRelations.value.length === 0) {
+    loadRelations()
+  }
+})
 </script>
 
 <!-- STYLE_SECTION -->
@@ -893,5 +959,39 @@ watch(activeTab, () => { selectedEntityId.value = null })
   margin-top: 12px;
   font-size: 13px;
   color: var(--neutral-400, #aaa);
+}
+
+.relations-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.relations-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--neutral-900, #111);
+}
+
+.relations-count {
+  font-size: 12px;
+  color: var(--neutral-400, #aaa);
+}
+
+.rel-type-tag {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.attr-panel__loading {
+  padding: 40px 0;
+  text-align: center;
+  color: var(--neutral-400, #aaa);
+  font-size: 13px;
 }
 </style>
