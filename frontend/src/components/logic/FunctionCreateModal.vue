@@ -84,6 +84,10 @@ onMounted(() => { if (props.visible) loadEntities() })
 async function handleCreate() {
   if (!form.value.name.trim()) { toast.error('请填写中文名称'); return }
   if (!form.value.callable_name.trim()) { toast.error('请填写英文名称'); return }
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(form.value.callable_name.trim())) {
+    toast.error('英文名称必须是合法标识符（字母或下划线开头，仅含字母、数字、下划线）')
+    return
+  }
   saving.value = true
   try {
     const result = await functionApi.create({
