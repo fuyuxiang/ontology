@@ -3,7 +3,7 @@ from .base import BaseActionExecutor, ExecutionResult
 
 class CallFunctionExecutor(BaseActionExecutor):
     async def execute(self, type_config: dict, params: dict, dry_run: bool = False) -> ExecutionResult:
-        function_name = type_config.get("function_name") or type_config.get("function_id", "")
+        function_name = type_config.get("function_name") or type_config.get("callable_name") or type_config.get("function_id", "")
         param_mapping = type_config.get("param_mapping", {})
         mapped_params = {k: params.get(v, v) for k, v in param_mapping.items()} if param_mapping else params
 
