@@ -1,8 +1,8 @@
 <template>
-  <div class="logic-page">
+  <div class="logic-page" :class="{ 'logic-page--embedded': embedded }">
     <BuilderReturnBanner kind-label="动作" />
     <div class="logic-page__header">
-      <div>
+      <div v-if="!embedded">
         <h1 class="text-display">行动建模</h1>
         <p class="text-caption" style="margin-top: 4px;">行动注册与执行管理</p>
       </div>
@@ -139,6 +139,8 @@ import { useRoute } from 'vue-router'
 import { actionApi, type ActionItem, type ActionTypeInfo } from '../../api/actions'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 import ActionBuilderDrawer from '../../components/logic/ActionBuilderDrawer.vue'
+
+defineProps<{ embedded?: boolean }>()
 
 const route = useRoute()
 
