@@ -39,7 +39,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { useOntologyStore } from '../../store/ontology'
+import { entityApi } from '../../api/ontology'
 import type { EntityListItem } from '../../types'
 
 const props = defineProps<{
@@ -48,17 +48,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{ back: [] }>()
 
-const store = useOntologyStore()
 const loading = ref(false)
-
 const attrs = ref<{ id: string; name: string; type: string; required: boolean; description: string }[]>([])
 
 async function loadDetail() {
   loading.value = true
+  attrs.value = []
   try {
-    await store.fetchEntity(props.entity.id)
-    const detail = store.currentEntity
-    if (detail) {
+    const detail = await entityApi.detail(props.entity.id)
+    if (detail && detail.attributes) {
       attrs.value = detail.attributes.map(a => ({
         id: a.id,
         name: a.name,
@@ -67,6 +65,8 @@ async function loadDetail() {
         description: a.description || '',
       }))
     }
+  } catch (e) {
+    console.error('加载对象详情失败', e)
   } finally {
     loading.value = false
   }
