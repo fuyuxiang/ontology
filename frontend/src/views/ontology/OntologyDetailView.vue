@@ -169,7 +169,7 @@
             <thead><tr><th>名称</th><th>关联对象</th><th>类型</th><th>状态</th></tr></thead>
             <tbody>
               <tr v-for="f in scenarioFunctions" :key="f.id">
-                <td class="link-cell" @click="router.push(`/logic/functions/${f.id}/code`)">{{ f.callable_name }}</td>
+                <td class="link-cell" @click="router.push(`/logic/functions/${f.id}/code`)">{{ f.name }}</td>
                 <td>{{ f.entity_name || '—' }}</td>
                 <td>{{ f.logic_type }}</td>
                 <td><span class="badge" :class="f.status === 'active' ? 'badge--active' : 'badge--draft'">{{ f.status === 'active' ? '已激活' : '未激活' }}</span></td>
