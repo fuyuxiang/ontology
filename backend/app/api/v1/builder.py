@@ -828,6 +828,13 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
     # 本批发布统一归属的场景（去重、去空）
     batch_scenarios = [c for c in dict.fromkeys(body.scenario_codes) if c]
 
+    # 如果指定了 ontology_id，自动把对应 scenario 的 code 加入 batch_scenarios
+    if body.ontology_id:
+        from app.models.scenario import ScenarioDict
+        scenario = db.get(ScenarioDict, body.ontology_id)
+        if scenario and scenario.code not in batch_scenarios:
+            batch_scenarios.append(scenario.code)
+
     created_entities = 0
     created_bindings = 0
     skipped = 0

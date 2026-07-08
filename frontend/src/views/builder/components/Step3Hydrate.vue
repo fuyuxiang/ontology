@@ -199,7 +199,7 @@
           </div>
         </div>
 
-        <div class="step3-panel">
+        <div v-if="!ontologyId" class="step3-panel">
           <div class="step3-panel__title">场景归属</div>
           <div class="step3-panel__sub">为本次发布的对象选择业务场景，可在本体管理中按场景筛选</div>
           <div class="step3-scenario-chips">
@@ -373,15 +373,17 @@ const gates = computed<PublishGate[]>(() => {
     pass: !!drillResult.value && drillStatus.value !== 'error',
   }
   list[2] = { ...list[2], desc: versionLabel.value, pass: true }
-  // 场景归属门禁：至少选择/新建一个场景才能发布
-  list.push({
-    key: 'scenario',
-    label: '场景归属已设置',
-    desc: selectedScenarioCodes.value.length
-      ? selectedScenarioNames.value.join('、')
-      : '未选择场景',
-    pass: selectedScenarioCodes.value.length > 0,
-  })
+  // 场景归属门禁：从本体详情进入时自动满足，否则需手动选择
+  if (!ontologyId.value) {
+    list.push({
+      key: 'scenario',
+      label: '场景归属已设置',
+      desc: selectedScenarioCodes.value.length
+        ? selectedScenarioNames.value.join('、')
+        : '未选择场景',
+      pass: selectedScenarioCodes.value.length > 0,
+    })
+  }
   return list
 })
 
