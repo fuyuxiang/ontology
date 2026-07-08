@@ -63,6 +63,13 @@
           <label class="agent-detail__label">标签</label>
           <input class="agent-detail__input" v-model="form.tagsStr" placeholder="多个标签用逗号分隔" />
         </div>
+        <div class="agent-detail__form-group">
+          <label class="agent-detail__label">关联本体</label>
+          <select class="agent-detail__select" v-model="selectedOntologyId" @change="onOntologyChange">
+            <option value="">请选择本体</option>
+            <option v-for="s in scenarioStore.scenarios" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
+        </div>
         <div class="agent-detail__form-group agent-detail__form-group--grow">
           <label class="agent-detail__label">系统提示词</label>
           <textarea class="agent-detail__textarea agent-detail__textarea--tall" v-model="form.system_prompt" placeholder="系统提示词"></textarea>
@@ -148,6 +155,7 @@ import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { agentsApi, type AgentItem, type ConversationSummary } from '../../api/agents'
 import { entityApi } from '../../api/ontology'
+import { useScenarioStore } from '../../store/scenarios'
 import { authHeaders } from '../../utils/authHeaders'
 import { renderMarkdownSafe } from '@/utils/sanitize'
 import { looksLikeMarkdown, downloadHtml, copyText } from '@/utils/markdownExport'
@@ -157,11 +165,13 @@ const router = useRouter()
 
 const isNew = computed(() => route.name === 'agent-new')
 
-const entities = ref<{ id: string; name: string; name_cn?: string }[]>([])
+const entities = ref<{ id: string; name: string; name_cn?: string; ontology_id?: string }[]>([])
 const current = ref<AgentItem | null>(null)
 const saving = ref(false)
 const streaming = ref(false)
 const showStaleDetail = ref(false)
+const scenarioStore = useScenarioStore()
+const selectedOntologyId = ref('')
 
 const form = reactive({
   name: '',
@@ -399,13 +409,30 @@ function scrollToBottom() {
   }
 }
 
+function onOntologyChange() {
+  if (!selectedOntologyId.value) {
+    form.entity_ids = []
+    return
+  }
+  const matched = entities.value.filter((e: any) => e.ontology_id === selectedOntologyId.value)
+  form.entity_ids = matched.map(e => e.id)
+}
+
 onMounted(async () => {
+  await scenarioStore.fetchScenarios()
   const entityList = await entityApi.list()
   entities.value = entityList as any
 
   if (!isNew.value) {
     const agent = await agentsApi.get(route.params.id as string)
     loadFormFromAgent(agent)
+    // 反推选中的本体
+    if (form.entity_ids.length > 0) {
+      const firstEntity = entities.value.find(e => e.id === form.entity_ids[0])
+      if (firstEntity?.ontology_id) {
+        selectedOntologyId.value = firstEntity.ontology_id
+      }
+    }
     await loadConversations()
     if (conversations.value.length > 0) {
       await selectConversation(conversations.value[0].id)
