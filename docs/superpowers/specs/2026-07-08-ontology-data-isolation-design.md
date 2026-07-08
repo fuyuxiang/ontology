@@ -87,7 +87,14 @@ class SharedAttribute(Base):
     )
 ```
 
-共享属性是本体内的属性模板复用机制。实体"应用"共享属性时在 `entity_attributes` 中创建记录并附加 `shared_attribute_id` 外键，修改共享属性定义时引用它的实体属性同步更新。
+共享属性是本体内的属性模板复用机制。实体"应用"共享属性时在 `entity_attributes` 中创建记录并附加 `shared_attribute_id` 外键（nullable，普通属性为 NULL），修改共享属性定义时引用它的实体属性同步更新元信息（名称、类型等）。
+
+#### entity_attributes 变更
+
+```python
+shared_attribute_id = Column(Integer, ForeignKey("ontology_shared_attributes.id"), nullable=True)
+# NULL = 普通属性，非 NULL = 从共享属性模板应用而来
+```
 
 ---
 
