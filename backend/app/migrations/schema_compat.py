@@ -1,5 +1,12 @@
 """各表 schema 迁移函数 — 幂等，可重复执行。"""
+import json
+import logging
+import uuid
+from datetime import datetime
+
 from sqlalchemy import text
+
+logger = logging.getLogger(__name__)
 
 
 def _get_cols(inspector, table: str) -> set:
@@ -229,3 +236,121 @@ def _migrate_ontology_functions(conn, inspector, tables):
     for stmt in _add:
         conn.execute(text(stmt))
     conn.commit()
+
+
+def _migrate_ontology_isolation(conn, inspector, tables):
+    """添加 ontology_id 列并迁移数据（幂等）。"""
+    # --- ontology_entities ---
+    if "ontology_entities" in tables:
+        cols = _get_cols(inspector, "ontology_entities")
+        if "ontology_id" not in cols:
+            conn.execute(text(
+                "ALTER TABLE ontology_entities ADD COLUMN ontology_id VARCHAR(36)"
+            ))
+            conn.commit()
+
+    # --- ontology_functions ---
+    if "ontology_functions" in tables:
+        cols = _get_cols(inspector, "ontology_functions")
+        if "ontology_id" not in cols:
+            conn.execute(text(
+                "ALTER TABLE ontology_functions ADD COLUMN ontology_id VARCHAR(36)"
+            ))
+            conn.commit()
+
+    # --- entity_actions ---
+    if "entity_actions" in tables:
+        cols = _get_cols(inspector, "entity_actions")
+        if "ontology_id" not in cols:
+            conn.execute(text(
+                "ALTER TABLE entity_actions ADD COLUMN ontology_id VARCHAR(36)"
+            ))
+            conn.commit()
+
+    # --- entity_attributes: shared_attribute_id ---
+    if "entity_attributes" in tables:
+        cols = _get_cols(inspector, "entity_attributes")
+        if "shared_attribute_id" not in cols:
+            conn.execute(text(
+                "ALTER TABLE entity_attributes ADD COLUMN shared_attribute_id VARCHAR(36)"
+            ))
+            conn.commit()
+
+    # --- 数据迁移: 按 scenario_codes 分配 ontology_id ---
+    if "ontology_entities" in tables and "scenario_dict" in tables:
+        # 获取第一个 scenario 作为默认
+        result = conn.execute(text("SELECT id FROM scenario_dict ORDER BY sort_order LIMIT 1"))
+        row = result.fetchone()
+        default_id = row[0] if row else None
+
+        if default_id:
+            # 处理有 scenario_codes 的实体
+            entities = conn.execute(text(
+                "SELECT id, scenario_codes FROM ontology_entities WHERE ontology_id IS NULL"
+            )).fetchall()
+
+            for eid, codes_raw in entities:
+                codes = json.loads(codes_raw) if codes_raw else []
+                if codes:
+                    # 获取第一个 code 对应的 scenario id
+                    sc = conn.execute(text(
+                        "SELECT id FROM scenario_dict WHERE code = :code"
+                    ), {"code": codes[0]}).fetchone()
+                    ontology_id = sc[0] if sc else default_id
+                else:
+                    ontology_id = default_id
+
+                conn.execute(text(
+                    "UPDATE ontology_entities SET ontology_id = :oid WHERE id = :eid"
+                ), {"oid": ontology_id, "eid": eid})
+
+                # 多 scenario_codes 的创建共享引用
+                if len(codes) > 1 and "ontology_shared_refs" in tables:
+                    for code in codes[1:]:
+                        sc = conn.execute(text(
+                            "SELECT id FROM scenario_dict WHERE code = :code"
+                        ), {"code": code}).fetchone()
+                        if sc:
+                            ref_id = str(uuid.uuid4())
+                            # Check if already exists
+                            existing = conn.execute(text(
+                                "SELECT id FROM ontology_shared_refs "
+                                "WHERE target_ontology_id = :tgt AND entity_id = :eid"
+                            ), {"tgt": sc[0], "eid": eid}).fetchone()
+                            if not existing:
+                                conn.execute(text(
+                                    "INSERT INTO ontology_shared_refs "
+                                    "(id, source_ontology_id, target_ontology_id, entity_id, shared_at) "
+                                    "VALUES (:id, :src, :tgt, :eid, :now)"
+                                ), {"id": ref_id, "src": ontology_id, "tgt": sc[0], "eid": eid,
+                                    "now": datetime.utcnow()})
+
+            conn.commit()
+
+            # functions: 跟随 entity 或归入默认
+            if "ontology_functions" in tables:
+                conn.execute(text("""
+                    UPDATE ontology_functions SET ontology_id = (
+                        SELECT ontology_id FROM ontology_entities
+                        WHERE ontology_entities.id = ontology_functions.entity_id
+                    ) WHERE entity_id IS NOT NULL AND ontology_id IS NULL
+                """))
+                conn.execute(text(
+                    "UPDATE ontology_functions SET ontology_id = :default WHERE ontology_id IS NULL"
+                ), {"default": default_id})
+                conn.commit()
+
+            # actions: 跟随 entity 或归入默认
+            if "entity_actions" in tables:
+                conn.execute(text("""
+                    UPDATE entity_actions SET ontology_id = (
+                        SELECT ontology_id FROM ontology_entities
+                        WHERE ontology_entities.id = entity_actions.entity_id
+                    ) WHERE entity_id IS NOT NULL AND ontology_id IS NULL
+                """))
+                conn.execute(text(
+                    "UPDATE entity_actions SET ontology_id = :default WHERE ontology_id IS NULL"
+                ), {"default": default_id})
+                conn.commit()
+
+    logger.info("本体隔离迁移完成")
