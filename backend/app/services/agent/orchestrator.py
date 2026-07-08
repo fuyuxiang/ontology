@@ -29,6 +29,7 @@ class AgentService:
         system_prompt_prefix: str | None = None,
         model_name: str | None = None,
         model_config: dict | None = None,
+        runtime_executor=None,
     ):
         self.db = db
         self._system_prompt_prefix = system_prompt_prefix
@@ -38,7 +39,7 @@ class AgentService:
             api_key=self._model_config.get("api_key"),
             api_base=self._model_config.get("api_base"),
         )
-        self._tool_router = ToolRouter(db)
+        self._tool_router = ToolRouter(db, runtime_executor=runtime_executor)
 
     # ── public ──────────────────────────────────────────────
 

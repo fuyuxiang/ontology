@@ -59,6 +59,47 @@ def calc(params):
         result = sandbox.validate(code)
         assert result.valid is False
 
+    def test_dunder_class_escape_rejected(self, sandbox):
+        """Verify that __class__.__bases__.__subclasses__() sandbox escape is blocked."""
+        code = '''
+def exploit(params):
+    return ().__class__.__bases__[0].__subclasses__()
+'''
+        result = sandbox.validate(code)
+        assert result.valid is False
+        assert any("__class__" in e or "__bases__" in e or "__subclasses__" in e for e in result.errors)
+
+    def test_dunder_mro_rejected(self, sandbox):
+        code = '''
+def exploit(params):
+    return "".__class__.__mro__[1]
+'''
+        result = sandbox.validate(code)
+        assert result.valid is False
+
+    def test_allowed_dunder_str_ok(self, sandbox):
+        """Allowed dunders like __init__, __str__ should pass."""
+        code = '''
+def f(params):
+    class Foo:
+        def __init__(self):
+            self.x = 1
+        def __str__(self):
+            return str(self.x)
+    return str(Foo())
+'''
+        result = sandbox.validate(code)
+        assert result.valid is True
+
+    def test_dunder_globals_rejected(self, sandbox):
+        code = '''
+def exploit(params):
+    return exploit.__globals__
+'''
+        result = sandbox.validate(code)
+        assert result.valid is False
+        assert any("__globals__" in e for e in result.errors)
+
 
 class TestExecution:
     def test_simple_function(self, sandbox):

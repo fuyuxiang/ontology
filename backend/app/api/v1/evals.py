@@ -1,7 +1,7 @@
 import time
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -154,7 +154,7 @@ def delete_case(cid: str, db: Session = Depends(get_db)):
 
 
 @router.post("/suites/{sid}/run")
-def run_suite(sid: str, db: Session = Depends(get_db)):
+def run_suite(sid: str, request: Request, db: Session = Depends(get_db)):
     s = db.get(EvalSuite, sid)
     if not s:
         raise HTTPException(404, "Suite not found")
@@ -204,6 +204,7 @@ def run_suite(sid: str, db: Session = Depends(get_db)):
                     db, nodes_json=a.nodes_json, edges_json=a.edges_json or [],
                     system_prompt=a.system_prompt or "", model_name=model_name,
                     model_config=model_config or None,
+                    runtime_executor=getattr(request.app.state, "runtime_executor", None),
                 )
                 for event in engine.run(case.input_prompt):
                     if event.get("type") == "answer" and event.get("content"):
@@ -213,6 +214,7 @@ def run_suite(sid: str, db: Session = Depends(get_db)):
                 agent_svc = AgentService(
                     db, system_prompt_prefix=a.system_prompt or None,
                     model_name=model_name, model_config=model_config or None,
+                    runtime_executor=getattr(request.app.state, "runtime_executor", None),
                 )
                 for event in agent_svc.ask(case.input_prompt, entity_id):
                     if event.get("type") == "answer" and event.get("content"):

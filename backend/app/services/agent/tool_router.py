@@ -468,6 +468,8 @@ class ToolRouter:
         sql_upper = sql.upper().strip()
         if not sql_upper.startswith("SELECT") and not sql_upper.startswith("WITH"):
             return {"error": "只允许 SELECT/WITH 语句"}, "非法 SQL", 0
+        if ";" in sql:
+            return {"error": "不允许多语句查询"}, "非法 SQL", 0
 
         svc = EntityDataService(self.db)
         assets = svc.list_assets()
