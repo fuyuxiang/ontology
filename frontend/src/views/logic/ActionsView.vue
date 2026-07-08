@@ -137,10 +137,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { actionApi, type ActionItem, type ActionTypeInfo } from '../../api/actions'
+import { useOntologyStore } from '../../store/ontology'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 import ActionBuilderDrawer from '../../components/logic/ActionBuilderDrawer.vue'
 
-defineProps<{ embedded?: boolean }>()
+const props = defineProps<{ embedded?: boolean }>()
 
 const route = useRoute()
 
@@ -210,6 +211,10 @@ function onDrawerSaved() {
 async function fetchActions() {
   const params: any = {}
   if (search.value) params.search = search.value
+  const ontologyStore = useOntologyStore()
+  if (props.embedded && ontologyStore.currentOntologyId) {
+    params.ontology_id = ontologyStore.currentOntologyId
+  }
   actions.value = await actionApi.list(params)
 }
 

@@ -134,11 +134,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi, type FunctionItem } from '../../api/functions'
+import { useOntologyStore } from '../../store/ontology'
 import FunctionBuilderDrawer from '../../components/logic/FunctionBuilderDrawer.vue'
 import FunctionCreateModal from '../../components/logic/FunctionCreateModal.vue'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 
-defineProps<{ embedded?: boolean }>()
+const props = defineProps<{ embedded?: boolean }>()
 
 const route = useRoute()
 const router = useRouter()
@@ -177,7 +178,12 @@ const filteredFunctions = computed(() => {
 })
 
 async function fetchFunctions() {
-  functions.value = await functionApi.list()
+  const query: Record<string, string> = {}
+  const ontologyStore = useOntologyStore()
+  if (props.embedded && ontologyStore.currentOntologyId) {
+    query.ontology_id = ontologyStore.currentOntologyId
+  }
+  functions.value = await functionApi.list(query)
 }
 
 function onFuncCreated(fn: { id: string; name: string }) {
