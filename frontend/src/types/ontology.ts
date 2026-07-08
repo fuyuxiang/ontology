@@ -70,6 +70,7 @@ export interface OntologyEntity {
   created_at: string
   updated_at: string
   created_by: string | null
+  ontology_id?: string
 }
 
 // 后端返回的关系详情
@@ -124,6 +125,8 @@ export interface EntityListItem {
   relation_count: number
   datasource_name: string | null
   scenario_codes?: string[]
+  ontology_id?: string
+  is_shared?: boolean
 }
 
 // ── 图遍历结果（匹配后端 snake_case）──

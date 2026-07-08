@@ -25,6 +25,7 @@ export interface FunctionQuery {
   entity_id?: string
   status?: string
   search?: string
+  ontology_id?: string
 }
 
 export interface FunctionTestResult {

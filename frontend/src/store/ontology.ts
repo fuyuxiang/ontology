@@ -9,6 +9,7 @@ export const useOntologyStore = defineStore('ontology', () => {
   const graphData = ref<GraphData | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
+  const currentOntologyId = ref<string | null>(null)
 
   const tier1 = computed(() => entities.value.filter(e => e.tier === 1))
   const tier2 = computed(() => entities.value.filter(e => e.tier === 2))
@@ -20,16 +21,26 @@ export const useOntologyStore = defineStore('ontology', () => {
     { tier: 3 as Tier, label: 'Tier 3 场景对象', entities: tier3.value },
   ])
 
-  async function fetchEntities(query?: { tier?: Tier; search?: string }) {
+  async function fetchEntities(query?: { tier?: Tier; search?: string; ontology_id?: string }) {
     loading.value = true
     error.value = null
     try {
-      entities.value = await entityApi.list(query)
+      const params = { ...query }
+      if (!params.ontology_id && currentOntologyId.value) {
+        params.ontology_id = currentOntologyId.value
+      }
+      entities.value = await entityApi.list(params)
     } catch (e: unknown) {
       error.value = (e as Error).message
     } finally {
       loading.value = false
     }
+  }
+
+  async function switchOntology(id: string) {
+    currentOntologyId.value = id
+    entities.value = []
+    await fetchEntities({ ontology_id: id })
   }
 
   async function fetchEntity(id: string) {
@@ -59,7 +70,7 @@ export const useOntologyStore = defineStore('ontology', () => {
 
   return {
     entities, currentEntity, graphData, loading, error,
-    tier1, tier2, tier3, grouped,
-    fetchEntities, fetchEntity, fetchGraph,
+    tier1, tier2, tier3, grouped, currentOntologyId,
+    fetchEntities, fetchEntity, fetchGraph, switchOntology,
   }
 })
