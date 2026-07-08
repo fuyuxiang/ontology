@@ -167,6 +167,11 @@
           <FunctionsView :embedded="true" />
         </div>
 
+        <!-- 动作定义 -->
+        <div v-else-if="activeTab === 'actions'" class="tab-actions">
+          <ActionsView :embedded="true" />
+        </div>
+
         <!-- 其他 tab 占位 -->
         <div v-else class="tab-placeholder">
           <p class="text-caption">{{ activeTabLabel }} — 开发中</p>
@@ -183,6 +188,7 @@ import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
 import { functionApi, type FunctionItem } from '../../api/functions'
 import FunctionsView from '../logic/FunctionsView.vue'
+import ActionsView from '../logic/ActionsView.vue'
 
 const route = useRoute()
 const router = useRouter()
