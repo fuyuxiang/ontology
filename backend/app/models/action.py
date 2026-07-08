@@ -12,6 +12,7 @@ class EntityAction(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     entity_id: Mapped[str | None] = mapped_column(ForeignKey("ontology_entities.id", ondelete="CASCADE"), nullable=True)
+    ontology_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("scenario_dict.id"), nullable=True, index=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="domain")
     action_type: Mapped[str] = mapped_column(String(30), nullable=False)
