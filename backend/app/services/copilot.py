@@ -74,11 +74,9 @@ def build_ontology_context(db: Session, entity_id: str | None = None) -> str:
     if actions:
         ctx_parts.append(f"\n### 可执行动作 ({len(actions)} 个)")
         for a in actions:
-            meta = a.action_meta_json or {}
-            action_name = meta.get("action_name", a.name)
             params = a.parameters_json or []
-            param_str = ", ".join(p["name"] for p in params) if params else "无参数"
-            ctx_parts.append(f"- {a.name} (英文名: {action_name}, 触发方式: {a.type}, 参数: {param_str})")
+            param_str = ", ".join(p["name"] for p in params if isinstance(p, dict)) if params else "无参数"
+            ctx_parts.append(f"- {a.name} (触发方式: {a.action_type or a.type}, 参数: {param_str})")
 
     # 如果指定了实体，加入详细信息
     if entity_id:
