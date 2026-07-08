@@ -44,6 +44,8 @@ from app.models.version_components import (
     OntologyVersionAction,
     OntologyVersionFunction,
 )
+from app.models.shared_ref import OntologySharedRef
+from app.models.shared_attribute import SharedAttribute
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",
@@ -69,4 +71,7 @@ __all__ = [
     "AiCodeConversation",
     # Agent Test Conversation
     "AgentTestConversation",
+    # Shared / Data Isolation
+    "OntologySharedRef",
+    "SharedAttribute",
 ]
