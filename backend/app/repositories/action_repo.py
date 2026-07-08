@@ -11,8 +11,22 @@ class ActionRepository(BaseRepository[EntityAction]):
     def __init__(self, db: Session):
         super().__init__(db)
 
-    def list_with_filters(self, entity_id=None, status=None, action_type=None, category=None, search=None):
+    def list_with_filters(self, entity_id=None, status=None, action_type=None, category=None, search=None, ontology_id=None):
         query = select(EntityAction)
+        if ontology_id:
+            from app.models.entity import OntologyEntity
+            from app.models.shared_ref import OntologySharedRef
+            entity_ids_in_scope = select(OntologyEntity.id).where(
+                OntologyEntity.ontology_id == ontology_id
+            )
+            shared_entity_ids = select(OntologySharedRef.entity_id).where(
+                OntologySharedRef.target_ontology_id == ontology_id
+            )
+            all_entity_ids = entity_ids_in_scope.union(shared_entity_ids)
+            query = query.where(
+                (EntityAction.ontology_id == ontology_id) |
+                (EntityAction.entity_id.in_(all_entity_ids))
+            )
         if entity_id:
             query = query.where(EntityAction.entity_id == entity_id)
         if status:
