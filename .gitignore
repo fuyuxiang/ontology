@@ -42,6 +42,8 @@ pnpm-debug.log*
 # Upload & temp files
 backend/uploads/
 tmp/
+# User workspace (runtime generated function files)
+workspace/*/
 # IDE / editor
 .vscode/*
 !.vscode/extensions.json
