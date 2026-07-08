@@ -125,6 +125,62 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
         },
         required=("datasource_ids", "document_ids", "business_context"),
     ),
+    # ── Tier 1: 数据查询（重构） ──
+    AgentToolSpec(
+        name="ontology_query_instances",
+        description="查询本体实体的实例数据，支持条件过滤和分页。优先使用此工具。",
+        parameters={
+            "entity_name": {"type": "string", "description": "实体名称"},
+            "filters": {"type": "object", "description": "过滤条件 {属性名: 值}"},
+            "page": {"type": "integer", "description": "页码，默认 1"},
+            "page_size": {"type": "integer", "description": "每页条数，默认 50，最大 200"},
+        },
+        required=("entity_name",),
+    ),
+    AgentToolSpec(
+        name="ontology_get_attr_mapping",
+        description="获取实体属性到物理数据库字段的映射关系，用于编写 SQL 前了解字段名。",
+        parameters={
+            "entity_names": {"type": "array", "items": {"type": "string"}, "description": "实体名称列表"},
+        },
+        required=("entity_names",),
+    ),
+    AgentToolSpec(
+        name="ontology_complex_sql",
+        description="执行复杂只读 SQL 查询（CTE/窗口函数/多表 JOIN）。需先通过 get_attr_mapping 获取字段名。仅允许 SELECT。",
+        parameters={
+            "sql": {"type": "string", "description": "SQL 语句（使用物理字段名）"},
+            "params": {"type": "array", "items": {"type": "string"}, "description": "参数化查询的参数值列表"},
+        },
+        required=("sql",),
+    ),
+    # ── Tier 2: 逻辑/动作调用 ──
+    AgentToolSpec(
+        name="ontology_list_capabilities",
+        description="列出当前本体可用的所有逻辑函数和动作函数，返回名称、描述、参数 schema。",
+        parameters={
+            "type": {"type": "string", "enum": ["logic", "action", "all"], "description": "过滤类型，默认 all"},
+        },
+    ),
+    AgentToolSpec(
+        name="ontology_run_logic",
+        description="执行指定的逻辑函数，返回计算结果。函数名通过 list_capabilities 获取。",
+        parameters={
+            "callable_name": {"type": "string", "description": "函数名称"},
+            "params": {"type": "object", "description": "函数所需参数"},
+        },
+        required=("callable_name",),
+    ),
+    AgentToolSpec(
+        name="ontology_run_action",
+        description="执行指定的动作函数（如生成报告、导出数据），可能有副作用。",
+        parameters={
+            "callable_name": {"type": "string", "description": "动作名称"},
+            "params": {"type": "object", "description": "动作所需参数"},
+        },
+        required=("callable_name",),
+        sensitive=True,
+    ),
 )
 
 
