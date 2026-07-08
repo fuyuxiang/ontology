@@ -321,7 +321,7 @@ function toggleSelect(id: string) {
 
 function goCreate(path: string) {
   showCreateMenu.value = false
-  router.push(path)
+  router.push({ path, query: { from: 'ontology-detail', code: code.value } })
 }
 
 async function deleteEntity(id: string) {
