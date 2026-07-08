@@ -123,7 +123,7 @@ const navGroups: NavGroup[] = [
     { path: '/service/api', label: '本体服务', icon: ico.api },
   ]},
   { label: '本体应用', items: [
-    { path: '/agent/manage', label: '智能体管理', icon: ico.agent },
+    { path: '/agent/manage', label: '智能体应用', icon: ico.agent },
   ]},
   { label: '运维与安全中心', items: [
     { path: '/ops/config', label: '系统配置', icon: ico.config },
