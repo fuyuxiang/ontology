@@ -84,7 +84,7 @@ class FunctionRegistry:
                 return_type=row.return_type or "object",
                 source_path=row.source_path or "",
                 func_name=row.func_name or row.callable_name,
-                ontology_id=int(row.entity_id.split("-")[0]) if row.entity_id else 0,
+                ontology_id=0,
                 checksum=row.checksum or "",
             )
             self._cache[meta.callable_name] = meta
