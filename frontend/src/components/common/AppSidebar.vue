@@ -123,7 +123,6 @@ const navGroups: NavGroup[] = [
   ]},
   { label: '本体中心', items: [
     { path: '/ontology/list', label: '本体列表', icon: ico.ontologyMgr },
-    { path: '/data/mapping', label: '数据映射', icon: ico.mapping },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
     { path: '/service/api', label: '本体服务', icon: ico.api },
   ]},
