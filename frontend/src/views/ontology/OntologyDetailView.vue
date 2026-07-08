@@ -248,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
@@ -357,13 +357,18 @@ function goBack() {
   router.push('/ontology/list')
 }
 
-onMounted(async () => {
+async function loadData() {
   await scenarioStore.fetchScenarios()
   const sc = scenarioStore.byCode(code.value)
   if (sc) {
     await ontologyStore.switchOntology(sc.id)
   }
-})
+}
+
+onMounted(loadData)
+onActivated(loadData)
+
+watch(code, loadData)
 </script>
 
 <!-- STYLE_SECTION -->
