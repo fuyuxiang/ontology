@@ -38,6 +38,7 @@ export interface ActionQuery {
   action_type?: string
   category?: string
   search?: string
+  ontology_id?: string
 }
 
 export interface ActionTypeInfo {

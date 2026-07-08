@@ -6,6 +6,7 @@ export interface EntityQuery {
   status?: EntityStatus
   search?: string
   namespace?: string
+  ontology_id?: string
 }
 
 // ── 本体文件预览（只解析不落库）──
