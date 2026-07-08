@@ -220,10 +220,14 @@ async function handleDelete(fn: FunctionItem) {
   await fetchFunctions()
 }
 
-onMounted(() => {
-  fetchFunctions()
+onMounted(async () => {
+  await fetchFunctions()
   if (route.query.from === 'builder') {
     showAdd.value = true
+  }
+  // 自动选中第一个函数
+  if (!selectedId.value && filteredFunctions.value.length > 0) {
+    selectedId.value = filteredFunctions.value[0].id
   }
 })
 </script>
