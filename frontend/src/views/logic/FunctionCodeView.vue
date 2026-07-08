@@ -40,7 +40,11 @@ const loading = ref(true)
 const error = ref('')
 
 function goBack() {
-  router.push('/logic/functions')
+  if (route.query.from === 'ontology' && route.query.code) {
+    router.push(`/ontology/list/${route.query.code}`)
+  } else {
+    router.push('/logic/functions')
+  }
 }
 
 onMounted(async () => {
