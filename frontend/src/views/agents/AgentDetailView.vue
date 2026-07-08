@@ -67,12 +67,6 @@
           <label class="agent-detail__label">系统提示词</label>
           <textarea class="agent-detail__textarea agent-detail__textarea--tall" v-model="form.system_prompt" placeholder="系统提示词"></textarea>
         </div>
-        <div class="agent-detail__form-group" v-if="!isNew">
-          <label class="agent-detail__label">实体绑定</label>
-          <select class="agent-detail__select" v-model="form.entity_ids" multiple>
-            <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name_cn || e.name }}</option>
-          </select>
-        </div>
       </div>
 
       <!-- Right: Chat test -->
