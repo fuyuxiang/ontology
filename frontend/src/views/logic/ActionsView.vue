@@ -19,19 +19,11 @@
     <div class="logic-page__stats">
       <div class="stat-card stat-card--semantic">
         <div class="stat-card__value">{{ stats.total }}</div>
-        <div class="stat-card__label">总行动数</div>
+        <div class="stat-card__label">总数</div>
       </div>
       <div class="stat-card stat-card--dynamic">
         <div class="stat-card__value">{{ stats.active }}</div>
         <div class="stat-card__label">已激活</div>
-      </div>
-      <div class="stat-card stat-card--kinetic">
-        <div class="stat-card__value">{{ stats.domain }}</div>
-        <div class="stat-card__label">领域行动</div>
-      </div>
-      <div class="stat-card stat-card--error">
-        <div class="stat-card__value">{{ stats.system }}</div>
-        <div class="stat-card__label">系统行动</div>
       </div>
     </div>
 
@@ -165,8 +157,6 @@ const showCreateModal = ref(false)
 const filterOptions = [
   { label: '全部', value: 'all' },
   { label: '已激活', value: 'active' },
-  { label: '领域', value: 'domain' },
-  { label: '系统', value: 'system' },
 ]
 
 const selectedAction = computed(() => filteredActions.value.find(a => a.id === selectedId.value) || null)
@@ -176,16 +166,12 @@ const stats = computed(() => {
   return {
     total: all.length,
     active: all.filter(a => a.status === 'active').length,
-    domain: all.filter(a => a.category === 'domain').length,
-    system: all.filter(a => a.category === 'system').length,
   }
 })
 
 const filteredActions = computed(() => {
   let list = actions.value
   if (activeFilter.value === 'active') list = list.filter(a => a.status === 'active')
-  else if (activeFilter.value === 'domain') list = list.filter(a => a.category === 'domain')
-  else if (activeFilter.value === 'system') list = list.filter(a => a.category === 'system')
   if (search.value) {
     const s = search.value.toLowerCase()
     list = list.filter(a => a.name.toLowerCase().includes(s) || (a.entity_name || '').toLowerCase().includes(s))
