@@ -138,22 +138,94 @@
 
         <!-- 对象定义 -->
         <div v-else-if="activeTab === 'entities'" class="tab-entities">
-          <h2 class="tab-title">对象定义</h2>
-          <table class="data-table" v-if="scenarioEntities.length">
-            <thead><tr><th>名称</th><th>中文名</th><th>属性数</th><th>状态</th></tr></thead>
-            <tbody>
-              <tr v-for="e in scenarioEntities" :key="e.id">
-                <td class="link-cell" @click="router.push(`/ontology/${e.id}`)">
-                  {{ e.className }}
-                  <a-tag v-if="e.is_shared" color="blue" style="margin-left: 8px">共享</a-tag>
-                </td>
-                <td>{{ e.label }}</td>
-                <td>{{ e.attributeCount || 0 }}</td>
-                <td><span class="badge" :class="e.status === 'active' ? 'badge--active' : 'badge--draft'">{{ e.status === 'active' ? '已激活' : '草稿' }}</span></td>
-              </tr>
-            </tbody>
-          </table>
-          <p v-else class="text-caption">该本体下暂无对象</p>
+          <div class="entities-toolbar">
+            <div class="entities-toolbar__left">
+              <span class="entities-toolbar__title">
+                <span class="entities-toolbar__indicator"></span>
+                对象
+              </span>
+              <span class="entities-toolbar__count">{{ filteredEntities.length }}</span>
+            </div>
+            <div class="entities-toolbar__right">
+              <div class="entities-search">
+                <input v-model="entitySearch" class="entities-search__input" placeholder="请输入" />
+                <svg class="entities-search__icon" width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.5"/>
+                  <path d="M9 9l2.5 2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class="entities-dropdown" v-click-outside="() => showBatchMenu = false">
+                <button class="entities-dropdown__btn" @click="showBatchMenu = !showBatchMenu">
+                  批量操作
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 4L5 6.5 7.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div v-if="showBatchMenu" class="entities-dropdown__menu">
+                  <button class="entities-dropdown__item" @click="batchDelete" :disabled="selectedIds.length === 0">批量删除</button>
+                  <button class="entities-dropdown__item" @click="batchActivate" :disabled="selectedIds.length === 0">批量激活</button>
+                  <button class="entities-dropdown__item" @click="batchExport" :disabled="selectedIds.length === 0">批量导出</button>
+                </div>
+              </div>
+              <div class="entities-dropdown" v-click-outside="() => showCreateMenu = false">
+                <button class="entities-dropdown__btn entities-dropdown__btn--primary" @click="showCreateMenu = !showCreateMenu">
+                  新建对象
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 4L5 6.5 7.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </button>
+                <div v-if="showCreateMenu" class="entities-dropdown__menu entities-dropdown__menu--grid">
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder')">
+                    <span class="entities-dropdown__grid-icon">🛠️</span>
+                    <span>手动构建</span>
+                  </button>
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/template')">
+                    <span class="entities-dropdown__grid-icon">📋</span>
+                    <span>模板构建</span>
+                  </button>
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/doc')">
+                    <span class="entities-dropdown__grid-icon">📄</span>
+                    <span>文档构建</span>
+                  </button>
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/ai')">
+                    <span class="entities-dropdown__grid-icon">🤖</span>
+                    <span>资产构建</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="entities-table-wrap">
+            <table class="entities-table" v-if="filteredEntities.length">
+              <thead>
+                <tr>
+                  <th class="entities-table__check"><input type="checkbox" :checked="isAllSelected" @change="toggleSelectAll" /></th>
+                  <th>中文名称</th>
+                  <th>英文名称</th>
+                  <th>状态</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="e in filteredEntities" :key="e.id">
+                  <td class="entities-table__check"><input type="checkbox" :checked="selectedIds.includes(e.id)" @change="toggleSelect(e.id)" /></td>
+                  <td class="link-cell" @click="router.push(`/ontology/${e.id}`)">{{ e.label || '—' }}</td>
+                  <td>{{ e.className }}</td>
+                  <td><span class="badge" :class="e.status === 'active' ? 'badge--active' : 'badge--draft'">{{ e.status === 'active' ? '已激活' : '草稿' }}</span></td>
+                  <td class="entities-table__actions">
+                    <button class="entities-table__action-btn" @click="router.push(`/ontology/${e.id}`)">编辑</button>
+                    <button class="entities-table__action-btn entities-table__action-btn--danger" @click="deleteEntity(e.id)">删除</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="entities-empty">
+              <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                <rect x="8" y="12" width="32" height="24" rx="3" stroke="#d0d5dd" stroke-width="1.5"/>
+                <path d="M8 18h32" stroke="#d0d5dd" stroke-width="1.5"/>
+                <circle cx="14" cy="15" r="1.5" fill="#d0d5dd"/>
+                <circle cx="19" cy="15" r="1.5" fill="#d0d5dd"/>
+              </svg>
+              <p class="entities-empty__text">暂无数据</p>
+            </div>
+          </div>
         </div>
 
         <!-- 逻辑定义 -->
@@ -183,6 +255,18 @@ import { useOntologyStore } from '../../store/ontology'
 import FunctionsView from '../logic/FunctionsView.vue'
 import ActionsView from '../logic/ActionsView.vue'
 
+const vClickOutside = {
+  mounted(el: any, binding: any) {
+    el._clickOutside = (e: MouseEvent) => {
+      if (!el.contains(e.target)) binding.value()
+    }
+    document.addEventListener('click', el._clickOutside)
+  },
+  unmounted(el: any) {
+    document.removeEventListener('click', el._clickOutside)
+  }
+}
+
 const route = useRoute()
 const router = useRouter()
 const scenarioStore = useScenarioStore()
@@ -202,6 +286,64 @@ const relationCount = computed(() => {
 })
 const logicCount = computed(() => ontologyStore.entities.reduce((sum, e) => sum + ((e as any).functionCount || 0), 0))
 const actionCount = computed(() => 0)
+
+// --- 对象定义 Tab 逻辑 ---
+const entitySearch = ref('')
+const selectedIds = ref<string[]>([])
+const showBatchMenu = ref(false)
+const showCreateMenu = ref(false)
+
+const filteredEntities = computed(() => {
+  const q = entitySearch.value.trim().toLowerCase()
+  if (!q) return scenarioEntities.value
+  return scenarioEntities.value.filter(
+    (e: any) => (e.label || '').toLowerCase().includes(q) || (e.className || '').toLowerCase().includes(q)
+  )
+})
+
+const isAllSelected = computed(() => {
+  return filteredEntities.value.length > 0 && filteredEntities.value.every((e: any) => selectedIds.value.includes(e.id))
+})
+
+function toggleSelectAll() {
+  if (isAllSelected.value) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = filteredEntities.value.map((e: any) => e.id)
+  }
+}
+
+function toggleSelect(id: string) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx >= 0) selectedIds.value.splice(idx, 1)
+  else selectedIds.value.push(id)
+}
+
+function goCreate(path: string) {
+  showCreateMenu.value = false
+  router.push(path)
+}
+
+async function deleteEntity(id: string) {
+  if (!confirm('确定删除该对象？')) return
+  await ontologyStore.removeEntity(id)
+}
+
+function batchDelete() {
+  if (selectedIds.value.length === 0) return
+  if (!confirm(`确定删除选中的 ${selectedIds.value.length} 个对象？`)) return
+  selectedIds.value.forEach(id => ontologyStore.removeEntity(id))
+  selectedIds.value = []
+  showBatchMenu.value = false
+}
+
+function batchActivate() {
+  showBatchMenu.value = false
+}
+
+function batchExport() {
+  showBatchMenu.value = false
+}
 
 const activeTabLabel = computed(() => {
   const map: Record<string, string> = {
@@ -483,6 +625,254 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   min-height: 200px;
+  color: var(--neutral-400, #aaa);
+}
+
+/* 对象定义 Tab */
+.tab-entities {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.entities-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.entities-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.entities-toolbar__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--neutral-900, #111);
+}
+
+.entities-toolbar__indicator {
+  width: 3px;
+  height: 16px;
+  background: var(--primary, #2563eb);
+  border-radius: 2px;
+}
+
+.entities-toolbar__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--neutral-100, #f0f0f0);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--neutral-600, #666);
+}
+
+.entities-toolbar__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.entities-search {
+  position: relative;
+}
+
+.entities-search__input {
+  width: 180px;
+  height: 32px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.entities-search__input:focus {
+  border-color: var(--primary, #2563eb);
+}
+
+.entities-search__icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--neutral-400, #aaa);
+  pointer-events: none;
+}
+
+.entities-dropdown {
+  position: relative;
+}
+
+.entities-dropdown__btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  font-size: 13px;
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: 6px;
+  background: var(--neutral-0, #fff);
+  color: var(--neutral-700, #333);
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.entities-dropdown__btn:hover { background: var(--neutral-50, #fafafa); }
+
+.entities-dropdown__btn--primary {
+  background: var(--primary, #2563eb);
+  color: #fff;
+  border-color: var(--primary, #2563eb);
+}
+
+.entities-dropdown__btn--primary:hover { opacity: 0.9; background: var(--primary, #2563eb); }
+
+.entities-dropdown__menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 120px;
+  background: #fff;
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  padding: 4px;
+}
+
+.entities-dropdown__item {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  text-align: left;
+  border: none;
+  background: none;
+  color: var(--neutral-700, #333);
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.entities-dropdown__item:hover { background: var(--neutral-50, #fafafa); }
+.entities-dropdown__item:disabled { color: var(--neutral-300, #ccc); cursor: not-allowed; }
+
+.entities-dropdown__menu--grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  min-width: 200px;
+  padding: 8px;
+}
+
+.entities-dropdown__grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--neutral-700, #333);
+  cursor: pointer;
+}
+
+.entities-dropdown__grid-item:hover { background: var(--neutral-50, #fafafa); }
+
+.entities-dropdown__grid-icon {
+  font-size: 20px;
+}
+
+.entities-table-wrap {
+  flex: 1;
+  background: var(--neutral-0, #fff);
+  border: 1px solid var(--neutral-100, #f0f0f0);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.entities-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.entities-table th {
+  text-align: left;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--neutral-600, #666);
+  padding: 12px 16px;
+  background: var(--neutral-50, #fafafa);
+  border-bottom: 1px solid var(--neutral-100, #f0f0f0);
+}
+
+.entities-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--neutral-50, #fafafa);
+  color: var(--neutral-700, #495057);
+}
+
+.entities-table tbody tr:hover {
+  background: var(--neutral-50, #fafafa);
+}
+
+.entities-table__check {
+  width: 40px;
+  text-align: center;
+}
+
+.entities-table__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.entities-table__action-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid var(--neutral-200, #e5e5e5);
+  border-radius: 4px;
+  background: var(--neutral-0, #fff);
+  color: var(--neutral-700, #333);
+  cursor: pointer;
+}
+
+.entities-table__action-btn:hover { background: var(--neutral-50, #fafafa); }
+
+.entities-table__action-btn--danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.entities-table__action-btn--danger:hover { background: #fef2f2; }
+
+.entities-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+  color: var(--neutral-400, #aaa);
+}
+
+.entities-empty__text {
+  margin-top: 12px;
+  font-size: 13px;
   color: var(--neutral-400, #aaa);
 }
 </style>

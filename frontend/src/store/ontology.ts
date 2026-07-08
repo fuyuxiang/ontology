@@ -68,9 +68,14 @@ export const useOntologyStore = defineStore('ontology', () => {
     }
   }
 
+  async function removeEntity(id: string) {
+    await entityApi.remove(id)
+    entities.value = entities.value.filter(e => e.id !== id)
+  }
+
   return {
     entities, currentEntity, graphData, loading, error,
     tier1, tier2, tier3, grouped, currentOntologyId,
-    fetchEntities, fetchEntity, fetchGraph, switchOntology,
+    fetchEntities, fetchEntity, fetchGraph, switchOntology, removeEntity,
   }
 })
