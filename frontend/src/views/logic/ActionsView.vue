@@ -258,6 +258,9 @@ onMounted(() => {
 <style scoped>
 @import './logic-shared.css';
 
+.logic-page--embedded { padding: 0; max-width: none; }
+.logic-page--embedded .logic-page__header { margin-bottom: 16px; justify-content: flex-end; }
+
 .master-detail {
   display: grid;
   grid-template-columns: 340px 1fr;
