@@ -56,7 +56,7 @@ def list_entities(
             tier=e.tier, status=e.status,
             attr_count=len(e.attributes),
             relation_count=rel_count,
-            rule_count=len(e.rules),
+            rule_count=0,
             datasource_name=(e.config_json or {}).get("datasource_name"),
             scenario_codes=e.scenario_codes,
             is_shared=e.id in shared_ids,
@@ -162,7 +162,7 @@ def get_full_graph(db: Session = Depends(get_db)):
             id=e.id, name=e.name, name_cn=e.name_cn,
             tier=e.tier, status=e.status, relation_count=rc,
             action_count=len(e.actions),
-            rule_count=len(e.rules),
+            rule_count=0,
             function_count=len(e.functions),
         ))
 
