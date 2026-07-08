@@ -47,6 +47,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi } from '../../api/functions'
 import { entityApi } from '../../api/ontology'
+import { useOntologyStore } from '../../store/ontology'
 import { useToast } from '../../composables/useToast'
 import ModalDialog from '../common/ModalDialog.vue'
 import type { EntityListItem } from '../../types'
@@ -60,6 +61,7 @@ const emit = defineEmits<{
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
+const ontologyStore = useOntologyStore()
 const entities = ref<EntityListItem[]>([])
 const saving = ref(false)
 
@@ -101,7 +103,8 @@ async function handleCreate() {
       logic_body: '',
       return_type: 'string',
       status: 'active',
-    })
+      ontology_id: ontologyStore.currentOntologyId || undefined,
+    } as any)
     toast.success('函数创建成功')
     emit('created', { id: result.id, name: result.name })
     const query: Record<string, string> = {}
