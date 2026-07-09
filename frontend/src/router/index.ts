@@ -35,8 +35,8 @@ const router = createRouter({
     { path: '/ontology/version', redirect: '/ontology/publish' },
 
     // 本体中心 — 本体服务
-    { path: '/service/api', name: 'service-api', component: () => import('../views/service/ApiServiceView.vue'), meta: { title: '本体服务' } },
-    { path: '/service/mcp', name: 'service-mcp', component: () => import('../views/service/McpServiceView.vue'), meta: { title: 'MCP 服务' } },
+    { path: '/service/mcp', name: 'service-mcp', component: () => import('../views/service/McpServiceView.vue'), meta: { title: '本体服务' } },
+    { path: '/service/api', redirect: '/service/mcp' },
 
     // 本体中心 — 辅助路由
     { path: '/ontology/create', name: 'ontology-create', component: () => import('../views/ontology/EntityCreateView.vue'), meta: { title: '新建本体对象' } },

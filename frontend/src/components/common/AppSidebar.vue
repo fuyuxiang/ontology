@@ -121,8 +121,7 @@ const navGroups: NavGroup[] = [
   { label: '本体中心', items: [
     { path: '/ontology/list', label: '本体列表', icon: ico.ontologyMgr },
     { path: '/ontology/publish', label: '本体发布', icon: ico.version },
-    { path: '/service/api', label: '本体服务', icon: ico.api },
-    { path: '/service/mcp', label: 'MCP 服务', icon: ico.mcp },
+    { path: '/service/mcp', label: '本体服务', icon: ico.mcp },
   ]},
   { label: '本体应用', items: [
     { path: '/agent/manage', label: '智能体应用', icon: ico.agent },
