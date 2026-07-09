@@ -30,7 +30,7 @@ _JSON_TYPE_MAP = {
 }
 
 
-def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult:
+def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id: str | None = None) -> ImportResult:
     """按 V1.1 本体 JSON Schema 规范解析，复用 import_schema.py 的逻辑。"""
     result = ImportResult()
 
@@ -81,6 +81,7 @@ def parse_json_ontology(data: dict, namespace: str, db: Session) -> ImportResult
             tier=obj.get("tier", 3),
             status="active",
             description=obj.get("description", ""),
+            ontology_id=ontology_id,
             config_json={
                 "namespace": namespace,
                 "primary_key": obj.get("primary_key"),
@@ -398,7 +399,7 @@ def _local_name(uri: str) -> str:
     return uri.rsplit("/", 1)[-1]
 
 
-def parse_owl_ontology(content: bytes, fmt: str, db: Session) -> ImportResult:
+def parse_owl_ontology(content: bytes, fmt: str, db: Session, *, ontology_id: str | None = None) -> ImportResult:
     """解析 OWL/XML 或 TTL 文件。"""
     from rdflib import OWL, RDF, RDFS, Graph
 
@@ -433,6 +434,7 @@ def parse_owl_ontology(content: bytes, fmt: str, db: Session) -> ImportResult:
         entity = OntologyEntity(
             id=eid, name=name, name_cn=name_cn,
             tier=3, status="active", description=description,
+            ontology_id=ontology_id,
         )
         db.add(entity)
         entity_map[uri] = eid

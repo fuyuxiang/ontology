@@ -439,6 +439,7 @@ async def create_from_file(
     file: UploadFile = File(...),
     file_type: str = Form(...),
     namespace: str = Form(""),
+    ontology_id: str = Form(""),
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -452,15 +453,17 @@ async def create_from_file(
     if not content:
         raise HTTPException(status_code=400, detail="文件内容为空")
 
+    _ontology_id = ontology_id or None
+
     try:
         if file_type == "json":
             import json as _json
             data = _json.loads(content.decode("utf-8"))
-            result = parse_json_ontology(data, namespace, db)
+            result = parse_json_ontology(data, namespace, db, ontology_id=_ontology_id)
         elif file_type == "owl":
-            result = parse_owl_ontology(content, "xml", db)
+            result = parse_owl_ontology(content, "xml", db, ontology_id=_ontology_id)
         else:
-            result = parse_owl_ontology(content, "turtle", db)
+            result = parse_owl_ontology(content, "turtle", db, ontology_id=_ontology_id)
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}") from e

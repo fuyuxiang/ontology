@@ -113,11 +113,12 @@ export const entityApi = {
     )
   },
 
-  importFromFile(file: File, fileType: string, namespace?: string) {
+  importFromFile(file: File, fileType: string, namespace?: string, ontologyId?: string) {
     const formData = new FormData()
     formData.append('file', file)
     formData.append('file_type', fileType)
     if (namespace) formData.append('namespace', namespace)
+    if (ontologyId) formData.append('ontology_id', ontologyId)
     return post<FileImportResult>('/entities/from-file', formData)
   },
 

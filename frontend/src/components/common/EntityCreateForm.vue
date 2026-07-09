@@ -227,11 +227,13 @@ import { entityApi } from '../../api/ontology'
 import { relationApi } from '../../api/relations'
 import { post } from '../../api/client'
 import { useToast } from '../../composables/useToast'
+import { useOntologyStore } from '../../store/ontology'
 import type { FileImportResult } from '../../types'
 
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; created: [] }>()
 const toast = useToast()
+const ontologyStore = useOntologyStore()
 
 const mode = ref<'ai' | 'manual' | 'import'>('ai')
 const tierNames: Record<number, string> = { 1: '核心', 2: '领域', 3: '场景' }
@@ -305,7 +307,7 @@ async function handleFileImport() {
   submitting.value = true
   importResult.value = null
   try {
-    const res = await entityApi.importFromFile(selectedFile.value, fileFormat.value, fileNamespace.value || undefined)
+    const res = await entityApi.importFromFile(selectedFile.value, fileFormat.value, fileNamespace.value || undefined, ontologyStore.currentOntologyId || undefined)
     importResult.value = res
     toast.success(`导入完成：创建 ${res.entities_created} 个实体，${res.relations_created} 个关系`)
     emit('created')

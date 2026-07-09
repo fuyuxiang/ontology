@@ -453,11 +453,13 @@ import { entityApi } from '../../api/ontology'
 import { relationApi } from '../../api/relations'
 import { post } from '../../api/client'
 import { useToast } from '../../composables/useToast'
+import { useOntologyStore } from '../../store/ontology'
 import { listDataSources, getTableList } from '../../api/datasource'
 import type { FileImportResult } from '../../types'
 
 const router = useRouter()
 const toast = useToast()
+const ontologyStore = useOntologyStore()
 
 const breadcrumbs = [
   { label: '本体管理', path: '/ontology' },
@@ -585,7 +587,7 @@ async function handleFileImport() {
   if (!selectedFile.value) return
   submitting.value = true; importResult.value = null
   try {
-    const res = await entityApi.importFromFile(selectedFile.value, fileFormat.value, fileNamespace.value || undefined)
+    const res = await entityApi.importFromFile(selectedFile.value, fileFormat.value, fileNamespace.value || undefined, ontologyStore.currentOntologyId || undefined)
     importResult.value = res
     toast.success(`导入完成：创建 ${res.entities_created} 个实体，${res.relations_created} 个关系`)
   } catch (e) { toast.error(`导入失败: ${(e as Error).message}`) }
