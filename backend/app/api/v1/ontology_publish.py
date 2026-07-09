@@ -53,6 +53,11 @@ class RejectRequest(BaseModel):
 class ApproveRequest(BaseModel):
     pass
 
+class QuickPublishRequest(BaseModel):
+    ontology_id: str
+    name: str | None = None
+    description: str | None = None
+
 
 # ─── 版本 CRUD ──────────────────────────────────────────────────────
 
@@ -368,6 +373,162 @@ def reject_version(version_id: str, req: RejectRequest, db: Session = Depends(ge
     v.reject_reason = req.reason
     db.commit()
     return {"message": "版本已驳回", "status": "rejected"}
+
+
+# ─── 快速发布 ────────────────────────────────────────────────────────
+
+@router.post("/quick-publish")
+def quick_publish(req: QuickPublishRequest, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    """一键发布：将指定本体下所有实体创建为新版本并直接发布"""
+    from app.models.scenario import ScenarioDict
+
+    scenario = db.query(ScenarioDict).filter(ScenarioDict.id == req.ontology_id).first()
+    if not scenario:
+        raise HTTPException(404, "本体不存在")
+
+    entities = db.query(OntologyEntity).options(
+        joinedload(OntologyEntity.attributes)
+    ).filter(OntologyEntity.ontology_id == req.ontology_id).all()
+    if not entities:
+        raise HTTPException(400, "该本体下没有对象，无法发布")
+
+    max_num = db.query(func.max(OntologyVersion.version_number)).scalar() or 0
+    version = OntologyVersion(
+        version_number=max_num + 1,
+        name=req.name or f"{scenario.name} v{max_num + 1}",
+        description=req.description,
+        status="published",
+        ontology_id=req.ontology_id,
+        created_by=user.id,
+        approved_by=user.id,
+        submitted_at=datetime.utcnow(),
+        published_at=datetime.utcnow(),
+        is_active=True,
+    )
+    db.add(version)
+    db.flush()
+
+    for entity in entities:
+        ve = OntologyVersionEntity(
+            version_id=version.id,
+            source_entity_id=entity.id,
+            name=entity.name,
+            name_cn=entity.name_cn,
+            tier=entity.tier,
+            description=entity.description,
+            config_json=entity.config_json,
+            publish_config=entity.publish_config,
+            scenario_codes=entity.scenario_codes,
+        )
+        db.add(ve)
+        db.flush()
+        for attr in entity.attributes:
+            va = OntologyVersionAttribute(
+                version_entity_id=ve.id,
+                source_attribute_id=attr.id,
+                name=attr.name,
+                type=attr.type,
+                description=attr.description or "",
+                required=attr.required,
+                example=attr.example,
+                constraints_json=attr.constraints_json,
+                source_table=attr.source_table,
+                source_field=attr.source_field,
+                data_status=attr.data_status or "未确认来源",
+            )
+            db.add(va)
+
+    _sync_relations(version, db)
+
+    old_active = db.query(OntologyVersion).filter(
+        OntologyVersion.is_active == True,
+        OntologyVersion.id != version.id,
+        OntologyVersion.ontology_id == req.ontology_id,
+    ).first()
+    db.query(OntologyVersion).filter(
+        OntologyVersion.is_active == True,
+        OntologyVersion.id != version.id,
+        OntologyVersion.ontology_id == req.ontology_id,
+    ).update({"is_active": False})
+
+    published_entity_ids = [e.id for e in entities]
+    db.query(OntologyEntity).filter(
+        OntologyEntity.id.in_(published_entity_ids)
+    ).update({"status": "published"})
+
+    impact = mark_stale_dependents(old_active, version, db)
+    snapshot_components_for_version(db, version)
+    db.commit()
+
+    return {
+        "message": f"版本 v{version.version_number} 已发布",
+        "version_id": version.id,
+        "version_number": version.version_number,
+        "entity_count": len(entities),
+        "impact": impact,
+    }
+
+
+# ─── 按本体聚合的发布状态 ────────────────────────────────────────────
+
+@router.get("/ontologies")
+def list_published_ontologies(db: Session = Depends(get_db)):
+    """返回所有有已发布版本的本体列表（卡片展示用）"""
+    from app.models.scenario import ScenarioDict
+
+    versions = db.query(OntologyVersion).filter(
+        OntologyVersion.ontology_id.isnot(None)
+    ).order_by(OntologyVersion.version_number.desc()).all()
+
+    ontology_map: dict[str, dict] = {}
+    for v in versions:
+        oid = v.ontology_id
+        if oid not in ontology_map:
+            ontology_map[oid] = {
+                "ontology_id": oid,
+                "active_version": None,
+                "versions": [],
+                "total_versions": 0,
+            }
+        entry = ontology_map[oid]
+        entry["total_versions"] += 1
+        entity_count = db.query(OntologyVersionEntity).filter(
+            OntologyVersionEntity.version_id == v.id
+        ).count()
+        v_info = {
+            "id": v.id,
+            "version_number": v.version_number,
+            "name": v.name,
+            "status": v.status,
+            "entity_count": entity_count,
+            "published_at": v.published_at.isoformat() if v.published_at else None,
+            "is_active": v.is_active,
+        }
+        entry["versions"].append(v_info)
+        if v.is_active and not entry["active_version"]:
+            entry["active_version"] = v_info
+
+    scenario_ids = list(ontology_map.keys())
+    scenarios = db.query(ScenarioDict).filter(ScenarioDict.id.in_(scenario_ids)).all()
+    scenario_by_id = {s.id: s for s in scenarios}
+
+    result = []
+    for oid, data in ontology_map.items():
+        sc = scenario_by_id.get(oid)
+        if not sc:
+            continue
+        result.append({
+            "ontology_id": oid,
+            "code": sc.code,
+            "name": sc.name,
+            "color": sc.color,
+            "description": sc.description,
+            "active_version": data["active_version"],
+            "total_versions": data["total_versions"],
+            "versions": data["versions"],
+        })
+
+    return result
 
 
 # ─── 版本组件查询 ────────────────────────────────────────────────────

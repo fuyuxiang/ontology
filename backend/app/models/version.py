@@ -22,6 +22,7 @@ class OntologyVersion(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     version_number: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
+    ontology_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("scenario_dict.id"), nullable=True, index=True)
     description: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(20), default="draft")
     created_by: Mapped[str | None] = mapped_column(String(36))

@@ -12,7 +12,7 @@
         <button class="btn-action">导入Excel</button>
         <button class="btn-action">测试</button>
         <button class="btn-action">仿真</button>
-        <button class="btn-action btn-action--primary">发布</button>
+        <button class="btn-action btn-action--primary" @click="publishOntology">发布</button>
         <button class="btn-action">保存</button>
       </div>
     </div>
@@ -295,6 +295,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
 import { entityApi } from '../../api/ontology'
+import { ontologyPublishApi } from '../../api/aip'
 import type { EntityRelationDetail } from '../../types'
 import FunctionsView from '../logic/FunctionsView.vue'
 import ActionsView from '../logic/ActionsView.vue'
@@ -406,6 +407,23 @@ function batchActivate() {
 
 function batchExport() {
   showBatchMenu.value = false
+}
+
+async function publishOntology() {
+  if (!scenario.value) return
+  if (ontologyStore.entities.length === 0) {
+    alert('当前本体下没有对象，无法发布')
+    return
+  }
+  if (!confirm(`确定发布本体「${scenario.value.name}」？将包含 ${ontologyStore.entities.length} 个对象。`)) return
+  try {
+    const res = await ontologyPublishApi.quickPublish(scenario.value.id, scenario.value.name)
+    alert(`发布成功！${res.message}`)
+    router.push('/ontology/publish')
+  } catch (e: any) {
+    const detail = e?.response?.data?.detail
+    alert(typeof detail === 'string' ? detail : '发布失败')
+  }
 }
 
 const activeTabLabel = computed(() => {
