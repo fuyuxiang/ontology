@@ -543,6 +543,9 @@ from app.api.v1.mcp import router as mcp_router  # noqa: E402
 import app.services.mcp_tools as _mcp_tools_init  # noqa: E402, F401 — 触发工具注册
 app.include_router(mcp_router, prefix="/api/v1")
 
+from app.api.v1.mcp_stats import router as mcp_stats_router  # noqa: E402
+app.include_router(mcp_stats_router, prefix="/api/v1")
+
 
 @app.get("/api/health")
 def health():
