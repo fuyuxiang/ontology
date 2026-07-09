@@ -124,26 +124,27 @@ onMounted(loadTools)
 </script>
 
 <style scoped>
-.docs { padding: 24px; }
-.docs__quickstart { background: var(--neutral-50); border-radius: 12px; padding: 24px; margin-bottom: 24px; }
-.docs__quickstart h2 { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: var(--neutral-900); }
+.docs { padding: 0 24px; }
+.docs__quickstart { background: var(--neutral-50, #fafafa); border: 1px solid var(--neutral-100, #f0f0f0); border-radius: var(--radius-lg, 12px); padding: 24px; margin-bottom: 24px; }
+.docs__quickstart h2 { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: var(--neutral-900, #111); }
 .steps { display: flex; gap: 24px; margin-bottom: 20px; }
 .step { display: flex; align-items: center; gap: 10px; }
-.step__num { width: 28px; height: 28px; border-radius: 50%; background: var(--semantic-600); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
-.step__text { font-size: 13px; color: var(--neutral-700); }
+.step__num { width: 28px; height: 28px; border-radius: 50%; background: var(--primary, #2563eb); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0; }
+.step__text { font-size: 13px; color: var(--neutral-700, #333); }
 .code-tabs { display: flex; gap: 4px; margin-bottom: 12px; }
-.code-tabs button { font-size: 11px; padding: 4px 10px; border: 1px solid var(--neutral-200); border-radius: 4px; background: #fff; cursor: pointer; }
-.code-tabs button.active { background: var(--semantic-600); color: #fff; border-color: var(--semantic-600); }
+.code-tabs button { font-size: 11px; padding: 4px 10px; border: 1px solid var(--neutral-200, #e5e5e5); border-radius: 6px; background: var(--neutral-0, #fff); cursor: pointer; color: var(--neutral-600, #555); transition: all 0.15s; }
+.code-tabs button:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); }
+.code-tabs button.active { background: var(--primary, #2563eb); color: #fff; border-color: var(--primary, #2563eb); }
 .code-block { background: #1e1e2e; color: #a6e3a1; padding: 16px; border-radius: 8px; font-size: 12px; overflow-x: auto; position: relative; white-space: pre; font-family: monospace; }
 .code-block .copy-btn { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.1); border: none; color: #cdd6f4; padding: 3px 8px; border-radius: 4px; font-size: 10px; cursor: pointer; }
 
-.docs__tools h2 { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: var(--neutral-900); }
-.tool-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-.tool-card { background: #fff; border: 1px solid var(--neutral-200); border-radius: 10px; padding: 16px; cursor: pointer; transition: all 0.15s; }
-.tool-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: var(--semantic-300); }
+.docs__tools h2 { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: var(--neutral-900, #111); }
+.tool-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+.tool-card { background: var(--neutral-0, #fff); border: 1px solid var(--neutral-100, #f0f0f0); border-radius: var(--radius-lg, 12px); padding: 20px; cursor: pointer; transition: box-shadow 0.15s, border-color 0.15s; }
+.tool-card:hover { border-color: var(--primary, #2563eb); box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08); }
 .tool-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.tool-card__name { font-size: 12px; font-weight: 600; color: var(--neutral-800); }
-.tool-card__tag { font-size: 10px; padding: 2px 6px; border-radius: 4px; background: #eef2ff; color: #6366f1; }
-.tool-card__desc { font-size: 12px; color: var(--neutral-600); margin: 0 0 8px; line-height: 1.4; }
-.tool-card__params { font-size: 11px; color: var(--neutral-400); }
+.tool-card__name { font-size: 13px; font-weight: 600; color: var(--neutral-900, #111); }
+.tool-card__tag { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: #eff6ff; color: var(--primary, #2563eb); font-weight: 500; }
+.tool-card__desc { font-size: 12px; color: var(--neutral-500, #888); margin: 0 0 8px; line-height: 1.5; }
+.tool-card__params { font-size: 11px; color: var(--neutral-400, #aaa); }
 </style>
