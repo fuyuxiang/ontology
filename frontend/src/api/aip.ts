@@ -234,6 +234,14 @@ export const listDatasourcesAsResources = () => get<any[]>('/connections')
 export const ontologyPublishApi = {
   previewImpact: (versionId: string) =>
     get<any>(`/ontology-publish/versions/${versionId}/impact`),
+  quickPublish: (ontologyId: string, name?: string, description?: string) =>
+    post<any>('/ontology-publish/quick-publish', { ontology_id: ontologyId, name, description }),
+  listPublishedOntologies: () =>
+    get<any>('/ontology-publish/ontologies'),
+  listVersions: (status?: string) =>
+    get<any>('/ontology-publish/versions', { params: status ? { status } : undefined }),
+  getVersion: (versionId: string) =>
+    get<any>(`/ontology-publish/versions/${versionId}`),
 }
 
 export const sceneStaleApi = {
