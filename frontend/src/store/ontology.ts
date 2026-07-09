@@ -68,8 +68,8 @@ export const useOntologyStore = defineStore('ontology', () => {
     }
   }
 
-  async function removeEntity(id: string) {
-    await entityApi.remove(id)
+  async function removeEntity(id: string, force = false) {
+    await entityApi.remove(id, force)
     entities.value = entities.value.filter(e => e.id !== id)
   }
 

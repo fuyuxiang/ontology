@@ -376,7 +376,20 @@ function goCreate(path: string) {
 
 async function deleteEntity(id: string) {
   if (!confirm('确定删除该对象？')) return
-  await ontologyStore.removeEntity(id)
+  try {
+    await ontologyStore.removeEntity(id)
+  } catch (e: any) {
+    const status = e?.response?.status
+    const detail = e?.response?.data?.detail
+    if (status === 409 && detail?.message) {
+      const msg = `${detail.message}\n（关联绑定: ${detail.bindings} 个，关系: ${detail.relations} 个，属性: ${detail.attributes} 个）\n\n是否强制删除？`
+      if (confirm(msg)) {
+        await ontologyStore.removeEntity(id, true)
+      }
+    } else {
+      alert(typeof detail === 'string' ? detail : detail?.message || '删除失败')
+    }
+  }
 }
 
 function batchDelete() {
