@@ -54,7 +54,6 @@
             :class="{ 'version-item--active': selectedVersionId === v.id }"
             @click="selectVersion(v.id)"
           >
-<!-- PLACEHOLDER_CONTINUE -->
             <div class="version-item__badge" :class="`version-item__badge--${v.status}`">v{{ v.version_number }}</div>
             <div class="version-item__info">
               <span class="version-item__name">{{ v.name }}</span>
@@ -132,7 +131,6 @@
         <div v-else class="version-empty-main"><span>← 选择一个版本查看详情</span></div>
       </div>
     </div>
-<!-- PLACEHOLDER_MODALS -->
     <!-- 创建版本弹窗 -->
     <div v-if="showCreateDialog" class="modal-overlay" @click.self="showCreateDialog = false">
       <div class="modal-box">
@@ -199,7 +197,6 @@
     </div>
   </div>
 </template>
-<!-- PLACEHOLDER_SCRIPT -->
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { get, post, del } from '../../api/client'
@@ -294,7 +291,6 @@ function backToGrid() {
   checkResult.value = null
   loadOntologies()
 }
-<!-- PLACEHOLDER_SCRIPT2 -->
 async function loadAllEntities() {
   const list = await get<{ items?: any[] } | any[]>('/entities')
   const items = Array.isArray(list) ? list : (list.items || [])
@@ -414,7 +410,6 @@ function formatTime(iso: string) {
   return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 </script>
-<!-- PLACEHOLDER_STYLE -->
 <style scoped>
 .publish-page { padding: 24px; height: 100%; display: flex; flex-direction: column; }
 .publish-page__header { margin-bottom: 20px; }
@@ -454,7 +449,6 @@ function formatTime(iso: string) {
 .version-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; border: 1px solid var(--neutral-100); transition: all 0.15s; }
 .version-item:hover { background: var(--neutral-50); }
 .version-item--active { background: var(--semantic-50); border-color: var(--semantic-200); }
-<!-- PLACEHOLDER_STYLE2 -->
 .version-item__badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; background: var(--neutral-100); color: var(--neutral-600); }
 .version-item__badge--published { background: #dcfce7; color: #166534; }
 .version-item__badge--pending_approval { background: #fef3c7; color: #92400e; }
