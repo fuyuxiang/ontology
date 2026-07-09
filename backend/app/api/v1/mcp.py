@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 import traceback
 
 from fastapi import APIRouter, Depends, Request
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.services.mcp_tools.auth import verify_mcp_auth
+from app.services.mcp_tools.call_logger import log_mcp_call
 from app.services.mcp_tools.mcp_config import MCP_SERVER_NAME, MCP_SERVER_VERSION
 from app.services.mcp_tools.registry import TOOL_REGISTRY, get_tools_list
 
@@ -75,14 +77,28 @@ async def _handle_tools_call(params: dict, db: Session, request: Request) -> dic
     if not tool:
         return {"error": {"code": -32602, "message": f"未知工具: {tool_name}"}}
 
+    start = time.perf_counter()
+    is_error = False
+    error_msg = None
     try:
         result = await tool.execute(arguments, db=db, request=request)
     except Exception as e:
+        is_error = True
+        error_msg = str(e)
         logger.error(f"工具 {tool_name} 执行失败: {e}\n{traceback.format_exc()}")
-        return {
+        result = {
             "content": [{"type": "text", "text": json.dumps({"error": str(e)}, ensure_ascii=False)}],
             "isError": True,
         }
+    finally:
+        duration_ms = int((time.perf_counter() - start) * 1000)
+        try:
+            log_mcp_call(db, tool_name, duration_ms, is_error, error_msg)
+        except Exception:
+            pass
+
+    if is_error:
+        return result
 
     return {
         "content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False, default=str)}],
