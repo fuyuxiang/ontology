@@ -39,6 +39,12 @@ port_pids() {
     lsof -tiTCP:"$1" -sTCP:LISTEN 2>/dev/null
 }
 
+# Vite binds the port even when the app fails to compile, so a listening port
+# is not proof of success. Return the first fatal build/scan error in the log.
+frontend_log_error() {
+    grep -aE 'PARSE_ERROR|Failed to scan for dependencies|Build failed with [0-9]+ error|Pre-transform error|Transform failed|Internal server error' "$FRONTEND_LOG" 2>/dev/null | head -1
+}
+
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
         echo "Missing required command: $1"
@@ -148,13 +154,34 @@ nohup env VITE_PROXY_TARGET="$VITE_PROXY_TARGET" npx vite --host 0.0.0.0 --port 
 echo $! > "$FRONTEND_PID_FILE"
 
 frontend_pids=""
+fe_error=""
 for i in $(seq 1 15); do
     sleep 1
+    if fe_error="$(frontend_log_error)" && [ -n "$fe_error" ]; then
+        break
+    fi
     if frontend_pids="$(port_pids "$FRONTEND_PORT")" && [ -n "$frontend_pids" ]; then
         break
     fi
     printf "  waiting... (%ds)\n" "$i"
 done
+
+# Port may bind before the dependency scan finishes; give errors a moment to surface.
+if [ -n "$frontend_pids" ] && [ -z "$fe_error" ]; then
+    sleep 2
+    fe_error="$(frontend_log_error)"
+fi
+
+if [ -n "$fe_error" ]; then
+    echo "Frontend started but failed to compile:"
+    echo "  $fe_error"
+    echo "See frontend.log for details."
+    frontend_pids="$(port_pids "$FRONTEND_PORT")"
+    if [ -n "$frontend_pids" ]; then
+        echo "$frontend_pids" | xargs kill 2>/dev/null || true
+    fi
+    exit 1
+fi
 
 if [ -z "$frontend_pids" ]; then
     echo "Frontend failed to start after 15s. Check frontend.log"
