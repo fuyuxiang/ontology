@@ -14,6 +14,7 @@ from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSuite
 from app.models.execution_log import ExecutionLog
 from app.models.function import OntologyFunction
 from app.models.lineage_edge import LineageEdge
+from app.models.mcp_call_log import McpCallLog  # noqa: F401
 from app.models.monitor import Alert, LLMCallRecord, ServiceMetric
 from app.models.object_binding import ObjectBinding
 from app.models.prompt_template import PromptTemplate
@@ -65,6 +66,7 @@ __all__ = [
     "LineageEdge", "ObjectBinding", "QualityMetric",
     "QualityRule", "HealthStatus",
     "ServiceMetric", "LLMCallRecord", "Alert",
+    "McpCallLog",
     # Skill Generation Platform
     "Skill", "SkillVersion", "SkillTool", "SkillToolRef",
     # AI Code Conversation
