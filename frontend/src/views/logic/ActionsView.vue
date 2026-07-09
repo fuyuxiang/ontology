@@ -16,17 +16,6 @@
       </div>
     </div>
 
-    <div class="logic-page__stats">
-      <div class="stat-card stat-card--semantic">
-        <div class="stat-card__value">{{ stats.total }}</div>
-        <div class="stat-card__label">总数</div>
-      </div>
-      <div class="stat-card stat-card--dynamic">
-        <div class="stat-card__value">{{ stats.active }}</div>
-        <div class="stat-card__label">已激活</div>
-      </div>
-    </div>
-
     <div class="master-detail">
       <div class="master-detail__list">
         <div class="master-detail__toolbar">
@@ -160,14 +149,6 @@ const filterOptions = [
 ]
 
 const selectedAction = computed(() => filteredActions.value.find(a => a.id === selectedId.value) || null)
-
-const stats = computed(() => {
-  const all = actions.value
-  return {
-    total: all.length,
-    active: all.filter(a => a.status === 'active').length,
-  }
-})
 
 const filteredActions = computed(() => {
   let list = actions.value
