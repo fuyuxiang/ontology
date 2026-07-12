@@ -98,7 +98,6 @@
               <div v-for="e in detail.entities" :key="e.id" class="res-card">
                 <div class="res-card__top">
                   <span class="res-card__name">{{ e.name_cn }}</span>
-                  <span class="res-card__ready" :class="e.readiness?.ready ? 'is-ok' : 'is-warn'">{{ e.readiness?.ready ? '就绪' : '未就绪' }}</span>
                 </div>
                 <span class="res-card__en">{{ e.name }}</span>
                 <p v-if="e.description" class="res-card__desc">{{ e.description }}</p>
@@ -582,9 +581,6 @@ function formatTime(iso: string) {
 .res-card__tag { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 4px; background: var(--semantic-50); color: var(--semantic-600); white-space: nowrap; }
 .res-card__tag--plain { background: var(--neutral-100); color: var(--neutral-600); }
 .res-card__rel { font-size: 12px; color: var(--neutral-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.res-card__ready { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 4px; white-space: nowrap; }
-.res-card__ready.is-ok { background: #dcfce7; color: #166534; }
-.res-card__ready.is-warn { background: #fef3c7; color: #92400e; }
 .res-empty { font-size: 13px; color: var(--neutral-400); text-align: center; padding: 24px; border: 1px dashed var(--neutral-200); border-radius: 10px; }
 
 .check-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 16px; }
