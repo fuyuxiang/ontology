@@ -73,6 +73,12 @@
               <span class="status-tag" :class="`status-tag--${detail.status}`">{{ formatStatus(detail.status) }}</span>
             </div>
             <p v-if="detail.description" class="meta-card__desc">{{ detail.description }}</p>
+            <div class="meta-card__stats">
+              <div class="res-stat"><span class="res-stat__value">{{ detail.entities.length }}</span><span class="res-stat__label">对象</span></div>
+              <div class="res-stat"><span class="res-stat__value">{{ detail.relations.length }}</span><span class="res-stat__label">关系</span></div>
+              <div class="res-stat"><span class="res-stat__value">{{ versionFunctions.length }}</span><span class="res-stat__label">逻辑</span></div>
+              <div class="res-stat"><span class="res-stat__value">{{ versionActions.length }}</span><span class="res-stat__label">动作</span></div>
+            </div>
             <div class="meta-card__timeline">
               <span v-if="detail.created_at">创建: {{ formatTime(detail.created_at) }}</span>
               <span v-if="detail.submitted_at">提交: {{ formatTime(detail.submitted_at) }}</span>
@@ -82,25 +88,78 @@
             <div v-if="detail.reject_reason" class="meta-card__reject">驳回原因: {{ detail.reject_reason }}</div>
           </div>
 
-          <div class="entity-card">
-            <div class="entity-card__header">
-              <h3>包含实体 ({{ detail.entities.length }})</h3>
-              <button v-if="detail.status === 'draft'" class="btn-sm" @click="showEntitySelector = true">+ 添加实体</button>
+          <!-- 对象 -->
+          <section class="res-section">
+            <div class="res-section__header">
+              <h3>对象<span class="res-section__count">{{ detail.entities.length }}</span></h3>
+              <button v-if="detail.status === 'draft'" class="btn-link" @click="showEntitySelector = true">+ 添加实体</button>
             </div>
-            <div v-if="detail.entities.length">
-              <div class="entity-table__row entity-table__row--header">
-                <span class="col-name">名称</span><span class="col-tier">层级</span><span class="col-attrs">属性</span><span class="col-status">就绪</span><span class="col-action">操作</span>
-              </div>
-              <div v-for="e in detail.entities" :key="e.id" class="entity-table__row">
-                <span class="col-name">{{ e.name_cn }}<small>{{ e.name }}</small></span>
-                <span class="col-tier">T{{ e.tier }}</span>
-                <span class="col-attrs">{{ e.mapped_count }}/{{ e.attribute_count }}</span>
-                <span class="col-status" :class="e.readiness?.ready ? 'check-pass' : 'check-fail'">{{ e.readiness?.ready ? '✓' : '✗' }}</span>
-                <span class="col-action"><button v-if="detail.status === 'draft'" class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)">移除</button></span>
+            <div v-if="detail.entities.length" class="res-grid">
+              <div v-for="e in detail.entities" :key="e.id" class="res-card">
+                <div class="res-card__top">
+                  <span class="res-card__name">{{ e.name_cn }}</span>
+                  <span class="res-card__ready" :class="e.readiness?.ready ? 'is-ok' : 'is-warn'">{{ e.readiness?.ready ? '就绪' : '未就绪' }}</span>
+                </div>
+                <span class="res-card__en">{{ e.name }}</span>
+                <p v-if="e.description" class="res-card__desc">{{ e.description }}</p>
+                <div class="res-card__foot">
+                  <span class="res-card__tag">属性 {{ e.mapped_count }}/{{ e.attribute_count }}</span>
+                  <button v-if="detail.status === 'draft'" class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)">移除</button>
+                </div>
               </div>
             </div>
-            <div v-else class="entity-empty">暂无实体，点击上方添加</div>
-          </div>
+            <div v-else class="res-empty">暂无对象</div>
+          </section>
+
+          <!-- 关系 -->
+          <section class="res-section">
+            <div class="res-section__header"><h3>关系<span class="res-section__count">{{ detail.relations.length }}</span></h3></div>
+            <div v-if="detail.relations.length" class="res-grid">
+              <div v-for="r in detail.relations" :key="r.id" class="res-card">
+                <div class="res-card__top">
+                  <span class="res-card__name">{{ r.name || r.rel_type }}</span>
+                  <span v-if="r.cardinality" class="res-card__tag res-card__tag--plain">{{ r.cardinality }}</span>
+                </div>
+                <span class="res-card__en">{{ r.rel_type }}</span>
+                <div class="res-card__foot">
+                  <span class="res-card__rel">{{ entityName(r.from_entity_id) }} → {{ entityName(r.to_entity_id) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-else class="res-empty">暂无关系</div>
+          </section>
+
+          <!-- 逻辑 -->
+          <section class="res-section">
+            <div class="res-section__header"><h3>逻辑<span class="res-section__count">{{ versionFunctions.length }}</span></h3></div>
+            <div v-if="versionFunctions.length" class="res-grid">
+              <div v-for="f in versionFunctions" :key="f.id" class="res-card">
+                <div class="res-card__top">
+                  <span class="res-card__name">{{ f.name }}</span>
+                  <span v-if="f.return_type" class="res-card__tag res-card__tag--plain">{{ f.return_type }}</span>
+                </div>
+                <span class="res-card__en">{{ entityName(f.version_entity_id) }}</span>
+                <p v-if="f.description" class="res-card__desc">{{ f.description }}</p>
+              </div>
+            </div>
+            <div v-else class="res-empty">暂无逻辑</div>
+          </section>
+
+          <!-- 动作 -->
+          <section class="res-section">
+            <div class="res-section__header"><h3>动作<span class="res-section__count">{{ versionActions.length }}</span></h3></div>
+            <div v-if="versionActions.length" class="res-grid">
+              <div v-for="a in versionActions" :key="a.id" class="res-card">
+                <div class="res-card__top">
+                  <span class="res-card__name">{{ a.name }}</span>
+                  <span v-if="a.category" class="res-card__tag res-card__tag--plain">{{ formatCategory(a.category) }}</span>
+                </div>
+                <span class="res-card__en">{{ a.action_type || '—' }}</span>
+                <p v-if="a.description" class="res-card__desc">{{ a.description }}</p>
+              </div>
+            </div>
+            <div v-else class="res-empty">暂无动作</div>
+          </section>
 
           <div v-if="checkResult" class="check-card">
             <h3>一致性检查</h3>
@@ -113,18 +172,18 @@
 
           <div class="action-bar">
             <template v-if="detail.status === 'draft'">
-              <button class="btn-secondary" @click="runCheck" :disabled="loading">一致性检查</button>
-              <button class="btn-primary" @click="submitForApproval" :disabled="loading || !detail.entities.length">提交审批</button>
-              <button class="btn-outline" @click="previewImpact">预览影响</button>
-              <button class="btn-danger-outline" @click="deleteVersion">删除草稿</button>
+              <button class="btn-quiet" @click="runCheck" :disabled="loading">一致性检查</button>
+              <button class="btn-quiet" @click="submitForApproval" :disabled="loading || !detail.entities.length">提交审批</button>
+              <button class="btn-quiet" @click="previewImpact">预览影响</button>
+              <button class="btn-quiet btn-quiet--danger" @click="deleteVersion">删除草稿</button>
             </template>
             <template v-else-if="detail.status === 'pending_approval'">
-              <button class="btn-primary" @click="approveVersion" :disabled="loading">审批通过</button>
-              <button class="btn-danger-outline" @click="showRejectDialog = true">驳回</button>
-              <button class="btn-outline" @click="previewImpact">预览影响</button>
+              <button class="btn-quiet" @click="approveVersion" :disabled="loading">审批通过</button>
+              <button class="btn-quiet btn-quiet--danger" @click="showRejectDialog = true">驳回</button>
+              <button class="btn-quiet" @click="previewImpact">预览影响</button>
             </template>
             <template v-else-if="detail.status === 'published'">
-              <button class="btn-secondary" @click="rollbackVersion" :disabled="loading">回滚到此版本</button>
+              <button class="btn-quiet" @click="rollbackVersion" :disabled="loading">回滚到此版本</button>
             </template>
           </div>
         </template>
@@ -231,6 +290,8 @@ const selectedOntology = ref<OntologyCard | null>(null)
 const versions = ref<VersionSummary[]>([])
 const selectedVersionId = ref<string | null>(null)
 const detail = ref<VersionDetail | null>(null)
+const versionFunctions = ref<any[]>([])
+const versionActions = ref<any[]>([])
 const checkResult = ref<CheckResult | null>(null)
 const loading = ref(false)
 
@@ -288,6 +349,8 @@ function backToGrid() {
   selectedOntology.value = null
   selectedVersionId.value = null
   detail.value = null
+  versionFunctions.value = []
+  versionActions.value = []
   checkResult.value = null
   loadOntologies()
 }
@@ -300,7 +363,27 @@ async function loadAllEntities() {
 async function selectVersion(id: string) {
   selectedVersionId.value = id
   checkResult.value = null
+  versionFunctions.value = []
+  versionActions.value = []
   detail.value = await get(`/ontology-publish/versions/${id}`)
+  const [fns, acts] = await Promise.all([
+    ontologyPublishApi.listVersionFunctions(id).catch(() => []),
+    ontologyPublishApi.listVersionActions(id).catch(() => []),
+  ])
+  versionFunctions.value = fns || []
+  versionActions.value = acts || []
+}
+
+// version_entity_id / from_entity_id 等引用的是 OntologyVersionEntity.id，映射回中文名
+function entityName(veId: string | null): string {
+  if (!veId || !detail.value) return '—'
+  const e = detail.value.entities.find(x => x.id === veId)
+  return e ? e.name_cn : '—'
+}
+
+function formatCategory(cat: string): string {
+  const map: Record<string, string> = { domain: '领域', system: '系统' }
+  return map[cat] || cat
 }
 
 async function createVersion() {
@@ -476,20 +559,33 @@ function formatTime(iso: string) {
 .status-tag--published { background: #dcfce7; color: #166534; }
 .status-tag--rejected { background: #fee2e2; color: #991b1b; }
 
-.entity-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 16px; }
-.entity-card__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.entity-card__header h3 { font-size: 14px; font-weight: 600; margin: 0; }
-.entity-table__row { display: flex; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--neutral-50); font-size: 13px; }
-.entity-table__row--header { font-size: 11px; font-weight: 600; color: var(--neutral-500); text-transform: uppercase; }
-.col-name { flex: 2; display: flex; flex-direction: column; gap: 1px; }
-.col-name small { font-size: 11px; color: var(--neutral-400); }
-.col-tier { width: 50px; text-align: center; }
-.col-attrs { width: 70px; text-align: center; }
-.col-status { width: 50px; text-align: center; }
-.col-action { width: 60px; text-align: center; }
-.check-pass { color: #16a34a; font-weight: 700; }
-.check-fail { color: #dc2626; font-weight: 700; }
-.entity-empty { font-size: 13px; color: var(--neutral-400); text-align: center; padding: 20px; }
+/* 资源统计概览 */
+.meta-card__stats { display: flex; gap: 28px; margin-top: 14px; }
+.res-stat { display: flex; flex-direction: column; gap: 2px; }
+.res-stat__value { font-size: 20px; font-weight: 700; color: var(--neutral-900); line-height: 1; }
+.res-stat__label { font-size: 11px; color: var(--neutral-500); }
+
+/* 分类资源区 */
+.res-section { display: flex; flex-direction: column; gap: 12px; }
+.res-section__header { display: flex; align-items: center; justify-content: space-between; }
+.res-section__header h3 { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; margin: 0; color: var(--neutral-800); }
+.res-section__count { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: var(--neutral-100); color: var(--neutral-600); }
+
+.res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.res-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px; transition: all 0.15s; }
+.res-card:hover { border-color: var(--semantic-400); box-shadow: 0 4px 12px rgba(59,130,246,0.08); }
+.res-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.res-card__name { font-size: 14px; font-weight: 600; color: var(--neutral-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.res-card__en { font-size: 11px; color: var(--neutral-400); }
+.res-card__desc { font-size: 12px; color: var(--neutral-500); line-height: 1.4; margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.res-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--neutral-50); }
+.res-card__tag { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 4px; background: var(--semantic-50); color: var(--semantic-600); white-space: nowrap; }
+.res-card__tag--plain { background: var(--neutral-100); color: var(--neutral-600); }
+.res-card__rel { font-size: 12px; color: var(--neutral-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.res-card__ready { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 4px; white-space: nowrap; }
+.res-card__ready.is-ok { background: #dcfce7; color: #166534; }
+.res-card__ready.is-warn { background: #fef3c7; color: #92400e; }
+.res-empty { font-size: 13px; color: var(--neutral-400); text-align: center; padding: 24px; border: 1px dashed var(--neutral-200); border-radius: 10px; }
 
 .check-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 16px; }
 .check-card h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
@@ -500,7 +596,14 @@ function formatTime(iso: string) {
 .issue-item { font-size: 12px; color: #dc2626; padding: 4px 8px; background: #fef2f2; border-radius: 4px; }
 .issue-item--rel { color: #92400e; background: #fef3c7; }
 
-.action-bar { display: flex; gap: 10px; align-items: center; padding-top: 8px; }
+.action-bar { display: flex; gap: 8px; align-items: center; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--neutral-100); flex-wrap: wrap; }
+
+/* 弱化的审批操作按钮 */
+.btn-quiet { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--neutral-200); background: #fff; color: var(--neutral-600); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.btn-quiet:hover:not(:disabled) { border-color: var(--semantic-400); color: var(--semantic-600); }
+.btn-quiet:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-quiet--danger { color: #b91c1c; }
+.btn-quiet--danger:hover:not(:disabled) { border-color: #fca5a5; color: #dc2626; }
 
 .btn-primary { padding: 8px 18px; border-radius: 6px; border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-primary:hover:not(:disabled) { background: var(--semantic-700); }
