@@ -267,6 +267,15 @@ def _migrate_ontology_isolation(conn, inspector, tables):
             ))
             conn.commit()
 
+    # --- ontology_versions ---
+    if "ontology_versions" in tables:
+        cols = _get_cols(inspector, "ontology_versions")
+        if "ontology_id" not in cols:
+            conn.execute(text(
+                "ALTER TABLE ontology_versions ADD COLUMN ontology_id VARCHAR(36)"
+            ))
+            conn.commit()
+
     # --- entity_attributes: shared_attribute_id ---
     if "entity_attributes" in tables:
         cols = _get_cols(inspector, "entity_attributes")
