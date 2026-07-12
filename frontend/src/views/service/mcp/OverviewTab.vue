@@ -1,27 +1,5 @@
 <template>
   <div class="overview">
-    <!-- 顶部 Banner -->
-    <div class="page-banner">
-      <div class="page-banner__content">
-        <h1 class="page-banner__title">本体服务</h1>
-        <p class="page-banner__desc">基于 MCP 协议对外暴露本体查询、数据探索和 Python 运行时能力，支持 Claude Desktop、Cursor 等 AI 客户端直接接入</p>
-      </div>
-      <div class="page-banner__right">
-        <div class="page-banner__status">
-          <span class="status-dot"></span>
-          <span>服务运行中</span>
-        </div>
-        <div class="page-banner__endpoint">
-          <code>{{ endpoint }}</code>
-          <button class="copy-btn" @click="copyEndpoint">复制</button>
-        </div>
-        <div class="page-banner__meta">
-          <span class="meta-tag">v1.0.0</span>
-          <span class="meta-tag">MCP · streamable-http</span>
-        </div>
-      </div>
-    </div>
-
     <!-- 统计卡片 -->
     <div class="overview__stats">
       <div class="stat-card">
@@ -146,8 +124,6 @@ const tools = ref<McpToolSchema[]>([])
 const ranges = ['1h', '24h', '7d'] as const
 const trendRange = ref<'1h' | '24h' | '7d'>('24h')
 
-const endpoint = `${window.location.origin}/api/v1/mcp`
-
 const trendEl = ref<HTMLElement | null>(null)
 const pieEl = ref<HTMLElement | null>(null)
 let trendChart: echarts.ECharts | null = null
@@ -168,12 +144,6 @@ function formatTime(t: string | null): string {
   const d = new Date(t)
   if (Number.isNaN(d.getTime())) return t
   return d.toLocaleString('zh-CN', { hour12: false })
-}
-
-async function copyEndpoint() {
-  try {
-    await navigator.clipboard.writeText(endpoint)
-  } catch { /* ignore */ }
 }
 
 function handleResize() {
@@ -262,61 +232,39 @@ onBeforeUnmount(() => {
 })
 </script>
 <style scoped>
-.page-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 32px;
-  background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 50%, #eff6ff 100%);
-  border-radius: var(--radius-lg, 12px);
-  margin: 0 24px 24px;
-}
-.page-banner__title { font-size: 24px; font-weight: 700; color: var(--neutral-900, #111); margin: 0 0 8px; }
-.page-banner__desc { font-size: 13px; color: var(--neutral-600, #555); margin: 0; max-width: 480px; line-height: 1.5; }
-.page-banner__right { text-align: right; }
-.page-banner__status { display: flex; align-items: center; gap: 6px; justify-content: flex-end; font-size: 13px; color: #16a34a; font-weight: 500; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block; animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.page-banner__endpoint { margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; }
-.page-banner__endpoint code { font-size: 12px; background: rgba(37,99,235,0.08); color: var(--primary, #2563eb); padding: 4px 10px; border-radius: 4px; }
-.copy-btn { margin-left: 8px; font-size: 11px; background: var(--primary, #2563eb); border: none; color: #fff; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
-.copy-btn:hover { opacity: 0.9; }
-.page-banner__meta { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
-.meta-tag { font-size: 11px; background: rgba(37,99,235,0.08); color: var(--primary, #2563eb); padding: 2px 8px; border-radius: 4px; }
-
-.overview__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 0 24px 24px; }
-.stat-card { background: var(--neutral-0, #fff); border: 1px solid var(--neutral-100, #f0f0f0); border-radius: var(--radius-lg, 12px); padding: 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow 0.15s, border-color 0.15s; }
-.stat-card:hover { border-color: var(--primary, #2563eb); box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08); }
+.overview__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 0 0 24px; }
+.stat-card { background: var(--neutral-0, #fff); border: 1px solid var(--neutral-100, #f1f3f5); border-radius: var(--radius-lg, 12px); padding: 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow 0.15s, border-color 0.15s; }
+.stat-card:hover { border-color: var(--semantic-200, #bac8ff); box-shadow: 0 4px 16px rgba(76, 110, 245, 0.08); }
 .stat-card__icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.stat-card__icon--calls { background: #eff6ff; }
-.stat-card__icon--speed { background: #ecfdf5; }
-.stat-card__icon--error { background: #fef2f2; }
-.stat-card__icon--conn { background: #fffbeb; }
+.stat-card__icon--calls { background: var(--semantic-50, #eef2ff); }
+.stat-card__icon--speed { background: var(--dynamic-50, #e6fcf5); }
+.stat-card__icon--error { background: var(--status-error-bg, #fff5f5); }
+.stat-card__icon--conn { background: var(--kinetic-50, #fff8e1); }
 .stat-card__body { flex: 1; }
-.stat-card__value { font-size: 22px; font-weight: 700; color: var(--neutral-900, #111); }
-.stat-card__value small { font-size: 12px; font-weight: 400; color: var(--neutral-500, #888); margin-left: 2px; }
-.stat-card__label { display: block; font-size: 12px; color: var(--neutral-500, #888); margin-top: 2px; }
+.stat-card__value { font-size: 22px; font-weight: 700; color: var(--neutral-900, #212529); }
+.stat-card__value small { font-size: 12px; font-weight: 400; color: var(--neutral-500, #adb5bd); margin-left: 2px; }
+.stat-card__label { display: block; font-size: 12px; color: var(--neutral-500, #adb5bd); margin-top: 2px; }
 .stat-card__trend { font-size: 11px; font-weight: 600; margin-left: 6px; }
-.trend--up { color: #16a34a; }
-.trend--down { color: #dc2626; }
+.trend--up { color: var(--status-success, #12b886); }
+.trend--down { color: var(--status-error, #fa5252); }
 
-.overview__charts { display: flex; gap: 16px; padding: 0 24px 24px; }
-.chart-panel { background: var(--neutral-0, #fff); border: 1px solid var(--neutral-100, #f0f0f0); border-radius: var(--radius-lg, 12px); padding: 16px; }
+.overview__charts { display: flex; gap: 16px; padding: 0 0 24px; }
+.chart-panel { background: var(--neutral-0, #fff); border: 1px solid var(--neutral-100, #f1f3f5); border-radius: var(--radius-lg, 12px); padding: 16px; }
 .chart-panel--main { flex: 2; }
 .chart-panel--side { flex: 1; }
 .chart-panel__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.chart-panel__header h3 { font-size: 13px; font-weight: 600; color: var(--neutral-800, #333); margin: 0; }
+.chart-panel__header h3 { font-size: 13px; font-weight: 600; color: var(--neutral-800, #343a40); margin: 0; }
 .range-btns { display: flex; gap: 4px; }
-.range-btns button { font-size: 11px; padding: 4px 10px; border: 1px solid var(--neutral-200, #e5e5e5); border-radius: 6px; background: var(--neutral-0, #fff); cursor: pointer; color: var(--neutral-600, #555); transition: all 0.15s; }
-.range-btns button:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); }
-.range-btns button.active { background: var(--primary, #2563eb); color: #fff; border-color: var(--primary, #2563eb); }
+.range-btns button { font-size: 11px; padding: 4px 10px; border: 1px solid var(--neutral-200, #e9ecef); border-radius: 6px; background: var(--neutral-0, #fff); cursor: pointer; color: var(--neutral-600, #868e96); transition: all 0.15s; }
+.range-btns button:hover { border-color: var(--semantic-600, #4c6ef5); color: var(--semantic-600, #4c6ef5); }
+.range-btns button.active { background: var(--semantic-600, #4c6ef5); color: #fff; border-color: var(--semantic-600, #4c6ef5); }
 .chart-panel__canvas { height: 240px; }
 
-.overview__table { padding: 0 24px 24px; }
-.section-title { font-size: 14px; font-weight: 600; color: var(--neutral-800, #333); margin: 0 0 12px; }
-.tool-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--neutral-0, #fff); border-radius: var(--radius-lg, 12px); overflow: hidden; border: 1px solid var(--neutral-100, #f0f0f0); }
-.tool-table th { text-align: left; padding: 10px 12px; background: var(--neutral-50, #fafafa); color: var(--neutral-600, #555); font-weight: 600; border-bottom: 1px solid var(--neutral-200, #e5e5e5); }
-.tool-table td { padding: 10px 12px; border-bottom: 1px solid var(--neutral-100, #f0f0f0); color: var(--neutral-700, #333); }
-.tool-table code { font-size: 11px; background: var(--neutral-100, #f0f0f0); padding: 1px 4px; border-radius: 3px; }
-.text-error { color: #dc2626; font-weight: 600; }
+.overview__table { padding: 0 0 24px; }
+.section-title { font-size: 14px; font-weight: 600; color: var(--neutral-800, #343a40); margin: 0 0 12px; }
+.tool-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--neutral-0, #fff); border-radius: var(--radius-lg, 12px); overflow: hidden; border: 1px solid var(--neutral-100, #f1f3f5); }
+.tool-table th { text-align: left; padding: 10px 12px; background: var(--neutral-50, #f8f9fa); color: var(--neutral-600, #868e96); font-weight: 600; border-bottom: 1px solid var(--neutral-200, #e9ecef); }
+.tool-table td { padding: 10px 12px; border-bottom: 1px solid var(--neutral-100, #f1f3f5); color: var(--neutral-700, #495057); }
+.tool-table code { font-size: 11px; background: var(--neutral-100, #f1f3f5); padding: 1px 4px; border-radius: 3px; }
+.text-error { color: var(--status-error, #fa5252); font-weight: 600; }
 </style>
