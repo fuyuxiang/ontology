@@ -1,11 +1,14 @@
 <template>
   <div class="publish-page">
-    <div class="publish-page__header">
-      <div class="publish-page__title-row">
-        <button v-if="selectedOntology" class="btn-back" @click="backToGrid">&larr; 返回</button>
-        <h1 class="page-title">{{ selectedOntology ? selectedOntology.name : '本体发布环境' }}</h1>
+    <!-- 顶部 Banner，与本体列表风格一致 -->
+    <div class="page-banner">
+      <div class="page-banner__content">
+        <div class="page-banner__title-row">
+          <button v-if="selectedOntology" class="btn-back" @click="backToGrid">&larr; 返回</button>
+          <h1 class="page-banner__title">{{ selectedOntology ? selectedOntology.name : '本体发布环境' }}</h1>
+        </div>
+        <p class="page-banner__desc">{{ selectedOntology ? `版本历史 · 共 ${selectedOntology.total_versions} 个版本` : '已发布本体一览，点击卡片查看版本历史' }}</p>
       </div>
-      <p class="page-desc">{{ selectedOntology ? `版本历史 · 共 ${selectedOntology.total_versions} 个版本` : '已发布本体一览，点击卡片查看版本历史' }}</p>
     </div>
 
     <!-- 第一级：本体卡片网格 -->
@@ -493,11 +496,23 @@ function formatTime(iso: string) {
 }
 </script>
 <style scoped>
-.publish-page { padding: 24px; height: 100%; display: flex; flex-direction: column; }
-.publish-page__header { margin-bottom: 20px; }
-.publish-page__title-row { display: flex; align-items: center; gap: 12px; }
-.page-title { font-size: 20px; font-weight: 700; color: var(--neutral-900); margin: 0; }
-.page-desc { font-size: 13px; color: var(--neutral-500); margin: 4px 0 0; }
+.publish-page { max-width: 1400px; margin: 0 auto; height: 100%; display: flex; flex-direction: column; }
+
+.page-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 32px 32px;
+  background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 50%, #eff6ff 100%);
+  border-radius: var(--radius-lg, 12px);
+  margin-bottom: 24px;
+  flex-shrink: 0;
+}
+.page-banner__title-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.page-banner__title { font-size: 24px; font-weight: 700; color: var(--neutral-900, #111); margin: 0; }
+.page-banner__desc { font-size: 13px; color: var(--neutral-600, #555); margin: 0; max-width: 600px; line-height: 1.5; }
+.btn-back { background: rgba(255,255,255,0.7); border: 1px solid var(--neutral-200, #e5e5e5); padding: 5px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--neutral-700, #333); transition: background 0.15s; }
+.btn-back:hover { background: #fff; }
 .btn-back { background: none; border: 1px solid var(--neutral-200); padding: 4px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--neutral-600); }
 .btn-back:hover { background: var(--neutral-50); }
 
