@@ -234,12 +234,12 @@ onBeforeUnmount(() => {
 <style scoped>
 .overview__stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 0 0 24px; }
 .stat-card { background: var(--neutral-0, #fff); border: 1px solid var(--neutral-100, #f1f3f5); border-radius: var(--radius-lg, 12px); padding: 16px; display: flex; align-items: center; gap: 12px; transition: box-shadow 0.15s, border-color 0.15s; }
-.stat-card:hover { border-color: var(--semantic-200, #bac8ff); box-shadow: 0 4px 16px rgba(76, 110, 245, 0.08); }
+.stat-card:hover { border-color: var(--primary, #2563eb); box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08); }
 .stat-card__icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.stat-card__icon--calls { background: var(--semantic-50, #eef2ff); }
-.stat-card__icon--speed { background: var(--dynamic-50, #e6fcf5); }
-.stat-card__icon--error { background: var(--status-error-bg, #fff5f5); }
-.stat-card__icon--conn { background: var(--kinetic-50, #fff8e1); }
+.stat-card__icon--calls { background: #eff6ff; }
+.stat-card__icon--speed { background: #ecfdf5; }
+.stat-card__icon--error { background: #fef2f2; }
+.stat-card__icon--conn { background: #fffbeb; }
 .stat-card__body { flex: 1; }
 .stat-card__value { font-size: 22px; font-weight: 700; color: var(--neutral-900, #212529); }
 .stat-card__value small { font-size: 12px; font-weight: 400; color: var(--neutral-500, #adb5bd); margin-left: 2px; }
@@ -256,8 +256,8 @@ onBeforeUnmount(() => {
 .chart-panel__header h3 { font-size: 13px; font-weight: 600; color: var(--neutral-800, #343a40); margin: 0; }
 .range-btns { display: flex; gap: 4px; }
 .range-btns button { font-size: 11px; padding: 4px 10px; border: 1px solid var(--neutral-200, #e9ecef); border-radius: 6px; background: var(--neutral-0, #fff); cursor: pointer; color: var(--neutral-600, #868e96); transition: all 0.15s; }
-.range-btns button:hover { border-color: var(--semantic-600, #4c6ef5); color: var(--semantic-600, #4c6ef5); }
-.range-btns button.active { background: var(--semantic-600, #4c6ef5); color: #fff; border-color: var(--semantic-600, #4c6ef5); }
+.range-btns button:hover { border-color: var(--primary, #2563eb); color: var(--primary, #2563eb); }
+.range-btns button.active { background: var(--primary, #2563eb); color: #fff; border-color: var(--primary, #2563eb); }
 .chart-panel__canvas { height: 240px; }
 
 .overview__table { padding: 0 0 24px; }

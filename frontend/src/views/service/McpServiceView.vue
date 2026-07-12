@@ -1,20 +1,24 @@
 <template>
   <div class="mcp-service">
-    <div class="mcp-service__header">
-      <div>
-        <h1 class="text-display">本体服务</h1>
-        <p class="text-caption" style="margin-top: 4px;">基于 MCP 协议对外暴露本体查询、数据探索与 Python 运行时能力</p>
+    <!-- 顶部 Banner，与本体列表风格一致 -->
+    <div class="page-banner">
+      <div class="page-banner__content">
+        <h1 class="page-banner__title">本体服务</h1>
+        <p class="page-banner__desc">基于 MCP 协议对外暴露本体查询、数据探索与 Python 运行时能力，支持 Claude Desktop、Cursor 等 AI 客户端直接接入</p>
       </div>
-      <div class="mcp-service__endpoint">
-        <span class="mcp-service__status">
+      <div class="page-banner__right">
+        <div class="page-banner__status">
           <span class="status-dot"></span>
-          服务运行中
-        </span>
-        <code>{{ endpoint }}</code>
-        <button class="btn-copy" @click="copyEndpoint">{{ copied ? '已复制' : '复制' }}</button>
+          <span>服务运行中</span>
+        </div>
+        <div class="page-banner__endpoint">
+          <code>{{ endpoint }}</code>
+          <button class="copy-btn" @click="copyEndpoint">{{ copied ? '已复制' : '复制' }}</button>
+        </div>
       </div>
     </div>
 
+    <!-- 标签导航 -->
     <div class="mcp-service__tabs">
       <button
         v-for="tab in tabs"
@@ -57,95 +61,53 @@ async function copyEndpoint() {
 
 <style scoped>
 .mcp-service {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-  padding: 24px 32px 0;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
-  box-sizing: border-box;
-  width: 100%;
 }
 
-.mcp-service__header {
+.page-banner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
-  flex-shrink: 0;
+  padding: 32px 32px;
+  background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 50%, #eff6ff 100%);
+  border-radius: var(--radius-lg, 12px);
+  margin-bottom: 24px;
 }
-
-.mcp-service__endpoint {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: var(--neutral-0, #fff);
-  border: 1px solid var(--neutral-200, #e9ecef);
-  border-radius: var(--radius-md, 8px);
-}
-.mcp-service__status {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--status-success, #12b886);
-  white-space: nowrap;
-}
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--status-success, #12b886);
-  animation: pulse 2s infinite;
-}
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-.mcp-service__endpoint code {
-  font-size: 12px;
-  font-family: var(--font-mono, monospace);
-  color: var(--neutral-700, #495057);
-  padding-left: 10px;
-  border-left: 1px solid var(--neutral-200, #e9ecef);
-}
-.btn-copy {
-  font-size: 11px;
-  background: var(--semantic-50, #eef2ff);
-  border: 1px solid var(--semantic-200, #bac8ff);
-  color: var(--semantic-600, #4c6ef5);
-  padding: 4px 10px;
-  border-radius: var(--radius-sm, 4px);
-  cursor: pointer;
-  transition: all 0.15s;
-  white-space: nowrap;
-}
-.btn-copy:hover { background: var(--semantic-100, #dbe4ff); }
+.page-banner__title { font-size: 24px; font-weight: 700; color: var(--neutral-900, #111); margin: 0 0 8px; }
+.page-banner__desc { font-size: 13px; color: var(--neutral-600, #555); margin: 0; max-width: 600px; line-height: 1.5; }
+.page-banner__right { text-align: right; flex-shrink: 0; }
+.page-banner__status { display: flex; align-items: center; gap: 6px; justify-content: flex-end; font-size: 13px; color: #16a34a; font-weight: 500; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block; animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.page-banner__endpoint { margin-top: 10px; display: flex; align-items: center; justify-content: flex-end; }
+.page-banner__endpoint code { font-size: 12px; background: rgba(37,99,235,0.08); color: var(--primary, #2563eb); padding: 5px 10px; border-radius: 6px; }
+.copy-btn { margin-left: 8px; font-size: 11px; background: var(--primary, #2563eb); border: none; color: #fff; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: opacity 0.15s; }
+.copy-btn:hover { opacity: 0.9; }
 
 .mcp-service__tabs {
   display: flex;
   gap: 4px;
-  border-bottom: 1px solid var(--neutral-200, #e9ecef);
-  flex-shrink: 0;
+  border-bottom: 1px solid var(--neutral-200, #e5e5e5);
+  margin: 0 0 24px;
 }
 .tab-btn {
   padding: 10px 4px;
-  margin-right: 20px;
-  font-size: 13px;
+  margin-right: 24px;
+  font-size: 14px;
   font-weight: 500;
-  color: var(--neutral-500, #adb5bd);
+  color: var(--neutral-500, #888);
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
-.tab-btn:hover { color: var(--neutral-800, #343a40); }
+.tab-btn:hover { color: var(--neutral-800, #333); }
 .tab-btn--active {
-  color: var(--semantic-600, #4c6ef5);
-  border-bottom-color: var(--semantic-600, #4c6ef5);
+  color: var(--primary, #2563eb);
+  border-bottom-color: var(--primary, #2563eb);
 }
 
-.mcp-service__content { flex: 1; overflow-y: auto; padding: 24px 0; }
+.mcp-service__content { padding-bottom: 24px; }
 </style>
