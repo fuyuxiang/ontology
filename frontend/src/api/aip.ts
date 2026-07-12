@@ -242,6 +242,10 @@ export const ontologyPublishApi = {
     get<any>('/ontology-publish/versions', { params: status ? { status } : undefined }),
   getVersion: (versionId: string) =>
     get<any>(`/ontology-publish/versions/${versionId}`),
+  listVersionFunctions: (versionId: string) =>
+    get<any>(`/ontology-publish/versions/${versionId}/functions`),
+  listVersionActions: (versionId: string) =>
+    get<any>(`/ontology-publish/versions/${versionId}/actions`),
 }
 
 export const sceneStaleApi = {
