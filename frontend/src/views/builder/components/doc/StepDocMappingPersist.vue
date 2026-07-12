@@ -24,6 +24,9 @@
         <span v-if="unregisteredCount" class="step-persist__stat step-persist__stat--error">
           ✗ 未注册 {{ unregisteredCount }}
         </span>
+        <span v-if="incompleteItems.length" class="step-persist__stat step-persist__stat--warn">
+          ⚠ 字段映射不完整 {{ incompleteItems.length }}
+        </span>
       </div>
 
       <!-- 主体：左列表 + 右明细 -->
@@ -49,6 +52,11 @@
             </span>
             <span class="step-persist__list-name">{{ item.entity_name }}</span>
             <span v-if="item.table_name" class="step-persist__list-table">{{ item.table_name }}</span>
+            <span
+              v-if="item.field_mappings.length && mappedFieldCount(item) / item.field_mappings.length < 0.5"
+              class="step-persist__list-warn"
+              title="字段映射不完整"
+            >⚠</span>
           </div>
         </div>
 
@@ -62,6 +70,17 @@
               <span class="step-persist__detail-conf">
                 置信度 {{ Math.round((selectedItem.confidence || 0) * 100) }}%
               </span>
+              <span class="step-persist__detail-conf">
+                字段映射 {{ mappedFieldCount(selectedItem) }}/{{ selectedItem.field_mappings.length }}
+              </span>
+            </div>
+
+            <!-- 字段映射不完整提示 -->
+            <div
+              v-if="selectedItem.field_mappings.length && mappedFieldCount(selectedItem) / selectedItem.field_mappings.length < 0.5"
+              class="step-persist__alert step-persist__alert--warn"
+            >
+              <strong>字段映射不完整：</strong>该实体仅 {{ mappedFieldCount(selectedItem) }}/{{ selectedItem.field_mappings.length }} 个属性匹配到来源字段，未匹配的属性落库后将没有数据源。可返回上一步手动补全映射。
             </div>
 
             <!-- 冲突提示 -->
@@ -210,6 +229,21 @@ const conflictCount = computed(() => items.value.filter(i => i.conflict).length)
 
 const unregisteredCount = computed(() => items.value.filter(i => !i.asset_registered).length)
 
+// 某实体已成功映射到字段的属性数（attribute_id + source_column 都有值）
+function mappedFieldCount(item: MappingPreviewItem): number {
+  return (item.field_mappings || []).filter(fm => fm.attribute_id && fm.source_column).length
+}
+
+// 字段映射不完整的实体（有属性但一个都没映射上，或映射率低于 50%）——仅统计将要落库的实体
+const incompleteItems = computed(() =>
+  items.value.filter(i => {
+    if (!i.asset_registered && skipSet.has(i.entity_name)) return false // 跳过的不算
+    const total = (i.field_mappings || []).length
+    if (total === 0) return false
+    return mappedFieldCount(i) / total < 0.5
+  }),
+)
+
 const hasUnhandledConflicts = computed(() =>
   items.value.some(i => i.conflict && !conflictActions[i.entity_name]),
 )
@@ -261,6 +295,16 @@ async function loadPreview() {
 }
 
 async function onApply() {
+  // 字段映射不完整时，落库前明确提示，避免静默产生「有对象无数据源」的本体
+  if (incompleteItems.value.length) {
+    const names = incompleteItems.value.map(i => i.entity_name).join('、')
+    const ok = window.confirm(
+      `以下实体的字段映射不完整，落库后这些属性将没有数据源：\n\n${names}\n\n` +
+      `建议返回上一步补全字段映射。是否仍要继续落库？`,
+    )
+    if (!ok) return
+  }
+
   applying.value = true
   try {
     const applyItems: MappingApplyItem[] = items.value
@@ -330,6 +374,7 @@ onMounted(() => {
 .step-persist__list-item--unregistered .step-persist__list-icon { color: #d32f2f; }
 .step-persist__list-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .step-persist__list-table { font-size: 11px; color: #888; white-space: nowrap; }
+.step-persist__list-warn { font-size: 12px; color: #f57c00; flex-shrink: 0; }
 
 /* right detail */
 .step-persist__detail { flex: 1; padding: 16px; overflow-y: auto; max-height: 480px; }
