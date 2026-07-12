@@ -102,7 +102,7 @@
                 <span class="res-card__en">{{ e.name }}</span>
                 <p v-if="e.description" class="res-card__desc">{{ e.description }}</p>
                 <div class="res-card__foot">
-                  <span class="res-card__tag">属性 {{ e.mapped_count }}/{{ e.attribute_count }}</span>
+                  <span class="res-card__tag">属性 {{ e.attribute_count }}</span>
                   <button v-if="detail.status === 'draft'" class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)">移除</button>
                 </div>
               </div>
