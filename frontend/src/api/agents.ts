@@ -64,10 +64,21 @@ export interface ConversationSummary {
   updated_at: string
 }
 
+export interface ConversationThinkStep {
+  category: 'ontology' | 'logic' | 'action' | 'data'
+  tool: string
+  label: string
+  arguments?: any
+  summary?: string | null
+  resultCount?: number | null
+  detail?: any
+}
+
 export interface ConversationMessage {
   role: 'user' | 'assistant'
   content: string
   ts?: string
+  steps?: ConversationThinkStep[]
 }
 
 export interface ConversationDetail extends ConversationSummary {

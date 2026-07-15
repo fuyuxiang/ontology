@@ -224,14 +224,99 @@ def delete_conversation(aid: str, cid: str, db: Session = Depends(get_db), user:
     return {"ok": True}
 
 
-def _writeback_conversation(db: Session, conv, question: str, answer: str) -> None:
-    """把本轮问答追加写回会话；title 若为默认值则用首条 user 消息生成。失败静默。"""
+# 工具名 → (分类, 中文名)。分类用于前端时间线分组着色：
+#   ontology 本体 / logic 逻辑 / action 动作 / data 数据
+_TOOL_META: dict[str, tuple[str, str]] = {
+    "describe_ontology_model": ("ontology", "读取本体模型"),
+    "get_entity_detail": ("ontology", "读取实体详情"),
+    "analyze_assets_for_ontology": ("ontology", "分析资产生成本体"),
+    "list_rules": ("logic", "读取本体规则"),
+    "evaluate_rule": ("logic", "评估规则"),
+    "evaluate_all_rules": ("logic", "评估全部规则"),
+    "screen_users_by_rule": ("logic", "按规则筛查"),
+    "execute_action": ("action", "执行动作"),
+    "query_entity_data": ("data", "查询实体数据"),
+    "query_datasource": ("data", "查询数据源"),
+    "list_datasources": ("data", "查询数据源列表"),
+    "list_business_datasources": ("data", "查询业务数据源"),
+    "list_business_documents": ("data", "查询业务文档"),
+    "get_table_schema": ("data", "读取表结构"),
+}
+
+
+def _tool_meta(tool: str) -> tuple[str, str]:
+    """返回工具的 (分类, 中文名)。画布节点工具名形如 "[节点标签]"。"""
+    if tool.startswith("[") and tool.endswith("]"):
+        return ("action", tool[1:-1])
+    return _TOOL_META.get(tool, ("action", tool))
+
+
+class _collect_steps:
+    """把 chat 流中的 tool_start/tool_result 事件累积成结构化思考步骤。
+
+    每一步形如 {category, tool, label, arguments, summary, resultCount, detail}，
+    随流实时推入前端时间线，结束后整体写回会话记录以便历史回看。
+    """
+
+    def __init__(self) -> None:
+        self._steps: list[dict] = []
+
+    def feed(self, event: dict) -> None:
+        etype = event.get("type")
+        if etype == "tool_start":
+            tool = event.get("tool", "")
+            category, label = _tool_meta(tool)
+            self._steps.append({
+                "category": category,
+                "tool": tool,
+                "label": label,
+                "arguments": event.get("arguments"),
+                "summary": None,
+                "resultCount": None,
+                "detail": None,
+            })
+        elif etype == "tool_result":
+            tool = event.get("tool", "")
+            # 就近回填最后一个同名且未完成的步骤，否则补一条
+            target = None
+            for s in reversed(self._steps):
+                if s["tool"] == tool and s["summary"] is None:
+                    target = s
+                    break
+            if target is None:
+                category, label = _tool_meta(tool)
+                target = {
+                    "category": category,
+                    "tool": tool,
+                    "label": label,
+                    "arguments": None,
+                }
+                self._steps.append(target)
+            target["summary"] = event.get("summary")
+            target["resultCount"] = event.get("resultCount")
+            target["detail"] = event.get("detail")
+
+    def result(self) -> list[dict]:
+        return self._steps
+
+
+def _writeback_conversation(
+    db: Session, conv, question: str, answer: str, steps: list | None = None
+) -> None:
+    """把本轮问答追加写回会话；title 若为默认值则用首条 user 消息生成。失败静默。
+
+    steps 为本轮 assistant 的思考过程（工具调用链），一并存入 assistant 消息，
+    便于历史会话回看时重现"使用本体、调用逻辑、执行动作"的过程。
+    """
     if conv is None:
         return
     try:
         msgs = list(conv.messages or [])
         msgs.append({"role": "user", "content": question})
-        msgs.append({"role": "assistant", "content": answer})
+        assistant_msg: dict = {"role": "assistant", "content": answer}
+        if steps:
+            assistant_msg["steps"] = steps
+        msgs.append(assistant_msg)
         conv.messages = msgs
         if not conv.title or conv.title == "新会话":
             conv.title = question.strip()[:30] or "新会话"
@@ -324,11 +409,13 @@ async def chat_with_agent(
         def event_stream():
             t0 = _time.time()
             chunks = []
+            steps = _collect_steps()
             status = "ok"
             try:
                 for event in engine.run(question_for_trace):
                     if event.get("type") == "answer" and event.get("content"):
                         chunks.append(event["content"])
+                    steps.feed(event)
                     yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as e:
                 status = "error"
@@ -347,7 +434,9 @@ async def chat_with_agent(
                     db.commit()
                 except Exception:
                     pass
-                _writeback_conversation(db, conv, question_for_trace, "".join(chunks))
+                _writeback_conversation(
+                    db, conv, question_for_trace, "".join(chunks), steps.result()
+                )
     else:
         entity_id = (a.entity_ids or [None])[0] if a.entity_ids else None
         agent_svc = AgentService(
@@ -361,11 +450,13 @@ async def chat_with_agent(
         def event_stream():
             t0 = _time.time()
             chunks = []
+            steps = _collect_steps()
             status = "ok"
             try:
                 for event in agent_svc.ask(question_for_trace, entity_id, history=history):
                     if event.get("type") in ("answer", "content") and event.get("content"):
                         chunks.append(event["content"])
+                    steps.feed(event)
                     yield f"data: {_json.dumps(event, ensure_ascii=False)}\n\n"
             except Exception as e:
                 status = "error"
@@ -384,7 +475,9 @@ async def chat_with_agent(
                     db.commit()
                 except Exception:
                     pass
-                _writeback_conversation(db, conv, question_for_trace, "".join(chunks))
+                _writeback_conversation(
+                    db, conv, question_for_trace, "".join(chunks), steps.result()
+                )
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
