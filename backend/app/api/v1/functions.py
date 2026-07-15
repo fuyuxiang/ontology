@@ -126,6 +126,7 @@ def update_function(
 @router.delete("/{func_id}", status_code=204)
 def delete_function(
     func_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -133,6 +134,9 @@ def delete_function(
     func = repo.get_by_id(func_id)
     if not func:
         raise HTTPException(status_code=404, detail="函数不存在")
+
+    callable_name = func.callable_name
+    source_path = func.source_path
 
     write_audit(
         db, user_id=user.id,
@@ -142,6 +146,9 @@ def delete_function(
     )
     repo.delete(func)
     repo.commit()
+
+    # 彻底删除：清运行时缓存 + 删掉工作区源文件，避免 scan_all/文件监听把函数重新登记回来
+    _purge_function_runtime(request, callable_name, source_path)
 
 
 @router.post("/{func_id}/test", response_model=FunctionTestResult)
@@ -176,6 +183,56 @@ def test_function(
 
 WORKSPACE_DIR = Path(__file__).resolve().parents[3] / ".." / "workspace"
 CODE_SERVER_PORT = int(__import__("os").environ.get("CODE_SERVER_PORT", "8443"))
+
+
+def _is_within_workspace(target: Path) -> bool:
+    """确保待删除路径位于工作区目录内，避免误删工作区外的文件。"""
+    try:
+        root = WORKSPACE_DIR.resolve()
+        target.resolve().relative_to(root)
+        return True
+    except (ValueError, OSError):
+        return False
+
+
+def _purge_function_runtime(
+    request: Request, callable_name: str, source_path: str | None
+) -> None:
+    """UI 删除函数后清理运行时痕迹：内存 registry 缓存 + 工作区源文件/目录。
+
+    否则应用重启时 scan_all 会遍历工作区 .py 重新登记，或文件监听在文件被触碰时
+    通过 _persist 把已删除的函数重建回数据库。
+    """
+    import logging
+    import shutil
+
+    logger = logging.getLogger(__name__)
+
+    # 1. 清内存缓存，使执行器/能力列表立即反映删除
+    registry = getattr(request.app.state, "function_registry", None)
+    if registry is not None and callable_name:
+        try:
+            registry.discard(callable_name)
+        except Exception as e:  # noqa: BLE001
+            logger.warning(f"清理 function registry 缓存失败 {callable_name}: {e}")
+
+    # 2. 删除该函数登记来源的源文件
+    if source_path:
+        src = Path(source_path)
+        if src.is_file() and _is_within_workspace(src):
+            try:
+                src.unlink()
+            except OSError as e:
+                logger.warning(f"删除函数源文件失败 {src}: {e}")
+
+    # 3. 删除工作区中以 callable_name 命名的函数目录（open_workspace 生成的）
+    if callable_name:
+        func_dir = WORKSPACE_DIR / callable_name
+        if func_dir.is_dir() and _is_within_workspace(func_dir):
+            try:
+                shutil.rmtree(func_dir)
+            except OSError as e:
+                logger.warning(f"删除函数工作区目录失败 {func_dir}: {e}")
 
 
 def _generate_function_template(callable_name: str, description: str) -> str:
