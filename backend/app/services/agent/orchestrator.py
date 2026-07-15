@@ -427,7 +427,7 @@ class AgentService:
                     return {
                         "type": "capabilities",
                         "functions": [
-                            {"name": c.get("callable_name", ""), "type": c.get("type", "")}
+                            {"name": c.get("name", ""), "type": c.get("type", "")}
                             for c in result[:20]
                         ],
                     }
