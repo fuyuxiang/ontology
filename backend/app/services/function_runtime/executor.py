@@ -23,6 +23,44 @@ class MaxDepthError(Exception):
     pass
 
 
+def _coerce_param(value: Any, declared_type: str) -> Any:
+    """按函数声明的参数类型强制转换入参。
+
+    入参多来自 JSON(MCP/HTTP)，数字常被传成字符串(如 "50")，函数内部
+    直接参与数值运算会抛 '<' not supported between int and str。这里按
+    ParamSchema.type 收口转换，转换失败则原样返回(交由函数自身校验)。
+    """
+    if value is None:
+        return None
+    t = (declared_type or "").lower()
+    try:
+        if t in ("number", "float", "double", "decimal"):
+            return float(value)
+        if t in ("integer", "int"):
+            return int(float(value)) if isinstance(value, str) else int(value)
+        if t in ("boolean", "bool"):
+            if isinstance(value, str):
+                return value.strip().lower() in ("true", "1", "yes", "y")
+            return bool(value)
+        if t in ("string", "str", "text"):
+            return value if isinstance(value, str) else str(value)
+    except (TypeError, ValueError):
+        return value
+    return value
+
+
+def _coerce_params(params: dict, param_schemas: list) -> dict:
+    """按 FunctionMeta.params 逐项做类型强制，未声明的参数保持原样。"""
+    if not params or not param_schemas:
+        return params
+    type_by_name = {p.name: p.type for p in param_schemas if getattr(p, "name", None)}
+    coerced = dict(params)
+    for name, decl_type in type_by_name.items():
+        if name in coerced:
+            coerced[name] = _coerce_param(coerced[name], decl_type)
+    return coerced
+
+
 class FunctionRuntimeExecutor:
     def __init__(self, registry: FunctionRegistry, sandbox: UnifiedSandbox, db: Session):
         self.registry = registry
@@ -85,6 +123,9 @@ class FunctionRuntimeExecutor:
         context.call_stack.append(callable_name)
 
         try:
+            # 按声明的参数类型强制转换入参(JSON 传来的 "50" → 50)，收口点覆盖
+            # MCP run_logic、tool_router run_logic/run_action 及 call_function 链式调用
+            params = _coerce_params(params, meta.params)
             code = self._read_source(meta.source_path)
             call_fn = self._build_call_function(context)
             ontology_helpers = self._build_ontology_helpers()

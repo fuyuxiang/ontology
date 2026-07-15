@@ -457,7 +457,7 @@ class ToolRouter:
             table_name = svc.get_table_name(asset)
             attrs = {}
             for a in entity.attributes:
-                attrs[a.name] = a.name
+                attrs[a.name] = a.source_field or a.name
             mapping[name] = {"table": table_name, "attributes": attrs}
         return mapping, f"返回 {len(entity_names)} 个实体的映射", len(entity_names)
 
@@ -472,11 +472,11 @@ class ToolRouter:
             return {"error": "不允许多语句查询"}, "非法 SQL", 0
 
         svc = EntityDataService(self.db)
-        assets = svc.list_assets()
-        if not assets:
-            return {"error": "没有可用数据源"}, "无数据源", 0
-        first_asset_name = assets[0].get("name", "")
-        result = svc.execute_sql_on_asset(first_asset_name, sql, purpose="agent.complex_sql")
+        # 以本体对象名书写 SQL：重写对象名→物理表名，并把涉及的 asset 全部并入白名单
+        entities = self.db.query(OntologyEntity).all()
+        if not entities:
+            return {"error": "没有可用对象"}, "无数据源", 0
+        result = svc.execute_ontology_sql(entities, sql, purpose="agent.complex_sql")
         if "error" in result:
             return result, f"SQL 执行失败: {result['error']}", 0
         return result, f"SQL 查询返回 {result.get('rowCount', 0)} 行", result.get("rowCount", 0)
