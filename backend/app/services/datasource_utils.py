@@ -94,7 +94,10 @@ def execute_readonly_sql(ds: DataSource, sql: str, limit: int = 50) -> dict:
     if _FORBIDDEN_SQL_PATTERN.match(sql):
         return {"error": "仅允许 SELECT 查询，禁止执行修改操作"}
 
-    limit = min(limit, 200)
+    try:
+        limit = min(int(limit), 200)
+    except (TypeError, ValueError):
+        limit = 50
     if not re.search(r"\bLIMIT\b", sql, re.IGNORECASE):
         sql = f"{sql} LIMIT {limit}"
 

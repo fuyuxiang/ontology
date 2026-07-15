@@ -17,6 +17,18 @@ from app.services.mcp_tools.registry import MCPTool, register
 from app.services.mcp_tools.resolve import resolve_ontology_id
 
 
+def _safe_int(value: Any, default: int) -> int:
+    """把外部传入(可能是字符串)的分页参数安全转成 int，失败回退默认值。
+
+    JSON 常把 page_size/limit 传成字符串，直接参与 min()/比较会抛
+    '<' not supported between int and str。
+    """
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _get_entity_in_ontology(db: Session, ontology_id: str, object_name: str) -> OntologyEntity | None:
     """在本体范围内按名称查找实体"""
     owned_ids = {r[0] for r in db.query(OntologyEntity.id).filter(
@@ -100,8 +112,8 @@ class QueryInstancesTool(MCPTool):
         if not table_name:
             return {"error": f"实体 '{object_name}' 的资产未配置表名"}
 
-        page_size = min(arguments.get("page_size") or DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
-        page_token = arguments.get("page_token") or 0
+        page_size = min(_safe_int(arguments.get("page_size"), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE)
+        page_token = _safe_int(arguments.get("page_token"), 0)
         return_attrs = arguments.get("return_attrs")
         where_sql = arguments.get("where_sql", "")
         where_params = arguments.get("where_params") or []
@@ -183,62 +195,39 @@ class ComplexSqlTool(MCPTool):
 
         sql = arguments["sql"].replace("\n", " ").strip()
         params_list = arguments.get("params") or []
-        page_size = min(arguments.get("page_size") or DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
-        page_token = arguments.get("page_token") or 0
+        page_size = min(_safe_int(arguments.get("page_size"), DEFAULT_PAGE_SIZE), MAX_PAGE_SIZE)
+        page_token = _safe_int(arguments.get("page_token"), 0)
 
-        # 查找 SQL 中引用的本体对象来确定执行的 connection
         entities = _get_all_entities_in_ontology(db, ontology_id)
+        if not entities:
+            return {"error": "本体中没有可用的对象"}
 
-        target_entity = None
-        sql_upper = sql.upper()
-        for e in entities:
-            if e.name.upper() in sql_upper:
-                target_entity = e
-                break
-
-        if not target_entity and entities:
-            target_entity = entities[0]
-
-        if not target_entity:
-            return {"error": "未找到可用的本体对象来执行查询"}
-
-        svc = EntityDataService(db)
-        result = svc.resolve_entity_asset(target_entity.id)
-        if not result:
-            return {"error": f"实体 '{target_entity.name}' 未绑定数据源"}
-
-        asset, binding = result
-        exec_svc = ExecuteService(db)
-
-        # 带分页
+        # 分页：SQL 未显式带 LIMIT 时补上
         paginated_sql = sql
-        if "LIMIT" not in sql_upper:
+        if "LIMIT" not in sql.upper():
             paginated_sql += f" LIMIT {page_size}"
             if page_token:
                 paginated_sql += f" OFFSET {page_token}"
 
-        try:
-            req = ExecuteRequest(
-                asset_id=asset.id,
-                sql=paginated_sql,
-                params={f"p{i}": v for i, v in enumerate(params_list)},
-                purpose=f"mcp.complex_sql.{ontology_name}",
-                timeout_ms=30000,
-                user_id=arguments.get("user_id"),
-            )
-            exec_result = exec_svc.execute(req)
-            items = [
-                {col: row[i] for i, col in enumerate(exec_result.columns)}
-                for row in exec_result.rows
-            ]
-            return {
-                "items": items,
-                "page_size": page_size,
-                "next_page_token": page_token + page_size if len(items) == page_size else None,
-                "total_count": len(items),
-            }
-        except Exception as e:
-            return {"error": str(e)}
+        # 对象名→物理表名重写 + 多表白名单，统一走 EntityDataService.execute_ontology_sql
+        svc = EntityDataService(db)
+        result = svc.execute_ontology_sql(
+            entities,
+            paginated_sql,
+            params={f"p{i}": v for i, v in enumerate(params_list)},
+            purpose=f"mcp.complex_sql.{ontology_name}",
+        )
+        if "error" in result:
+            return {"error": result["error"]}
+
+        columns = result["columns"]
+        items = [dict(zip(columns, row)) for row in result["rows"]]
+        return {
+            "items": items,
+            "page_size": page_size,
+            "next_page_token": page_token + page_size if len(items) == page_size else None,
+            "total_count": len(items),
+        }
 
 
 # ── ontology_object_find ───────────────────────────────────
@@ -279,7 +268,7 @@ class ObjectFindTool(MCPTool):
         svc = EntityDataService(db)
         filters = arguments.get("filters", {})
         fields = arguments.get("fields")
-        limit = min(arguments.get("limit") or 50, 200)
+        limit = min(_safe_int(arguments.get("limit"), 50), 200)
         valid_attrs = set(_get_attr_mapping(db, entity.id).keys())
 
         return svc.query_entity_data(
