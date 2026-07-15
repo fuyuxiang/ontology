@@ -104,7 +104,7 @@
         <div class="agent-detail__chat-body" v-else>
           <div class="agent-detail__messages" ref="messagesRef">
             <div v-for="(msg, i) in messages" :key="i" class="agent-detail__message" :class="`agent-detail__message--${msg.role}`">
-              <!-- 思考过程：使用本体 / 调用逻辑 / 执行动作 / 查询数据 的调用时间线 -->
+              <!-- 思考过程：意图识别 → 本体查询 → 逻辑计算 → 执行动作 → 生成回答 -->
               <div
                 v-if="msg.role === 'assistant' && msg.steps && msg.steps.length"
                 class="agent-detail__think"
@@ -124,10 +124,10 @@
                     :key="si"
                     class="agent-detail__step"
                   >
-                    <span class="agent-detail__step-dot" :class="`agent-detail__step-dot--${step.category}`"></span>
+                    <span class="agent-detail__step-dot" :class="`agent-detail__step-dot--${step.stage}`"></span>
                     <div class="agent-detail__step-body">
                       <div class="agent-detail__step-line">
-                        <span class="agent-detail__step-tag" :class="`agent-detail__step-tag--${step.category}`">{{ CATEGORY_LABELS[step.category] }}</span>
+                        <span class="agent-detail__step-tag" :class="`agent-detail__step-tag--${step.stage}`">{{ STAGE_LABELS[step.stage] }}</span>
                         <span class="agent-detail__step-label">{{ step.label }}</span>
                         <span
                           v-if="step.summary == null && streaming && i === messages.length - 1"
@@ -217,10 +217,12 @@ let savedSnapshot = ''
 const messagesRef = ref<HTMLElement | null>(null)
 const chatInput = ref('')
 
-// 思考过程的一步：一次工具调用（使用本体 / 调用逻辑 / 执行动作 / 查询数据）
+// 思考过程阶段：意图识别 → 本体查询 → 逻辑计算 → 执行动作 → 生成回答
+// intent / answer 为前端合成阶段；ontology / logic / action 来自工具调用
+type ThinkStage = 'intent' | 'ontology' | 'logic' | 'action' | 'answer'
 interface ThinkStep {
-  category: 'ontology' | 'logic' | 'action' | 'data'
-  tool: string
+  stage: ThinkStage
+  tool?: string          // 工具类步骤才有；合成步骤为空
   label: string
   arguments?: any
   summary?: string | null
@@ -249,35 +251,47 @@ async function copyMessage(content: string, idx: number) {
   copiedTimer = setTimeout(() => { copiedIdx.value = -1 }, 1500)
 }
 
-// 工具英文名 → [分类, 中文名]。分类用于思考过程时间线分组着色：
-// ontology 本体 / logic 逻辑 / action 动作 / data 数据
-type ToolCategory = 'ontology' | 'logic' | 'action' | 'data'
-const TOOL_META: Record<string, [ToolCategory, string]> = {
+// 工具英文名 → [阶段, 中文名]。阶段用于思考过程时间线分组：
+// ontology 本体查询 / logic 逻辑计算 / action 执行动作
+type ToolStage = 'ontology' | 'logic' | 'action'
+const TOOL_META: Record<string, [ToolStage, string]> = {
+  // 本体查询：读模型/结构、取数、查实例
   describe_ontology_model: ['ontology', '读取本体模型'],
   get_entity_detail: ['ontology', '读取实体详情'],
+  query_entity_data: ['ontology', '查询实体数据'],
+  ontology_query_instances: ['ontology', '查询实体实例'],
+  ontology_get_attr_mapping: ['ontology', '读取属性映射'],
+  ontology_complex_sql: ['ontology', '执行复杂查询'],
+  ontology_list_capabilities: ['ontology', '列出本体能力'],
+  query_datasource: ['ontology', '查询数据源'],
+  list_datasources: ['ontology', '查询数据源列表'],
+  get_table_schema: ['ontology', '读取表结构'],
+  list_business_datasources: ['ontology', '查询业务数据源'],
+  list_business_documents: ['ontology', '查询业务文档'],
   analyze_assets_for_ontology: ['ontology', '分析资产生成本体'],
+  // 逻辑计算：执行逻辑函数、规则评估/筛查
+  ontology_run_logic: ['logic', '执行逻辑函数'],
   list_rules: ['logic', '读取本体规则'],
   evaluate_rule: ['logic', '评估规则'],
   evaluate_all_rules: ['logic', '评估全部规则'],
   screen_users_by_rule: ['logic', '按规则筛查'],
+  // 执行动作：有副作用的业务动作
   execute_action: ['action', '执行动作'],
-  query_entity_data: ['data', '查询实体数据'],
-  query_datasource: ['data', '查询数据源'],
-  list_datasources: ['data', '查询数据源列表'],
-  list_business_datasources: ['data', '查询业务数据源'],
-  list_business_documents: ['data', '查询业务文档'],
-  get_table_schema: ['data', '读取表结构'],
+  ontology_run_action: ['action', '执行动作函数'],
 }
-function toolMeta(tool: string): [ToolCategory, string] {
-  // 画布节点工具名形如 "[节点标签]"，归为动作并去掉方括号
+function toolMeta(tool: string): [ToolStage, string] {
+  // 画布节点工具名形如 "[节点标签]"，归为执行动作并去掉方括号
   if (tool.startsWith('[') && tool.endsWith(']')) return ['action', tool.slice(1, -1)]
-  return TOOL_META[tool] || ['action', tool]
+  return TOOL_META[tool] || ['ontology', tool]
 }
-const CATEGORY_LABELS: Record<ToolCategory, string> = {
-  ontology: '本体',
-  logic: '逻辑',
-  action: '动作',
-  data: '数据',
+
+// 阶段中文名与展示顺序（意图识别 → 本体查询 → 逻辑计算 → 执行动作 → 生成回答）
+const STAGE_LABELS: Record<ThinkStage, string> = {
+  intent: '意图识别',
+  ontology: '本体查询',
+  logic: '逻辑计算',
+  action: '执行动作',
+  answer: '生成回答',
 }
 
 function formToPayload() {
@@ -348,6 +362,26 @@ async function loadConversations() {
   conversations.value = await agentsApi.listConversations(current.value.id).catch(() => [])
 }
 
+// 历史会话的步骤（后端字段为 category=ontology/logic/action）还原为前端阶段模型，
+// 首尾补上"意图识别""生成回答"合成阶段，与实时展示保持一致
+function restoreSteps(raw: any): ThinkStep[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined
+  const toolSteps: ThinkStep[] = raw.map((s: any) => ({
+    stage: (['ontology', 'logic', 'action'].includes(s.category) ? s.category : 'ontology') as ThinkStage,
+    tool: s.tool,
+    label: s.label || s.tool || '',
+    arguments: s.arguments,
+    summary: s.summary,
+    resultCount: s.resultCount,
+    detail: s.detail,
+  }))
+  return [
+    { stage: 'intent', label: '理解问题、规划调用', summary: '' },
+    ...toolSteps,
+    { stage: 'answer', label: '输出分析结论', summary: '' },
+  ]
+}
+
 async function selectConversation(cid: string) {
   if (!current.value) return
   activeConversationId.value = cid
@@ -356,7 +390,7 @@ async function selectConversation(cid: string) {
     messages.value = detail.messages.map((m: any) => ({
       role: m.role,
       content: m.content,
-      steps: m.steps || undefined,
+      steps: restoreSteps(m.steps),
       stepsOpen: false,  // 历史回看默认收起，可点开
     }))
   } catch {
@@ -388,6 +422,15 @@ async function removeConversation(cid: string) {
   if (!activeConversationId.value && first) await selectConversation(first.id)
 }
 
+// 把最近一个还在"进行中"的步骤收尾。合成阶段（意图识别/生成回答）没有
+// 工具返回，用空串占位标记完成，避免一直显示"进行中…"
+function finishRunningStep(msg: ChatMessage) {
+  const running = [...(msg.steps || [])].reverse().find(s => s.summary == null)
+  if (running && (running.stage === 'intent' || running.stage === 'answer')) {
+    running.summary = ''
+  }
+}
+
 async function sendMessage() {
   const text = chatInput.value.trim()
   if (!text || !current.value || streaming.value) return
@@ -407,7 +450,14 @@ async function sendMessage() {
 
   chatInput.value = ''
   messages.value.push({ role: 'user', content: text })
-  messages.value.push({ role: 'assistant', content: '', status: '思考中…' })
+  messages.value.push({
+    role: 'assistant',
+    content: '',
+    status: '思考中…',
+    // 意图识别为首个合成阶段：从发问到首个工具调用/正文之间
+    steps: [{ stage: 'intent', label: '理解问题、规划调用' }],
+    stepsOpen: true,
+  })
   streaming.value = true
 
   await nextTick()
@@ -441,15 +491,21 @@ async function sendMessage() {
           if (evt.type === 'content') {
             // 正文分块（orchestrator / graph_engine 均以 content 事件流式输出）
             cur.status = undefined  // 正文开始，清除阶段提示
+            if (!cur.content) {
+              // 正文首次到达：收尾意图识别阶段，补入"生成回答"合成阶段
+              finishRunningStep(cur)
+              cur.steps.push({ stage: 'answer', label: '输出分析结论' })
+            }
             cur.content += evt.content
           } else if (evt.type === 'answer') {
             // 出错兜底：后端直接返回完整答复
             cur.status = undefined
             cur.content = evt.content
           } else if (evt.type === 'tool_start') {
-            // 工具调用开始：累积一步思考过程 + 气泡阶段提示
-            const [category, label] = toolMeta(evt.tool)
-            cur.steps.push({ category, tool: evt.tool, label, arguments: evt.arguments })
+            // 工具调用开始：收尾上一阶段，累积一步思考过程 + 气泡提示
+            finishRunningStep(cur)
+            const [stage, label] = toolMeta(evt.tool)
+            cur.steps.push({ stage, tool: evt.tool, label, arguments: evt.arguments })
             cur.stepsOpen = true  // 流式过程中自动展开时间线
             if (!cur.content) cur.status = `正在${label}…`
           } else if (evt.type === 'tool_result') {
@@ -478,6 +534,7 @@ async function sendMessage() {
         cur.status = undefined
         cur.content = '（未返回内容）'
       }
+      finishRunningStep(cur)  // 收尾"生成回答"阶段
       // 答复已出，自动收起思考过程时间线，可手动点开回看
       if (cur.content && cur.steps && cur.steps.length) cur.stepsOpen = false
     }
@@ -800,10 +857,11 @@ onMounted(async () => {
   border-radius: 50%;
   z-index: 1;
 }
+.agent-detail__step-dot--intent { background: #64748b; }
 .agent-detail__step-dot--ontology { background: #2563eb; }
 .agent-detail__step-dot--logic { background: #7c3aed; }
 .agent-detail__step-dot--action { background: #ea580c; }
-.agent-detail__step-dot--data { background: #059669; }
+.agent-detail__step-dot--answer { background: #059669; }
 .agent-detail__step-body {
   flex: 1;
   min-width: 0;
@@ -821,10 +879,11 @@ onMounted(async () => {
   font-size: 11px;
   line-height: 18px;
 }
+.agent-detail__step-tag--intent { background: #f1f5f9; color: #64748b; }
 .agent-detail__step-tag--ontology { background: #eff6ff; color: #2563eb; }
 .agent-detail__step-tag--logic { background: #f5f3ff; color: #7c3aed; }
 .agent-detail__step-tag--action { background: #fff7ed; color: #ea580c; }
-.agent-detail__step-tag--data { background: #ecfdf5; color: #059669; }
+.agent-detail__step-tag--answer { background: #ecfdf5; color: #059669; }
 .agent-detail__step-label {
   font-size: 12px;
   color: var(--neutral-700, #374151);

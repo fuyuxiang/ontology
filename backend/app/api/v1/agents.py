@@ -224,31 +224,41 @@ def delete_conversation(aid: str, cid: str, db: Session = Depends(get_db), user:
     return {"ok": True}
 
 
-# 工具名 → (分类, 中文名)。分类用于前端时间线分组着色：
-#   ontology 本体 / logic 逻辑 / action 动作 / data 数据
+# 工具名 → (阶段, 中文名)。阶段用于前端思考过程时间线分组：
+#   ontology 本体查询 / logic 逻辑计算 / action 执行动作
+#   （intent 意图识别、answer 生成回答为前端合成阶段，不来自工具）
 _TOOL_META: dict[str, tuple[str, str]] = {
+    # ── 本体查询：读取模型/结构、取数、查实例 ──
     "describe_ontology_model": ("ontology", "读取本体模型"),
     "get_entity_detail": ("ontology", "读取实体详情"),
+    "query_entity_data": ("ontology", "查询实体数据"),
+    "ontology_query_instances": ("ontology", "查询实体实例"),
+    "ontology_get_attr_mapping": ("ontology", "读取属性映射"),
+    "ontology_complex_sql": ("ontology", "执行复杂查询"),
+    "ontology_list_capabilities": ("ontology", "列出本体能力"),
+    "query_datasource": ("ontology", "查询数据源"),
+    "list_datasources": ("ontology", "查询数据源列表"),
+    "get_table_schema": ("ontology", "读取表结构"),
+    "list_business_datasources": ("ontology", "查询业务数据源"),
+    "list_business_documents": ("ontology", "查询业务文档"),
     "analyze_assets_for_ontology": ("ontology", "分析资产生成本体"),
+    # ── 逻辑计算：执行逻辑函数、规则评估/筛查 ──
+    "ontology_run_logic": ("logic", "执行逻辑函数"),
     "list_rules": ("logic", "读取本体规则"),
     "evaluate_rule": ("logic", "评估规则"),
     "evaluate_all_rules": ("logic", "评估全部规则"),
     "screen_users_by_rule": ("logic", "按规则筛查"),
+    # ── 执行动作：有副作用的业务动作 ──
     "execute_action": ("action", "执行动作"),
-    "query_entity_data": ("data", "查询实体数据"),
-    "query_datasource": ("data", "查询数据源"),
-    "list_datasources": ("data", "查询数据源列表"),
-    "list_business_datasources": ("data", "查询业务数据源"),
-    "list_business_documents": ("data", "查询业务文档"),
-    "get_table_schema": ("data", "读取表结构"),
+    "ontology_run_action": ("action", "执行动作函数"),
 }
 
 
 def _tool_meta(tool: str) -> tuple[str, str]:
-    """返回工具的 (分类, 中文名)。画布节点工具名形如 "[节点标签]"。"""
+    """返回工具的 (阶段, 中文名)。画布节点工具名形如 "[节点标签]"。"""
     if tool.startswith("[") and tool.endswith("]"):
         return ("action", tool[1:-1])
-    return _TOOL_META.get(tool, ("action", tool))
+    return _TOOL_META.get(tool, ("ontology", tool))
 
 
 class _collect_steps:
