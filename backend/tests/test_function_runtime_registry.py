@@ -37,6 +37,20 @@ class TestRegistryInMemory:
         registry.unregister("calc")
         assert registry.get("calc") is None
 
+    def test_discard_removes_from_cache(self):
+        db = MagicMock()
+        db.query.return_value.filter.return_value.first.return_value = None
+        registry = FunctionRegistry(db)
+        registry.register(_make_meta("calc"))
+        registry.discard("calc")
+        assert registry.get("calc") is None
+
+    def test_discard_missing_is_noop(self):
+        db = MagicMock()
+        registry = FunctionRegistry(db)
+        registry.discard("nonexistent")  # 不应抛异常
+        assert registry.get("nonexistent") is None
+
     def test_get_nonexistent_returns_none(self):
         db = MagicMock()
         registry = FunctionRegistry(db)

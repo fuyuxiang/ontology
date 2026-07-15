@@ -30,6 +30,10 @@ class FunctionRegistry:
             self.db.delete(row)
             self.db.commit()
 
+    def discard(self, callable_name: str) -> None:
+        """从内存缓存移除函数（用于 UI 删除后同步运行时状态，不区分登记来源）。"""
+        self._cache.pop(callable_name, None)
+
     def get(self, callable_name: str) -> FunctionMeta | None:
         return self._cache.get(callable_name)
 
