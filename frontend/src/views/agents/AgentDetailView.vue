@@ -116,11 +116,11 @@
                     viewBox="0 0 16 16" fill="none"
                   ><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   <span class="agent-detail__think-title">思考过程</span>
-                  <span class="agent-detail__think-count">{{ msg.steps.length }} 步</span>
+                  <span class="agent-detail__think-count">{{ displaySteps(msg).length }} 步</span>
                 </button>
                 <div v-show="msg.stepsOpen" class="agent-detail__think-steps">
                   <div
-                    v-for="(step, si) in msg.steps"
+                    v-for="(step, si) in displaySteps(msg)"
                     :key="si"
                     class="agent-detail__step"
                   >
@@ -130,6 +130,7 @@
                         <span class="agent-detail__step-tag" :class="`agent-detail__step-tag--${step.stage}`">{{ STAGE_LABELS[step.stage] }}</span>
                         <span class="agent-detail__step-label">{{ step.label }}</span>
                         <span v-if="stepTarget(step)" class="agent-detail__step-target" :class="`agent-detail__step-target--${step.stage}`">{{ stepTarget(step) }}</span>
+                        <span v-if="(step.repeat || 1) > 1" class="agent-detail__step-repeat">×{{ step.repeat }}</span>
                         <span
                           v-if="step.summary == null && streaming && i === messages.length - 1"
                           class="agent-detail__step-running"
@@ -249,6 +250,7 @@ interface ThinkStep {
   summary?: string | null
   resultCount?: number | null
   detail?: any
+  repeat?: number         // 相邻重复步骤折叠后的次数，>1 时以 ×N 展示
 }
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -399,11 +401,47 @@ function stepFacts(step: ThinkStep): { label: string; value: string }[] {
   return out
 }
 
+// 把相邻的重复步骤折叠成一条：模型常对同一实体反复查询，时间线里会出现大量
+// 「同阶段+同标签+同目标+同摘要+同记录数」的连续步骤，这里按签名合并并记次数，
+// 使思考过程时间线保持简洁。签名不含耗时/入参细节，仅看用户可感知的展示要素。
+function dedupeSteps(steps: ThinkStep[] | undefined): ThinkStep[] {
+  if (!steps || !steps.length) return []
+  const sig = (s: ThinkStep) =>
+    [s.stage, s.label, stepTarget(s), s.summary ?? '', s.resultCount ?? ''].join('¦')
+  const out: ThinkStep[] = []
+  let prevSig = ''
+  for (const s of steps) {
+    const cur = sig(s)
+    const last = out[out.length - 1]
+    if (last && cur === prevSig) {
+      last.repeat = (last.repeat || 1) + 1
+      continue
+    }
+    out.push({ ...s, repeat: 1 })
+    prevSig = cur
+  }
+  return out
+}
+
+// 去重结果按 steps 数组引用缓存，避免模板里多处（计数/时间线/调用链）重复计算。
+// 流式过程中 steps 被原地 push，引用不变，故用长度参与 key 让缓存随之失效。
+const _dedupeCache = new WeakMap<ThinkStep[], { len: number; out: ThinkStep[] }>()
+function displaySteps(msg: ChatMessage): ThinkStep[] {
+  const steps = msg.steps
+  if (!steps || !steps.length) return []
+  const cached = _dedupeCache.get(steps)
+  if (cached && cached.len === steps.length) return cached.out
+  const out = dedupeSteps(steps)
+  _dedupeCache.set(steps, { len: steps.length, out })
+  return out
+}
+
 // 汇总整条消息的「本体调用链」思维链：把每一步压成一个链路节点，供答复下方展示。
 interface ChainNode { stage: ThinkStage; label: string; target: string }
 function messageChain(msg: ChatMessage): ChainNode[] {
-  if (!msg.steps || !msg.steps.length) return []
-  return msg.steps.map(s => ({
+  const steps = displaySteps(msg)
+  if (!steps.length) return []
+  return steps.map(s => ({
     stage: s.stage,
     label: STAGE_LABELS[s.stage],
     target: stepTarget(s),
@@ -1031,6 +1069,17 @@ onMounted(async () => {
 .agent-detail__step-target--ontology { background: #eff6ff; color: #1d4ed8; }
 .agent-detail__step-target--logic { background: #f5f3ff; color: #6d28d9; }
 .agent-detail__step-target--action { background: #fff7ed; color: #c2410c; }
+/* 折叠重复步骤的次数角标 */
+.agent-detail__step-repeat {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 8px;
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 600;
+  background: var(--neutral-200, #e5e7eb);
+  color: var(--neutral-600, #4b5563);
+}
 /* 每步关键事实：数据源 / 数据表 / 筛选 / 调用链 / 耗时 等 */
 .agent-detail__step-facts {
   margin-top: 3px;
