@@ -129,12 +129,19 @@
                       <div class="agent-detail__step-line">
                         <span class="agent-detail__step-tag" :class="`agent-detail__step-tag--${step.stage}`">{{ STAGE_LABELS[step.stage] }}</span>
                         <span class="agent-detail__step-label">{{ step.label }}</span>
+                        <span v-if="stepTarget(step)" class="agent-detail__step-target" :class="`agent-detail__step-target--${step.stage}`">{{ stepTarget(step) }}</span>
                         <span
                           v-if="step.summary == null && streaming && i === messages.length - 1"
                           class="agent-detail__step-running"
                         >进行中…</span>
                       </div>
                       <div v-if="step.summary" class="agent-detail__step-summary">{{ step.summary }}</div>
+                      <div v-if="stepFacts(step).length" class="agent-detail__step-facts">
+                        <span v-for="(f, fi) in stepFacts(step)" :key="fi" class="agent-detail__fact">
+                          <span class="agent-detail__fact-k">{{ f.label }}</span>
+                          <span class="agent-detail__fact-v">{{ f.value }}</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -150,6 +157,20 @@
                   v-html="renderMarkdownSafe(msg.content)"
                 ></div>
                 <template v-else>{{ msg.content }}</template>
+              </div>
+              <!-- 本体调用链：把本轮命中的本体对象/逻辑函数/动作串成一条思维链 -->
+              <div
+                v-if="msg.role === 'assistant' && !streaming && msg.content && messageChain(msg).length"
+                class="agent-detail__chain"
+              >
+                <span class="agent-detail__chain-title">本体调用链</span>
+                <template v-for="(node, ni) in messageChain(msg)" :key="ni">
+                  <span class="agent-detail__chain-node" :class="`agent-detail__chain-node--${node.stage}`">
+                    <span class="agent-detail__chain-stage">{{ node.label }}</span>
+                    <span v-if="node.target" class="agent-detail__chain-target">{{ node.target }}</span>
+                  </span>
+                  <span v-if="ni < messageChain(msg).length - 1" class="agent-detail__chain-arrow">→</span>
+                </template>
               </div>
               <div
                 v-if="msg.role === 'assistant' && !streaming && msg.content"
@@ -292,6 +313,101 @@ const STAGE_LABELS: Record<ThinkStage, string> = {
   logic: '逻辑计算',
   action: '执行动作',
   answer: '生成回答',
+}
+
+// 从一步思考过程里提炼「调用了哪个本体对象/哪个逻辑函数/哪些数据」的目标标签，
+// 供时间线上高亮展示，让用户看清每一步落在哪个本体资产上。
+function stepTarget(step: ThinkStep): string {
+  const d = step.detail || {}
+  switch (d.type) {
+    case 'logic_run':
+    case 'action_run':
+      return d.callable || ''
+    case 'instance_query':
+    case 'entity_query':
+      return d.entity_cn || d.entity || ''
+    case 'entity_detail':
+      return d.entity_cn || d.entity || ''
+    case 'evaluate_single':
+    case 'screen':
+      return d.rule_name || ''
+    case 'action':
+      return d.action_name || ''
+    default:
+      break
+  }
+  // 退化到入参里的实体/函数名
+  const a = step.arguments || {}
+  return a.callable_name || a.entity_name || a.action_name || ''
+}
+
+// 把一步的关键 detail 拆成若干「键: 值」小标签，展示数据来源、筛选条件、耗时、调用链等。
+function stepFacts(step: ThinkStep): { label: string; value: string }[] {
+  const d = step.detail || {}
+  const out: { label: string; value: string }[] = []
+  const fmtObj = (o: any) => {
+    if (!o || typeof o !== 'object') return String(o ?? '')
+    const parts = Object.entries(o).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
+    return parts.join('、')
+  }
+  switch (d.type) {
+    case 'logic_run':
+    case 'action_run':
+      if (d.params && Object.keys(d.params).length) out.push({ label: '入参', value: fmtObj(d.params) })
+      if (Array.isArray(d.call_trace) && d.call_trace.length) out.push({ label: '调用链', value: d.call_trace.join(' → ') })
+      if (d.execution_ms != null) out.push({ label: '耗时', value: `${d.execution_ms}ms` })
+      if (d.error) out.push({ label: '错误', value: String(d.error) })
+      break
+    case 'instance_query':
+    case 'entity_query':
+      if (d.datasource) out.push({ label: '数据源', value: d.datasource })
+      if (d.table) out.push({ label: '数据表', value: d.table })
+      if (d.filters && Object.keys(d.filters).length) out.push({ label: '筛选', value: fmtObj(d.filters) })
+      if (d.row_count != null) out.push({ label: '记录数', value: `${d.row_count}` })
+      break
+    case 'sql_query':
+      if (d.sql) out.push({ label: 'SQL', value: d.sql })
+      if (d.row_count != null) out.push({ label: '返回', value: `${d.row_count} 行` })
+      break
+    case 'attr_mapping':
+      for (const m of (d.mappings || [])) out.push({ label: m.entity, value: m.table })
+      break
+    case 'ontology_model':
+      if (d.entities?.length) out.push({ label: '本体对象', value: d.entities.join('、') })
+      out.push({ label: '规模', value: `${d.entity_count} 对象 / ${d.relation_count} 关系` })
+      break
+    case 'capabilities':
+      for (const f of (d.functions || [])) out.push({ label: f.type === 'action' ? '动作' : '逻辑', value: f.name })
+      break
+    case 'entity_detail':
+      out.push({ label: '结构', value: `${d.attr_count ?? 0} 属性 / ${d.relation_count ?? 0} 关系` })
+      break
+    case 'evaluate_single':
+      out.push({ label: '规则', value: d.rule_name || '' })
+      out.push({ label: '结果', value: `${d.triggered ? '触发' : '未触发'}（命中 ${d.matched_count}/${d.total_count}）` })
+      break
+    case 'screen':
+      if (d.risk_level) out.push({ label: '风险', value: d.risk_level })
+      if (d.matched_users != null) out.push({ label: '命中人数', value: `${d.matched_users}` })
+      break
+    case 'action':
+      out.push({ label: '结果', value: d.success ? '成功' : '失败' })
+      break
+    default:
+      break
+  }
+  return out
+}
+
+// 汇总整条消息的「本体调用链」思维链：把每一步压成一个链路节点，供答复下方展示。
+interface ChainNode { stage: ThinkStage; label: string; target: string }
+function messageChain(msg: ChatMessage): ChainNode[] {
+  if (!msg.steps || !msg.steps.length) return []
+  return msg.steps.map(s => ({
+    stage: s.stage,
+    label: STAGE_LABELS[s.stage],
+    target: stepTarget(s),
+  }))
 }
 
 function formToPayload() {
@@ -898,6 +1014,96 @@ onMounted(async () => {
   color: var(--neutral-500, #6b7280);
   line-height: 1.5;
   word-break: break-word;
+}
+/* 每步调用目标：本体对象名 / 逻辑函数名 / 动作名 */
+.agent-detail__step-target {
+  flex: none;
+  max-width: 100%;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 18px;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  background: var(--neutral-100, #f3f4f6);
+  color: var(--neutral-700, #374151);
+  word-break: break-all;
+}
+.agent-detail__step-target--ontology { background: #eff6ff; color: #1d4ed8; }
+.agent-detail__step-target--logic { background: #f5f3ff; color: #6d28d9; }
+.agent-detail__step-target--action { background: #fff7ed; color: #c2410c; }
+/* 每步关键事实：数据源 / 数据表 / 筛选 / 调用链 / 耗时 等 */
+.agent-detail__step-facts {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.agent-detail__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 1px 6px;
+  border: 1px solid var(--neutral-200, #e5e7eb);
+  border-radius: 4px;
+  background: #fff;
+  font-size: 11px;
+  line-height: 16px;
+}
+.agent-detail__fact-k {
+  flex: none;
+  color: var(--neutral-400, #9ca3af);
+}
+.agent-detail__fact-v {
+  color: var(--neutral-700, #374151);
+  word-break: break-all;
+}
+/* 本体调用链：答复下方的横向思维链 */
+.agent-detail__chain {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px dashed var(--neutral-200, #e5e7eb);
+  border-radius: 8px;
+  background: #fafbfc;
+}
+.agent-detail__chain-title {
+  flex: none;
+  margin-right: 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--neutral-500, #6b7280);
+}
+.agent-detail__chain-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--neutral-100, #f3f4f6);
+  font-size: 11px;
+  line-height: 18px;
+}
+.agent-detail__chain-node--intent { background: #f1f5f9; color: #475569; }
+.agent-detail__chain-node--ontology { background: #eff6ff; color: #1d4ed8; }
+.agent-detail__chain-node--logic { background: #f5f3ff; color: #6d28d9; }
+.agent-detail__chain-node--action { background: #fff7ed; color: #c2410c; }
+.agent-detail__chain-node--answer { background: #ecfdf5; color: #047857; }
+.agent-detail__chain-stage {
+  font-weight: 500;
+}
+.agent-detail__chain-target {
+  padding-left: 4px;
+  border-left: 1px solid currentColor;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  opacity: 0.85;
+}
+.agent-detail__chain-arrow {
+  color: var(--neutral-400, #9ca3af);
+  font-size: 12px;
 }
 .agent-detail__msg-actions {
   margin-top: 4px;

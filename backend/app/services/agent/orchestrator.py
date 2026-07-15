@@ -354,7 +354,85 @@ class AgentService:
 
     def _extract_tool_detail(self, tool_name: str, args: dict, result: Any) -> dict | None:
         try:
-            if tool_name == "get_business_rules":
+            # ── 逻辑函数：展示调用了哪个逻辑函数 + 本体内部调用链 ──
+            if tool_name == "ontology_run_logic":
+                if isinstance(result, dict):
+                    return {
+                        "type": "logic_run",
+                        "callable": args.get("callable_name", ""),
+                        "params": args.get("params", {}),
+                        "success": result.get("success", False),
+                        "execution_ms": result.get("execution_ms"),
+                        "call_trace": result.get("call_trace", []),
+                        "error": result.get("error"),
+                    }
+
+            # ── 动作函数：展示调用了哪个动作函数 + 调用链 ──
+            elif tool_name == "ontology_run_action":
+                if isinstance(result, dict):
+                    return {
+                        "type": "action_run",
+                        "callable": args.get("callable_name", ""),
+                        "params": args.get("params", {}),
+                        "success": result.get("success", False),
+                        "execution_ms": result.get("execution_ms"),
+                        "call_trace": result.get("call_trace", []),
+                        "error": result.get("error"),
+                    }
+
+            # ── 本体实例查询：展示查了哪个本体对象、命中数据源/表、筛选条件 ──
+            elif tool_name == "ontology_query_instances":
+                if isinstance(result, dict) and not result.get("error"):
+                    return {
+                        "type": "instance_query",
+                        "entity": result.get("entity", args.get("entity_name", "")),
+                        "datasource": result.get("datasource", ""),
+                        "table": result.get("table", ""),
+                        "filters": args.get("filters", {}),
+                        "row_count": result.get("rowCount", 0),
+                    }
+
+            # ── 属性映射：展示解析了哪些本体对象、映射到哪张表 ──
+            elif tool_name == "ontology_get_attr_mapping":
+                if isinstance(result, dict):
+                    mappings = []
+                    for name, m in result.items():
+                        if isinstance(m, dict) and not m.get("error"):
+                            mappings.append({"entity": name, "table": m.get("table", "")})
+                    return {"type": "attr_mapping", "mappings": mappings}
+
+            # ── 复杂 SQL：展示实际执行的查询语句与返回行数 ──
+            elif tool_name == "ontology_complex_sql":
+                if isinstance(result, dict) and not result.get("error"):
+                    return {
+                        "type": "sql_query",
+                        "sql": args.get("sql", ""),
+                        "row_count": result.get("rowCount", 0),
+                    }
+
+            # ── 本体模型：展示读取到的本体对象与关系概览 ──
+            elif tool_name == "describe_ontology_model":
+                if isinstance(result, dict):
+                    ents = result.get("entities", []) or []
+                    return {
+                        "type": "ontology_model",
+                        "entity_count": len(ents),
+                        "relation_count": len(result.get("relations", []) or []),
+                        "entities": [e.get("name_cn") or e.get("name", "") for e in ents[:12]],
+                    }
+
+            # ── 本体能力清单：展示可用逻辑/动作函数 ──
+            elif tool_name == "ontology_list_capabilities":
+                if isinstance(result, list):
+                    return {
+                        "type": "capabilities",
+                        "functions": [
+                            {"name": c.get("callable_name", ""), "type": c.get("type", "")}
+                            for c in result[:20]
+                        ],
+                    }
+
+            elif tool_name == "get_business_rules":
                 if isinstance(result, list):
                     rules = []
                     for r in result:
