@@ -104,6 +104,41 @@
         <div class="agent-detail__chat-body" v-else>
           <div class="agent-detail__messages" ref="messagesRef">
             <div v-for="(msg, i) in messages" :key="i" class="agent-detail__message" :class="`agent-detail__message--${msg.role}`">
+              <!-- 思考过程：使用本体 / 调用逻辑 / 执行动作 / 查询数据 的调用时间线 -->
+              <div
+                v-if="msg.role === 'assistant' && msg.steps && msg.steps.length"
+                class="agent-detail__think"
+              >
+                <button class="agent-detail__think-head" @click="msg.stepsOpen = !msg.stepsOpen">
+                  <svg
+                    class="agent-detail__think-caret"
+                    :class="{ 'is-open': msg.stepsOpen }"
+                    viewBox="0 0 16 16" fill="none"
+                  ><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <span class="agent-detail__think-title">思考过程</span>
+                  <span class="agent-detail__think-count">{{ msg.steps.length }} 步</span>
+                </button>
+                <div v-show="msg.stepsOpen" class="agent-detail__think-steps">
+                  <div
+                    v-for="(step, si) in msg.steps"
+                    :key="si"
+                    class="agent-detail__step"
+                  >
+                    <span class="agent-detail__step-dot" :class="`agent-detail__step-dot--${step.category}`"></span>
+                    <div class="agent-detail__step-body">
+                      <div class="agent-detail__step-line">
+                        <span class="agent-detail__step-tag" :class="`agent-detail__step-tag--${step.category}`">{{ CATEGORY_LABELS[step.category] }}</span>
+                        <span class="agent-detail__step-label">{{ step.label }}</span>
+                        <span
+                          v-if="step.summary == null && streaming && i === messages.length - 1"
+                          class="agent-detail__step-running"
+                        >进行中…</span>
+                      </div>
+                      <div v-if="step.summary" class="agent-detail__step-summary">{{ step.summary }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="agent-detail__bubble" :class="`agent-detail__bubble--${msg.role}`">
                 <span v-if="msg.status && !msg.content" class="agent-detail__thinking">
                   <span class="agent-detail__thinking-dots"><i></i><i></i><i></i></span>
@@ -181,7 +216,25 @@ let savedSnapshot = ''
 
 const messagesRef = ref<HTMLElement | null>(null)
 const chatInput = ref('')
-const messages = ref<{ role: 'user' | 'assistant'; content: string; status?: string }[]>([])
+
+// 思考过程的一步：一次工具调用（使用本体 / 调用逻辑 / 执行动作 / 查询数据）
+interface ThinkStep {
+  category: 'ontology' | 'logic' | 'action' | 'data'
+  tool: string
+  label: string
+  arguments?: any
+  summary?: string | null
+  resultCount?: number | null
+  detail?: any
+}
+interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  status?: string
+  steps?: ThinkStep[]
+  stepsOpen?: boolean  // 思考过程时间线是否展开
+}
+const messages = ref<ChatMessage[]>([])
 
 const conversations = ref<ConversationSummary[]>([])
 const activeConversationId = ref<string | null>(null)
@@ -196,23 +249,35 @@ async function copyMessage(content: string, idx: number) {
   copiedTimer = setTimeout(() => { copiedIdx.value = -1 }, 1500)
 }
 
-// 工具英文名 → 中文提示，未命中则回退显示原始名
-const TOOL_LABELS: Record<string, string> = {
-  describe_ontology_model: '读取本体模型',
-  list_datasources: '查询数据源列表',
-  get_table_schema: '读取表结构',
-  query_datasource: '查询数据源',
-  get_entity_detail: '读取实体详情',
-  query_entity_data: '查询实体数据',
-  execute_action: '执行动作',
-  list_business_datasources: '查询业务数据源',
-  list_business_documents: '查询业务文档',
-  analyze_assets_for_ontology: '分析资产生成本体',
+// 工具英文名 → [分类, 中文名]。分类用于思考过程时间线分组着色：
+// ontology 本体 / logic 逻辑 / action 动作 / data 数据
+type ToolCategory = 'ontology' | 'logic' | 'action' | 'data'
+const TOOL_META: Record<string, [ToolCategory, string]> = {
+  describe_ontology_model: ['ontology', '读取本体模型'],
+  get_entity_detail: ['ontology', '读取实体详情'],
+  analyze_assets_for_ontology: ['ontology', '分析资产生成本体'],
+  list_rules: ['logic', '读取本体规则'],
+  evaluate_rule: ['logic', '评估规则'],
+  evaluate_all_rules: ['logic', '评估全部规则'],
+  screen_users_by_rule: ['logic', '按规则筛查'],
+  execute_action: ['action', '执行动作'],
+  query_entity_data: ['data', '查询实体数据'],
+  query_datasource: ['data', '查询数据源'],
+  list_datasources: ['data', '查询数据源列表'],
+  list_business_datasources: ['data', '查询业务数据源'],
+  list_business_documents: ['data', '查询业务文档'],
+  get_table_schema: ['data', '读取表结构'],
 }
-function toolLabel(tool: string): string {
-  // 画布节点工具名形如 "[节点标签]"，直接展示
-  if (tool.startsWith('[')) return tool.replace(/^\[|\]$/g, '')
-  return TOOL_LABELS[tool] || tool
+function toolMeta(tool: string): [ToolCategory, string] {
+  // 画布节点工具名形如 "[节点标签]"，归为动作并去掉方括号
+  if (tool.startsWith('[') && tool.endsWith(']')) return ['action', tool.slice(1, -1)]
+  return TOOL_META[tool] || ['action', tool]
+}
+const CATEGORY_LABELS: Record<ToolCategory, string> = {
+  ontology: '本体',
+  logic: '逻辑',
+  action: '动作',
+  data: '数据',
 }
 
 function formToPayload() {
@@ -288,7 +353,12 @@ async function selectConversation(cid: string) {
   activeConversationId.value = cid
   try {
     const detail = await agentsApi.getConversation(current.value.id, cid)
-    messages.value = detail.messages.map(m => ({ role: m.role, content: m.content }))
+    messages.value = detail.messages.map((m: any) => ({
+      role: m.role,
+      content: m.content,
+      steps: m.steps || undefined,
+      stepsOpen: false,  // 历史回看默认收起，可点开
+    }))
   } catch {
     messages.value = []
     await loadConversations()
@@ -367,6 +437,7 @@ async function sendMessage() {
         try {
           const evt = JSON.parse(data)
           const cur = messages.value[lastIdx]
+          if (!cur.steps) cur.steps = []
           if (evt.type === 'content') {
             // 正文分块（orchestrator / graph_engine 均以 content 事件流式输出）
             cur.status = undefined  // 正文开始，清除阶段提示
@@ -376,10 +447,21 @@ async function sendMessage() {
             cur.status = undefined
             cur.content = evt.content
           } else if (evt.type === 'tool_start') {
-            // 工具调用开始：在气泡里提示正在做什么
-            if (!cur.content) cur.status = `正在${toolLabel(evt.tool)}…`
+            // 工具调用开始：累积一步思考过程 + 气泡阶段提示
+            const [category, label] = toolMeta(evt.tool)
+            cur.steps.push({ category, tool: evt.tool, label, arguments: evt.arguments })
+            cur.stepsOpen = true  // 流式过程中自动展开时间线
+            if (!cur.content) cur.status = `正在${label}…`
           } else if (evt.type === 'tool_result') {
-            // 工具返回：展示该步骤的结果摘要
+            // 工具返回：回填该步骤的结果摘要与详情
+            const step = [...cur.steps].reverse().find(
+              s => s.tool === evt.tool && s.summary == null,
+            )
+            if (step) {
+              step.summary = evt.summary
+              step.resultCount = evt.resultCount
+              step.detail = evt.detail
+            }
             if (!cur.content && evt.summary) cur.status = evt.summary
           }
         } catch { /* skip non-json lines */ }
@@ -389,11 +471,15 @@ async function sendMessage() {
     }
   } finally {
     streaming.value = false
-    // 流结束后若气泡仍无正文，清掉阶段提示并给出兜底文案，避免卡在“思考中”
     const cur = messages.value[messages.value.length - 1]
-    if (cur && cur.role === 'assistant' && !cur.content) {
-      cur.status = undefined
-      cur.content = '（未返回内容）'
+    if (cur && cur.role === 'assistant') {
+      // 流结束后若气泡仍无正文，清掉阶段提示并给出兜底文案，避免卡在“思考中”
+      if (!cur.content) {
+        cur.status = undefined
+        cur.content = '（未返回内容）'
+      }
+      // 答复已出，自动收起思考过程时间线，可手动点开回看
+      if (cur.content && cur.steps && cur.steps.length) cur.stepsOpen = false
     }
   }
   await loadConversations()
@@ -646,6 +732,113 @@ onMounted(async () => {
   gap: 8px;
   color: var(--neutral-500, #6b7280);
   white-space: normal;  /* 覆盖气泡的 pre-wrap，避免模板换行被当成真实换行 */
+}
+/* 思考过程时间线 */
+.agent-detail__think {
+  margin-bottom: 6px;
+  border: 1px solid var(--neutral-200, #e5e7eb);
+  border-radius: 8px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+.agent-detail__think-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--neutral-600, #4b5563);
+}
+.agent-detail__think-head:hover {
+  background: var(--neutral-100, #f3f4f6);
+}
+.agent-detail__think-caret {
+  width: 12px;
+  height: 12px;
+  color: var(--neutral-400, #9ca3af);
+  transition: transform 0.15s;
+}
+.agent-detail__think-caret.is-open {
+  transform: rotate(90deg);
+}
+.agent-detail__think-title {
+  font-weight: 500;
+}
+.agent-detail__think-count {
+  color: var(--neutral-400, #9ca3af);
+}
+.agent-detail__think-steps {
+  padding: 4px 10px 8px 12px;
+  display: flex;
+  flex-direction: column;
+}
+.agent-detail__step {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  padding: 4px 0;
+}
+/* 竖向连接线 */
+.agent-detail__step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 14px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--neutral-200, #e5e7eb);
+}
+.agent-detail__step-dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 50%;
+  z-index: 1;
+}
+.agent-detail__step-dot--ontology { background: #2563eb; }
+.agent-detail__step-dot--logic { background: #7c3aed; }
+.agent-detail__step-dot--action { background: #ea580c; }
+.agent-detail__step-dot--data { background: #059669; }
+.agent-detail__step-body {
+  flex: 1;
+  min-width: 0;
+}
+.agent-detail__step-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.agent-detail__step-tag {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 18px;
+}
+.agent-detail__step-tag--ontology { background: #eff6ff; color: #2563eb; }
+.agent-detail__step-tag--logic { background: #f5f3ff; color: #7c3aed; }
+.agent-detail__step-tag--action { background: #fff7ed; color: #ea580c; }
+.agent-detail__step-tag--data { background: #ecfdf5; color: #059669; }
+.agent-detail__step-label {
+  font-size: 12px;
+  color: var(--neutral-700, #374151);
+}
+.agent-detail__step-running {
+  font-size: 11px;
+  color: var(--neutral-400, #9ca3af);
+}
+.agent-detail__step-summary {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--neutral-500, #6b7280);
+  line-height: 1.5;
+  word-break: break-word;
 }
 .agent-detail__msg-actions {
   margin-top: 4px;
