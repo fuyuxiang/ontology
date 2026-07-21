@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -18,9 +18,12 @@ if TYPE_CHECKING:
 
 class OntologyVersion(Base):
     __tablename__ = "ontology_versions"
+    __table_args__ = (
+        UniqueConstraint("ontology_id", "version_number", name="uq_version_ontology_number"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
-    version_number: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     ontology_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("scenario_dict.id"), nullable=True, index=True)
     description: Mapped[str | None] = mapped_column(Text)

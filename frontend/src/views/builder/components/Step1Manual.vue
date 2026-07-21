@@ -310,7 +310,7 @@ function addObject(seed?: Partial<OntologyObjectDraft>) {
     icon: seed?.icon || '🔷',
     instanceCount: 0,
     properties: seed?.properties || [{ id: uid('prop'), name: 'name', displayName: '名称', type: 'string', required: true }],
-    derivedProperties: [], rules: [], actions: [], approved: false,
+    derivedProperties: [], actions: [], approved: false,
   }
   objects.value.push(o)
   selectedId.value = o.id

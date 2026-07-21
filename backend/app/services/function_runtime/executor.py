@@ -205,9 +205,7 @@ class FunctionRuntimeExecutor:
             return [dict(zip(columns, row)) for row in result["rows"]]
 
         def update_object(entity_name: str, record_id: str, updates: dict) -> bool:
-            # update_object is a no-op placeholder for now (would need write-back support)
-            logger.info(f"update_object({entity_name}, {record_id}, {updates}) — write-back not implemented")
-            return True
+            raise NotImplementedError("update_object 尚未实现，不支持写回操作")
 
         return {
             "query_object": query_object,

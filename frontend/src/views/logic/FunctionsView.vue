@@ -167,7 +167,7 @@ async function fetchFunctions() {
   functions.value = await functionApi.list(query)
 }
 
-function onFuncCreated(fn: { id: string; name: string }) {
+function onFuncCreated(_fn: { id: string; name: string }) {
   showCreateModal.value = false
   fetchFunctions()
 }

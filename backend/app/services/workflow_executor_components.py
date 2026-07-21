@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 from app.models.version_components import (
     OntologyVersionAction,
     OntologyVersionFunction,
-    OntologyVersionRule,
 )
 from app.services.function_executor import FunctionExecutor
 
@@ -79,14 +78,7 @@ def execute_component_node(db: Session, node_data: dict, context: dict) -> dict:
                 "error": result.error, "execution_ms": result.execution_ms}
 
     elif ref_type == "rule":
-        vr = db.query(OntologyVersionRule).filter(
-            OntologyVersionRule.id == ref_id
-        ).first()
-        if not vr:
-            return {"triggered": False, "error": f"Version rule {ref_id} not found"}
-        triggered = _evaluate_rule_conditions(vr, resolved_params)
-        return {"triggered": triggered, "confidence": 1.0 if triggered else 0.0,
-                "conditions": []}
+        return {"triggered": False, "error": "规则域已移除，规则执行不再支持"}
 
     elif ref_type == "action":
         va = db.query(OntologyVersionAction).filter(

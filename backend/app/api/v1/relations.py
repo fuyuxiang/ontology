@@ -72,6 +72,17 @@ def create_relation(
     if not f_name or not t_name:
         raise HTTPException(status_code=400, detail="源实体或目标实体不存在")
 
+    # 校验两端实体属于同一本体
+    from_entity = db.get(OntologyEntity, data.from_entity_id)
+    to_entity = db.get(OntologyEntity, data.to_entity_id)
+    if from_entity and to_entity and from_entity.ontology_id != to_entity.ontology_id:
+        # 检查是否通过共享引用建立跨本体关系
+        shared = db.query(OntologySharedRef).filter(
+            OntologySharedRef.entity_id.in_([data.from_entity_id, data.to_entity_id])
+        ).first()
+        if not shared:
+            raise HTTPException(status_code=400, detail="两端实体不属于同一本体，且未通过共享引用关联")
+
     rel = EntityRelation(
         id=gen_uuid(), from_entity_id=data.from_entity_id, to_entity_id=data.to_entity_id,
         name=data.name, rel_type=data.rel_type, cardinality=data.cardinality, description=data.description,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
@@ -24,7 +26,7 @@ class SharedRefOut(BaseModel):
     source_ontology_id: str
     target_ontology_id: str
     entity_id: str
-    shared_at: str | None = None
+    shared_at: datetime | None = None
     shared_by: str | None = None
 
 

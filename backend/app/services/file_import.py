@@ -149,18 +149,22 @@ def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id:
         from_id = f"{source_ns}_{source}" if source_ns else source
         to_id = f"{target_ns}_{target}" if target_ns else target
 
-        # namespace 感知的实体查找
+        # namespace 感知的实体查找（限定在当前本体内）
         if not db.get(OntologyEntity, from_id):
             if db.get(OntologyEntity, source):
                 from_id = source
-            else:
-                found = db.query(OntologyEntity).filter(OntologyEntity.name == source).first()
+            elif ontology_id:
+                found = db.query(OntologyEntity).filter(
+                    OntologyEntity.name == source, OntologyEntity.ontology_id == ontology_id
+                ).first()
                 from_id = found.id if found else from_id
         if not db.get(OntologyEntity, to_id):
             if db.get(OntologyEntity, target):
                 to_id = target
-            else:
-                found = db.query(OntologyEntity).filter(OntologyEntity.name == target).first()
+            elif ontology_id:
+                found = db.query(OntologyEntity).filter(
+                    OntologyEntity.name == target, OntologyEntity.ontology_id == ontology_id
+                ).first()
                 to_id = found.id if found else to_id
 
         if not db.get(OntologyEntity, from_id) or not db.get(OntologyEntity, to_id):
@@ -204,17 +208,18 @@ def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id:
         if entity_id:
             action = EntityAction(
                 entity_id=entity_id,
+                ontology_id=ontology_id,
                 name=act.get("display_name", act["name"]),
-                type=act.get("trigger", "automatic"),
+                action_type=act.get("trigger", "automatic"),
                 status="active",
                 parameters_json=act.get("parameters"),
-                preconditions_json=act.get("preconditions"),
-                effects_json=act.get("effects"),
-                action_meta_json={
+                type_config={
                     "action_name": act["name"],
                     "reasoning_mode": act.get("reasoning_mode"),
                     "permissions": act.get("permissions"),
                     "audit": act.get("audit"),
+                    "preconditions": act.get("preconditions"),
+                    "effects": act.get("effects"),
                 },
             )
             db.add(action)
@@ -424,7 +429,7 @@ def parse_owl_ontology(content: bytes, fmt: str, db: Session, *, ontology_id: st
         comments = list(g.objects(cls, RDFS.comment))
         description = str(comments[0]) if comments else ""
 
-        eid = name
+        eid = f"{ontology_id}_{name}" if ontology_id else name
         existing = db.query(OntologyEntity).filter(OntologyEntity.id == eid).first()
         if existing:
             entity_map[uri] = eid

@@ -551,7 +551,7 @@ async function handleSubmit() {
   submitting.value = true
   try {
     const schema_json = form.datasource_id ? { datasource_id: form.datasource_id, table_name: form.table_name } : undefined
-    await entityApi.create({ name: form.name, name_cn: form.name_cn, tier: form.tier, description: form.description, schema_json, attributes: form.attributes.filter(a => a.name) } as never)
+    await entityApi.create({ name: form.name, name_cn: form.name_cn, tier: form.tier, description: form.description, schema_json, ontology_id: ontologyStore.currentOntologyId || '', attributes: form.attributes.filter(a => a.name) } as never)
     toast.success('对象创建成功')
     router.push('/browser')
   } catch (e) { toast.error(`创建失败: ${(e as Error).message}`) }
@@ -680,7 +680,7 @@ async function handleAiCreate() {
     const created: Record<string, string> = {}
     for (const entity of selected) {
       const schema_json = entity.datasource_id ? { datasource_id: entity.datasource_id, table_name: entity.table_name } : undefined
-      const res = await entityApi.create({ name: entity.name, name_cn: entity.name_cn, tier: entity.tier as any, description: entity.description, schema_json, attributes: entity.attributes.map(a => ({ id: '', name: a.name, type: a.type as any, description: a.description, required: a.required })) } as any)
+      const res = await entityApi.create({ name: entity.name, name_cn: entity.name_cn, tier: entity.tier as any, description: entity.description, schema_json, ontology_id: ontologyStore.currentOntologyId || '', attributes: entity.attributes.map(a => ({ id: '', name: a.name, type: a.type as any, description: a.description, required: a.required })) } as any)
       created[entity.name] = res.id
     }
     for (const rel of selectedRelations.value) {

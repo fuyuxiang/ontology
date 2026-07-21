@@ -432,51 +432,6 @@ class AgentService:
                         ],
                     }
 
-            elif tool_name == "get_business_rules":
-                if isinstance(result, list):
-                    rules = []
-                    for r in result:
-                        rules.append({
-                            "name": r.get("name", ""),
-                            "has_conditions": r.get("has_structured_conditions", False),
-                            "entity": r.get("entity", ""),
-                        })
-                    return {"type": "rules", "rules": rules}
-
-            elif tool_name == "screen_users_by_rule":
-                if isinstance(result, dict) and not result.get("error"):
-                    return {
-                        "type": "screen",
-                        "rule_name": result.get("rule_name", ""),
-                        "risk_level": result.get("risk_level", ""),
-                        "match_mode": result.get("match_mode", ""),
-                        "conditions_count": result.get("conditions_count", 0),
-                        "matched_users": result.get("matched_users", 0),
-                        "entities_involved": [],
-                        "conditions": [],
-                    }
-
-            elif tool_name == "evaluate_all_rules":
-                if isinstance(result, dict) and not result.get("error"):
-                    return {
-                        "type": "evaluate",
-                        "user_id": result.get("user_id", ""),
-                        "overall_risk": result.get("overall_risk", ""),
-                        "triggered_count": result.get("triggered_count", 0),
-                        "evaluated_count": result.get("evaluated_count", 0),
-                    }
-
-            elif tool_name == "evaluate_rule":
-                if isinstance(result, dict) and not result.get("error"):
-                    return {
-                        "type": "evaluate_single",
-                        "rule_name": result.get("rule_name", ""),
-                        "triggered": result.get("triggered", False),
-                        "matched_count": result.get("matched_count", 0),
-                        "total_count": result.get("total_count", 0),
-                        "risk_level": result.get("risk_level", ""),
-                    }
-
             elif tool_name == "query_entity_data":
                 if isinstance(result, dict) and not result.get("error"):
                     return {
