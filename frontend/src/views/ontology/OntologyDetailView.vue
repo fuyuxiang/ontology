@@ -529,8 +529,9 @@ async function loadRelations() {
   try {
     const results: EntityRelationDetail[] = []
     const seen = new Set<string>()
+    const ontologyId = scenario.value?.id
     for (const e of scenarioEntities.value) {
-      const rels = await entityApi.relations(e.id)
+      const rels = await entityApi.relations(e.id, ontologyId)
       for (const r of rels) {
         if (!seen.has(r.id)) {
           seen.add(r.id)
