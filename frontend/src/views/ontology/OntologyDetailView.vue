@@ -49,6 +49,9 @@
             <span class="detail-nav__icon">🔌</span> 接口定义
             <span class="detail-nav__count">0</span>
           </a>
+          <a class="detail-nav__item" :class="{ active: activeTab === 'graph' }" @click="activeTab = 'graph'">
+            <span class="detail-nav__icon">🕸️</span> 本体图谱
+          </a>
 
           <div class="detail-nav__section">更多</div>
           <a class="detail-nav__item" :class="{ active: activeTab === 'shared-attrs' }" @click="activeTab = 'shared-attrs'">
@@ -280,6 +283,22 @@
           <ActionsView :embedded="true" />
         </div>
 
+        <!-- 本体图谱 -->
+        <div v-else-if="activeTab === 'graph'" class="tab-graph">
+          <div class="graph-header">
+            <span class="graph-header__title">本体图谱</span>
+            <span class="graph-header__desc">可视化展示本体对象与关系</span>
+          </div>
+          <div class="graph-container">
+            <SemanticCanvas
+              :objects="graphObjects"
+              :relations="graphRelations"
+              :phase="'graph_done'"
+              :editable="false"
+            />
+          </div>
+        </div>
+
         <!-- 其他 tab 占位 -->
         <div v-else class="tab-placeholder">
           <p class="text-caption">{{ activeTabLabel }} — 开发中</p>
@@ -297,9 +316,11 @@ import { useOntologyStore } from '../../store/ontology'
 import { entityApi } from '../../api/ontology'
 import { ontologyPublishApi } from '../../api/aip'
 import type { EntityRelationDetail } from '../../types'
+import type { OntologyObjectDraft, OntologyRelationDraft } from '../../types/builder'
 import FunctionsView from '../logic/FunctionsView.vue'
 import ActionsView from '../logic/ActionsView.vue'
 import EntityAttrPanel from './EntityAttrPanel.vue'
+import SemanticCanvas from '../builder/components/graph/SemanticCanvas.vue'
 
 const vClickOutside = {
   mounted(el: any, binding: any) {
@@ -429,10 +450,60 @@ async function publishOntology() {
 const activeTabLabel = computed(() => {
   const map: Record<string, string> = {
     history: '历史', relations: '关系定义', actions: '动作定义',
-    api: '接口定义', 'shared-attrs': '共享属性', groups: '分组', tasks: '任务记录',
+    api: '接口定义', graph: '本体图谱', 'shared-attrs': '共享属性', groups: '分组', tasks: '任务记录',
   }
   return map[activeTab.value] || activeTab.value
 })
+
+// --- 本体图谱数据转换 ---
+function tierIcon(tier: number): string {
+  return tier === 1 ? '⭐' : tier === 2 ? '🔷' : '🔹'
+}
+const graphObjects = computed<OntologyObjectDraft[]>(() =>
+  scenarioEntities.value.map((e: any) => {
+    // 优先使用已加载的 attributes，否则根据 attr_count 生成占位属性（用于节点大小计算）
+    const attrs = (e.attributes || []).map((a: any) => ({
+      id: a.id,
+      name: a.name,
+      displayName: a.name,
+      type: a.type || 'string',
+      required: a.required || false,
+      description: a.description || '',
+    }))
+    if (attrs.length === 0 && e.attr_count > 0) {
+      for (let i = 0; i < Math.min(e.attr_count, 10); i++) {
+        attrs.push({ id: `placeholder_${i}`, name: `attr_${i}`, displayName: `属性${i}`, type: 'string', required: false })
+      }
+    }
+    return {
+      id: e.id,
+      name: e.name,
+      displayName: e.name_cn || e.name,
+      tier: (e.tier || 3) as 1 | 2 | 3,
+      description: e.description || '',
+      primaryKey: 'id',
+      icon: tierIcon(e.tier),
+      instanceCount: 0,
+      properties: attrs,
+      derivedProperties: [],
+      actions: [],
+    }
+  })
+)
+
+const graphRelations = computed<OntologyRelationDraft[]>(() =>
+  allRelations.value.map(r => ({
+    id: r.id,
+    name: r.name,
+    displayName: r.description || r.name,
+    source: r.from_entity_id,
+    target: r.to_entity_id,
+    cardinality: (r.cardinality || '1:N') as '1:1' | '1:N' | 'N:N',
+    description: r.description || '',
+    relationType: 'ObjectProperty' as const,
+    semanticType: 'association' as const,
+  }))
+)
 
 function goBack() {
   router.push('/ontology/list')
@@ -476,7 +547,7 @@ async function loadRelations() {
 watch(code, loadData)
 watch(activeTab, (tab) => {
   selectedEntityId.value = null
-  if (tab === 'relations' && allRelations.value.length === 0) {
+  if ((tab === 'relations' || tab === 'graph') && allRelations.value.length === 0) {
     loadRelations()
   }
 })
@@ -1024,5 +1095,45 @@ watch(activeTab, (tab) => {
   text-align: center;
   color: var(--neutral-400, #aaa);
   font-size: 13px;
+}
+
+/* 本体图谱 Tab */
+.tab-graph {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.graph-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.graph-header__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--neutral-900, #111);
+}
+
+.graph-header__desc {
+  font-size: 12px;
+  color: var(--neutral-400, #aaa);
+}
+
+.graph-container {
+  height: calc(100vh - 200px);
+  min-height: 500px;
+  background: var(--neutral-0, #fff);
+  border: 1px solid var(--neutral-100, #f0f0f0);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+
+.graph-container :deep(.canvas-wrap) {
+  height: 100%;
 }
 </style>
