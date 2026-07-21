@@ -222,7 +222,6 @@ export function executeSceneStream(
 
 export const listAgentsAsResources = () => get<any[]>('/agents')
 export const listSkillsAsResources = () => get<any[]>('/skills')
-export const listRulesAsResources = () => get<any[]>('/rules')
 export const listActionsAsResources = () => get<any[]>('/actions')
 export const listFunctionsAsResources = () => get<any[]>('/functions')
 export const listEntitiesAsResources = () => get<any[]>('/entities')

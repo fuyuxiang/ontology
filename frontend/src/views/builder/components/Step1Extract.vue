@@ -245,7 +245,7 @@ function handleEvent(ev: any) {
       icon: ev.icon || '🔷',
       instanceCount: 0,
       properties: [],
-      derivedProperties: [], rules: [], actions: [],
+      derivedProperties: [], actions: [],
       checked: true,
     })
   } else if (t === 'attr_proposed') {

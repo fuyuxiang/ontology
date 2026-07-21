@@ -24,7 +24,6 @@ from app.schemas.entity import (
     GraphNode,
     OntologyPreviewResult,
     RelationOut,
-    RuleOut,
 )
 from app.services.audit import write_audit
 
@@ -564,7 +563,6 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
         scenario_codes=entity.scenario_codes,
         attributes=[AttributeOut.model_validate(a) for a in entity.attributes],
         relations=rel_list,
-        rules=[],
         actions=[ActionOut.model_validate(a) for a in entity.actions],
         functions=[FunctionBriefOut.model_validate(f) for f in entity.functions],
         created_at=entity.created_at, updated_at=entity.updated_at,
@@ -583,6 +581,7 @@ def create_entity(
         status=data.status, description=data.description,
         config_json=data.config_json,
         scenario_codes=data.scenario_codes,
+        ontology_id=data.ontology_id,
         created_by=user.id,
     )
     for attr in data.attributes:

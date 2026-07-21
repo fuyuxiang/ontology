@@ -148,7 +148,7 @@ const scenarios = computed(() => scenarioStore.scenarios)
 const filteredList = computed(() => {
   const items = scenarios.value.map(s => {
     const entityCount = ontologyStore.entities.filter(
-      e => (e.scenarioCodes || []).includes(s.code)
+      e => (e.scenario_codes || []).includes(s.code)
     ).length
     const logicCount = functions.value.filter(
       f => (f as any).scenario_code === s.code
@@ -175,7 +175,6 @@ async function handleCreate() {
   createForm.name = ''
   createForm.code = ''
   createForm.description = ''
-  createForm.method = 'custom'
   await scenarioStore.fetchScenarios(true)
   router.push(`/ontology/list/${created.code}`)
 }

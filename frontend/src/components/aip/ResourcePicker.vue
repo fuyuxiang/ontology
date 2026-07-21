@@ -12,12 +12,12 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import {
-  listAgentsAsResources, listSkillsAsResources, listRulesAsResources,
+  listAgentsAsResources, listSkillsAsResources,
   listActionsAsResources, listFunctionsAsResources, listEntitiesAsResources,
   listModelsAsResources, listDatasourcesAsResources,
 } from '../../api/aip'
 
-type ResourceType = 'agent' | 'skill' | 'rule' | 'action' | 'function' | 'entity' | 'model' | 'datasource'
+type ResourceType = 'agent' | 'skill' | 'action' | 'function' | 'entity' | 'model' | 'datasource'
 
 const props = defineProps<{
   type: ResourceType
@@ -31,7 +31,6 @@ const items = ref<any[]>([])
 const loaders: Record<ResourceType, () => Promise<any[]>> = {
   agent: listAgentsAsResources,
   skill: listSkillsAsResources,
-  rule: listRulesAsResources,
   action: listActionsAsResources,
   function: listFunctionsAsResources,
   entity: listEntitiesAsResources,
@@ -70,7 +69,6 @@ const jumpUrl = computed(() => {
   const map: Record<ResourceType, string> = {
     agent: '/service/agent',
     skill: '/logic/skills',
-    rule: '/logic/rules',
     action: '/logic/actions',
     function: '/logic/functions',
     entity: '/browser',

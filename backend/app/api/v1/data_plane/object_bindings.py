@@ -47,7 +47,7 @@ def create_binding(
     user: User = Depends(require_user),
 ):
     try:
-        return ObjectBindingService(db).create(
+        binding = ObjectBindingService(db).create(
             object_type_id=body.object_type_id,
             asset_id=body.asset_id,
             role=body.role,
@@ -56,6 +56,8 @@ def create_binding(
             filter_expr=body.filter_expr,
             user_id=user.id,
         )
+        db.commit()
+        return binding
     except ValueError as e:
         raise HTTPException(409, str(e)) from e
     except LookupError as e:
@@ -69,7 +71,9 @@ def update_binding(binding_id: str, body: BindingUpdate, db: Session = Depends(g
         if "field_mappings" in payload:
             payload["field_mappings"] = [fm if isinstance(fm, dict) else fm.model_dump()
                                           for fm in (payload["field_mappings"] or [])]
-        return ObjectBindingService(db).update(binding_id, **payload)
+        binding = ObjectBindingService(db).update(binding_id, **payload)
+        db.commit()
+        return binding
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
 
@@ -78,6 +82,7 @@ def update_binding(binding_id: str, body: BindingUpdate, db: Session = Depends(g
 def delete_binding(binding_id: str, db: Session = Depends(get_db)):
     try:
         ObjectBindingService(db).delete(binding_id)
+        db.commit()
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
 

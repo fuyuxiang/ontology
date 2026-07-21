@@ -208,7 +208,7 @@ async function runTest() {
     try { params = JSON.parse(testInput.value) } catch { alert('输入参数不是合法 JSON'); testing.value = false; return }
     const id = (props.editId ?? savedId.value)!
     const res = await actionApi.execute(id, params)
-    testSuccess.value = true
+    testSuccess.value = res?.success === true
     testResult.value = JSON.stringify(res, null, 2)
   } catch (e: any) {
     testSuccess.value = false

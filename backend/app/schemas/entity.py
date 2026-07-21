@@ -38,6 +38,7 @@ class EntityBase(BaseModel):
 
 
 class EntityCreate(EntityBase):
+    ontology_id: str
     attributes: list[AttributeBase] = []
 
 
@@ -117,27 +118,10 @@ class FunctionBriefOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class RuleOut(BaseModel):
-    id: str
-    name: str
-    entity_id: str
-    entity_name: str = ""
-    condition_expr: str
-    action_desc: str
-    status: str
-    priority: str
-    trigger_count: int
-    last_triggered: datetime | None = None
-    conditions_json: list | None = None
-    rule_meta_json: dict | None = None
-    model_config = {"from_attributes": True}
-
-
 class EntityDetail(EntityBase):
     id: str
     attributes: list[AttributeOut] = []
     relations: list[RelationOut] = []
-    rules: list[RuleOut] = []
     actions: list[ActionOut] = []
     functions: list[FunctionBriefOut] = []
     created_at: datetime

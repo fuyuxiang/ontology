@@ -69,7 +69,7 @@ class ObjectBindingService:
         self.usage.upsert(asset_id, "object_binding", binding.id, note=f"role={role}")
         # 兼容反写：EntityAttribute.source_table/source_field
         self._mirror_to_entity_attributes(binding, asset)
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(binding)
         # 血缘 + 事件
         self.bus.emit("binding.created", {
@@ -85,7 +85,7 @@ class ObjectBindingService:
                 setattr(b, k, v)
         if changes.get("field_mappings") is not None:
             self._mirror_to_entity_attributes(b, self.assets.get_by_id(b.asset_id))
-        self.db.commit()
+        self.db.flush()
         self.db.refresh(b)
         self.bus.emit("binding.updated", {
             "binding_id": b.id, "asset_id": b.asset_id, "object_type_id": b.object_type_id,
@@ -107,7 +107,7 @@ class ObjectBindingService:
                     attr.data_status = "未确认来源"
         asset_id, object_type_id = b.asset_id, b.object_type_id
         self.db.delete(b)
-        self.db.commit()
+        self.db.flush()
         self.bus.emit("binding.deleted", {
             "asset_id": asset_id, "object_type_id": object_type_id,
         })

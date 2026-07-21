@@ -332,11 +332,15 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User =
     if v.status != "pending_approval":
         raise HTTPException(400, "只有待审批状态可以通过")
 
+    # 只失活同一本体下的活动版本
     old_active = db.query(OntologyVersion).filter(
-        OntologyVersion.is_active == True, OntologyVersion.id != v.id
+        OntologyVersion.is_active == True, OntologyVersion.ontology_id == v.ontology_id,
+        OntologyVersion.id != v.id
     ).first()
 
-    db.query(OntologyVersion).filter(OntologyVersion.is_active == True).update({"is_active": False})
+    db.query(OntologyVersion).filter(
+        OntologyVersion.is_active == True, OntologyVersion.ontology_id == v.ontology_id
+    ).update({"is_active": False})
     v.status = "published"
     v.is_active = True
     v.published_at = datetime.utcnow()
@@ -392,7 +396,10 @@ def quick_publish(req: QuickPublishRequest, db: Session = Depends(get_db), user:
     if not entities:
         raise HTTPException(400, "该本体下没有对象，无法发布")
 
-    max_num = db.query(func.max(OntologyVersion.version_number)).scalar() or 0
+    # 按本体查询最大版本号
+    max_num = db.query(func.max(OntologyVersion.version_number)).filter(
+        OntologyVersion.ontology_id == req.ontology_id
+    ).scalar() or 0
     version = OntologyVersion(
         version_number=max_num + 1,
         name=req.name or f"{scenario.name} v{max_num + 1}",
@@ -545,18 +552,6 @@ def list_version_functions(version_id: str, db: Session = Depends(get_db)):
             for f in items]
 
 
-@router.get("/versions/{version_id}/rules")
-def list_version_rules(version_id: str, db: Session = Depends(get_db)):
-    from app.models.version_components import OntologyVersionRule
-    items = db.query(OntologyVersionRule).filter(
-        OntologyVersionRule.version_id == version_id
-    ).all()
-    return [{"id": r.id, "name": r.name, "description": r.description,
-             "condition_expr": r.condition_expr, "priority": r.priority,
-             "input_params": r.input_params, "version_entity_id": r.version_entity_id}
-            for r in items]
-
-
 @router.get("/versions/{version_id}/actions")
 def list_version_actions(version_id: str, db: Session = Depends(get_db)):
     from app.models.version_components import OntologyVersionAction
@@ -577,11 +572,15 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
     if target.status != "published":
         raise HTTPException(400, "只能回滚到已发布的版本")
 
-    max_num = db.query(func.max(OntologyVersion.version_number)).scalar() or 0
+    # 按本体查询最大版本号
+    max_num = db.query(func.max(OntologyVersion.version_number)).filter(
+        OntologyVersion.ontology_id == target.ontology_id
+    ).scalar() or 0
     new_version = OntologyVersion(
         version_number=max_num + 1,
         name=f"回滚自 v{target.version_number}",
         description=f"从版本 v{target.version_number} ({target.name}) 回滚",
+        ontology_id=target.ontology_id,
         status="pending_approval",
         created_by=user.id,
         submitted_at=datetime.utcnow(),

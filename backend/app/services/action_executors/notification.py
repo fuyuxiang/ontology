@@ -18,8 +18,8 @@ class NotificationExecutor(BaseActionExecutor):
             )
 
         return ExecutionResult(
-            success=True,
-            message=f"Notification sent to {recipient} via {channel}",
+            success=False,
+            message=f"通知执行器尚未实现真实的发送功能（channel={channel}），仅支持 dry_run 模式",
             output={"channel": channel, "recipient": recipient, "message": message},
         )
 

@@ -92,6 +92,8 @@ async def mapping_preview(req: MappingPreviewRequest, db: Session = Depends(get_
 
 @router.post("/mapping/apply")
 async def mapping_apply(req: MappingApplyRequest, db: Session = Depends(get_db)):
-    return doc_mapping_persist_service.apply_mappings(
+    result = doc_mapping_persist_service.apply_mappings(
         [item.model_dump() for item in req.items], db
     )
+    db.commit()
+    return result

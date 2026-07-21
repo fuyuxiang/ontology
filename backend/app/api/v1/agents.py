@@ -242,12 +242,8 @@ _TOOL_META: dict[str, tuple[str, str]] = {
     "list_business_datasources": ("ontology", "查询业务数据源"),
     "list_business_documents": ("ontology", "查询业务文档"),
     "analyze_assets_for_ontology": ("ontology", "分析资产生成本体"),
-    # ── 逻辑计算：执行逻辑函数、规则评估/筛查 ──
+    # ── 逻辑计算：执行逻辑函数 ──
     "ontology_run_logic": ("logic", "执行逻辑函数"),
-    "list_rules": ("logic", "读取本体规则"),
-    "evaluate_rule": ("logic", "评估规则"),
-    "evaluate_all_rules": ("logic", "评估全部规则"),
-    "screen_users_by_rule": ("logic", "按规则筛查"),
     # ── 执行动作：有副作用的业务动作 ──
     "execute_action": ("action", "执行动作"),
     "ontology_run_action": ("action", "执行动作函数"),

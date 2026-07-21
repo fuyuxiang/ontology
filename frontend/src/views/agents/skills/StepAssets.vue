@@ -50,7 +50,6 @@ const emit = defineEmits<{ (e: 'next', payload: { sessionId: string; assetsConte
 
 const tabs = [
   { key: 'entities', label: '实体' },
-  { key: 'rules', label: '规则' },
   { key: 'functions', label: '函数' },
   { key: 'actions', label: '动作' },
 ]
@@ -58,8 +57,8 @@ const tabs = [
 const activeTab = ref('entities')
 const search = ref('')
 const loading = ref(false)
-const items = ref<Record<string, any[]>>({ entities: [], rules: [], functions: [], actions: [] })
-const selected = ref<Record<string, string[]>>({ entities: [], rules: [], functions: [], actions: [] })
+const items = ref<Record<string, any[]>>({ entities: [], functions: [], actions: [] })
+const selected = ref<Record<string, string[]>>({ entities: [], functions: [], actions: [] })
 
 const filteredItems = computed(() => {
   const list = items.value[activeTab.value] || []
@@ -96,13 +95,12 @@ async function handleNext() {
 }
 
 onMounted(async () => {
-  const [entities, rules, functions, actions] = await Promise.all([
+  const [entities, functions, actions] = await Promise.all([
     client.get('/entities').then(r => r.data),
-    client.get('/rules').then(r => r.data),
     client.get('/functions').then(r => r.data),
     client.get('/actions').then(r => r.data),
   ])
-  items.value = { entities, rules, functions, actions }
+  items.value = { entities, functions, actions }
 })
 </script>
 

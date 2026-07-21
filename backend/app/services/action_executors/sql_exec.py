@@ -23,11 +23,11 @@ class SqlExecExecutor(BaseActionExecutor):
                 output={"sql": sql_template, "params": sql_params, "connection_id": connection_id},
             )
 
-        from app.database import get_db
+        from app.database import SessionLocal
         from app.services.data_plane.execute_service import ExecuteService
 
+        db = SessionLocal()
         try:
-            db = next(get_db())
             svc = ExecuteService(db)
             result = svc.execute_on_connection(
                 connection_id=connection_id,
@@ -48,6 +48,8 @@ class SqlExecExecutor(BaseActionExecutor):
                 message=f"SQL 执行失败: {str(e)}",
                 output={"error": str(e)},
             )
+        finally:
+            db.close()
 
     @classmethod
     def get_config_schema(cls) -> dict:

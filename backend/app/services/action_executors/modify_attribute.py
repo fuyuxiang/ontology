@@ -17,8 +17,8 @@ class ModifyAttributeExecutor(BaseActionExecutor):
             )
 
         return ExecutionResult(
-            success=True,
-            message=f"Set {target_attribute} = {resolved_value}",
+            success=False,
+            message="修改属性执行器尚未实现真实的数据库写入，仅支持 dry_run 模式",
             output={"entity_id": target_entity_id, "attribute": target_attribute, "value": resolved_value},
         )
 
