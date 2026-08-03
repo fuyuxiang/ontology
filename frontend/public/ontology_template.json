@@ -2062,7 +2062,7 @@
           "rule": "仅当工单状态为已退单时，该关联关系存在"
         }
       ],
-      "description": "一个装机工单可产生一次或多次退单记录"
+      "description": "工单的退单"
     },
     {
       "name": "order_has_dispatch",
@@ -2082,7 +2082,7 @@
         }
       ],
       "constraints": [],
-      "description": "一个受理订单可对应一次或多次派单（重新派单场景）"
+      "description": "工单的派单记录"
     },
     {
       "name": "order_has_engineer_call",
@@ -2107,7 +2107,7 @@
           "rule": "通话记录的外呼时间应在订单受理时间之后"
         }
       ],
-      "description": "一个装机工单关联工程师与客户的多次外呼通话（LF-001数据采集层读取此关联）"
+      "description": "工单的工程师外呼通话"
     },
     {
       "name": "order_has_callback_call",
@@ -2120,7 +2120,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "一个装机工单可关联多次中台回访外呼通话记录（ACT-007、ACT-008创建，ACT-009回填结果）"
+      "description": "工单的回访外呼通话"
     },
     {
       "name": "order_at_address",
@@ -2150,7 +2150,7 @@
         }
       ],
       "constraints": [],
-      "description": "装机订单对应的服务地址"
+      "description": "工单的服务地址"
     },
     {
       "name": "address_has_pending",
@@ -2163,7 +2163,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "地址下的待装库积压记录，用于判断资源类退单原因（E29证据来源）"
+      "description": "地址的待装记录"
     },
     {
       "name": "customer_has_competitor_call",
@@ -2176,7 +2176,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "客户与竞争运营商的通话记录，支持转网意图根因假设（E36证据来源）"
+      "description": "客户的异网通话"
     },
     {
       "name": "customer_has_demand",
@@ -2189,7 +2189,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "客户的宽带服务需求，退单后挽回策略的核心依据（ACT-012触发后创建/更新）"
+      "description": "客户的宽带需求"
     },
     {
       "name": "order_customer",
@@ -2202,7 +2202,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "装机工单关联的申请客户"
+      "description": "工单的申请客户"
     },
     {
       "name": "order_product",
@@ -2215,7 +2215,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "装机工单关联的订购产品"
+      "description": "工单的订购产品"
     },
     {
       "name": "order_channel",
@@ -2228,7 +2228,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "装机工单的业务受理渠道"
+      "description": "工单的受理渠道"
     },
     {
       "name": "order_has_marketing_call",
@@ -2241,7 +2241,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "装机工单关联的中台营销外呼通话（ACT-012创建，根因=用户原因且已归档时触发）"
+      "description": "工单的营销外呼通话"
     },
     {
       "name": "dispatch_engineer",
@@ -2254,7 +2254,7 @@
       "directionality": "directed",
       "properties": [],
       "constraints": [],
-      "description": "派单记录关联的执行工程师"
+      "description": "派单的执行工程师"
     }
   ],
   "action_types": [
