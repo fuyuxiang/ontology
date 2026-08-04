@@ -4,7 +4,10 @@ AI 智能本体构建服务 — 引导式自动化本体构建
 - 引导用户提供业务素材（文档、数据字典）
 - AI 自动分析并追问关键业务问题
 - 自动构建完整本体（实体、属性、关系）
-- 面向联通运营商领域
+
+平台层不内置任何具体行业/业务的场景与领域知识。若用户在「系统配置 → AI」中
+配置了 `ai.scenarios`（推荐场景清单，JSON）或 `ai.domain_knowledge`（领域知识串），
+构建流程会自动读入作为提示词补充；未配置时按通用建模流程执行。
 """
 from __future__ import annotations
 
@@ -60,111 +63,47 @@ class SessionState:
 _sessions: dict[str, SessionState] = {}
 
 
-# ── 联通运营商领域知识库 ──
+# ── 场景与领域知识（用户在「系统配置 → AI」中配置） ──
 
-TELECOM_SCENARIOS: dict[str, dict] = {
-    "宽带退单稽核": {
-        "description": "宽带装机退单根因分析，涉及客户、工程师、工单、质检等业务对象",
-        "suggested_materials": [
-            {"label": "退单工单数据表结构或数据字典", "required": True},
-            {"label": "稽核规则/归因判断逻辑文档", "required": True},
-            {"label": "施工流程规范或工程师管理制度", "required": False},
-            {"label": "语音质检评分标准", "required": False},
-        ],
-        "typical_questions": [
-            "退单原因主要分哪几大类？每类下面有哪些细分原因？",
-            "工单从创建到关闭经过哪些状态流转？",
-            "稽核归因的判断优先级是怎样的？",
-        ],
-    },
-    "携号转网预警": {
-        "description": "识别高风险携转用户，输出预警等级和挽留策略",
-        "suggested_materials": [
-            {"label": "用户画像/CRM数据字段说明", "required": True},
-            {"label": "携转政策规范或业务规则文档", "required": True},
-            {"label": "投诉分类标准", "required": False},
-            {"label": "套餐产品目录", "required": False},
-        ],
-        "typical_questions": [
-            "预警等级是怎么划分的？有几个级别？",
-            "判断用户携转风险的核心指标有哪些？",
-            "挽留策略有哪些类型？",
-        ],
-    },
-    "政企故障分析": {
-        "description": "政企客户网络故障多维根因分析",
-        "suggested_materials": [
-            {"label": "告警数据字典或网管系统字段说明", "required": True},
-            {"label": "故障处理流程/SLA规范文档", "required": True},
-            {"label": "网络拓扑层级说明", "required": False},
-            {"label": "政企客户等级划分标准", "required": False},
-        ],
-        "typical_questions": [
-            "故障影响范围怎么界定？有哪些级别？",
-            "根因分类体系是怎样的？",
-            "故障工单的处理时限要求是什么？",
-        ],
-    },
-    "客户价值分析": {
-        "description": "客户价值评估与分群经营",
-        "suggested_materials": [
-            {"label": "CRM客户数据字典", "required": True},
-            {"label": "ARPU/客户价值计算规则文档", "required": True},
-            {"label": "客户分群标准或营销策略文档", "required": False},
-            {"label": "产品/套餐目录", "required": False},
-        ],
-        "typical_questions": [
-            "客户价值等级怎么划分？依据哪些指标？",
-            "客户生命周期分哪几个阶段？",
-            "高价值客户的判定标准是什么？",
-        ],
-    },
-    "网络质量优化": {
-        "description": "无线/有线网络质量监控与优化",
-        "suggested_materials": [
-            {"label": "网管KPI指标定义文档", "required": True},
-            {"label": "基站/设备参数表结构", "required": True},
-            {"label": "网络质量评估标准", "required": False},
-            {"label": "用户投诉与网络关联规则", "required": False},
-        ],
-        "typical_questions": [
-            "核心质量指标有哪些？达标阈值分别是多少？",
-            "网络层级结构是怎样的（核心网→汇聚→接入）？",
-            "质差小区的判定规则是什么？",
-        ],
-    },
-}
 
-TELECOM_DOMAIN_KNOWLEDGE = """
-## 联通运营商领域知识
-- 客户分个人客户（公众客户）和政企客户（集团客户）
-- BSS（业务支撑系统）管理计费、账务、CRM客户关系
-- OSS（运营支撑系统）管理网络资源、故障告警、性能监控
-- BOSS = BSS + OSS 的统称
-- 常见业务系统：CRM、计费、账务、工单、网管、资源管理
-- 核心业务对象层级参考：
-  - T1核心（跨场景复用）：客户Customer、用户User、产品Product、套餐Package
-  - T2领域（领域内共享）：工单WorkOrder、设备Device、告警Alarm、投诉Complaint、合同Contract
-  - T3场景（场景专属）：分析结果AnalysisResult、预警AlertResult、稽核记录AuditRecord
-- 客户标识：客户ID、手机号、宽带账号、证件号
-- 常见关系模式：客户→订购→产品、客户→发起→工单、设备→产生→告警、工单→关联→设备
-"""
+def load_scenarios(db: Session) -> dict[str, dict]:
+    """从 system_config.key='ai.scenarios' 读用户配置的推荐场景清单。
+
+    JSON 结构：{ "场景名": { "description": str,
+                              "suggested_materials": [{"label": str, "required": bool}, ...],
+                              "typical_questions": [str, ...] }, ... }
+    """
+    from app.models.system_config import SystemConfig
+    row = db.query(SystemConfig).filter(SystemConfig.key == "ai.scenarios").first()
+    if not row or not row.value:
+        return {}
+    try:
+        data = json.loads(row.value)
+        return data if isinstance(data, dict) else {}
+    except (ValueError, TypeError):
+        return {}
+
+
+def load_domain_knowledge(db: Session) -> str:
+    """从 system_config.key='ai.domain_knowledge' 读用户配置的领域知识串。"""
+    from app.models.system_config import SystemConfig
+    row = db.query(SystemConfig).filter(SystemConfig.key == "ai.domain_knowledge").first()
+    if row and row.value:
+        return row.value
+    return ""
 
 
 # ── Prompt 模板 ──
 
-_SCENARIO_PROMPT = """你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。用户想要构建一个业务场景的本体模型。
+_SCENARIO_PROMPT = """你是一名资深的业务建模与本体建模专家。用户想要构建一个业务场景的本体模型。
 请根据用户的描述，识别具体的业务场景，并给出简短确认（1-2句话）。
 如果用户描述模糊，请用一个业务问题帮助明确（不要问技术问题，不要提"实体""属性""关系"等建模术语）。
-
-已知联通常见场景：宽带退单稽核、携号转网预警、政企故障分析、客户价值分析、网络质量优化。
-如果用户描述的场景不在上述列表中，也正常处理。
 
 请以JSON格式回复：
 {"confirmed": true/false, "scenario": "识别到的场景名称", "message": "给用户的确认/追问消息"}
 如果confirmed=false，说明需要进一步明确，message中包含追问。"""
 
-_MATERIALS_PROMPT = """你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。用户要构建「{scenario}」场景的本体。
+_MATERIALS_PROMPT = """你是一名资深的业务建模与本体建模专家。用户要构建「{scenario}」场景的本体。
 请告诉用户需要提供哪些业务材料来帮助AI自动构建本体。
 
 要求：
@@ -179,13 +118,13 @@ _MATERIALS_PROMPT = """你是一名深耕中国联通业务体系的运营商领
 请以JSON格式回复：
 {{"message": "给用户的引导消息（markdown格式）", "materials": [{{"label": "材料名称", "required": true/false, "hint": "简短说明这个材料包含什么"}}]}}"""
 
-_CLARIFY_PROMPT = """你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。用户要构建「{scenario}」场景的本体，已提供以下材料。
+_CLARIFY_PROMPT = """你是一名资深的业务建模与本体建模专家。用户要构建「{scenario}」场景的本体，已提供以下材料。
 请分析材料内容，判断是否有关键业务信息缺失需要追问。
 
 ## 已提供材料摘要
 {materials_summary}
 
-## 联通运营商领域知识
+## 领域知识补充
 {domain_knowledge}
 
 ## 追问规则
@@ -204,7 +143,7 @@ _CLARIFY_PROMPT = """你是一名深耕中国联通业务体系的运营商领�
 请以JSON格式回复：
 {{"need_clarify": true/false, "question": "追问内容（如果need_clarify=true）", "reason": "为什么需要这个信息（内部参考，不展示给用户）"}}"""
 
-_BUILD_PROMPT = """你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的业务对象、流程规则和系统边界。请基于以下业务材料和信息，自动构建完整的本体模型。
+_BUILD_PROMPT = """你是一名资深的业务建模与本体建模专家。请基于以下业务材料和信息，自动构建完整的本体模型。
 
 ## 已有本体（避免重复创建，可建立关联）
 {existing_context}
@@ -222,9 +161,9 @@ _BUILD_PROMPT = """你是一名深耕中国联通业务体系的运营商领域�
 
 ## 构建要求
 1. 实体要求：
-   - 英文名使用PascalCase（如BroadbandChurnOrder）
+   - 英文名使用PascalCase
    - 中文名简洁明确
-   - 层级判断：T1=核心对象（客户、用户、产品等跨场景复用）、T2=领域对象（工单、设备等领域内共享）、T3=场景对象（分析结果等仅当前场景使用）
+   - 层级判断：T1=核心对象（跨场景复用）、T2=领域对象（领域内共享）、T3=场景对象（仅当前场景使用）
    - 每个实体需要业务描述
 
 2. 属性要求：
@@ -329,14 +268,16 @@ class AIOntologyBuilder:
         yield {"type": "thinking", "content": "正在为您准备材料收集引导..."}
 
         scenario_hint = ""
-        if state.scenario in TELECOM_SCENARIOS:
-            info = TELECOM_SCENARIOS[state.scenario]
-            materials = info["suggested_materials"]
-            hint_lines = ["已知该场景的推荐材料："]
-            for m in materials:
-                req = "必选" if m["required"] else "推荐"
-                hint_lines.append(f"- [{req}] {m['label']}")
-            scenario_hint = "\n".join(hint_lines)
+        scenarios = load_scenarios(self.db)
+        if state.scenario in scenarios:
+            info = scenarios[state.scenario]
+            materials = info.get("suggested_materials", [])
+            if materials:
+                hint_lines = ["已知该场景的推荐材料："]
+                for m in materials:
+                    req = "必选" if m.get("required") else "推荐"
+                    hint_lines.append(f"- [{req}] {m.get('label', '')}")
+                scenario_hint = "\n".join(hint_lines)
 
         prompt = _MATERIALS_PROMPT.format(
             scenario=state.scenario,
@@ -391,7 +332,7 @@ class AIOntologyBuilder:
         prompt = _CLARIFY_PROMPT.format(
             scenario=state.scenario,
             materials_summary=materials_summary,
-            domain_knowledge=TELECOM_DOMAIN_KNOWLEDGE,
+            domain_knowledge=load_domain_knowledge(self.db) or "（无补充领域知识）",
         )
 
         previous_qa = ""
@@ -434,7 +375,8 @@ class AIOntologyBuilder:
         yield {"type": "build_progress", "step": "识别业务对象", "progress": 30}
 
         constraint_block = build_constraint_prompt(
-            existing_entities=self._get_existing_entity_names(state.existing_context)
+            existing_entities=self._get_existing_entity_names(state.existing_context),
+            domain_knowledge=load_domain_knowledge(self.db),
         )
         prompt = _BUILD_PROMPT.format(
             existing_context=state.existing_context or "（暂无已有本体）",

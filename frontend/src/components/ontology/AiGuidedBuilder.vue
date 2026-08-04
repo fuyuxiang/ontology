@@ -215,13 +215,12 @@ async function initSession() {
       role: 'ai',
       content: '您好！我是本体建模助手。请问您要构建哪个业务场景的本体？\n\n可以选择下方常见场景，或直接描述您的业务需求。',
     })
-    suggestions.value = [
-      { label: '宽带退单稽核', value: '宽带退单稽核' },
-      { label: '携号转网预警', value: '携号转网预警' },
-      { label: '政企故障分析', value: '政企故障分析' },
-      { label: '客户价值分析', value: '客户价值分析' },
-      { label: '网络质量优化', value: '网络质量优化' },
-    ]
+    try {
+      const { scenarios } = await aiOntologyApi.listScenarios()
+      suggestions.value = (scenarios || []).map(s => ({ label: s.name, value: s.name }))
+    } catch {
+      suggestions.value = []
+    }
   } catch {
     messages.value.push({ role: 'ai', content: '会话初始化失败，请刷新重试。' })
   }

@@ -111,12 +111,6 @@ export const entityApi = {
     return post<OntologyEntity>('/entities/from-datasource', data)
   },
 
-  sceneLayerStats(namespace: string) {
-    return get<{ key: string; label: string; entityCount: number; attrCount: number; relationCount: number; actionCount: number }[]>(
-      '/entities/scene-layer-stats', { params: { namespace } },
-    )
-  },
-
   importFromFile(file: File, fileType: string, namespace?: string, ontologyId?: string) {
     const formData = new FormData()
     formData.append('file', file)

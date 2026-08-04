@@ -78,8 +78,8 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
         name="query_entity_data",
         description="通过本体实体名查询真实实例数据。自动解析实体对应的数据源和表，无需手写SQL。支持按属性过滤。优先使用此工具而非 query_datasource。",
         parameters={
-            "entity_name": {"type": "string", "description": "本体实体英文名称（如 CbssSubscriber）"},
-            "filters": {"type": "object", "description": "过滤条件，键为属性名，值为期望值（如 {\"user_id\": \"123\", \"user_status\": \"1\"}）"},
+            "entity_name": {"type": "string", "description": "本体实体英文名称"},
+            "filters": {"type": "object", "description": "过滤条件，键为属性名，值为期望值"},
             "fields": {"type": "array", "items": {"type": "string"}, "description": "要返回的属性列表（可选，默认返回全部）"},
             "limit": {"type": "integer", "description": "最大返回行数，默认 20，最大 200"},
         },

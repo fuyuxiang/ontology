@@ -124,11 +124,12 @@ def get_result(session_id: str):
 
 
 @router.get("/scenarios")
-def list_scenarios():
-    from app.services.ai_ontology_builder import TELECOM_SCENARIOS
+def list_scenarios(db: Session = Depends(get_db)):
+    from app.services.ai_ontology_builder import load_scenarios
+    scenarios = load_scenarios(db)
     return {
         "scenarios": [
-            {"name": name, "description": info["description"]}
-            for name, info in TELECOM_SCENARIOS.items()
+            {"name": name, "description": info.get("description", "")}
+            for name, info in scenarios.items()
         ]
     }

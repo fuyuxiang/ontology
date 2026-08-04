@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.auth import router as auth_router
 from app.api.v1.auth import seed_admin
 from app.api.v1.entities import router as entities_router
-# 注：broadband 模块已删除——该模块是早期开发态 demo，无任何调用方（前/后端、Agent/Skill 0 引用），其硬编码 SQL 引用的 bb_* 表在生产也不存在
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.db_compat import ensure_legacy_schema_compat
@@ -61,62 +60,6 @@ def _seed_system_config(db):
             db.add(SystemConfig(group=group, key=key, value=value, description=desc))
             added += 1
 
-    # 初始化默认 AI 模型列表（JSON）
-    if "ai.models" not in existing:
-        import json
-        default_models = json.dumps([
-            {
-                "id": "claude-sonnet",
-                "name": "Claude Sonnet 4",
-                "provider": "Anthropic",
-                "model_id": "claude-sonnet-4-20250514",
-                "api_key": "",
-                "base_url": "https://api.anthropic.com",
-                "temperature": 0.7,
-                "max_tokens": 4096,
-                "scenes": ["ontology", "general"],
-                "is_default": True,
-            },
-            {
-                "id": "claude-opus",
-                "name": "Claude Opus 4",
-                "provider": "Anthropic",
-                "model_id": "claude-opus-4-20250514",
-                "api_key": "",
-                "base_url": "https://api.anthropic.com",
-                "temperature": 0.5,
-                "max_tokens": 8192,
-                "scenes": ["ontology"],
-                "is_default": False,
-            },
-            {
-                "id": "gpt-4o",
-                "name": "GPT-4o",
-                "provider": "OpenAI",
-                "model_id": "gpt-4o",
-                "api_key": "",
-                "base_url": "https://api.openai.com",
-                "temperature": 0.7,
-                "max_tokens": 4096,
-                "scenes": ["agent", "data"],
-                "is_default": False,
-            },
-            {
-                "id": "deepseek-v3",
-                "name": "DeepSeek V3",
-                "provider": "DeepSeek",
-                "model_id": "deepseek-chat",
-                "api_key": "",
-                "base_url": "https://api.deepseek.com",
-                "temperature": 0.7,
-                "max_tokens": 4096,
-                "scenes": ["data", "general"],
-                "is_default": False,
-            },
-        ], ensure_ascii=False)
-        db.add(SystemConfig(group="ai", key="ai.models", value=default_models, description="AI 模型列表"))
-        added += 1
-
     if added:
         db.commit()
         logger.info(f"系统配置初始化完成：新增 {added} 项")
@@ -154,7 +97,6 @@ from app.api.v1.governance import router as governance_router
 from app.api.v1.impact_analysis import router as impact_analysis_router
 
 # datasources_router 已废弃，数据接入统一走 data_plane/connections + assets
-from app.api.v1.mnp import router as mnp_router
 from app.api.v1.models import router as models_router
 from app.api.v1.monitor import router as monitor_router
 from app.api.v1.ontology_api import router as ontology_api_router
@@ -166,7 +108,6 @@ from app.api.v1.registry import router as registry_router
 from app.api.v1.relations import router as relations_router
 from app.api.v1.resolution import router as resolution_router
 from app.api.v1.scenarios import router as scenarios_router
-from app.api.v1.scenes import router as scenes_router
 from app.api.v1.shared_attributes import router as shared_attrs_router
 from app.api.v1.shared_refs import router as shared_refs_router
 from app.api.v1.skill_gen import router as skill_gen_router
@@ -211,37 +152,6 @@ async def lifespan(app: FastAPI):
         logger.info("Data Plane 事件 handler 已注册")
     except Exception as e:
         logger.warning(f"Data Plane 事件 handler 注册失败: {e}")
-
-    # 注册业务侧 sql_view Asset（mnp；broadband 已下线）
-    try:
-        from scripts.seed_business_assets import seed as seed_business_assets
-        bs_stats = seed_business_assets()
-        logger.info(f"业务资产 seed 完成: {bs_stats}")
-    except Exception as e:
-        logger.warning(f"业务资产 seed 失败: {e}")
-
-    # 预热携号转网案例用户缓存（后台执行，不阻塞启动）
-    import asyncio
-
-    def _preheat_sync():
-        try:
-            from app.api.v1.scenes import execute_mnp_flow, list_mnp_case_users
-            db = SessionLocal()
-            try:
-                case_users = list_mnp_case_users(db)
-                logger.info(f"预热案例用户缓存完成，共 {len(case_users)} 个用户")
-                for u in case_users:
-                    try:
-                        execute_mnp_flow(user_id=u.user_id, db=db)
-                    except Exception:
-                        pass
-                logger.info("预热案例用户执行数据缓存完成")
-            finally:
-                db.close()
-        except Exception as e:
-            logger.debug(f"预热案例用户缓存跳过: {e}")
-
-    asyncio.create_task(asyncio.to_thread(_preheat_sync))
 
     # 启动监控采集器
     try:
@@ -307,8 +217,6 @@ app.include_router(copilot_router, prefix="/api/v1")
 app.include_router(relations_router, prefix="/api/v1")
 app.include_router(auth_router, prefix="/api/v1")
 # app.include_router(datasources_router, prefix="/api/v1")  # 已废弃
-app.include_router(mnp_router, prefix="/api/v1")
-app.include_router(scenes_router, prefix="/api/v1")
 app.include_router(scenarios_router, prefix="/api/v1")
 app.include_router(models_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")

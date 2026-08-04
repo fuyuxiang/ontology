@@ -9,10 +9,6 @@ import type {
   UploadRecord,
   OntologyHints,
 } from '../types/builder'
-import {
-  SCENARIO_CLASS_PRESETS,
-  SCENARIO_RELATION_PRESETS,
-} from '../data/builderPresets'
 
 const SESSIONS_KEY = 'builder-sessions'
 const UPLOADS_KEY = 'builder-upload-records'
@@ -78,43 +74,6 @@ function loadUploads(): UploadRecord[] {
 
 function persist<T>(key: string, val: T) {
   try { localStorage.setItem(key, JSON.stringify(val)) } catch { /* noop */ }
-}
-
-export function buildPresetClasses(scenarioId: string): OntologyObjectDraft[] {
-  const presets = SCENARIO_CLASS_PRESETS[scenarioId] || []
-  return presets.map((p, i) => ({
-    id: uid('obj'),
-    name: p.name || `Object${i + 1}`,
-    displayName: p.displayName || p.name || `对象${i + 1}`,
-    tier: (p.tier ?? 1) as 1 | 2 | 3,
-    description: p.description || '',
-    primaryKey: p.primaryKey || 'id',
-    icon: p.icon || '🔷',
-    instanceCount: p.instanceCount ?? 0,
-    properties: [
-      { id: uid('prop'), name: 'name', displayName: '名称', type: 'string', required: true },
-      { id: uid('prop'), name: 'updated_at', displayName: '更新时间', type: 'date', required: false },
-    ],
-    derivedProperties: [],
-    actions: [],
-    approved: false,
-  }))
-}
-
-export function buildPresetRelations(scenarioId: string, objects: OntologyObjectDraft[]): OntologyRelationDraft[] {
-  const rels = SCENARIO_RELATION_PRESETS[scenarioId] || []
-  const findId = (name: string) => objects.find(o => o.name === name)?.id || ''
-  return rels.map((r, i) => ({
-    id: uid('rel'),
-    name: r.name,
-    displayName: r.displayName,
-    source: findId(r.source) || r.source,
-    target: findId(r.target) || r.target,
-    cardinality: r.cardinality,
-    description: r.displayName,
-    relationType: 'ObjectProperty' as const,
-    semanticType: i % 3 === 0 ? 'composition' as const : i % 3 === 1 ? 'event' as const : 'association' as const,
-  }))
 }
 
 export const useBuilderStore = defineStore('builder', () => {

@@ -172,9 +172,13 @@ class TestBuildConstraintPrompt:
         assert "T3" in prompt
 
     def test_contains_telecom_knowledge(self):
+        # 平台层不预置具体领域知识；传入 domain_knowledge 时应写入 prompt
+        prompt = build_constraint_prompt(domain_knowledge="用户在配置里录入的领域知识")
+        assert "用户在配置里录入的领域知识" in prompt
+
+    def test_without_domain_knowledge(self):
         prompt = build_constraint_prompt()
-        assert "客户" in prompt
-        assert "用户" in prompt
+        assert "领域知识补充" not in prompt
 
     def test_with_existing_entities(self):
         existing = ["Customer", "Product"]
