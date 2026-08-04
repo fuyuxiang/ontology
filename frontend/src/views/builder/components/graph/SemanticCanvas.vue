@@ -57,7 +57,7 @@
               filter="url(#graph-shadow)"
             />
             <text x="0" :y="1" text-anchor="middle" class="graph-node-label" :fill="n.color">{{ n.icon }} {{ n.label }}</text>
-            <text x="0" :y="n.r + 14" text-anchor="middle" class="graph-node-sub">{{ n.count }} 实例</text>
+            <text v-if="n.count > 0" x="0" :y="n.r + 14" text-anchor="middle" class="graph-node-sub">{{ n.count }} 实例</text>
           </g>
         </g>
       </svg>
@@ -121,7 +121,7 @@ function initLayout() {
       count: o.instanceCount || 0,
       x: Math.cos(angle) * radius,
       y: Math.sin(angle) * radius,
-      r: Math.max(32, Math.min(50, 28 + (o.properties?.length || 0) * 2)),
+      r: Math.max(32, Math.min(50, 28 + (o.propertyCount ?? o.properties?.length ?? 0) * 2)),
       color: nodeColors[i % nodeColors.length],
       vx: 0, vy: 0,
     }

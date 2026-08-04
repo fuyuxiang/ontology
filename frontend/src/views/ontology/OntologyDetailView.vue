@@ -461,7 +461,6 @@ function tierIcon(tier: number): string {
 }
 const graphObjects = computed<OntologyObjectDraft[]>(() =>
   scenarioEntities.value.map((e: any) => {
-    // 优先使用已加载的 attributes，否则根据 attr_count 生成占位属性（用于节点大小计算）
     const attrs = (e.attributes || []).map((a: any) => ({
       id: a.id,
       name: a.name,
@@ -470,11 +469,6 @@ const graphObjects = computed<OntologyObjectDraft[]>(() =>
       required: a.required || false,
       description: a.description || '',
     }))
-    if (attrs.length === 0 && e.attr_count > 0) {
-      for (let i = 0; i < Math.min(e.attr_count, 10); i++) {
-        attrs.push({ id: `placeholder_${i}`, name: `attr_${i}`, displayName: `属性${i}`, type: 'string', required: false })
-      }
-    }
     return {
       id: e.id,
       name: e.name,
@@ -485,6 +479,8 @@ const graphObjects = computed<OntologyObjectDraft[]>(() =>
       icon: tierIcon(e.tier),
       instanceCount: 0,
       properties: attrs,
+      // 列表接口不返回属性明细，用真实属性总数供画布计算节点大小
+      propertyCount: e.attr_count || attrs.length,
       derivedProperties: [],
       actions: [],
     }

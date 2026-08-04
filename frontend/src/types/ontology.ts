@@ -165,6 +165,7 @@ export interface FileImportResult {
   relations_created: number
   actions_created: number
   errors: string[]
+  warnings?: string[]
 }
 
 // ── 看板统计 ──

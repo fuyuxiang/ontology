@@ -428,6 +428,14 @@
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" fill="var(--status-success-bg)"/><path d="M5 8l2 2 4-4" stroke="var(--status-success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           导入完成：{{ importResult.entities_created }} 个实体，{{ importResult.relations_created }} 个关系
         </div>
+        <div v-if="importResult?.warnings?.length" class="import-warnings">
+          <div class="import-warnings__title">以下内容未被导入</div>
+          <div v-for="(w, i) in importResult.warnings" :key="i" class="import-warnings__item">{{ w }}</div>
+        </div>
+        <div v-if="importResult?.errors?.length" class="import-warnings import-warnings--error">
+          <div class="import-warnings__title">导入过程中的错误</div>
+          <div v-for="(err, i) in importResult.errors" :key="i" class="import-warnings__item">{{ err }}</div>
+        </div>
         <div class="form-actions">
           <button class="btn-secondary" @click="router.back()">取消</button>
           <button class="btn-primary" @click="handleFileImport" :disabled="submitting || !selectedFile">{{ submitting ? '导入中...' : '导入文件' }}</button>
@@ -838,6 +846,10 @@ async function handleAiCreate() {
 .import-preview__title { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-600); margin-bottom: 6px; }
 .import-preview__stats { display: flex; gap: 16px; flex-wrap: wrap; font-size: var(--text-caption-size); color: var(--neutral-700); }
 .import-result { display: flex; align-items: center; gap: 8px; padding: 10px 14px; background: var(--status-success-bg); border-radius: var(--radius-md); font-size: var(--text-body-size); color: var(--status-success); }
+.import-warnings { margin-top: 8px; padding: 10px 14px; background: var(--status-warning-bg, var(--neutral-50)); border: 1px solid var(--status-warning, var(--neutral-200)); border-radius: var(--radius-md); font-size: var(--text-caption-size); color: var(--neutral-700); }
+.import-warnings--error { background: var(--status-error-bg, var(--neutral-50)); border-color: var(--status-error, var(--neutral-200)); }
+.import-warnings__title { font-weight: 600; margin-bottom: 4px; }
+.import-warnings__item { line-height: 1.6; }
 
 .tpl-download { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--status-info-bg); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); }
 .tpl-download__info { display: flex; align-items: center; gap: 8px; font-size: var(--text-body-size); color: var(--status-info); }

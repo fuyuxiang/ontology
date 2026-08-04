@@ -489,6 +489,7 @@ async def create_from_file(
         rules_created=result.rules_created,
         actions_created=result.actions_created,
         errors=result.errors,
+        warnings=result.warnings,
     )
 
 

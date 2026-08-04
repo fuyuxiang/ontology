@@ -69,6 +69,8 @@ export interface OntologyObjectDraft {
   icon: string
   instanceCount: number
   properties: OntologyProperty[]
+  /** 属性总数；当 properties 未加载明细时（如本体图谱按列表数据渲染）提供真实数量 */
+  propertyCount?: number
   derivedProperties: string[]   // Function ID 数组（派生属性）
   actions: string[]             // EntityAction ID 数组
   approved?: boolean
