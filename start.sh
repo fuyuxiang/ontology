@@ -131,10 +131,11 @@ fi
 nohup "$BACKEND_PYTHON" -m uvicorn "${backend_args[@]}" > "$BACKEND_LOG" 2>&1 &
 echo $! > "$BACKEND_PID_FILE"
 
-# 后端 lifespan startup 会先跑完建表/迁移/seed/Function Runtime 扫描才绑定端口，
-# 冷启动约 18s，这里给到 45s，避免误判失败导致前端与 code-server 不启动。
+# 后端 lifespan startup 会先跑完建表/迁移/seed/Function Runtime 扫描才绑定端口。
+# 冷启动本地 MySQL 约 18s；内网 MySQL + 26 个 workspace 函数全量扫描约 75-90s，
+# 给到 100s 留余量，避免误判失败导致前端与 code-server 不启动。
 backend_pids=""
-for i in $(seq 1 45); do
+for i in $(seq 1 100); do
     sleep 1
     if backend_pids="$(port_pids "$BACKEND_PORT")" && [ -n "$backend_pids" ]; then
         break
@@ -143,7 +144,7 @@ for i in $(seq 1 45); do
 done
 
 if [ -z "$backend_pids" ]; then
-    echo "Backend failed to start after 45s. Check backend.log"
+    echo "Backend failed to start after 100s. Check backend.log"
     exit 1
 fi
 echo "Backend running with PID(s):"
