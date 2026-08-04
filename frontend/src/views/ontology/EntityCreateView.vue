@@ -381,24 +381,17 @@
     <!-- 从文件导入 -->
     <div v-if="mode === 'import'" class="single-panel">
       <div class="entity-form">
-        <!-- 模板下载 -->
-        <div class="tpl-download">
-          <div class="tpl-download__info">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1v9M5 7l3 3 3-3M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="var(--status-info)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span>下载 JSON 模板参考（宽带退单稽核场景 V1.1 规范）</span>
-          </div>
-          <a href="/ontology_template.json" download="ontology_template.json" class="btn-sm">下载模板</a>
-        </div>
-
         <!-- 格式说明 -->
         <div class="schema-hint">
           <div class="schema-hint__title">JSON 文件结构说明</div>
           <div class="schema-hint__fields">
-            <div class="schema-field"><code>scenario</code><span>场景元数据（名称、命名空间、描述）</span></div>
-            <div class="schema-field"><code>object_types</code><span>实体定义列表，含 tier、properties、datasource_ref</span></div>
-            <div class="schema-field"><code>link_types</code><span>关系定义列表，含 source_type、target_type、cardinality</span></div>
-            <div class="schema-field"><code>action_types</code><span>动作定义列表，含 trigger、parameters、effects</span></div>
+            <div class="schema-field"><code>scenario</code><span>场景元数据，可选；仅 namespace 用作缺省命名空间</span></div>
+            <div class="schema-field"><code>object_types</code><span>实体定义列表：name、display_name、tier、primary_key、datasource_ref、properties[]（name、type、required）</span></div>
+            <div class="schema-field"><code>link_types</code><span>关系定义列表：name、source_type、target_type、cardinality（one_to_many / 1:N 等）</span></div>
+            <div class="schema-field"><code>action_types</code><span>动作定义列表：name、trigger、parameters[]、effects[]</span></div>
+            <div class="schema-field"><code>data_sources</code><span>数据源定义列表：source_id、tables[]；供 object_types.datasource_ref 引用</span></div>
           </div>
+          <div class="schema-hint__note">上传后会先解析预览，确认无误再导入；未列出的顶层字段不会被导入。</div>
         </div>
 
         <div class="form-row">
@@ -852,6 +845,7 @@ async function handleAiCreate() {
 .schema-hint { background: var(--neutral-50); border: 1px solid var(--neutral-200); border-radius: var(--radius-md); padding: 12px 14px; }
 .schema-hint__title { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-600); margin-bottom: 8px; }
 .schema-hint__fields { display: flex; flex-direction: column; gap: 4px; }
+.schema-hint__note { margin-top: 8px; font-size: var(--text-caption-size); color: var(--neutral-500); }
 .schema-field { display: flex; align-items: baseline; gap: 10px; font-size: var(--text-caption-size); }
 .schema-field code { font-family: var(--font-mono); color: var(--semantic-600); background: var(--neutral-0); padding: 1px 6px; border-radius: 3px; border: 1px solid var(--neutral-200); min-width: 130px; }
 .schema-field span { color: var(--neutral-500); }
