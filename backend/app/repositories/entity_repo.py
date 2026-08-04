@@ -55,6 +55,24 @@ class EntityRepository(BaseRepository[OntologyEntity]):
             (EntityRelation.from_entity_id == entity_id) | (EntityRelation.to_entity_id == entity_id)
         ).scalar() or 0
 
+    def get_relation_counts(self, entity_ids: list[str]) -> dict[str, int]:
+        if not entity_ids:
+            return {}
+        id_set = set(entity_ids)
+        rows = self.db.query(
+            EntityRelation.from_entity_id, EntityRelation.to_entity_id
+        ).filter(
+            EntityRelation.from_entity_id.in_(id_set)
+            | EntityRelation.to_entity_id.in_(id_set)
+        ).all()
+        counts: dict[str, int] = {}
+        for fid, tid in rows:
+            endpoints = {fid} if fid == tid else {fid, tid}
+            for eid in endpoints:
+                if eid in id_set:
+                    counts[eid] = counts.get(eid, 0) + 1
+        return counts
+
     def get_all_relations(self) -> list[EntityRelation]:
         return self.db.query(EntityRelation).all()
 

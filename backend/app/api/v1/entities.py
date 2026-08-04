@@ -47,14 +47,16 @@ def list_entities(
     # 标记共享实体
     shared_ids = repo.get_shared_entity_ids(ontology_id) if ontology_id else set()
 
+    entity_ids = [e.id for e in entities]
+    rel_counts = repo.get_relation_counts(entity_ids)
+
     result = []
     for e in entities:
-        rel_count = repo.get_relation_count(e.id)
         result.append(EntityListItem(
             id=e.id, name=e.name, name_cn=e.name_cn,
             tier=e.tier, status=e.status,
             attr_count=len(e.attributes),
-            relation_count=rel_count,
+            relation_count=rel_counts.get(e.id, 0),
             function_count=len(e.functions),
             action_count=len(e.actions),
             rule_count=0,

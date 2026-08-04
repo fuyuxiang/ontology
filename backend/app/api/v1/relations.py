@@ -46,18 +46,29 @@ def list_relations(
     else:
         rels = repo.list_by_entity(entity_id)
 
-    result = []
-    for r in rels:
-        result.append(RelationOut(
+    if rels:
+        needed_ids = {r.from_entity_id for r in rels} | {r.to_entity_id for r in rels}
+        rows = db.query(OntologyEntity.id, OntologyEntity.name).filter(
+            OntologyEntity.id.in_(needed_ids)
+        ).all()
+        name_map = {rid: rname for rid, rname in rows}
+    else:
+        name_map = {}
+
+    return [
+        RelationOut(
             id=r.id,
             from_entity_id=r.from_entity_id,
-            from_entity_name=repo.get_entity_name(r.from_entity_id),
+            from_entity_name=name_map.get(r.from_entity_id, ""),
             to_entity_id=r.to_entity_id,
-            to_entity_name=repo.get_entity_name(r.to_entity_id),
-            name=r.name, rel_type=r.rel_type,
-            cardinality=r.cardinality, description=r.description,
-        ))
-    return result
+            to_entity_name=name_map.get(r.to_entity_id, ""),
+            name=r.name,
+            rel_type=r.rel_type,
+            cardinality=r.cardinality,
+            description=r.description,
+        )
+        for r in rels
+    ]
 
 
 @router.post("", response_model=RelationOut, status_code=201)

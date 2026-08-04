@@ -96,8 +96,9 @@ export const entityApi = {
     return get<GraphData>('/entities/graph')
   },
 
-  relations(entityId: string, ontologyId?: string) {
-    const params: Record<string, string> = { entity_id: entityId }
+  relations(entityId?: string, ontologyId?: string) {
+    const params: Record<string, string> = {}
+    if (entityId) params.entity_id = entityId
     if (ontologyId) params.ontology_id = ontologyId
     return get<EntityRelationDetail[]>('/relations', { params })
   },
