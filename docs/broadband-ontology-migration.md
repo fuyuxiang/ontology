@@ -65,20 +65,26 @@ compute_rule_evidence / collect_order_context / extract_call_evidence / batch_au
 
 虽然 1.1~1.3 已经成立，但有两处可改进：
 
-### 3.1 `workspace/` 是运行时产物
+### 3.1 `workspace/` 是运行时产物（不在版本控制内）
 
-`workspace/*/main.py` 7 个退单稽核函数在开发机文件系统上，git 只跟踪 `workspace/.gitkeep` 和 `workspace/sample/calc_demo/`（`.gitignore:39` 排除 `workspace/*/`）。风险：
+`workspace/*/main.py` 7 个退单稽核函数在开发机文件系统上，git 只跟踪 `workspace/.gitkeep` 和 `workspace/sample/calc_demo/`（`.gitignore` 排除 `workspace/*/`）。这是**项目设置**，由用户决定不入仓。
 
-- 开发机故障 / 重装 = 生产配置丢失（虽然 `OntologyFunction` 表有元数据，但 `source_path` 指向的文件不在了）
-- 团队多人协作无法代码评审
+需要注意的客观事实：
 
-**建议**：把 `workspace/audit_single_order/` 等目录加进版本控制，删除 `.gitignore` 中的排除规则；或定期导出到 `docs/` 作为快照。
+- `OntologyFunction.source_path` 指向绝对路径（如 `/Users/fuyuxiang/.../workspace/audit_single_order/main.py`），跨机/跨开发环境不通用
+- 开发机故障 / 重装 = 物理文件丢失（数据库元数据在但 watcher 找不到 source_path）
+- 26 个 `OntologyFunction` 记录中 3 个（`abdssff` / `afff` / `test`）内容为 `def xxx(params): return {}` 空壳
+
+如需在团队内部分享函数代码、跨机协作，备选方案：
+
+- 定期将 `workspace/` 打包到 `docs/snapshots/workspace-<date>.tar.gz` 提交
+- 把 `source_path` 改为相对路径，并约定 watcher 启动时从 git 检出至运行时目录
 
 ### 3.2 对象已发布但属性映射手工维护
 
 `entity_attributes` 中 147 条 `source_table/source_field` 是用户在界面上手工填的（`ObjectBindingService.create` 自动镜像 + 人工补充）。DDL 变更时无自动跟随机制——这是当前真正未解决的「本体驱动 vs 物理 schema 漂移」问题。
 
-**建议**：增加 `python -m scripts.sync_attr_field_maps` 一类工具，对比 Asset 的 `schema_snapshot` 与当前 `EntityAttribute.source_field`，给出 diff 报告；不自动改，给人工评审。
+**已落地**：`backend/scripts/check_attr_field_maps.py`（提交 `c01ce063`）只读对比 Asset 的 `schema_snapshot` 与当前 `EntityAttribute.source_field`，输出三类差异（缺映射 / 列失效 / 类型不一致）。生产库验证：11 个退单稽核对象普遍发现 `month_id / day_id / prov_id` 分摊维度未建映射、date/boolean 类型漂移。脚本只读不写，由人工事后决定如何处理。
 
 ## 四、被 seed 误导的 4 张表（已核实的现状）
 
