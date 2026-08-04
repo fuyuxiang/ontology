@@ -54,6 +54,7 @@ export interface OntologyPreviewResult {
   relations: PreviewRelation[]
   actions: PreviewAction[]
   data_sources: PreviewDataSource[]
+  warnings?: string[]
   summary: {
     object_count: number
     relation_count: number

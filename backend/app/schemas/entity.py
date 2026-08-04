@@ -138,6 +138,7 @@ class FileImportResult(BaseModel):
     rules_created: int = 0
     actions_created: int = 0
     errors: list[str] = []
+    warnings: list[str] = []
 
 
 # ── 本体文件预览（只解析不落库）──
@@ -197,6 +198,7 @@ class OntologyPreviewResult(BaseModel):
     relations: list[PreviewRelation] = []
     actions: list[PreviewAction] = []
     data_sources: list[PreviewDataSource] = []
+    warnings: list[str] = []
     summary: PreviewSummary = PreviewSummary()
 
 

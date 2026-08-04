@@ -20,6 +20,7 @@ class ImportResult:
     rules_created: int = 0
     actions_created: int = 0
     errors: list[str] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
 
 
 # ── JSON 类型映射 ──
@@ -29,10 +30,28 @@ _JSON_TYPE_MAP = {
     "array": "json", "object": "json",
 }
 
+# ── 解析器实际消费的顶层字段；其余字段一律不会被导入 ──
+_SUPPORTED_TOP_LEVEL_KEYS = {
+    "scenario", "object_types", "link_types", "action_types", "data_sources",
+}
+
+
+def _collect_ignored_top_level(data: dict) -> list[str]:
+    """返回文件中存在但解析器不消费的顶层字段名，用于向用户明示丢弃内容。"""
+    return sorted(k for k in data if k not in _SUPPORTED_TOP_LEVEL_KEYS)
+
+
+def _ignored_warning(data: dict) -> list[str]:
+    ignored = _collect_ignored_top_level(data)
+    if not ignored:
+        return []
+    return [f"以下顶层字段不在导入范围内，已忽略：{'、'.join(ignored)}"]
+
 
 def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id: str | None = None) -> ImportResult:
     """按 V1.1 本体 JSON Schema 规范解析，复用 import_schema.py 的逻辑。"""
     result = ImportResult()
+    result.warnings.extend(_ignored_warning(data))
 
     if not namespace:
         scenario = data.get("scenario", {})
@@ -266,6 +285,7 @@ def preview_json_ontology(data: dict, namespace: str) -> dict:
     if not namespace:
         namespace = data.get("scenario", {}).get("namespace", "")
 
+    warnings: list[str] = _ignored_warning(data)
     ds_map = _build_ds_logical_to_physical(data)
 
     # ── object_types → objects（含属性，物理表映射）──
@@ -309,6 +329,9 @@ def preview_json_ontology(data: dict, namespace: str) -> dict:
         source = link.get("source_type", "")
         target = link.get("target_type", "")
         if source not in object_names or target not in object_names:
+            warnings.append(
+                f"关系 {link.get('name', '')}（{source} -> {target}）跳过：两端对象未在 object_types 中定义"
+            )
             continue
         relations.append({
             "name": link.get("name", ""),
@@ -359,6 +382,7 @@ def preview_json_ontology(data: dict, namespace: str) -> dict:
         "relations": relations,
         "actions": actions,
         "data_sources": data_sources,
+        "warnings": warnings,
         "summary": {
             "object_count": len(objects),
             "relation_count": len(relations),
