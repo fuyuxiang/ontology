@@ -11,6 +11,7 @@ dist-ssr/
 # Database
 *.db
 *.db-*
+*.db.bak.*
 *.sqlite
 *.sqlite-*
 *.sqlite3

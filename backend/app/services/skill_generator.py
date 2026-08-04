@@ -19,12 +19,7 @@ logger = logging.getLogger(__name__)
 
 _sessions: dict[str, dict] = {}
 
-ROLE_PREFIX = (
-    "你是一名深耕中国联通业务体系的运营商领域专家兼本体建模专家，"
-    "熟悉联通在公众客户、政企客户、网络资源、产品中心、订单中心、计费账务、"
-    "客户服务、渠道运营、智慧家庭、物联网、云网融合、数据中台和智慧运营等领域的"
-    "业务对象、流程规则和系统边界。"
-)
+ROLE_PREFIX = "你是一名资深的业务建模与本体建模专家。"
 
 GENERATE_SYSTEM_PROMPT = ROLE_PREFIX + """你的任务是基于用户提供的本体资产和业务需求，生成一个可被AI Agent调用的完整技能定义。
 

@@ -97,6 +97,7 @@
         <div class="ai-templates">
           <div class="panel-title">场景模板参考</div>
           <div class="tpl-list">
+            <div v-if="templates.length === 0" class="tpl-empty">暂无模板，可直接在左侧输入场景描述</div>
             <div v-for="tpl in templates" :key="tpl.name" class="tpl-card" @click="aiText = tpl.text; aiInputMode = 'text'">
               <div class="tpl-card__head">
                 <span class="tpl-card__icon">{{ tpl.icon }}</span>
@@ -503,42 +504,8 @@ const tierColors: Record<number, { bg: string; fg: string }> = {
 const tierBg = (t: number) => tierColors[t]?.bg ?? '#eee'
 const tierFg = (t: number) => tierColors[t]?.fg ?? '#333'
 
-// ── 场景模板 ──
-const templates = [
-  {
-    icon: '📡',
-    name: '宽带退单稽核',
-    desc: '宽带装机退单根因分析，涉及客户、工程师、工单、质检等实体',
-    text: `宽带退单稽核场景涉及以下核心实体：
-客户（Customer）是核心对象，包含客户ID、姓名、手机号、地址、套餐等级属性。
-宽带退单工单（BroadbandChurnOrder）记录退单信息，包含工单ID、退单时间、退单原因、状态、根因类别属性，关联客户和工程师。
-工程师（Engineer）负责装机施工，包含工号、姓名、技能等级、所属团队属性。
-语音质检记录（VoiceAuditRecord）记录客服通话质检结果，包含录音ID、质检得分、关键词、情绪标签属性，关联工单。
-施工记录（ConstructionRecord）记录现场施工情况，包含施工时间、施工结果、异常描述属性，关联工单和工程师。
-稽核规则（AuditRule）定义归因判断逻辑，包含规则ID、规则名称、触发条件、归因类别属性。`,
-  },
-  {
-    icon: '📱',
-    name: '携号转网预警',
-    desc: '识别高风险携转用户，输出预警等级和挽留策略',
-    text: `携号转网预警场景涉及以下核心实体：
-用户（User）是核心对象，包含用户ID、手机号、在网时长、套餐类型、ARPU值属性。
-套餐（Package）描述用户订购的产品，包含套餐ID、套餐名称、月租费、流量额度、语音分钟数属性。
-投诉记录（ComplaintRecord）记录用户投诉历史，包含投诉ID、投诉时间、投诉类型、处理状态属性，关联用户。
-携转查询记录（MnpQueryRecord）记录用户查询携转的行为，包含查询时间、查询渠道属性，关联用户。
-预警结果（AlertResult）输出风险评估结论，包含风险等级、风险原因、挽留策略、置信度属性，关联用户。`,
-  },
-  {
-    icon: '🏢',
-    name: '政企根因分析',
-    desc: '政企客户网络故障多维根因分析',
-    text: `政企根因分析场景涉及以下核心实体：
-政企客户（EnterpriseCustomer）是核心对象，包含客户ID、企业名称、行业类型、合同等级、专属客户经理属性。
-网络设备（NetworkDevice）描述客户侧和运营商侧设备，包含设备ID、设备类型、IP地址、所属网络层级属性。
-故障工单（FaultOrder）记录故障处理过程，包含工单ID、故障时间、故障描述、影响范围、处理状态属性，关联政企客户。
-根因分析结果（RootCauseResult）输出分析结论，包含主因类别、次因类别、故障链路描述、修复建议属性，关联故障工单。`,
-  },
-]
+// ── 场景模板（业务场景由用户自行录入，此处不预置任何具体业务） ──
+const templates: Array<{ icon: string; name: string; desc: string; text: string }> = []
 
 // ── 手动创建 ──
 const form = reactive({
@@ -735,6 +702,7 @@ async function handleAiCreate() {
 /* 模板 */
 .ai-templates { background: var(--neutral-0); border: 1px solid var(--neutral-200); border-radius: var(--radius-lg); padding: 16px; }
 .tpl-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+.tpl-empty { padding: 16px; text-align: center; font-size: var(--text-caption-size); color: var(--neutral-400); border: 1px dashed var(--neutral-200); border-radius: var(--radius-md); }
 .tpl-card { padding: 12px; border: 1px solid var(--neutral-200); border-radius: var(--radius-md); cursor: pointer; transition: all var(--transition-fast); }
 .tpl-card:hover { border-color: var(--semantic-300); background: var(--semantic-50); }
 .tpl-card__head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }

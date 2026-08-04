@@ -57,7 +57,7 @@ def build_system_prompt(
         "Step 3: 输出结果\n"
         "```\n"
         "\n"
-        "### 场景B：分析类问题（如'退单根因分布？'）\n"
+        "### 场景B：分析类问题（如'X 指标的分布？'）\n"
         "```\n"
         "Step 1: 数据采集 → query_entity_data 查询相关实体数据\n"
         "Step 2: 逻辑分析 → call_function 执行逻辑函数进行计算\n"

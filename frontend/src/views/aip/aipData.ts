@@ -32,17 +32,8 @@ export const NODE_TYPES: NodeTypeMeta[] = [
   { type: 'subscene', label: '子场景', group: '编排节点', color: '#7C3AED', description: '嵌套执行其他场景', icon: 'robot' },
 ]
 
-/* ========== ML 模型选项 ========== */
-export const ML_MODELS = [
-  { value: 'churn_predictor_v2', label: '流失预测 v2' },
-  { value: 'product_affinity_v1', label: '产品亲和度 v1' },
-  { value: 'touchpoint_effect_v1', label: '触点效果 v1' },
-  { value: 'arpu_predictor_v1', label: 'ARPU 预测 v1' },
-  { value: 'kpi_anomaly_detector_v1', label: 'KPI 异动检测 v1' },
-  { value: 'kpi_contribution_decomposer_v1', label: '贡献度分解 v1' },
-  { value: 'install_success_predictor_v1', label: '装机成功率预测 v1' },
-  { value: 'refund_risk_classifier_v1', label: '退单风险分类 v1' },
-]
+/* ========== ML 模型选项（业务模型由用户在「模型管理」页录入，此处不预置） ========== */
+export const ML_MODELS: { value: string; label: string }[] = []
 
 /* ========== 控件枚举 ========== */
 export const OPERATORS = ['==', '!=', '>', '<', '>=', '<=', 'IN', 'NOT_IN', 'BETWEEN', 'switch']

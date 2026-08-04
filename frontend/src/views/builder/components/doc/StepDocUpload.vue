@@ -10,7 +10,7 @@
 
     <div class="step-upload__field">
       <label class="step-upload__label">业务需求描述</label>
-      <textarea class="step-upload__textarea" v-model="desc" placeholder="例如：我需要构建宽带退单稽核的本体，包含客户、工单、退单原因等实体..." rows="4"></textarea>
+      <textarea class="step-upload__textarea" v-model="desc" placeholder="用一两句话描述你想构建本体的业务场景，例如涉及哪些业务对象、要解决什么问题..." rows="4"></textarea>
     </div>
 
     <div class="step-upload__field">

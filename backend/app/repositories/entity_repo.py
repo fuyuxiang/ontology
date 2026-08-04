@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import func
 
-from app.models import EntityAttribute, EntityRelation, OntologyEntity
-from app.models.action import EntityAction
+from app.models import EntityRelation, OntologyEntity
 from app.models.shared_ref import OntologySharedRef
 from app.repositories.base import BaseRepository
 
@@ -76,18 +75,3 @@ class EntityRepository(BaseRepository[OntologyEntity]):
     def get_all_relations(self) -> list[EntityRelation]:
         return self.db.query(EntityRelation).all()
 
-    def get_scene_layer_counts(self, entity_ids: list[str]) -> dict:
-        attr_count = self.db.query(func.count(EntityAttribute.id)).filter(
-            EntityAttribute.entity_id.in_(entity_ids)
-        ).scalar() or 0
-        rel_count = self.db.query(func.count(EntityRelation.id)).filter(
-            EntityRelation.from_entity_id.in_(entity_ids) | EntityRelation.to_entity_id.in_(entity_ids)
-        ).scalar() or 0
-        action_count = self.db.query(func.count(EntityAction.id)).filter(
-            EntityAction.entity_id.in_(entity_ids)
-        ).scalar() or 0
-        return {
-            "attrCount": attr_count,
-            "relationCount": rel_count,
-            "actionCount": action_count,
-        }

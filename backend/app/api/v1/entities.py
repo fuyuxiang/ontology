@@ -67,48 +67,6 @@ def list_entities(
     return result
 
 
-# ── 场景层级映射：namespace -> { layer_key: [entity_name, ...] } ──
-_SCENE_LAYER_MAP: dict[str, dict[str, list[str]]] = {
-    "s5": {
-        "signal": [
-            "MobileSubscriber", "PortabilityQuery",
-            "UserContract", "UserArrears", "ComplaintWorkOrder",
-        ],
-        "aggregate": ["MonthlyBilling", "VoiceCallRecord", "ConvergencePackage"],
-        "decision": ["RetentionRecord"],
-    },
-}
-
-
-@router.get("/scene-layer-stats")
-def get_scene_layer_stats(
-    namespace: str = Query(..., description="场景命名空间，如 s5"),
-    db: Session = Depends(get_db),
-):
-    """按层级统计场景实体、属性、关系、规则、动作数量。"""
-    layer_map = _SCENE_LAYER_MAP.get(namespace)
-    if not layer_map:
-        raise HTTPException(status_code=404, detail=f"未找到命名空间 {namespace} 的层级映射")
-
-    repo = EntityRepository(db)
-    layer_labels = {"signal": "语义层", "aggregate": "动力层", "decision": "动态层"}
-    result = []
-
-    for layer_key in ("signal", "aggregate", "decision"):
-        entity_names = layer_map.get(layer_key, [])
-        entity_ids = [f"{namespace}_{n}" for n in entity_names]
-        entity_count = len(entity_ids)
-        counts = repo.get_scene_layer_counts(entity_ids)
-        result.append({
-            "key": layer_key,
-            "label": layer_labels.get(layer_key, layer_key),
-            "entityCount": entity_count,
-            **counts,
-        })
-
-    return result
-
-
 @router.get("/data-layer")
 def get_data_layer(db: Session = Depends(get_db)):
 

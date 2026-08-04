@@ -229,7 +229,7 @@ class EntityDataService:
 
         rewritten_sql = sql
         referenced_assets: dict[str, Asset] = {}
-        # 长名优先，避免 InstallOrder 被 InstallOrderItem 之类前缀误匹配
+        # 长名优先，避免短名被长名前缀误匹配
         for obj_name in sorted(name_to_asset, key=len, reverse=True):
             asset, table_name = name_to_asset[obj_name]
             pattern = re.compile(rf"(?<![\w.]){re.escape(obj_name)}(?![\w])")

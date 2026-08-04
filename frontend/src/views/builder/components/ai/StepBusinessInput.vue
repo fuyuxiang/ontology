@@ -2,7 +2,7 @@
   <div class="step-input">
     <h2 class="step-input__title">描述你的业务场景</h2>
     <p class="step-input__sub">输入业务描述，AI 将自动匹配相关的数据主题域</p>
-    <textarea class="step-input__textarea" v-model="desc" placeholder="例如：我需要构建宽带退单稽核的本体，包含客户、工单、退单原因等实体..." rows="5"></textarea>
+    <textarea class="step-input__textarea" v-model="desc" placeholder="用一两句话描述你想构建本体的业务场景，例如涉及哪些业务对象、要解决什么问题..." rows="5"></textarea>
     <button class="step-input__btn" :disabled="!desc.trim() || loading" @click="analyze">
       {{ loading ? '分析中...' : '开始分析' }}
     </button>

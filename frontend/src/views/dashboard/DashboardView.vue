@@ -205,27 +205,16 @@ function onConfigSaved(cfg: DashboardConfig) {
 }
 
 /* ── Icon mapping ── */
-const coreNames = new Set(['Customer', 'Order', 'Product', 'Channel', 'Organization', 'Staff', 'Address'])
-const iconMap: Record<string, string> = {
-  Customer: '/images/ontology/icon-客户.png',
-  Order: '/images/ontology/icon-订单.png',
-  Product: '/images/ontology/icon-产品.png',
-  Address: '/images/ontology/icon-地址.png',
-  Channel: '/images/ontology/icon-渠道.png',
-  Staff: '/images/ontology/icon-员工.png',
-  Organization: '/images/ontology/icon-组织.png',
-  InstallOrder: '/images/ontology/icon-订单.png',
-  InstallChurn: '/images/ontology/icon-域本体.png',
-  Engineer: '/images/ontology/icon-员工.png',
-}
+const CORE_ICON = '/images/ontology/icon-核心本体.png'
+const DOMAIN_ICON = '/images/ontology/icon-域本体.png'
 
 function toNode(e: EntityListItem): OntologyNode {
-  const isCore = coreNames.has(e.name) || e.tier === 1 || e.tier === 2
+  const isCore = e.tier === 1 || e.tier === 2
   return {
     id: e.id,
     label: e.name_cn || e.name,
     desc: `${e.name} · Tier ${e.tier}`,
-    icon: iconMap[e.name] || (isCore ? '/images/ontology/icon-核心本体.png' : '/images/ontology/icon-域本体.png'),
+    icon: isCore ? CORE_ICON : DOMAIN_ICON,
     tier: e.tier,
     status: e.status,
     relationCount: e.relation_count,
@@ -236,8 +225,8 @@ function toNode(e: EntityListItem): OntologyNode {
 }
 
 /* ── Node layout ── */
-const coreNodes = computed(() => entities.value.filter(e => coreNames.has(e.name) || e.tier === 1).map(toNode))
-const domainNodes = computed(() => entities.value.filter(e => !coreNames.has(e.name) && e.tier !== 1).map(toNode))
+const coreNodes = computed(() => entities.value.filter(e => e.tier === 1).map(toNode))
+const domainNodes = computed(() => entities.value.filter(e => e.tier !== 1).map(toNode))
 
 function toBalancedRows<T>(items: T[], maxCols: number): T[][] {
   if (!items.length) return []
@@ -616,48 +605,6 @@ const ICON_MAP: Record<string, string> = {
   logic: '/images/ontology/icon-LOGIC SOURCES.png',
   actions: '/images/ontology/icon-SYSTEMS OF ACTION.png',
 }
-const WORKFLOW_ICON = '/images/ontology/icon-核心本体.png'
-const WORKFLOW_CARD_ITEMS = [
-  { icon: WORKFLOW_ICON, label: '风险工作流' },
-  { icon: WORKFLOW_ICON, label: '证据检测流' },
-  { icon: WORKFLOW_ICON, label: '客户分析' },
-  { icon: WORKFLOW_ICON, label: '异网分析' },
-  { icon: WORKFLOW_ICON, label: '仪表盘' },
-]
-const AUTOMATION_ICON_ITEMS = [
-  { icon: WORKFLOW_ICON, label: '合约到期提醒' },
-  { icon: WORKFLOW_ICON, label: '异常预警' },
-  { icon: WORKFLOW_ICON, label: '本体优化建议' },
-]
-const PRODUCT_ICON_ITEMS = [
-  { icon: WORKFLOW_ICON, label: '智能问答' },
-  { icon: WORKFLOW_ICON, label: '场景验证' },
-]
-const DATASOURCE_ICON_ITEMS = [
-  { icon: WORKFLOW_ICON, label: 'CBSS' },
-  { icon: WORKFLOW_ICON, label: '外呼录音' },
-  { icon: WORKFLOW_ICON, label: '地址库' },
-  { icon: WORKFLOW_ICON, label: '待装库' },
-  { icon: WORKFLOW_ICON, label: '通话记录' },
-  { icon: WORKFLOW_ICON, label: '客户信息' },
-]
-const LOGIC_ICON_ITEMS = [
-  { icon: WORKFLOW_ICON, label: 'Actions' },
-  { icon: WORKFLOW_ICON, label: 'Functions' },
-]
-const ACTIONS_ICON_ITEMS = [
-  { icon: WORKFLOW_ICON, label: '二次营销外呼' },
-  { icon: WORKFLOW_ICON, label: '维挽' },
-  { icon: WORKFLOW_ICON, label: '员工培训' },
-]
-const ICON_ITEMS_MAP: Record<string, { icon: string; label: string }[]> = {
-  analytics: WORKFLOW_CARD_ITEMS,
-  automations: AUTOMATION_ICON_ITEMS,
-  products: PRODUCT_ICON_ITEMS,
-  datasources: DATASOURCE_ICON_ITEMS,
-  logic: LOGIC_ICON_ITEMS,
-  actions: ACTIONS_ICON_ITEMS,
-}
 const FLEX_MAP: Record<string, number> = {
   analytics: 479, automations: 537, products: 470,
   datasources: 514, logic: 514, actions: 441,
@@ -675,11 +622,11 @@ function resolveCardItems(card: any): string[] {
       items.push(`${val} ${item.label || ''}`.trim())
     } else if (item.type === 'datasources') {
       const dsList = s.datasources ?? []
-      const bb = dsList.filter((d: any) => d.name.startsWith('bb_'))
-      const other = dsList.filter((d: any) => !d.name.startsWith('bb_'))
-      if (bb.length) items.push(`宽带退单(${bb.length}表)`, ...bb.slice(0, 4).map((d: any) => d.name.replace('bb_', '')))
-      if (other.length) items.push(`携号转网(${other.length}表)`, ...other.slice(0, 3).map((d: any) => d.name))
-      if (!dsList.length) items.push('暂无数据源')
+      if (dsList.length) {
+        items.push(...dsList.slice(0, 6).map((d: any) => d.name))
+      } else {
+        items.push('暂无数据源')
+      }
     } else if (item.type === 'rule_priority' || (item as any).type === 'logic_stats') {
       // legacy card type compatibility: show actions/functions instead
       items.push(`Actions: ${s.action_count ?? 0} (今日${s.today_action_executions ?? 0}次)`)
@@ -694,24 +641,14 @@ function resolveCardItems(card: any): string[] {
 
 const allCards = computed(() => {
   const cards = dashConfig.value?.cards_config
-  if (!cards) {
-    // fallback to hardcoded defaults
-    return [
-      { key: 'analytics', title: 'ANALYTICS & WORKFLOWS', flex: 479, bg: BG_MAP.analytics, items: [], iconItems: WORKFLOW_CARD_ITEMS },
-      { key: 'automations', title: 'AUTOMATIONS', flex: 537, bg: BG_MAP.automations, items: [], iconItems: AUTOMATION_ICON_ITEMS },
-      { key: 'products', title: 'PRODUCTS & SDKs', flex: 470, bg: BG_MAP.products, items: [], iconItems: PRODUCT_ICON_ITEMS },
-      { key: 'datasources', title: 'DATA SOURCES', flex: 514, bg: BG_MAP.datasources, items: [], iconItems: DATASOURCE_ICON_ITEMS },
-      { key: 'logic', title: 'LOGIC SOURCES', flex: 514, bg: BG_MAP.logic, items: [], iconItems: LOGIC_ICON_ITEMS },
-      { key: 'actions', title: 'SYSTEMS OF ACTION', flex: 441, bg: BG_MAP.actions, items: [], iconItems: ACTIONS_ICON_ITEMS },
-    ]
-  }
+  if (!cards) return []
   return cards.filter(c => c.enabled).map(c => ({
     key: c.key, title: c.title,
     flex: FLEX_MAP[c.key] ?? 470,
     bg: BG_MAP[c.key] ?? BG_MAP.analytics,
     icon: ICON_MAP[c.key],
-    items: ICON_ITEMS_MAP[c.key] ? [] : resolveCardItems(c),
-    iconItems: ICON_ITEMS_MAP[c.key],
+    items: resolveCardItems(c),
+    iconItems: [] as { icon: string; label: string }[],
   }))
 })
 
