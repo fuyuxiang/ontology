@@ -22,7 +22,7 @@
 
 ## Overview
 
-Yuanshu Ontology is an enterprise ontology intelligence platform. Its technical direction is **semantic-web-centric, end-to-end intelligent construction** — treating an ontology that conforms to W3C Semantic Web standards as the core asset, and closing the full loop from data ingestion, ontology modeling, mapping and binding, validation against real data, and versioned publishing through to AI consumption, all on one platform.
+Yuanshu Ontology is an enterprise ontology intelligence platform. Its technical direction is **semantic-web-centric, end-to-end intelligent construction** — treating an ontology that conforms to Semantic Web standards as the core asset, and closing the full loop from data ingestion, ontology modeling, mapping and binding, validation against real data, and versioned publishing through to AI consumption, all on one platform.
 
 Within that direction, the ontology serves as the **semantic map between AI and enterprise data**: anchored downward to physical table columns, and upward providing LLMs with semantic coordinates that are reasonable, executable, and governable. The platform delivers an end-to-end workflow from data integration to agent applications, letting teams build intelligent scenarios on well-governed business semantics rather than raw tables and scripts.
 
@@ -55,7 +55,7 @@ With the map in place, AI stops guessing: it **queries the ontology** for semant
 
 ### 1. Semantic-Web-Centric
 
-The platform's core asset is an **ontology conforming to W3C Semantic Web standards**, not the private configuration of some AI application.
+The platform's core asset is an **ontology conforming to Semantic Web standards**, not the private configuration of some AI application.
 
 - The modeling layer aligns with **OWL 2**: classes, object properties, data properties, and named individuals, with support for `subClassOf` / `equivalentClass` / `disjointWith` / `domain` / `range` / `inverseOf`, covering **12 class expression types** (existential and universal quantification, min/max/exact cardinality, intersection/union/complement, hasValue) and **7 object property characteristics** (functional, inverseFunctional, transitive, symmetric, asymmetric, reflexive, irreflexive).
 - It provides **bidirectional OWL/XML parsing and serialization** (frontend `utils/owl/`) plus **RDF/XML and Turtle import** (backend rdflib), so ontologies interoperate with standard tools such as Protégé.
