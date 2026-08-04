@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import type { OntologyObjectDraft, OntologyRelationDraft, Step1Phase } from '../../../../types/builder'
 
 const props = defineProps<{
@@ -105,8 +105,6 @@ const viewBox = computed(() => `${vx.value} ${vy.value} ${vw.value} ${vh.value}`
 interface LayoutNode { id: string; label: string; icon: string; count: number; x: number; y: number; r: number; color: string; vx: number; vy: number }
 
 const layoutNodes = ref<LayoutNode[]>([])
-let simRunning = false
-let animFrame = 0
 let draggingNodeId: string | null = null
 let dragOffset = { x: 0, y: 0 }
 
@@ -126,25 +124,21 @@ function initLayout() {
       vx: 0, vy: 0,
     }
   })
+  runSimulation(nodes)
   layoutNodes.value = nodes
-  simRunning = true
-  runSimulation()
 }
 
-function runSimulation() {
+function runSimulation(nodes: LayoutNode[]) {
   const alpha = 0.3
   const repulsion = 8000
   const linkDist = 180
   const linkStrength = 0.05
   const centerStrength = 0.01
-  let iterations = 0
-  const maxIter = 300
+  const maxIter = 200
 
-  function tick() {
-    if (!simRunning || iterations > maxIter) { simRunning = false; return }
-    iterations++
-    const nodes = layoutNodes.value
+  const nodeIndex = new Map(nodes.map((n, i) => [n.id, i]))
 
+  for (let iter = 0; iter < maxIter; iter++) {
     for (const n of nodes) {
       n.vx += -n.x * centerStrength
       n.vy += -n.y * centerStrength
@@ -163,7 +157,6 @@ function runSimulation() {
       }
     }
 
-    const nodeIndex = new Map(nodes.map((n, i) => [n.id, i]))
     for (const rel of props.relations) {
       const si = nodeIndex.get(rel.source) ?? nodeIndex.get(findNodeIdByName(rel.source))
       const ti = nodeIndex.get(rel.target) ?? nodeIndex.get(findNodeIdByName(rel.target))
@@ -178,21 +171,17 @@ function runSimulation() {
     }
 
     for (const n of nodes) {
-      if (n.id === draggingNodeId) { n.vx = 0; n.vy = 0; continue }
       n.vx *= alpha; n.vy *= alpha
       n.x += n.vx; n.y += n.vy
     }
-
-    layoutNodes.value = [...nodes]
-    animFrame = requestAnimationFrame(tick)
   }
-
-  animFrame = requestAnimationFrame(tick)
 }
 
-watch(() => props.objects, initLayout, { deep: true })
+watch(
+  () => props.objects.map(o => o.id).join('|') + '::' + props.relations.map(r => `${r.source}->${r.target}`).join('|'),
+  initLayout,
+)
 onMounted(initLayout)
-onUnmounted(() => { simRunning = false; cancelAnimationFrame(animFrame) })
 
 const renderedLinks = computed(() => {
   const nodeMap = new Map(layoutNodes.value.map(n => [n.id, n]))

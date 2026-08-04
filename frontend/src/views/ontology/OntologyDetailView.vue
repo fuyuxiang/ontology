@@ -506,6 +506,8 @@ function goBack() {
 }
 
 async function loadData() {
+  allRelations.value = []
+  relationsLoaded.value = false
   await scenarioStore.fetchScenarios()
   const sc = scenarioStore.byCode(code.value)
   if (sc) {
@@ -518,24 +520,16 @@ onActivated(loadData)
 
 // --- 关系定义 Tab ---
 const allRelations = ref<EntityRelationDetail[]>([])
+const relationsLoaded = ref(false)
 const relationsLoading = ref(false)
 
 async function loadRelations() {
+  const ontologyId = scenario.value?.id
+  if (!ontologyId) return
   relationsLoading.value = true
   try {
-    const results: EntityRelationDetail[] = []
-    const seen = new Set<string>()
-    const ontologyId = scenario.value?.id
-    for (const e of scenarioEntities.value) {
-      const rels = await entityApi.relations(e.id, ontologyId)
-      for (const r of rels) {
-        if (!seen.has(r.id)) {
-          seen.add(r.id)
-          results.push(r)
-        }
-      }
-    }
-    allRelations.value = results
+    allRelations.value = await entityApi.relations(undefined, ontologyId)
+    relationsLoaded.value = true
   } finally {
     relationsLoading.value = false
   }
@@ -544,7 +538,7 @@ async function loadRelations() {
 watch(code, loadData)
 watch(activeTab, (tab) => {
   selectedEntityId.value = null
-  if ((tab === 'relations' || tab === 'graph') && allRelations.value.length === 0) {
+  if ((tab === 'relations' || tab === 'graph') && !relationsLoaded.value) {
     loadRelations()
   }
 })
