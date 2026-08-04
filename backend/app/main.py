@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.auth import router as auth_router
 from app.api.v1.auth import seed_admin
 from app.api.v1.entities import router as entities_router
+# 注：broadband 模块已删除——该模块是早期开发态 demo，无任何调用方（前/后端、Agent/Skill 0 引用），其硬编码 SQL 引用的 bb_* 表在生产也不存在
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.db_compat import ensure_legacy_schema_compat
@@ -129,7 +130,6 @@ from app.api.v1.ai_ontology import router as ai_ontology_router
 from app.api.v1.aip_executions import router as aip_executions_router
 from app.api.v1.aip_scenes import router as aip_scenes_router
 from app.api.v1.aip_webhooks import router as aip_webhooks_router
-from app.api.v1.broadband import router as broadband_router
 from app.api.v1.builder import router as builder_router
 from app.api.v1.business_documents import router as business_documents_router
 from app.api.v1.copilot import router as copilot_router
@@ -212,7 +212,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Data Plane 事件 handler 注册失败: {e}")
 
-    # 注册业务侧 sql_view Asset（mnp / scenes / broadband）
+    # 注册业务侧 sql_view Asset（mnp；broadband 已下线）
     try:
         from scripts.seed_business_assets import seed as seed_business_assets
         bs_stats = seed_business_assets()
@@ -310,7 +310,6 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(mnp_router, prefix="/api/v1")
 app.include_router(scenes_router, prefix="/api/v1")
 app.include_router(scenarios_router, prefix="/api/v1")
-app.include_router(broadband_router, prefix="/api/v1")
 app.include_router(models_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 app.include_router(agents_open_router, prefix="/api/v1")
