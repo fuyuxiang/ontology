@@ -1,5 +1,5 @@
 import { get, post, put, del } from './client'
-import type { OntologyEntity, EntityListItem, EntityRelationDetail, GraphData, Tier, EntityStatus, FileImportResult } from '../types'
+import type { OntologyEntity, EntityCreatePayload, EntityListItem, EntityRelationDetail, GraphData, Tier, EntityStatus, FileImportResult } from '../types'
 
 export interface EntityQuery {
   tier?: Tier
@@ -72,7 +72,7 @@ export const entityApi = {
     return get<OntologyEntity>(`/entities/${id}`)
   },
 
-  create(data: Partial<OntologyEntity>) {
+  create(data: EntityCreatePayload) {
     return post<OntologyEntity>('/entities', data)
   },
 

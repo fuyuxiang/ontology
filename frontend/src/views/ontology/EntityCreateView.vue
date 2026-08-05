@@ -457,7 +457,7 @@ import { post } from '../../api/client'
 import { useToast } from '../../composables/useToast'
 import { useOntologyStore } from '../../store/ontology'
 import { listDataSources, getTableList } from '../../api/datasource'
-import type { FileImportResult } from '../../types'
+import type { AttrType, FileImportResult, Tier } from '../../types'
 
 const router = useRouter()
 const toast = useToast()
@@ -468,6 +468,16 @@ const breadcrumbs = [
   { label: '本体目录', path: '/browser' },
   { label: '新建本体对象' },
 ]
+
+// 后端要求 ontology_id 必填，且空串会创建出无归属对象，这里统一前置校验
+function requireOntologyId(): string | null {
+  const id = ontologyStore.currentOntologyId
+  if (!id) {
+    toast.error('未选择所属本体，请先从本体列表进入')
+    return null
+  }
+  return id
+}
 
 const mode = ref<'ai' | 'manual' | 'import'>('ai')
 const aiSubMode = ref<'guided' | 'quick'>('guided')
@@ -516,10 +526,22 @@ const form = reactive({
 function addAttr() { form.attributes.push({ name: '', type: 'string', description: '', required: false }) }
 async function handleSubmit() {
   if (!form.name || !form.name_cn) return
+  const ontologyId = requireOntologyId()
+  if (!ontologyId) return
   submitting.value = true
   try {
-    const schema_json = form.datasource_id ? { datasource_id: form.datasource_id, table_name: form.table_name } : undefined
-    await entityApi.create({ name: form.name, name_cn: form.name_cn, tier: form.tier, description: form.description, schema_json, ontology_id: ontologyStore.currentOntologyId || '', attributes: form.attributes.filter(a => a.name) } as never)
+    const config_json = form.datasource_id ? { datasource_id: form.datasource_id, table_name: form.table_name } : undefined
+    await entityApi.create({
+      name: form.name,
+      name_cn: form.name_cn,
+      tier: form.tier as Tier,
+      description: form.description,
+      config_json,
+      ontology_id: ontologyId,
+      attributes: form.attributes.filter(a => a.name).map(a => ({
+        name: a.name, type: a.type as AttrType, description: a.description, required: a.required,
+      })),
+    })
     toast.success('对象创建成功')
     router.push('/browser')
   } catch (e) { toast.error(`创建失败: ${(e as Error).message}`) }
@@ -642,13 +664,25 @@ async function handleAiExtract() {
 
 async function handleAiCreate() {
   if (!aiResult.value) return
+  const ontologyId = requireOntologyId()
+  if (!ontologyId) return
   aiCreating.value = true
   try {
     const selected = aiResult.value.entities.filter(e => e.selected)
     const created: Record<string, string> = {}
     for (const entity of selected) {
-      const schema_json = entity.datasource_id ? { datasource_id: entity.datasource_id, table_name: entity.table_name } : undefined
-      const res = await entityApi.create({ name: entity.name, name_cn: entity.name_cn, tier: entity.tier as any, description: entity.description, schema_json, ontology_id: ontologyStore.currentOntologyId || '', attributes: entity.attributes.map(a => ({ id: '', name: a.name, type: a.type as any, description: a.description, required: a.required })) } as any)
+      const config_json = entity.datasource_id ? { datasource_id: entity.datasource_id, table_name: entity.table_name } : undefined
+      const res = await entityApi.create({
+        name: entity.name,
+        name_cn: entity.name_cn,
+        tier: entity.tier as Tier,
+        description: entity.description,
+        config_json,
+        ontology_id: ontologyId,
+        attributes: entity.attributes.map(a => ({
+          name: a.name, type: a.type as AttrType, description: a.description, required: a.required,
+        })),
+      })
       created[entity.name] = res.id
     }
     for (const rel of selectedRelations.value) {
