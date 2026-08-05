@@ -112,8 +112,11 @@
           </select>
         </div>
         <div class="np-field">
-          <label>命名空间</label>
-          <input v-model="createForm.namespace" class="np-input" placeholder="可选" />
+          <label>所属本体 <span class="np-req">*</span></label>
+          <select v-model="createForm.ontology_id" class="np-input">
+            <option value="">请选择所属本体</option>
+            <option v-for="s in scenarioStore.scenarios" :key="s.id" :value="s.id">{{ s.name }}</option>
+          </select>
         </div>
         <div class="np-field">
           <label>描述</label>
@@ -130,9 +133,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { entityApi } from '../../../api/ontology'
+import { useScenarioStore } from '../../../store/scenarios'
 import type { RelationData } from '../../../api/relations'
 import type { Tier, EntityStatus } from '../../../types'
 
@@ -143,14 +147,18 @@ const props = defineProps<{
 const emit = defineEmits<{ close: []; updated: []; created: []; deleted: [] }>()
 
 const router = useRouter()
+const scenarioStore = useScenarioStore()
 const editing = ref(false)
 const creating = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
 const errMsg = ref('')
 
+onMounted(() => { scenarioStore.fetchScenarios() })
+
 const editForm = ref<{ name: string; name_cn: string; tier: Tier; status: EntityStatus; description: string }>({ name: '', name_cn: '', tier: 1, status: 'active', description: '' })
-const createForm = ref<{ name: string; name_cn: string; tier: Tier; namespace: string; description: string }>({ name: '', name_cn: '', tier: 2, namespace: '', description: '' })
+// 全局图谱视图没有当前本体上下文，由用户在表单中显式选择（后端 ontology_id 必填）
+const createForm = ref<{ name: string; name_cn: string; tier: Tier; ontology_id: string; description: string }>({ name: '', name_cn: '', tier: 2, ontology_id: '', description: '' })
 
 function goDetail() { router.push(`/ontology/${props.node.id}`) }
 
@@ -183,6 +191,7 @@ async function handleSave() {
 
 async function handleCreate() {
   if (!createForm.value.name || !createForm.value.name_cn) { errMsg.value = '英文名和中文名必填'; return }
+  if (!createForm.value.ontology_id) { errMsg.value = '请选择所属本体'; return }
   errMsg.value = ''
   saving.value = true
   try {

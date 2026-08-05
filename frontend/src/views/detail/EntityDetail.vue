@@ -425,9 +425,14 @@ const tierLabel = computed(() => ({ 1: '核心对象', 2: '领域对象', 3: '�
 const statusLabel = computed(() => ({ active: '活跃', warning: '警告', error: '异常' }[entity.value.status]))
 
 const dsInfo = computed(() => {
-  const sj = detail.value?.schema_json
-  if (!sj || !sj.datasource_id) return null
-  return { datasource_id: sj.datasource_id, datasource_name: sj.datasource_name || '未知', table_name: sj.table_name || '' }
+  // 后端该字段已由 schema_json 迁移重命名为 config_json
+  const cj = detail.value?.config_json
+  if (!cj || !cj.datasource_id) return null
+  return {
+    datasource_id: String(cj.datasource_id),
+    datasource_name: cj.datasource_name ? String(cj.datasource_name) : '未知',
+    table_name: cj.table_name ? String(cj.table_name) : '',
+  }
 })
 
 const breadcrumbs = computed(() => [

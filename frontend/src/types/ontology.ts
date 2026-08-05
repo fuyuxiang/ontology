@@ -62,7 +62,7 @@ export interface OntologyEntity {
   status: EntityStatus
   description?: string
   scenario_codes?: string[]
-  schema_json?: Record<string, unknown>
+  config_json?: Record<string, unknown>
   attributes: EntityAttribute[]
   relations: EntityRelationDetail[]
   actions: ActionDetail[]
@@ -71,6 +71,32 @@ export interface OntologyEntity {
   updated_at: string
   created_by: string | null
   ontology_id?: string
+}
+
+// ── 创建对象的请求载荷（与后端 EntityCreate 对齐）──
+export interface EntityCreateAttribute {
+  name: string
+  type: AttrType
+  description?: string
+  required?: boolean
+  example?: string | null
+  constraints_json?: Record<string, unknown> | null
+  source_table?: string | null
+  source_field?: string | null
+  data_status?: string
+}
+
+export interface EntityCreatePayload {
+  name: string
+  name_cn: string
+  tier: Tier
+  // 后端 ontology_id 为必填，缺失会被 Pydantic 拒绝（422）
+  ontology_id: string
+  status?: EntityStatus
+  description?: string
+  config_json?: Record<string, unknown>
+  scenario_codes?: string[]
+  attributes?: EntityCreateAttribute[]
 }
 
 // 后端返回的关系详情

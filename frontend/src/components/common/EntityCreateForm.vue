@@ -7,6 +7,16 @@
       <button class="mode-tab" :class="{ 'mode-tab--active': mode === 'import' }" @click="mode = 'import'">从文件导入</button>
     </div>
 
+    <!-- 所属本体：三种模式共用，后端要求必填 -->
+    <div class="form-row">
+      <label class="form-label">所属本体</label>
+      <select v-model="targetOntologyId" class="form-input">
+        <option value="">请选择所属本体</option>
+        <option v-for="s in scenarioStore.scenarios" :key="s.id" :value="s.id">{{ s.name }}</option>
+      </select>
+      <span class="form-hint">新建对象将归属到该本体</span>
+    </div>
+
     <!-- AI 智能创建 -->
     <div v-if="mode === 'ai'" class="entity-form">
       <!-- 步骤一：输入 -->
@@ -221,19 +231,35 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, computed } from 'vue'
+import { reactive, ref, computed, onMounted } from 'vue'
 import ModalDialog from './ModalDialog.vue'
 import { entityApi } from '../../api/ontology'
 import { relationApi } from '../../api/relations'
 import { post } from '../../api/client'
 import { useToast } from '../../composables/useToast'
 import { useOntologyStore } from '../../store/ontology'
-import type { FileImportResult } from '../../types'
+import { useScenarioStore } from '../../store/scenarios'
+import type { AttrType, FileImportResult, Tier } from '../../types'
 
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: []; created: [] }>()
 const toast = useToast()
 const ontologyStore = useOntologyStore()
+const scenarioStore = useScenarioStore()
+
+// 所属本体：Explorer 页面不设置 currentOntologyId，默认取它作为初值，允许用户改选
+const targetOntologyId = ref(ontologyStore.currentOntologyId || '')
+
+onMounted(() => { scenarioStore.fetchScenarios() })
+
+// 后端 ontology_id 必填，空串会创建出无归属对象，提交前统一校验
+function requireOntologyId(): string | null {
+  if (!targetOntologyId.value) {
+    toast.error('请先选择所属本体')
+    return null
+  }
+  return targetOntologyId.value
+}
 
 const mode = ref<'ai' | 'manual' | 'import'>('ai')
 const tierNames: Record<number, string> = { 1: '核心', 2: '领域', 3: '场景' }
@@ -252,9 +278,20 @@ function addAttr() {
 
 async function handleSubmit() {
   if (!form.name || !form.name_cn) return
+  const ontologyId = requireOntologyId()
+  if (!ontologyId) return
   submitting.value = true
   try {
-    await entityApi.create({ name: form.name, name_cn: form.name_cn, tier: form.tier, description: form.description, attributes: form.attributes.filter(a => a.name) } as never)
+    await entityApi.create({
+      name: form.name,
+      name_cn: form.name_cn,
+      tier: form.tier as Tier,
+      description: form.description,
+      ontology_id: ontologyId,
+      attributes: form.attributes.filter(a => a.name).map(a => ({
+        name: a.name, type: a.type as AttrType, description: a.description, required: a.required,
+      })),
+    })
     form.name = ''; form.name_cn = ''; form.tier = 1; form.description = ''; form.attributes = []
     toast.success('对象创建成功'); emit('created'); emit('close')
   } catch (e) { toast.error(`创建失败: ${(e as Error).message}`) }
@@ -304,10 +341,12 @@ function onFileChange(e: Event) {
 
 async function handleFileImport() {
   if (!selectedFile.value) return
+  const ontologyId = requireOntologyId()
+  if (!ontologyId) return
   submitting.value = true
   importResult.value = null
   try {
-    const res = await entityApi.importFromFile(selectedFile.value, fileFormat.value, fileNamespace.value || undefined, ontologyStore.currentOntologyId || undefined)
+    const res = await entityApi.importFromFile(selectedFile.value, fileFormat.value, fileNamespace.value || undefined, ontologyId)
     importResult.value = res
     toast.success(`导入完成：创建 ${res.entities_created} 个实体，${res.relations_created} 个关系`)
     emit('created')
@@ -366,6 +405,8 @@ async function handleAiExtract() {
 
 async function handleAiCreate() {
   if (!aiResult.value) return
+  const ontologyId = requireOntologyId()
+  if (!ontologyId) return
   aiCreating.value = true
   try {
     const selected = aiResult.value.entities.filter(e => e.selected)
@@ -374,10 +415,13 @@ async function handleAiCreate() {
       const res = await entityApi.create({
         name: entity.name,
         name_cn: entity.name_cn,
-        tier: entity.tier as any,
+        tier: entity.tier as Tier,
         description: entity.description,
-        attributes: entity.attributes.map(a => ({ id: '', name: a.name, type: a.type as any, description: a.description, required: false })),
-      } as any)
+        ontology_id: ontologyId,
+        attributes: entity.attributes.map(a => ({
+          name: a.name, type: a.type as AttrType, description: a.description, required: false,
+        })),
+      })
       created[entity.name] = res.id
     }
     for (const rel of aiResult.value.relations) {
