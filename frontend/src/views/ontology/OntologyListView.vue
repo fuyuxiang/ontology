@@ -50,9 +50,10 @@
         <p class="onto-card__desc">{{ item.description || '暂无描述' }}</p>
 
         <div class="onto-card__stats">
-          <span class="onto-card__stat-item" title="对象">&#x1F4C4; {{ item.entityCount }}</span>
-          <span class="onto-card__stat-item" title="逻辑">&#x26A1; {{ item.logicCount }}</span>
-          <span class="onto-card__stat-item" title="关系">&#x1F517; {{ item.relationCount }}</span>
+          <span class="onto-card__stat-item" title="对象">&#x1F4C4; {{ item.entity_count }}</span>
+          <span class="onto-card__stat-item" title="关系">&#x1F517; {{ item.relation_count }}</span>
+          <span class="onto-card__stat-item" title="逻辑">&#x26A1; {{ item.logic_count }}</span>
+          <span class="onto-card__stat-item" title="动作">&#x1F3AF; {{ item.action_count }}</span>
         </div>
 
         <div class="onto-card__meta">
@@ -130,32 +131,19 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
-import { useOntologyStore } from '../../store/ontology'
-import { functionApi, type FunctionItem } from '../../api/functions'
 import { scenarioApi } from '../../api/scenarios'
 
 const router = useRouter()
 const scenarioStore = useScenarioStore()
-const ontologyStore = useOntologyStore()
 
 const search = ref('')
-const functions = ref<FunctionItem[]>([])
 const showCreate = ref(false)
 const createForm = reactive({ name: '', code: '', description: '' })
 
 const scenarios = computed(() => scenarioStore.scenarios)
 
 const filteredList = computed(() => {
-  const items = scenarios.value.map(s => {
-    const entityCount = ontologyStore.entities.filter(
-      e => (e.scenario_codes || []).includes(s.code)
-    ).length
-    const logicCount = functions.value.filter(
-      f => (f as any).scenario_code === s.code
-    ).length
-    const relationCount = 0
-    return { ...s, entityCount, logicCount, relationCount }
-  })
+  const items = scenarios.value
   if (!search.value) return items
   const q = search.value.toLowerCase()
   return items.filter(i => i.name.toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q))
@@ -186,11 +174,7 @@ async function handleDelete(item: any) {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    scenarioStore.fetchScenarios(),
-    ontologyStore.fetchEntities(),
-    functionApi.list().then(list => { functions.value = list }),
-  ])
+  await scenarioStore.fetchScenarios()
 })
 </script>
 

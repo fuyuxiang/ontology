@@ -5,6 +5,7 @@ from app.core.deps import require_user
 from app.database import get_db
 from app.models import OntologyEntity, ScenarioDict
 from app.models.user import User
+from app.repositories.entity_repo import EntityRepository
 from app.schemas.scenario import ScenarioCreate, ScenarioOut, ScenarioUpdate
 from app.services.audit import write_audit
 
@@ -13,11 +14,17 @@ router = APIRouter(prefix="/scenarios", tags=["scenarios"])
 
 @router.get("", response_model=list[ScenarioOut])
 def list_scenarios(db: Session = Depends(get_db)):
-    return (
+    scenarios = (
         db.query(ScenarioDict)
         .order_by(ScenarioDict.sort_order, ScenarioDict.created_at)
         .all()
     )
+    stats = EntityRepository(db).get_ontology_stats()
+    empty = {"entity_count": 0, "relation_count": 0, "logic_count": 0, "action_count": 0}
+    return [
+        ScenarioOut.model_validate(sc).model_copy(update=stats.get(sc.id, empty))
+        for sc in scenarios
+    ]
 
 
 @router.post("", response_model=ScenarioOut, status_code=201)
