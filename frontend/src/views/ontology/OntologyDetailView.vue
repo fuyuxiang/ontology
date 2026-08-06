@@ -347,12 +347,12 @@ const scenario = computed(() => scenarioStore.byCode(code.value))
 // Entities are now fetched by backend filtered by ontology_id via switchOntology
 const scenarioEntities = computed(() => ontologyStore.entities)
 
-const entityCount = computed(() => ontologyStore.entities.length)
-const relationCount = computed(() => {
-  return ontologyStore.entities.reduce((sum, e) => sum + (e.relation_count || 0), 0)
-})
-const logicCount = computed(() => ontologyStore.entities.reduce((sum, e) => sum + (e.function_count || 0), 0))
-const actionCount = computed(() => ontologyStore.entities.reduce((sum, e) => sum + (e.action_count || 0), 0))
+// 侧栏计数统一取后端 get_ontology_stats 的聚合结果（与本体列表卡片同源）：
+// 逻辑与动作可以只挂 ontology_id 而不绑定实体，前端按实体累加会漏计这类记录。
+const entityCount = computed(() => scenario.value?.entity_count ?? 0)
+const relationCount = computed(() => scenario.value?.relation_count ?? 0)
+const logicCount = computed(() => scenario.value?.logic_count ?? 0)
+const actionCount = computed(() => scenario.value?.action_count ?? 0)
 
 // --- 对象定义 Tab 逻辑 ---
 const entitySearch = ref('')

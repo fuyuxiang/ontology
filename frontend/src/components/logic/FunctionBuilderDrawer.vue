@@ -4,6 +4,7 @@ import { functionApi } from '../../api/functions'
 import AiCodePanel from './AiCodePanel.vue'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
+import { useOntologyStore } from '../../store/ontology'
 import { randomUUID } from '../../utils/uuid'
 import type { EntityListItem } from '../../types'
 
@@ -19,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToast()
+const ontologyStore = useOntologyStore()
 const entities = ref<EntityListItem[]>([])
 const saving = ref(false)
 const testing = ref(false)
@@ -143,6 +145,7 @@ async function save() {
       description: form.value.description,
       entity_id: form.value.entity_ids[0] || null,
       entity_ids: form.value.entity_ids,
+      ontology_id: ontologyStore.currentOntologyId,
       return_type: form.value.return_type,
       tags: form.value.tags.split(',').map(t => t.trim()).filter(Boolean),
       input_schema: form.value.input_params,

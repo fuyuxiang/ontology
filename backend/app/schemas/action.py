@@ -26,6 +26,7 @@ class ActionCreate(BaseModel):
     description: str | None = None
     category: str
     entity_id: str | None = None
+    ontology_id: str | None = None
     action_type: str
     type_config: dict | None = None
     parameters_json: list[ParameterDef] | None = None
@@ -52,6 +53,7 @@ class ActionUpdate(BaseModel):
     description: str | None = None
     category: str | None = None
     entity_id: str | None = None
+    ontology_id: str | None = None
     action_type: str | None = None
     type_config: dict | None = None
     parameters_json: list[ParameterDef] | None = None
@@ -66,6 +68,7 @@ class ActionOut(BaseModel):
     category: str
     entity_id: str | None = None
     entity_name: str | None = None
+    ontology_id: str | None = None
     action_type: str
     type_config: dict | None = None
     parameters_json: list | None = None

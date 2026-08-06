@@ -115,7 +115,7 @@
       :visible="drawerVisible"
       :edit-id="drawerEditId"
       @close="drawerVisible = false"
-      @saved="drawerVisible = false; fetchActions()"
+      @saved="drawerVisible = false; refreshAfterMutation()"
     />
   </div>
 </template>
@@ -125,6 +125,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { actionApi, type ActionItem, type ActionTypeInfo } from '../../api/actions'
 import { useOntologyStore } from '../../store/ontology'
+import { useScenarioStore } from '../../store/scenarios'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 import ActionBuilderDrawer from '../../components/logic/ActionBuilderDrawer.vue'
 import ActionCreateModal from '../../components/logic/ActionCreateModal.vue'
@@ -133,6 +134,7 @@ const props = defineProps<{ embedded?: boolean }>()
 
 const route = useRoute()
 const router = useRouter()
+const scenarioStore = useScenarioStore()
 
 const actions = ref<ActionItem[]>([])
 const actionTypes = ref<ActionTypeInfo[]>([])
@@ -184,7 +186,7 @@ function openEdit(id: string) {
 
 function onActionCreated() {
   showCreateModal.value = false
-  fetchActions()
+  refreshAfterMutation()
 }
 
 async function fetchActions() {
@@ -195,6 +197,12 @@ async function fetchActions() {
     params.ontology_id = ontologyStore.currentOntologyId
   }
   actions.value = await actionApi.list(params)
+}
+
+/** 增删改后同步刷新本体统计，使详情页侧栏计数即时更新 */
+async function refreshAfterMutation() {
+  await fetchActions()
+  if (props.embedded) await scenarioStore.refreshScenarios()
 }
 
 async function fetchActionTypes() {
@@ -210,7 +218,7 @@ async function handleDelete(action: ActionItem) {
   if (!confirm(`确定删除行动「${action.name}」？`)) return
   await actionApi.remove(action.id)
   if (selectedId.value === action.id) selectedId.value = null
-  await fetchActions()
+  await refreshAfterMutation()
 }
 
 onMounted(() => {

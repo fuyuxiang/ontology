@@ -124,6 +124,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi, type FunctionItem } from '../../api/functions'
 import { useOntologyStore } from '../../store/ontology'
+import { useScenarioStore } from '../../store/scenarios'
 import FunctionBuilderDrawer from '../../components/logic/FunctionBuilderDrawer.vue'
 import FunctionCreateModal from '../../components/logic/FunctionCreateModal.vue'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
@@ -132,6 +133,7 @@ const props = defineProps<{ embedded?: boolean }>()
 
 const route = useRoute()
 const router = useRouter()
+const scenarioStore = useScenarioStore()
 
 const functions = ref<FunctionItem[]>([])
 const search = ref('')
@@ -167,15 +169,21 @@ async function fetchFunctions() {
   functions.value = await functionApi.list(query)
 }
 
+/** 增删改后同步刷新本体统计，使详情页侧栏计数即时更新 */
+async function refreshAfterMutation() {
+  await fetchFunctions()
+  if (props.embedded) await scenarioStore.refreshScenarios()
+}
+
 function onFuncCreated(_fn: { id: string; name: string }) {
   showCreateModal.value = false
-  fetchFunctions()
+  refreshAfterMutation()
 }
 
 function onFuncSaved(fn: { id: string; name: string }) {
   showAdd.value = false
   editingFuncId.value = undefined
-  fetchFunctions()
+  refreshAfterMutation()
   if (route.query.from === 'builder') {
     const sid = route.query.session_id as string
     const oid = route.query.object_id as string
@@ -198,7 +206,7 @@ async function handleDelete(fn: FunctionItem) {
   if (!confirm(`确定删除逻辑「${fn.name}」？`)) return
   await functionApi.remove(fn.id)
   if (selectedId.value === fn.id) selectedId.value = null
-  await fetchFunctions()
+  await refreshAfterMutation()
 }
 
 onMounted(async () => {
