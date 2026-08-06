@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     ADMIN_INITIAL_PASSWORD: str = ""
     CREDENTIAL_ENCRYPTION_KEY: str = ""
 
+    # 内嵌 code-server 的监听端口。前端按当前访问地址 + 该端口拼编辑器 URL。
+    CODE_SERVER_PORT: int = 8443
+    # 仅反向代理场景需要：code-server 不在 `<当前访问主机>:CODE_SERVER_PORT` 上时，
+    # 填写其对外基址（如 https://example.com/code-server）。留空表示由前端自行推导。
+    CODE_SERVER_PUBLIC_URL: str = ""
+
     model_config = {"env_file": str(_ENV_FILE), "extra": "ignore"}
 
 

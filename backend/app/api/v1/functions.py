@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
+from app.config import settings
 from app.database import get_db
 from app.models import OntologyEntity
 from app.models.function import OntologyFunction
@@ -184,7 +185,6 @@ def test_function(
 
 
 WORKSPACE_DIR = Path(__file__).resolve().parents[3] / ".." / "workspace"
-CODE_SERVER_PORT = int(__import__("os").environ.get("CODE_SERVER_PORT", "8443"))
 
 
 def _is_within_workspace(target: Path) -> bool:
@@ -254,14 +254,14 @@ def {callable_name}(params):
 
 
 class WorkspaceOut(BaseModel):
-    url: str
     folder: str
+    port: int
+    public_url: str = ""
 
 
 @router.post("/{func_id}/workspace", response_model=WorkspaceOut)
 def open_workspace(
     func_id: str,
-    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -278,7 +278,10 @@ def open_workspace(
         template = _generate_function_template(func.callable_name, func.description or "")
         main_file.write_text(template, encoding="utf-8")
 
-    host = request.headers.get("host", "localhost").split(":")[0]
-    folder_path = str(func_dir)
-    url = f"http://{host}:{CODE_SERVER_PORT}/?folder={folder_path}"
-    return WorkspaceOut(url=url, folder=folder_path)
+    # 只返回工作区路径与端口：编辑器 URL 的主机名必须由浏览器按当前访问地址推导。
+    # 后端读到的 Host 头已被前端 dev server 代理（changeOrigin）重写，无法反映真实访问地址。
+    return WorkspaceOut(
+        folder=str(func_dir),
+        port=settings.CODE_SERVER_PORT,
+        public_url=settings.CODE_SERVER_PUBLIC_URL,
+    )
