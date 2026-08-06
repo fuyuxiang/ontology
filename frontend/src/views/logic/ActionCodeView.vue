@@ -30,6 +30,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { actionApi } from '../../api/actions'
+import { buildCodeServerUrl } from '../../utils/codeServer'
 
 const route = useRoute()
 const router = useRouter()
@@ -56,7 +57,7 @@ onMounted(async () => {
     actionName.value = action.name
 
     const ws = await actionApi.openWorkspace(actionId)
-    codeServerUrl.value = ws.url
+    codeServerUrl.value = buildCodeServerUrl(ws)
   } catch (err: any) {
     error.value = err?.message || '打开工作区失败'
   } finally {

@@ -36,8 +36,9 @@ export interface FunctionTestResult {
 }
 
 export interface WorkspaceResult {
-  url: string
   folder: string
+  port: number
+  public_url?: string
 }
 
 export const functionApi = {

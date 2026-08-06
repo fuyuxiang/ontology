@@ -63,5 +63,5 @@ export const actionApi = {
   execute: (id: string, params: Record<string, any>, dryRun = false) =>
     post<ActionExecuteResult>(`/actions/${id}/execute`, { params, dry_run: dryRun }),
   types: () => get<ActionTypeInfo[]>('/actions/types'),
-  openWorkspace: (id: string) => post<{ url: string; folder: string }>(`/actions/${id}/workspace`),
+  openWorkspace: (id: string) => post<{ folder: string; port: number; public_url?: string }>(`/actions/${id}/workspace`),
 }

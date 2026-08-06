@@ -1,11 +1,12 @@
 import re
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
+from app.config import settings
 from app.database import get_db
 from app.models import OntologyEntity
 from app.models.action import EntityAction
@@ -189,7 +190,6 @@ async def execute_action(
 
 
 WORKSPACE_DIR = Path(__file__).resolve().parents[3] / ".." / "workspace"
-CODE_SERVER_PORT = int(__import__("os").environ.get("CODE_SERVER_PORT", "8443"))
 
 
 def _sanitize_dirname(name: str) -> str:
@@ -214,14 +214,14 @@ def {safe_name}(params):
 
 
 class WorkspaceOut(BaseModel):
-    url: str
     folder: str
+    port: int
+    public_url: str = ""
 
 
 @router.post("/{action_id}/workspace", response_model=WorkspaceOut)
 def open_action_workspace(
     action_id: str,
-    request: Request,
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
@@ -239,7 +239,9 @@ def open_action_workspace(
         template = _generate_action_template(action.name, action.description or "")
         main_file.write_text(template, encoding="utf-8")
 
-    host = request.headers.get("host", "localhost").split(":")[0]
-    folder_path = str(action_dir)
-    url = f"http://{host}:{CODE_SERVER_PORT}/?folder={folder_path}"
-    return WorkspaceOut(url=url, folder=folder_path)
+    # 同 functions.open_workspace：主机名交由浏览器推导，后端只提供路径与端口。
+    return WorkspaceOut(
+        folder=str(action_dir),
+        port=settings.CODE_SERVER_PORT,
+        public_url=settings.CODE_SERVER_PUBLIC_URL,
+    )
