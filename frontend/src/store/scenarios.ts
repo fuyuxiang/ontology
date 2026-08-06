@@ -22,5 +22,10 @@ export const useScenarioStore = defineStore('scenarios', () => {
     return scenarios.value.find(s => s.code === code)
   }
 
-  return { scenarios, loaded, loading, fetchScenarios, byCode }
+  /** 强制重新拉取，用于逻辑/动作/对象增删后刷新本体统计计数 */
+  async function refreshScenarios() {
+    return fetchScenarios(true)
+  }
+
+  return { scenarios, loaded, loading, fetchScenarios, refreshScenarios, byCode }
 })

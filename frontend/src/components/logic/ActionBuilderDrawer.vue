@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { actionApi, type ActionTypeInfo } from '../../api/actions'
 import { entityApi } from '../../api/ontology'
 import AiCodePanel from './AiCodePanel.vue'
+import { useOntologyStore } from '../../store/ontology'
 import { randomUUID } from '../../utils/uuid'
 import type { EntityListItem } from '../../types'
 
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 
 const route = useRoute()
 const router = useRouter()
+const ontologyStore = useOntologyStore()
 
 const entities = ref<EntityListItem[]>([])
 const actionTypes = ref<ActionTypeInfo[]>([])
@@ -165,6 +167,7 @@ async function save() {
       action_type: form.value.action_type,
       type_config: Object.keys(typeConfig).length > 0 ? typeConfig : undefined,
       parameters_json: form.value.parameters.length > 0 ? form.value.parameters : undefined,
+      ontology_id: ontologyStore.currentOntologyId || undefined,
     }
     if (form.value.category === 'domain') {
       payload.entity_id = form.value.entity_id

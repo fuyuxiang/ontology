@@ -26,6 +26,7 @@ router = APIRouter(prefix="/functions", tags=["functions"])
 def _func_to_out(f: OntologyFunction, entity_name: str) -> FunctionOut:
     return FunctionOut(
         id=f.id, entity_id=f.entity_id, entity_ids=f.entity_ids or [],
+        ontology_id=f.ontology_id,
         entity_name=entity_name,
         name=f.name, callable_name=f.callable_name or "",
         description=f.description, return_type=f.return_type,
@@ -75,6 +76,7 @@ def create_function(
 
     func = OntologyFunction(
         entity_id=data.entity_id, entity_ids=data.entity_ids or [],
+        ontology_id=data.ontology_id,
         name=data.name,
         callable_name=data.callable_name,
         description=data.description, return_type=data.return_type,
