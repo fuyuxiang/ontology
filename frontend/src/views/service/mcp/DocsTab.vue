@@ -52,6 +52,7 @@
 import { ref, onMounted } from 'vue'
 import { getMcpTools, type McpToolSchema } from '../../../api/mcp'
 import ToolDrawer from './ToolDrawer.vue'
+import { copyText } from '../../../utils/markdownExport'
 
 const tools = ref<McpToolSchema[]>([])
 const selectedTool = ref<McpToolSchema | null>(null)
@@ -108,9 +109,7 @@ function getCategory(name: string): string {
 }
 
 async function copyConfig() {
-  try {
-    await navigator.clipboard.writeText(clientConfigs[activeClient.value])
-  } catch { /* ignore */ }
+  await copyText(clientConfigs[activeClient.value])
 }
 
 async function loadTools() {

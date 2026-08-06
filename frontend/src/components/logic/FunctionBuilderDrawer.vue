@@ -4,6 +4,7 @@ import { functionApi } from '../../api/functions'
 import AiCodePanel from './AiCodePanel.vue'
 import { entityApi } from '../../api/ontology'
 import { useToast } from '../../composables/useToast'
+import { randomUUID } from '../../utils/uuid'
 import type { EntityListItem } from '../../types'
 
 const props = defineProps<{
@@ -25,7 +26,7 @@ const testInput = ref('{}')
 const testResult = ref<string | null>(null)
 const testSuccess = ref<boolean | null>(null)
 const savedId = ref<string | null>(null)
-const tempSessionId = ref(crypto.randomUUID())
+const tempSessionId = ref(randomUUID())
 const showAiPanel = ref(false)
 
 const aiTargetId = computed(() => savedId.value || props.editId || `tmp_${tempSessionId.value}`)
@@ -73,7 +74,7 @@ async function load() {
 
 function resetForm() {
   savedId.value = null
-  tempSessionId.value = crypto.randomUUID()
+  tempSessionId.value = randomUUID()
   testResult.value = null
   testSuccess.value = null
   form.value = {

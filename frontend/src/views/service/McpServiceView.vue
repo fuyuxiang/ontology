@@ -40,6 +40,7 @@
 import { ref } from 'vue'
 import OverviewTab from './mcp/OverviewTab.vue'
 import DocsTab from './mcp/DocsTab.vue'
+import { copyText } from '../../utils/markdownExport'
 
 const tabs = [
   { key: 'overview', label: '服务概览' },
@@ -51,11 +52,10 @@ const endpoint = `${window.location.origin}/api/v1/mcp`
 const copied = ref(false)
 
 async function copyEndpoint() {
-  try {
-    await navigator.clipboard.writeText(endpoint)
+  if (await copyText(endpoint)) {
     copied.value = true
     setTimeout(() => { copied.value = false }, 1500)
-  } catch { /* ignore */ }
+  }
 }
 </script>
 

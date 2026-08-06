@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { actionApi, type ActionTypeInfo } from '../../api/actions'
 import { entityApi } from '../../api/ontology'
 import AiCodePanel from './AiCodePanel.vue'
+import { randomUUID } from '../../utils/uuid'
 import type { EntityListItem } from '../../types'
 
 const props = defineProps<{
@@ -29,7 +30,7 @@ const testResult = ref<string | null>(null)
 const testSuccess = ref<boolean | null>(null)
 const savedId = ref<string | null>(null)
 const showAiPanel = ref(false)
-const tempSessionId = ref(crypto.randomUUID())
+const tempSessionId = ref(randomUUID())
 
 const aiTargetId = computed(() => savedId.value || props.editId || `tmp_${tempSessionId.value}`)
 
