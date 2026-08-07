@@ -182,7 +182,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="本体驱动智能策略平台 API",
-    version="0.1.0",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
