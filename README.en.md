@@ -1,380 +1,979 @@
 <div align="center">
 
-# Yuanshu Ontology
+# 元枢本体 · Yuanshu Ontology
 
-**Enterprise Ontology Intelligence Platform**
+**A Runnable Ontology Platform for Enterprise AI**
 
-*Ontology-Driven · Semantic Web · Make Data Understandable · Make AI Trustworthy*
+**AI-Native Construction · Business Semantic Modeling · Data Grounding · Logic & Action · Agent Runtime**
 
-**[中文](README.md)** | **[English](README.en.md)**
+**One Map · One Body · One Loop**
 
-[![Vue 3](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vue.js)](https://vuejs.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-6.x-3178C6?logo=typescript)](https://www.typescriptlang.org/)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](https://python.org/)
-[![OWL 2](https://img.shields.io/badge/W3C-OWL_2-005A9C)](https://www.w3.org/OWL/)
-[![MCP](https://img.shields.io/badge/MCP-2024--11--05-8A2BE2)](https://modelcontextprotocol.io/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+Map the Business · Embody the Capability · Close the Intelligence Loop
+
+**[中文](README.md)** · **[English](README.en.md)**
+
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://python.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
 
 </div>
 
 ---
 
-## Overview
+## What Is Yuanshu?
 
-Yuanshu Ontology is an enterprise ontology intelligence platform. Its technical direction is **semantic-web-centric, end-to-end intelligent construction** — treating an ontology that conforms to Semantic Web standards as the core asset, and closing the full loop from data ingestion, ontology modeling, mapping and binding, validation against real data, and versioned publishing through to AI consumption, all on one platform.
+**Yuanshu Ontology is an open-source, enterprise-grade runnable ontology platform.**
 
-Within that direction, the ontology serves as the **semantic map between AI and enterprise data**: anchored downward to physical table columns, and upward providing LLMs with semantic coordinates that are reasonable, executable, and governable. The platform delivers an end-to-end workflow from data integration to agent applications, letting teams build intelligent scenarios on well-governed business semantics rather than raw tables and scripts.
+It organizes business knowledge scattered across databases, documents, business rules, algorithmic models, and system interfaces into unified **objects, relations, states, events, logic, and actions**, forming an enterprise business semantics that business users, applications, and AI agents can all understand and invoke.
 
----
+Yuanshu goes beyond "describing the business world": it connects to real data, carries business logic and models, defines executable actions, and exposes these capabilities through MCP, SDKs, agents, and intelligent workflows — making the ontology the **runtime business context** for enterprise AI.
 
-## Why a Semantic Map
+Unlike traditional manual modeling that starts from a blank canvas, Yuanshu brings AI into ontology production, using document understanding, data asset analysis, semantic extraction, relation discovery, rule recognition, and intelligent mapping to assist the path from business knowledge to a runnable ontology.
 
-The real bottleneck for LLMs in the enterprise is not model capability — it is the **semantic gap**:
-
-- Enterprise data exists in **physical form** — table `t_cbss_sub_info`, column `dev_num`, scattered across a dozen heterogeneous systems.
-- Business users and AI think in **semantic form** — "has this high-value broadband subscriber filed any complaints about installation quality lately?"
-
-Handing a raw schema to an LLM essentially asks the model to *guess* the correspondence between the physical and the business world. A wrong guess produces no feedback, a right guess cannot be reused, and the next scenario starts guessing all over again.
-
-**An ontology is precisely the semantic map that closes this gap.** It is a formal, versioned, governable semantic structure anchored to both ends at once:
-
-| Map element | Implementation in the ontology | What it anchors |
-|-------------|-------------------------------|-----------------|
-| **Coordinate system** | Object types + relations | How business concepts compose the world |
-| **Legend** | Attributes + data types + constraints | The observable dimensions of each concept |
-| **Routes** | Relation cardinality, graph traversal, lineage | How concepts reach one another |
-| **Landing points** | Object bindings | Semantic attribute ↔ physical table column |
-| **Capability markers** | Logic functions + actions | What can actually be done on this map |
-
-With the map in place, AI stops guessing: it **queries the ontology** for semantic coordinates, **follows the bindings** down to real data, and **invokes the mounted capabilities** to compute and act — every step explainable, traceable, and governable.
+> **Start from enterprise data and knowledge, construct business semantics automatically, and bring those semantics into actual operation.**
 
 ---
 
-## Technical Direction
+## Core Philosophy · One Map · One Body · One Loop
 
-### 1. Semantic-Web-Centric
+### One Map
 
-The platform's core asset is an **ontology conforming to Semantic Web standards**, not the private configuration of some AI application.
+**Business Semantic Map**
 
-- The modeling layer aligns with **OWL 2**: classes, object properties, data properties, and named individuals, with support for `subClassOf` / `equivalentClass` / `disjointWith` / `domain` / `range` / `inverseOf`, covering **12 class expression types** (existential and universal quantification, min/max/exact cardinality, intersection/union/complement, hasValue) and **7 object property characteristics** (functional, inverseFunctional, transitive, symmetric, asymmetric, reflexive, irreflexive).
-- It provides **bidirectional OWL/XML parsing and serialization** (frontend `utils/owl/`) plus **RDF/XML and Turtle import** (backend rdflib), so ontologies interoperate with standard tools such as Protégé.
-- Four built-in modeling views ship out of the box: the native platform canvas, a **Protégé-style OWL editor** (15 components reproducing the class tree, property tree, and axiom panels), a **WebVOWL visualization**, and a **VocBench terminology view** — letting ontology engineers work in the paradigm they already know.
+A unified description of what exists in the enterprise business world:
 
-> The Semantic Web here is not decoration. It guarantees the ontology is an **interchangeable standard asset** rather than a proprietary schema locked inside the platform.
+- Objects
+- Attributes
+- Relations
+- States
+- Events
+- Evidence
 
-### 2. End-to-End Intelligent Construction
+So that business users, applications, and AI share one set of business semantics.
 
-Going from raw data to AI-consumable semantic services closes the loop in six stages on a single platform. **Every stage involves an LLM, and every stage has a deterministic check behind it:**
+### One Body
 
+**Runnable Ontology**
+
+Organized on top of unified business semantics:
+
+- Facts
+- Rules
+- Functions
+- Models
+- Actions
+- Governance
+
+Advancing business semantics from "understandable" to "runnable."
+
+### One Loop
+
+**Ontology Intelligence Loop**
+
+Connecting end to end:
+
+- Intelligent construction
+- Data grounding
+- Ontology services
+- Business execution
+- Result write-back
+- Continuous evolution
+
+Turning the ontology from a one-off model into a continuously evolving enterprise intelligence asset.
+
+**Map the Business · Embody the Capability · Close the Intelligence Loop**
+
+---
+
+## Why a Runnable Ontology?
+
+Enterprises already own plenty of data platforms, business systems, rules, models, and knowledge bases, but these assets usually exist in different forms:
+
+- Data lives in tables, columns, and metrics;
+- Business knowledge lives in policies, documents, and expert experience;
+- Business logic lives in SQL, code, rule engines, and algorithmic models;
+- Execution capability lives in APIs, workflows, and production systems;
+- What AI actually faces, however, is often just fragmented data, text, and tools.
+
+As AI moves from Q&A and assisted analysis into business judgment and execution, data access or RAG alone is not enough to describe an enterprise's complete business context reliably.
+
+Yuanshu organizes these capabilities onto unified business objects through the ontology:
+
+```text
+        Data · Document · Rule · Model · API
+                          │
+                          ▼
+          ┌────────────────────┐
+          │ Business Semantics │
+          ├────────────────────┤
+          │  Object            │
+          │  Relation          │
+          │  State             │
+          │  Event             │
+          │  Evidence          │
+          └────────────────────┘
+                          │
+                          ▼
+          ┌────────────────────┐
+          │ Runnable Ontology  │
+          ├────────────────────┤
+          │  Fact              │
+          │  Logic             │
+          │  Model             │
+          │  Action            │
+          │  Governance        │
+          └────────────────────┘
+                          │
+                          ▼
+                  MCP · SDK · Agent
+                   Workflow · API
+                          │
+                          ▼
+     Understand · Decide · Execute · Write Back
 ```
-① Ingest      ② Model       ③ Map          ④ Validate     ⑤ Publish     ⑥ Consume
-Connection    5 entry       ObjectBinding  4-phase        Version       MCP / OSDK
-  Asset       points        heuristic+LLM  hydration      snapshot      Agent / AIP
+
+The ontology is therefore more than a schema and more than a static relationship diagram: it is a business runtime layer that enterprise AI can use continuously.
+
+---
+
+## Core Capabilities
+
+### 1. AI-Native Automated Ontology Construction
+
+Yuanshu treats AI as a collaborator in ontology production instead of requiring users to rely entirely on manual modeling.
+
+It supports assisted identification from existing enterprise data and knowledge:
+
+- Business objects and object attributes
+- Business relations between objects
+- States and business events
+- Business rules and constraints
+- Computational logic and model capabilities
+- Executable actions
+- Terminology, evidence, and governance information
+
+The platform offers multiple intelligent construction entry points, including document-driven, data-asset-driven, interactive guided, and domain drill-down approaches.
+
+The overall mechanism is:
+
+**AI generation + programmatic validation + human confirmation**
+
+```text
+Business Materials / Data Assets
+              │
+              ▼
+     Knowledge Parsing
+              │
+              ▼
+   Candidate Extraction
+              │
+              ▼
+ Object · Attribute · Relation
+    Rule · Model · Action
+              │
+              ▼
+Structural & Semantic Checks
+              │
+              ▼
+   Expert Confirmation
+              │
+              ▼
+      Ontology Model
 ```
 
-| Stage | Intelligence | Deterministic backstop |
-|-------|-------------|------------------------|
-| ① Ingest | Automatic document parsing and summarization (PDF/Word/Excel) | Automatic schema sync with diff; connectivity tests |
-| ② Model | Document extraction / asset conversation / domain drill-down, streamed over SSE | Pydantic naming-convention validation with up to 5 retries |
-| ③ Map | Token Jaccard + Chinese semantic expansion + type-compatibility matrix scoring; low-confidence attributes fall back to the LLM | Confidence tiers (high/medium/low) with human confirmation |
-| ④ Validate | — | 4-phase hydration against real data: ingestion check → instantiation → relation JOIN verification → policy assertions |
-| ⑤ Publish | — | 3 quality gates + approval workflow + full component snapshot + impact analysis |
-| ⑥ Consume | ReAct agents, AIP workflow orchestration | Sandboxed execution, six-gate SQL pipeline, end-to-end auditing |
+AI improves the efficiency of knowledge discovery and modeling, deterministic programs handle structural constraints and quality validation, and experts confirm the critical business semantics.
 
-### 3. The Ontology as the AI Runtime Context
+---
 
-Once published, the ontology is not a document — it is **the executable context of an agent**:
+### 2. Runnable Ontology Modeling
 
-- An **MCP Server** (JSON-RPC 2.0, protocol version `2024-11-05`) exposes **15 ontology tools** — attribute mapping lookup, instance queries, complex SQL, logic function execution, action execution, and Python workspace read/write/run. Any MCP client can adopt the ontology as a source of both knowledge and capability.
-- **OSDK code generation** emits **TypeScript / Python SDKs** from the published ontology, so downstream systems access data through object semantics such as `Customer.list(client, {...})` instead of assembling SQL.
-- **Ontology context injection** organizes objects, relations, data-source mappings, and available actions by tier and injects them into the agent system prompt, guiding tool selection inside the ReAct loop.
+Yuanshu models more than entities and relations — it organizes complete ontology capabilities around real business operation.
+
+#### Objects
+
+Describe the entities, events, and business concepts in the enterprise business world.
+
+Supported:
+
+- Object Type
+- Attribute
+- Unique Identifier
+- State
+- Event
+- Shared Attribute
+- Shared Reference
+- Layered ontology organization
+
+#### Relations
+
+Describe stable, well-defined business connections between objects.
+
+Supported:
+
+- Relation direction
+- Relation cardinality
+- One-to-one / one-to-many / many-to-many
+- Relation constraints
+- Cross-object references
+- Graph traversal
+- Relation lineage
+
+#### Logic
+
+Turn enterprise rules, computations, and expert experience into logic capabilities that systems and agents can invoke.
+
+Supported:
+
+- Expression
+- SQL
+- Python
+- Function invocation
+- Function composition
+- Rules and constraints
+- Model capability mounting
+
+#### Action
+
+Encapsulate system interfaces and business operations into execution capabilities associated with business objects.
+
+Supported:
+
+- API Call
+- SQL Execution
+- Function Call
+- Custom Script
+- Attribute Modification
+- Notification
+
+Actions can be combined with preconditions, permission control, approval, and execution auditing, so AI can invoke enterprise capabilities while execution boundaries stay explicit.
+
+#### Governance
+
+Governance runs through the entire process of ontology design, publishing, and operation.
+
+Including:
+
+- Ownership
+- Permission control
+- Version management
+- Review and publishing
+- Impact analysis
+- Runtime monitoring
+- Audit traceability
+- Rollback and recovery
+
+---
+
+### 3. Data Grounding
+
+The ontology model describes how the business world is understood; **Data Grounding** connects those business definitions to real enterprise data.
+
+Yuanshu establishes the mapping between business objects and physical data through `ObjectBinding`.
+
+Supported:
+
+- Primary data binding
+- Enrichment data binding
+- Document evidence binding
+- Attribute mapping suggestions
+- Data type compatibility checks
+- Primary key identification
+- LLM-assisted mapping
+- Relation validation
+- Data quality checks
+- Data lineage
+
+```text
+Physical Data
+Database / Table / Document / API
+                  │
+                  ▼
+           Object Binding
+                  │
+                  ▼
+Object · Attribute · Relation · Event · Evidence
+                  │
+                  ▼
+          Ontology Instance
+```
+
+Yuanshu draws an explicit distinction:
+
+**Ontology modeling** produces the business semantic specification;
+
+**Data grounding** maps that specification onto real business facts;
+
+The two work together as separate processes.
+
+---
+
+### 4. Validation Against Real Data
+
+Once data binding is complete, Yuanshu can validate the connection quality between ontology and data against real data.
+
+The validation process covers:
+
+1. Data source connectivity and schema checks
+2. Object attribute instantiation validation
+3. Object relation and JOIN validation
+4. Data quality and policy assertions
+
+Combined with data quality rules, mapping confidence, and runtime probes, this reduces cases where the model is defined correctly but cannot actually run against the data.
+
+---
+
+### 5. Logic and Action Runtime
+
+A published ontology is not only queryable — it can directly carry business execution capability.
+
+#### Logic Runtime
+
+Logic functions support:
+
+- Expression
+- SQL
+- Python
+
+And provide:
+
+- AST security validation
+- Sandboxed execution
+- Call timeouts
+- Call chain tracing
+- Nested function invocation
+- Circular call detection
+
+An online workspace is also available for maintaining Logic and Action source code directly.
+
+#### Action Runtime
+
+The platform provides a unified Action Executor that abstracts capabilities across different systems into governable business actions.
+
+Actions are associated with ontology objects, so callers focus on:
+
+> "which business action to perform on which business object"
+
+rather than the underlying:
+
+> "which interface to call, which table to modify, which column to update."
+
+---
+
+### 6. Ontology Services for AI and Agents
+
+A published ontology can serve as the runtime business context for AI agents.
+
+Yuanshu organizes:
+
+- Objects
+- Attributes
+- Relations
+- Data mappings
+- Logic
+- Action
+- Permission information
+
+into capabilities that agents can understand and invoke.
+
+#### MCP Server
+
+A built-in MCP Server exposes ontology capabilities to external agents and MCP clients over a standard protocol.
+
+MCP tools currently cover these categories:
+
+- Ontology queries
+- Object instance queries
+- Attribute mapping queries
+- Data access
+- Logic execution
+- Action execution
+- Python Workspace
+
+Supported:
+
+- JSON-RPC 2.0
+- Bearer JWT
+- API Key
+- Call logging
+- Call statistics
+
+#### Ontology SDK
+
+Yuanshu can generate the following automatically from a published ontology:
+
+- TypeScript SDK
+- Python SDK
+
+Business applications can develop directly against object semantics, without propagating physical table structures into upper layers.
+
+#### ReAct Agent
+
+A built-in agent runtime can operate on ontology context:
+
+```text
+   Understand Intent
+          ↓
+     Query Ontology
+          ↓
+Retrieve Business Facts
+          ↓
+      Invoke Logic
+          ↓
+     Execute Action
+          ↓
+    Generate Result
+```
+
+Agent tool invocation supports streaming traces and call chain visualization.
+
+---
+
+### 7. Intelligent Workflow Orchestration
+
+For business tasks requiring multi-step coordination, Yuanshu provides visual workflow orchestration.
+
+Supported:
+
+- DAG execution
+- Conditional branching
+- Parallel nodes
+- Subflows
+- Cross-node data mapping
+- Logic invocation
+- Action invocation
+- Agent nodes
+- Scheduled triggers
+- Event triggers
+- Webhook
+
+The ontology provides unified business objects and capabilities; the workflow organizes how those capabilities run together.
+
+---
+
+### 8. Full Ontology Lifecycle Governance
+
+Yuanshu manages the ontology as a long-lived enterprise asset.
+
+#### Version Lifecycle
+
+```text
+Draft
+  │
+  ▼
+Pending Approval
+  │
+  ├────► Rejected
+  │
+  ▼
+Published
+```
+
+Supported:
+
+- Draft management
+- Publishing approval
+- Version snapshots
+- Version comparison
+- Rollback
+- Breaking change analysis
+- Dependency checks
+- Deletion protection
+
+Changes to the ontology, Logic, and Action can be tracked, along with analysis of their impact on published capabilities and upper-layer applications.
+
+---
+
+### 9. Data Integration and Connectors
+
+Yuanshu provides a unified data connector framework.
+
+Currently supported:
+
+#### Database
+
+- MySQL
+- PostgreSQL
+- SQL Server
+- Oracle
+
+#### Object Storage
+
+- Amazon S3
+- MinIO
+- S3-compatible storage such as OSS / COS / OBS
+
+#### File Transfer
+
+- FTP
+- SFTP
+
+#### Streaming
+
+- Kafka
+
+#### API
+
+- REST API
+
+Data assets are uniformly abstracted as:
+
+- Table
+- SQL View
+- Document
+
+providing a single data entry point for ontology construction and data grounding.
+
+---
+
+### 10. Security and Governance
+
+An enterprise ontology needs more than unified semantics — it needs data access and action execution to stay under control.
+
+Yuanshu provides:
+
+- RBAC permission system
+- JWT authentication
+- API Key authentication
+- Connection credential encryption
+- Sensitive field masking
+- SQL AST security checks
+- Table-level access control
+- Parameterized queries
+- Execution rate limiting
+- Operation auditing
+- Execution auditing
+- Service health monitoring
+- LLM call statistics
+
+Permissions, execution, and auditing run through the entire chain of data, ontology, Logic, Action, and agent invocation.
+
+---
+
+## Full Ontology Lifecycle
+
+Yuanshu covers the complete lifecycle from business knowledge entering the platform to the ontology entering AI and business operation.
+
+```text
+  Knowledge & Data
+      │
+      ▼
+  AI Construction
+      │
+      ▼
+  Ontology Modeling
+      │
+      ▼
+  Data Grounding
+      │
+      ▼
+  Validation & Publishing
+      │
+      ▼
+  Ontology Services
+      │
+      ▼
+  Logic / Action / Agent
+      │
+      ▼
+  Business Write-Back
+      │
+      ▼
+  Runtime Feedback ─────► Continuous Evolution
+                              │
+      ▲                       │
+      └───────────────────────┘
+```
+
+This is also Yuanshu's core technical direction:
+
+> **Map the Business · Embody the Capability · Close the Intelligence Loop**
 
 ---
 
 ## Architecture
 
-![Architecture](docs/images/architecture.png)
+```text
+┌───────────────────────────────────────────────────────────────┐
+│                      AI & Applications                        │
+│                                                               │
+│   Agent | Workflow | Copilot | Business App                   │
+├───────────────────────────────────────────────────────────────┤
+│                      Ontology Services                        │
+│                                                               │
+│   MCP Server | Ontology API | TypeScript SDK | Python SDK     │
+├───────────────────────────────────────────────────────────────┤
+│                       Runtime Layer                           │
+│                                                               │
+│   Logic | Function | Model | Action | Event                   │
+├───────────────────────────────────────────────────────────────┤
+│                       Ontology Core                           │
+│                                                               │
+│   Object | Attribute | Relation | State | Event               │
+│   Logic | Action | Governance                                 │
+├───────────────────────────────────────────────────────────────┤
+│                       Data Grounding                          │
+│                                                               │
+│   ObjectBinding | Mapping | Validation | Quality | Lineage    │
+├───────────────────────────────────────────────────────────────┤
+│                        Data Sources                           │
+│                                                               │
+│   Database | Warehouse | Document | Object Storage            │
+│   Kafka | API                                                 │
+└───────────────────────────────────────────────────────────────┘
 
+     Permission | Version | Approval | Audit | Monitor
+              Governance across all layers
 ```
-┌──────────────────────────────────────────────────────────────┐
-│  Consumption   MCP Server (15 tools) · OSDK (TS/Py)           │
-│                Ontology API · ReAct agents · AIP · Copilot    │
-├──────────────────────────────────────────────────────────────┤
-│  Capability    Logic functions (expression/sql/python)        │
-│                Actions (6 executors) · Skills (LLM+AST+sandbox)│
-├──────────────────────────────────────────────────────────────┤
-│  Semantic      ★ ONTOLOGY CORE ★                              │
-│                Object types · Attributes · Relations          │
-│                Shared attributes/refs · OWL 2 modeling        │
-│                Version snapshots · Approval · Impact analysis │
-├──────────────────────────────────────────────────────────────┤
-│  Binding       ObjectBinding (primary/enrichment/document)    │
-│                Mapping suggestions · Hydration · Lineage      │
-├──────────────────────────────────────────────────────────────┤
-│  Data          Connections (5 categories) · Assets            │
-│                Unified execution gate · Quality rules · Audit │
-└──────────────────────────────────────────────────────────────┘
-```
-
-**Layering principle:** each layer depends only on the semantic contract of the one below. An agent does not know that `t_cbss_sub_info` exists — it knows only `CbssSubscriber`. Physical change is absorbed by the binding layer while the semantic layer stays stable.
 
 ---
 
-## Capabilities
+## AI Construction and Deterministic Execution
 
-### Semantic Layer · Ontology Core
+Yuanshu distinguishes two classes of problems by design.
 
-| Capability | Implementation |
-|-----------|----------------|
-| Object modeling | Three tiers (T1 core / T2 domain / T3 scenario); attributes stored in a dedicated table with constraints and example values |
-| Relation modeling | `has_one` / `has_many` / `belongs_to` / `many_to_many`, with cardinality annotation and acyclicity declaration |
-| OWL 2 editing | Protégé-style class tree, property tree, and axiom panels; 12 class expression types; 7 property characteristics |
-| Standards interop | Bidirectional OWL/XML serialization; import from RDF/XML, Turtle, JSON, and Excel |
-| Cross-ontology reuse | Shared attributes and shared refs (referencing an entire object across ontologies, read-only) |
-| Graph exploration | Vue Flow + d3-force dual-layer canvas: ontology object layer (colored by tier) plus a toggleable data asset layer |
-| Lineage view | BFS over a 1–5 hop entity neighborhood, rendered as an interactive graph |
+### Problems Suited to AI
 
-### Semantic Layer · Versioning and Governance
+For example:
 
-| Capability | Implementation |
-|-----------|----------------|
-| Version pipeline | `draft → pending_approval → published`, plus a `rejected` branch and a quick-publish path |
-| Quality gates | ① a data source must be bound ② attributes must be defined ③ attribute mapping coverage ≥ 50%; plus relation endpoint consistency checks |
-| Version snapshots | Full snapshots of five component types — entities, attributes, relations, logic functions, actions — frozen at publish time |
-| Rollback | Creates a **new version** from the target version (retaining `rollback_from` provenance) and still goes through approval, leaving history intact |
-| Impact analysis | Dry-run preview of breaking changes before publishing; affected AIP scenes and agents are automatically flagged `stale` afterwards |
-| Deletion safety | Before deleting a function or action, the platform reports which published versions, AIP scenes, and skills reference it, returning `safe_to_delete` |
+- Understanding business documents
+- Discovering candidate business objects
+- Completing attributes
+- Identifying relations
+- Extracting rules
+- Generating mapping suggestions
+- Generating Logic / Skills
 
-### Binding Layer · From Semantics to Physical Data
+These steps take full advantage of the semantic understanding of large models.
 
-| Capability | Implementation |
-|-----------|----------------|
-| Object bindings | Three roles: `primary` (main table), `enrichment` (supplementary), `document_evidence` |
-| Mapping suggestions | Normalization + snake/camel/Chinese tokenization → Token Jaccard; 30+ Chinese business-term expansions; type-compatibility matrix; `difflib` fuzzy matching; column-comment hits; primary-key hints. Scores ≥ 0.8 high, ≥ 0.5 medium |
-| LLM fallback | Low-confidence attributes are batched to the LLM, which returns candidate columns with reasons and scores |
-| Hydration | **① Ingestion check** connectivity, schema sync, preview, profiling → **② Instantiation** attribute-to-column hit rate → **③ Relation verification** primary-key existence plus same-connection sample JOIN → **④ Policy assertions** primary-key uniqueness and required-field null rate (5% threshold). Progress streamed over SSE |
-| Quality rules | `row_count_min` / `freshness` / `pk_uniqueness` / `null_ratio_max` auto-mounted on binding creation; 6 rule kinds across 6 probe types |
-| Lineage | Resource-level `Asset → ObjectType → Action` lineage, written automatically from binding and execution events |
+### Problems That Must Execute Deterministically
 
-### Data Layer · Ingestion and Execution
+For example:
 
-| Capability | Implementation |
-|-----------|----------------|
-| Connector framework | Registered under a `(category, type)` composite key across 5 categories: database, object storage, file transfer, message queue, API |
-| Implemented connectors | MySQL · PostgreSQL · SQL Server · Oracle · S3 (compatible with OSS/COS/OBS/MinIO) · FTP · SFTP · Kafka · REST |
-| Credential security | Encrypted at rest with Fernet (`fernet://`), never stored in plaintext; masked when returned for editing |
-| Connection pooling | In-process LIFO pool, 5-minute idle reclamation, capacity capped per connection config |
-| Unified execution gate | **Six gates:** locator rewriting → sqlglot AST security review (DDL always denied, DML requires authorization) → table allowlist → parameter completeness → token-bucket rate limiting → execution with column-level masking and TTL caching |
-| Parameterization | A single `:name` placeholder style at the business layer, converted per driver to `%(name)s` or `:name`, with a state machine that skips string literals and `::cast` |
-| Data assets | Three kinds — `table`, `sql_view`, `document`; documents support upload, object storage, directory, API, and message queue sources |
-| Execution audit | Every execution writes an `ExecutionLog`: SQL stored only as a hash plus a 500-character preview, parameters redacted to `<type:length>` |
+- Schema validation
+- Data type validation
+- Primary key checks
+- JOIN validation
+- Permission checks
+- SQL security checks
+- Action execution
+- Publishing approval
+- Version snapshots
+- Audit records
 
-### Capability Layer · Logic and Actions
+These steps are handled by deterministic programs and governance mechanisms.
 
-| Capability | Implementation |
-|-----------|----------------|
-| Logic functions | Three forms: `expression` (restricted eval), `sql` (ontology object names rewritten to physical tables), `python` (sandboxed) |
-| Function runtime | AST allowlist validation + `SIGALRM` timeouts (30s per call, 120s per chain) + max recursion depth 10 + A→B→A cycle detection + chained `call_function` + call-stack tracing |
-| Embedded IDE | Bundled code-server lets you edit function and action sources directly under `workspace/`; watchdog observes file changes and auto-registers `@Function` decorator metadata |
-| Action executors | Six kinds: `api_call` (httpx) · `sql_exec` (parameterized writes) · `call_function` · `custom_script` (5s timeout) · `modify_attribute` (dry-run) · `notification` (dry-run) |
-| Skills | Multi-turn requirement gathering → LLM-generated tool code and schemas → **automatic AST validation** → sandbox testing → versioned publishing, with rollback and deprecation |
+Yuanshu's AI principle is therefore not:
 
-### Consumption Layer · AI Applications
+> **let the LLM decide everything**
 
-| Capability | Implementation |
-|-----------|----------------|
-| ReAct agents | Up to 12 function-calling rounds; loop detection (two consecutive identical call signatures force convergence); final round sets `tool_choice=none` to force an answer |
-| Reasoning visualization | The backend tags each tool as `ontology` / `logic` / `action` and streams `tool_start` / `tool_result`; the frontend composes a five-stage timeline — **intent recognition → ontology query → logic computation → action execution → answer generation** — collapsing adjacent duplicate steps as `×N` and rendering the ontology call chain beneath the reply |
-| MCP Server | JSON-RPC 2.0 over HTTP with 15 tools; dual authentication via Bearer JWT or `X-API-Key`; every call is logged with volume, latency, and error-rate statistics |
-| OSDK | Generates TypeScript / Python SDKs from the published ontology (client, one class per object, relation traversal methods, usage examples) |
-| AIP orchestration | DAG ready-queue scheduling with conditional branches (`branch-true/false`), parallel nodes, sub-scenes, and cross-node data mapping (`node.field[0].sub` path syntax); 20+ node types |
-| Three trigger types | A self-implemented 5-field cron scheduler (30-second polling, same-minute deduplication) · an event bus (matching entity actions) · webhooks (HMAC-SHA256 signature verification) |
-| Evaluation and tracing | Evaluation suites assert on keywords and report pass rate and average latency; traces record input, output, duration, and tokens |
+but:
 
-### Operations and Security
-
-| Capability | Implementation |
-|-----------|----------------|
-| RBAC | Four built-in roles (admin / editor / operator / viewer), `{module}:{action}` permission format, JWT (HS256) with bcrypt |
-| Auditing | Dual-track: operation audit (including before/after snapshots) and execution audit (SQL fingerprint, block reason, cache hit) |
-| Masking | Encrypted connection credentials, masked model API keys, column-level result masking driven by `sensitivity_tags` (`pii` keeps the first 3 and last 4 characters; `sensitive` is fully masked) |
-| Monitoring | Health probes across 10 services on a 30-second cycle, resource metrics, LLM call statistics, alerts pushed live over WebSocket, automatic historical cleanup |
-| Model management | A model registry unifies multiple providers (OpenAI-compatible protocol), binds models per scenario, and supports connectivity testing |
+> **let AI handle understanding and generation, let programs handle validation and execution, and let humans make the final call at critical points.**
 
 ---
 
-## Tech Stack
+## Openness and Interoperability
 
-| Layer | Technologies |
-|-------|-------------|
-| Frontend | Vue 3.5 · TypeScript 6 · Vite 8 · Pinia 3 · Vue Router 4 · Ant Design Vue 4.2 |
-| Frontend visualization | Vue Flow 1.48 (ontology graph / lineage / AIP canvas) · d3-force (force-directed layout) · ECharts 6 (metric charts) · hand-written SVG semantic canvas |
-| Semantic Web | OWL/XML parsing and serialization on the frontend (`utils/owl/`) · rdflib on the backend (RDF/XML, Turtle import) |
-| Backend | FastAPI 0.115 · Uvicorn · SQLAlchemy 2.0 · Pydantic 2 · Alembic |
-| Auth | python-jose (JWT HS256) · passlib + bcrypt · RBAC dependency injection |
-| Database | SQLite (dev) / MySQL (prod) |
-| Connectors | pymysql · psycopg2 · pymssql · oracledb · boto3 · ftplib / paramiko · native Kafka protocol · httpx |
-| SQL safety | sqlglot (AST parsing, dialect adaptation, dangerous-construct blocking) |
-| AI / LLM | OpenAI-compatible protocol · function calling · SSE streaming · MCP JSON-RPC 2.0 |
-| Document parsing | python-docx · pdfplumber · openpyxl · pandas |
-| Embedded IDE | code-server (editing logic function and action sources) |
-| Operations | psutil (resource collection) · watchdog (hot function registration) · WebSocket push |
+Yuanshu positions itself as a **runnable enterprise ontology platform**, while also supporting data exchange with standard ontologies and external tools.
 
-**Codebase size:** 237 backend Python modules / 51 database tables / 42 route modules / 351 API endpoints; 137 Vue components / 104 views / 32 business routes on the frontend.
+Currently supported:
+
+- OWL/XML
+- RDF/XML
+- Turtle
+- JSON
+- Excel
+
+Along with:
+
+- Native platform visual modeling
+- Protégé-style editing interface
+- WebVOWL visualization
+- Terminology view
+
+These capabilities serve model exchange, migration of existing ontologies, and collaboration with professional ontology engineering, without constraining Yuanshu's own ontology runtime model.
 
 ---
 
 ## Quick Start
 
-### Prerequisites
+### Requirements
 
 - Python 3.11+
-- Node.js 18+ (npm)
+- Node.js 18+
+- npm
 
-### Configuration
+---
 
-Create `.env` in the **project root**:
+### 1. Clone
+
+```bash
+git clone https://github.com/fuyuxiang/ontology.git
+cd ontology
+```
+
+---
+
+### 2. Configure
+
+Create `.env` in the project root:
 
 ```env
-# Metadata store: SQLite for development, MySQL recommended for production
+# Metadata database
 DATABASE_URL=sqlite:///./ontology.db
+
+# MySQL example
 # DATABASE_URL=mysql+pymysql://user:pass@host:3306/ontology?charset=utf8mb4
 
-# LLM (OpenAI-compatible protocol)
+# LLM - OpenAI compatible API
 LLM_BASE_URL=https://your-llm-endpoint/v1
 LLM_API_KEY=your-api-key
 LLM_MODEL=your-model-name
 
-# Required — startup aborts if missing
+# Required
 SECRET_KEY=replace-with-strong-random-string
 
 # Optional
-CREDENTIAL_ENCRYPTION_KEY=       # Credential encryption key; regenerated randomly each start if empty
-ADMIN_INITIAL_PASSWORD=          # Initial admin password; defaults to "admin" if empty
+CREDENTIAL_ENCRYPTION_KEY=
+ADMIN_INITIAL_PASSWORD=
 CORS_ORIGINS=http://localhost:5177
 ```
 
-### One-Command Startup
+---
+
+### 3. Start
+
+Linux / macOS:
 
 ```bash
-./start.sh          # Launches backend (8001), frontend (5177), and code-server (8443)
-./stop.sh           # Stops everything
+./start.sh
 ```
 
-### Manual Startup
+Windows:
+
+```powershell
+.\start.bat
+```
+
+Once started:
+
+| Service     | Address                            |
+| ----------- | ---------------------------------- |
+| Web UI      | `http://localhost:5177`            |
+| API         | `http://localhost:8001`            |
+| API Docs    | `http://localhost:8001/docs`       |
+| MCP Server  | `http://localhost:8001/api/v1/mcp` |
+| Code Server | `http://localhost:8443`            |
+
+The first startup initializes the database and creates an administrator account automatically.
+
+> For production, configure a strong `SECRET_KEY`, `CREDENTIAL_ENCRYPTION_KEY`, and administrator password, and restrict access to Code Server, CORS, and MCP.
+
+Stop the services:
 
 ```bash
-# Backend
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+./stop.sh
+```
 
-# Frontend
+---
+
+## Development
+
+### Backend
+
+```bash
+cd backend
+
+pip install -r requirements.txt
+
+uvicorn app.main:app \
+  --host 0.0.0.0 \
+  --port 8001 \
+  --reload
+```
+
+### Frontend
+
+```bash
 cd frontend
+
 npm install
+
 npm run dev
 ```
 
-Open `http://localhost:5177` for the UI, `http://localhost:8001/docs` for API docs, and `http://localhost:8001/api/v1/mcp` for the MCP endpoint.
+---
 
-> On first launch the platform creates tables, runs compatibility migrations, and provisions an `admin` account (password from `ADMIN_INITIAL_PASSWORD`, or `admin` if unset). **In production, always set this variable and change the password after first login.**
+## Tech Stack
 
-### Production Recommendations
-
-Use MySQL for metadata · generate strong `SECRET_KEY` and `CREDENTIAL_ENCRYPTION_KEY` values (otherwise stored credentials become undecryptable after a restart) · keep credentials in a KMS · disable code-server or restrict it to an internal network · enable MCP authentication (`MCP_REQUIRE_AUTH=true`) · narrow `CORS_ORIGINS`.
+| Layer             | Technology                                          |
+| ----------------- | --------------------------------------------------- |
+| Frontend          | Vue 3 · TypeScript · Vite · Pinia · Ant Design Vue  |
+| Visualization     | Vue Flow · d3-force · ECharts                       |
+| Backend           | FastAPI · Uvicorn · SQLAlchemy · Pydantic · Alembic |
+| Metadata DB       | SQLite · MySQL                                      |
+| AI / LLM          | OpenAI-compatible API · Function Calling · ReAct    |
+| Agent Protocol    | MCP · JSON-RPC 2.0                                  |
+| SQL               | sqlglot                                             |
+| Documents         | python-docx · pdfplumber · openpyxl · pandas        |
+| Runtime Workspace | code-server                                         |
+| Auth              | JWT · bcrypt · RBAC                                 |
+| Realtime          | SSE · WebSocket                                     |
 
 ---
 
 ## Project Structure
 
 ```text
-backend/
-├── app/
-│   ├── api/v1/                      # 42 route modules, 351 endpoints
-│   │   ├── entities.py              # Object type CRUD, graph, lineage
-│   │   ├── relations.py             # Relation modeling
-│   │   ├── builder.py               # Document extraction / suggestions / hydration / commit
-│   │   ├── ai_ontology.py           # AI-guided modeling (5-phase session)
-│   │   ├── ai_builder_v2.py         # Domain drill-down modeling
-│   │   ├── doc_builder.py           # Document-conversation modeling and mapping
-│   │   ├── ontology_publish.py      # Versions / approval / snapshots / rollback
-│   │   ├── impact_analysis.py       # Deletion and publish impact analysis
-│   │   ├── mcp.py                   # MCP JSON-RPC server
-│   │   ├── osdk.py                  # TS / Python SDK generation
-│   │   ├── aip_*.py                 # Scene orchestration, execution, webhooks
-│   │   └── data_plane/              # Connections, assets, execution, probes, lineage, quality, bindings
-│   ├── connectors/                  # Pluggable connectors (composite-key registry)
-│   ├── models/                      # 51 SQLAlchemy tables
-│   └── services/
-│       ├── agent/                   # ReAct orchestrator, graph engine, context builder
-│       ├── aip/                     # Scene runner, scheduler, event bus, data mapper
-│       ├── builder/                 # 4-phase hydration validation
-│       ├── data_plane/              # Execution gate, mapping suggestions, bindings, quality, lineage
-│       ├── function_runtime/        # Function registry, file watcher, unified sandbox
-│       ├── action_executors/        # 6 action executors
-│       └── mcp_tools/               # 15 MCP tools
-└── requirements.txt
-
-frontend/
-├── src/
-│   ├── views/
-│   │   ├── builder/                 # Four modeling views
-│   │   │   └── components/protege/  # Protégé-style OWL editor (15 components)
-│   │   ├── ontology/                # Ontology list, detail, publishing
-│   │   ├── dataflow/                # Dual-layer ontology graph canvas
-│   │   ├── agents/                  # Agents, reasoning timeline, skill wizard
-│   │   ├── aip/                     # Workflow orchestration canvas
-│   │   └── ...                      # 104 view components in total
-│   ├── components/canvas/           # Graph nodes, edges, toolbar, lineage graph
-│   ├── utils/owl/                   # OWL/XML parser and serializer
-│   ├── store/                       # 9 Pinia modules (including 50-step OWL editor undo)
-│   └── api/                         # 29 typed API clients (with hand-rolled SSE parsing)
-└── package.json
-
-workspace/                           # Logic function / action sources (edited via code-server)
+ontology/
+│
+├── backend/
+│   └── app/
+│       ├── api/
+│       │   └── v1/
+│       │       ├── entities.py
+│       │       ├── relations.py
+│       │       ├── builder.py
+│       │       ├── ai_ontology.py
+│       │       ├── ai_builder_v2.py
+│       │       ├── doc_builder.py
+│       │       ├── ontology_publish.py
+│       │       ├── impact_analysis.py
+│       │       ├── mcp.py
+│       │       ├── osdk.py
+│       │       └── data_plane/
+│       │
+│       ├── connectors/
+│       ├── models/
+│       │
+│       └── services/
+│           ├── agent/
+│           ├── aip/
+│           ├── builder/
+│           ├── data_plane/
+│           ├── function_runtime/
+│           ├── action_executors/
+│           └── mcp_tools/
+│
+├── frontend/
+│   └── src/
+│       ├── views/
+│       │   ├── builder/
+│       │   ├── ontology/
+│       │   ├── dataflow/
+│       │   ├── agents/
+│       │   └── aip/
+│       │
+│       ├── components/
+│       ├── utils/
+│       ├── store/
+│       └── api/
+│
+├── workspace/
+│
+├── code-server/
+│
+├── docs/
+│
+└── tools/
 ```
 
 ---
 
-## Scope and Roadmap
+## Design Principles
 
-The technical direction stays unchanged. The following capabilities are planned but not yet implemented, stated here plainly:
+Yuanshu follows several core principles.
 
-| Area | Current status |
-|------|----------------|
-| Reasoner | No OWL reasoning or consistency checking yet; `subClassOf` is stored as an ordinary relation with no runtime inheritance expansion |
-| SPARQL | No SPARQL endpoint; ontology queries go through REST and MCP tools |
-| RDF export | OWL/XML export is supported; Turtle and JSON-LD export are pending |
-| Graph database | Neo4j configuration and health probes are in place, but graph storage is not enabled — graphs are computed live from relational tables |
-| Hive / ClickHouse | Declared in the connector registry; connector implementations pending |
-| Oracle | Connection and querying work; automatic schema sync is pending |
-| Federated queries | Cross-asset JOINs work within one connection; cross-connection federation is not yet supported |
+### Business Semantics First
+
+Upper-layer applications and AI should work against stable business objects rather than depending directly on underlying tables and columns.
+
+### AI for Construction, Determinism for Execution
+
+AI is used for understanding, discovery, and generation; deterministic programs handle validation, execution, and governance.
+
+### Ontology as Runtime
+
+The ontology is a runtime business context shared by applications, agents, and business processes — not a static document produced once modeling ends.
+
+### Govern Everything
+
+Objects, relations, Logic, Action, data access, and agent execution should all have explicit permission, version, and audit boundaries.
+
+### Build Once, Reuse Across Applications
+
+Unified business semantics and capabilities should be continuously reusable across multiple agents, workflows, and business applications, instead of being rebuilt per scenario.
 
 ---
 
 ## Contributing
 
+Contributions to Yuanshu are welcome.
+
+We especially welcome contributions in these areas:
+
+- AI Ontology Building
+- Ontology Modeling
+- Data Grounding
+- Data Connectors
+- Logic Runtime
+- Action Runtime
+- MCP Tools
+- Agent Runtime
+- Workflow
+- Visualization
+- Governance & Security
+
+Contribution flow:
+
 1. Fork this repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (describe the change itself)
-4. Push the branch (`git push origin feature/amazing-feature`)
+
+2. Create a feature branch
+
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+
+3. Commit your changes
+
+4. Push the branch
+
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+
 5. Open a Pull Request
+
+For larger feature designs, we recommend discussing the approach in an Issue first.
 
 ---
 
-## Star History
+## Community
 
-<a href="https://star-history.com/#854875058/ontology-driven-platform&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=854875058/ontology-driven-platform&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=854875058/ontology-driven-platform&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=854875058/ontology-driven-platform&type=Date" />
- </picture>
-</a>
+If you are:
+
+- Researching enterprise ontologies and AI agents;
+- Looking to improve automated ontology construction;
+- Building new data connectors;
+- Interested in contributing new Logic / Action / MCP tools;
+- Interested in enterprise semantic modeling, knowledge engineering, or agent runtimes;
+
+you are welcome to join the discussion through GitHub Issues and Pull Requests.
 
 ---
 
 ## License
 
-[MIT](LICENSE) © Yuanshu Ontology
+[MIT License](LICENSE)
+
+---
+
+<div align="center">
+
+### 元枢本体 · Yuanshu Ontology
+
+**Make enterprise business understandable, intelligent capability runnable, and ontology assets evolvable.**
+
+**Map the Business · Embody the Capability · Close the Intelligence Loop**
+
+</div>
