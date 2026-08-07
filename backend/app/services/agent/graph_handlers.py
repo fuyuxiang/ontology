@@ -81,7 +81,7 @@ class NodeHandlersMixin:
 
     def _exec_agent_loop(self, node_id: str, data: dict, context: dict, started_at: float):
         """执行 Agent ReAct loop，yield 事件，返回 (result, summary)。"""
-        from app.services.aip.agent_loop import AgentNodeRunner
+        from app.services.agent.node_agent_loop import AgentNodeRunner
 
         # 收集挂载的 skill/tool ID（从子节点边获取）
         skill_ids = list(data.get("skill_ids", []))
@@ -470,44 +470,6 @@ class NodeHandlersMixin:
                     f"函数 {func.name} 暂未实现 {func.logic_type}")
         except Exception as e:
             return {"error": str(e), "function": func.name}, f"函数 {func.name} 执行异常: {e}"
-
-    def _exec_subscene(self, data: dict, context: dict, question: str):
-        """AIP subscene 节点：嵌套执行另一个场景。"""
-        scene_id = data.get("scene_id") or ""
-        if not scene_id:
-            return {"error": "未指定 scene_id"}, "未指定子场景"
-        # 延迟 import 防循环依赖
-        from app.models.scene import AipScene
-        from app.services.agent.graph_engine import GraphEngine
-        sub = self.db.get(AipScene, scene_id)
-        if not sub:
-            return {"error": f"场景 {scene_id} 不存在"}, "子场景不存在"
-        sub_engine = GraphEngine(
-            self.db,
-            nodes_json=sub.nodes_json or [],
-            edges_json=sub.edges_json or [],
-            system_prompt=self.system_prompt,
-            model_name=self.model_name,
-            model_config=self.model_config,
-            emit_node_io=False,
-        )
-        sub_input = dict(data.get("input_params") or {})
-        # 把当前 context 中可序列化的子集传给子场景
-        for k, v in context.items():
-            if k in ("question", "system_prompt", "input_params"):
-                continue
-            sub_input.setdefault(k, _safe_jsonable(v))
-        final_output = {}
-        try:
-            for ev in sub_engine.run_for_scene(sub_input):
-                if ev.get("type") == "scene_finished":
-                    final_output = ev.get("final_output", {})
-                if ev.get("type") == "scene_failed":
-                    return {"error": ev.get("error"), "failed_node": ev.get("failed_node")}, "子场景执行失败"
-        except Exception as e:
-            return {"error": str(e)}, f"子场景异常: {e}"
-        return ({"subscene_id": scene_id, "final_output": final_output},
-                f"子场景 {sub.name} 执行完成")
 
     def _exec_passthrough(self, data: dict, context: dict, question: str):
         """memoryNode / toolNode 等子节点：仅作为 agentNode 的元数据，不真正执行。"""

@@ -15,7 +15,6 @@ from app.database import get_db
 from app.models.agent import Agent
 from app.models.entity import OntologyEntity
 from app.models.relation import EntityRelation
-from app.models.scene import AipScene
 from app.models.user import User
 from app.models.version import (
     OntologyVersion,
@@ -26,7 +25,6 @@ from app.models.version import (
 from app.services.ontology_impact import (
     compute_breaking_changes,
     find_affected_agents,
-    find_affected_scenes,
     mark_stale_dependents,
 )
 from app.services.version_component_snapshot import snapshot_components_for_version
@@ -287,12 +285,7 @@ def preview_impact(version_id: str, db: Session = Depends(get_db)):
 
     changes = compute_breaking_changes(old_entities, new_entities)
     if not changes:
-        return {"breaking_changes": [], "affected_scenes": [], "affected_agents": []}
-
-    scenes = db.query(AipScene).filter(AipScene.ontology_bindings.isnot(None)).all()
-    scene_dicts = [{"id": s.id, "ontology_bindings": s.ontology_bindings, "name": s.name} for s in scenes]
-    affected_scene_ids = set(find_affected_scenes(scene_dicts, changes))
-    affected_scenes_info = [{"id": s.id, "name": s.name} for s in scenes if s.id in affected_scene_ids]
+        return {"breaking_changes": [], "affected_agents": []}
 
     agents = db.query(Agent).filter(Agent.entity_ids.isnot(None)).all()
     agent_dicts = [{"id": a.id, "entity_ids": a.entity_ids, "name": a.name} for a in agents]
@@ -301,7 +294,6 @@ def preview_impact(version_id: str, db: Session = Depends(get_db)):
 
     return {
         "breaking_changes": changes,
-        "affected_scenes": affected_scenes_info,
         "affected_agents": affected_agents_info,
     }
 

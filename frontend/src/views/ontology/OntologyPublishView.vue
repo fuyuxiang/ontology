@@ -261,7 +261,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { get, post, del } from '../../api/client'
-import { ontologyPublishApi } from '../../api/aip'
+import { ontologyPublishApi } from '../../api/ontologyPublish'
 
 interface OntologyCard {
   ontology_id: string; code: string; name: string; color: string | null

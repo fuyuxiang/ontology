@@ -7,7 +7,6 @@ const router = createRouter({
     { path: '/login', name: 'login', component: () => import('../views/auth/LoginView.vue'), meta: { title: '登录', public: true } },
 
     // 工作台
-    { path: '/workspace/business', name: 'workspace-business', component: () => import('../views/dashboard/DashboardView.vue'), meta: { title: '业务总览' } },
     { path: '/dashboard', name: 'dashboard', component: () => import('../views/dashboard/SystemDashboardView.vue'), meta: { title: '系统看版' } },
 
     // 数据集成
@@ -22,8 +21,7 @@ const router = createRouter({
     { path: '/builder/doc', name: 'ontology-builder-doc', component: () => import('../views/builder/DocBuilderView.vue'), meta: { title: '文档构建' } },
     { path: '/builder/ai', name: 'ontology-builder-ai', component: () => import('../views/builder/AiBuilderView.vue'), meta: { title: '资产构建' } },
 
-    // 数据映射与逻辑建模
-    { path: '/data/mapping', name: 'data-mapping', component: () => import('../views/mapping/MappingView.vue'), meta: { title: '数据映射' } },
+    // 逻辑建模
     { path: '/logic', redirect: '/logic/functions' },
     { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
     { path: '/logic/functions/:id/code', name: 'logic-function-code', component: () => import('../views/logic/FunctionCodeView.vue'), meta: { title: '函数编辑' } },
@@ -38,26 +36,13 @@ const router = createRouter({
     { path: '/service/mcp', name: 'service-mcp', component: () => import('../views/service/McpServiceView.vue'), meta: { title: '本体服务' } },
     { path: '/service/api', redirect: '/service/mcp' },
 
-    // 本体中心 — 辅助路由
-    { path: '/ontology/create', name: 'ontology-create', component: () => import('../views/ontology/EntityCreateView.vue'), meta: { title: '新建本体对象' } },
-    { path: '/ontology/:id', name: 'ontology-detail', component: () => import('../views/detail/EntityDetail.vue'), meta: { title: '实体详情' } },
-    { path: '/browser/graph', name: 'browser-graph', component: () => import('../views/dataflow/DataflowView.vue'), meta: { title: '本体图谱' } },
-
     // 智能体应用中心
     { path: '/agent/manage', name: 'agent-manage', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: '智能体管理' } },
     { path: '/agent/manage/new', name: 'agent-new', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '新建智能体' } },
     { path: '/agent/manage/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
-    { path: '/agent/toolbox', name: 'agent-toolbox', component: () => import('../views/agents/skills/SkillListView.vue'), meta: { title: '技能管理' } },
-    { path: '/agent/toolbox/create', name: 'skill-create', component: () => import('../views/agents/skills/SkillWizard.vue'), meta: { title: '创建技能' } },
-    { path: '/agent/toolbox/:id', name: 'skill-detail', component: () => import('../views/agents/skills/SkillDetailView.vue'), meta: { title: '技能详情' } },
-    { path: '/aip', name: 'aip-platform', component: () => import('../views/aip/AipPlatformView.vue'), meta: { title: '流程编排' } },
 
     // 运维与安全中心
-    { path: '/ops/monitor', name: 'ops-monitor', component: () => import('../views/settings/MonitorView.vue'), meta: { title: '运维监控' } },
-    { path: '/ops/log-audit', name: 'ops-log-audit', component: () => import('../views/ops/LogAuditView.vue'), meta: { title: '日志与审计' } },
-    { path: '/ops/permissions', name: 'ops-permissions', component: () => import('../views/governance/PermissionsView.vue'), meta: { title: '权限管理' } },
     { path: '/ops/config', name: 'ops-config', component: () => import('../views/settings/SystemConfigView.vue'), meta: { title: '系统配置' } },
-    { path: '/settings/models', name: 'settings-models', component: () => import('../views/models/ModelManageView.vue'), meta: { title: '模型配置' } },
 
     // 兼容旧路由
     { path: '/datasource', redirect: '/data/connections' },
@@ -66,12 +51,7 @@ const router = createRouter({
     { path: '/data/catalog', redirect: '/data/assets' },
     { path: '/data/hydration', redirect: '/ontology/publish' },
     { path: '/service/agent', redirect: '/agent/manage' },
-    { path: '/service/workflow', redirect: '/aip' },
-    { path: '/harness', redirect: '/aip' },
-    { path: '/settings/monitor', redirect: '/ops/monitor' },
     { path: '/settings/general', redirect: '/ops/config' },
-    { path: '/governance/permissions', redirect: '/ops/permissions' },
-    { path: '/governance/audit', redirect: '/ops/log-audit' },
   ]
 })
 

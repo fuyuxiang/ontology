@@ -22,46 +22,6 @@ def _migrate_rename_schema_json(conn, inspector, tables):
     conn.commit()
 
 
-def _migrate_datasources(conn, inspector, tables):
-    if "datasources" not in tables:
-        return
-    cols = _get_cols(inspector, "datasources")
-    _add = []
-    if "table_name" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN table_name VARCHAR(200) DEFAULT ''")
-    if "record_count" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN record_count INTEGER DEFAULT 0")
-    if "enabled" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN enabled TINYINT(1) DEFAULT 0")
-    if "source_category" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN source_category VARCHAR(20) DEFAULT 'database'")
-    for col in ("file_path", "file_type"):
-        if col not in cols:
-            size = "500" if "path" in col else "20"
-            _add.append(f"ALTER TABLE datasources ADD COLUMN {col} VARCHAR({size})")
-    if "api_url" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN api_url VARCHAR(500)")
-    if "api_method" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN api_method VARCHAR(10) DEFAULT 'GET'")
-    if "api_headers" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN api_headers JSON")
-    if "api_body" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN api_body TEXT")
-    if "mq_topic" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN mq_topic VARCHAR(200)")
-    if "mq_group" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN mq_group VARCHAR(200)")
-    if "poll_interval" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN poll_interval INTEGER DEFAULT 60")
-    if "parsed_content" not in cols:
-        _add.append("ALTER TABLE datasources ADD COLUMN parsed_content TEXT")
-    for stmt in _add:
-        conn.execute(text(stmt))
-    if "record_count" not in cols and "table_count" in cols:
-        conn.execute(text("UPDATE datasources SET record_count = table_count"))
-    conn.commit()
-
-
 def _drop_business_rules(conn, inspector, tables):
     for tbl in ("business_rules", "ontology_version_rules"):
         if tbl in tables:
@@ -128,22 +88,6 @@ def _migrate_agents(conn, inspector, tables):
         _add.append("ALTER TABLE agents ADD COLUMN ontology_version_id VARCHAR(36)")
     if "ontology_stale" not in cols:
         _add.append("ALTER TABLE agents ADD COLUMN ontology_stale TINYINT(1) NOT NULL DEFAULT 0")
-    for stmt in _add:
-        conn.execute(text(stmt))
-    conn.commit()
-
-
-def _migrate_aip_scenes(conn, inspector, tables):
-    if "aip_scenes" not in tables:
-        return
-    cols = _get_cols(inspector, "aip_scenes")
-    _add = []
-    if "ontology_version_id" not in cols:
-        _add.append("ALTER TABLE aip_scenes ADD COLUMN ontology_version_id VARCHAR(36)")
-    if "ontology_stale" not in cols:
-        _add.append("ALTER TABLE aip_scenes ADD COLUMN ontology_stale TINYINT(1) NOT NULL DEFAULT 0")
-    if "ontology_stale_detail" not in cols:
-        _add.append("ALTER TABLE aip_scenes ADD COLUMN ontology_stale_detail JSON")
     for stmt in _add:
         conn.execute(text(stmt))
     conn.commit()

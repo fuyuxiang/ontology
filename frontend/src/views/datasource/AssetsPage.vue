@@ -150,7 +150,6 @@
     <AssetDetailDrawer
       v-model:visible="detail.visible"
       :asset-id="detail.assetId"
-      @navigate-to-binding="onNavigateToBinding"
     />
 
     <!-- 新建结构化资产 -->
@@ -289,11 +288,6 @@ async function del(record: Asset) {
   } catch (e: any) {
     message.error(e.response?.data?.detail || '删除失败（可能被引用）')
   }
-}
-
-function onNavigateToBinding(_assetId: string) {
-  // 跳转到本体建模 BindingTab。由调用方实现路由跳转；这里做兜底提示。
-  message.info('请前往本体建模模块的 ObjectType 编辑器进行绑定')
 }
 
 function kindLabel(a: Asset) {

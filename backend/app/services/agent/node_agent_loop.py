@@ -1,7 +1,7 @@
 """
-AIP Agent 节点执行器 — 本体驱动的 ReAct Loop
+Agent 画布节点执行器 — 本体驱动的 ReAct Loop
 
-Agent 节点在流程编排中的执行逻辑：
+agentNode 在智能体画布中的执行逻辑：
 1. 从节点配置读取绑定的本体对象类型 + 挂载的 Skill/Tool
 2. 自动将本体中对应的规则/函数/动作 + 手动挂载的 Skill/Tool 注册为 LLM function-calling tools
 3. 构建本体上下文（实体描述 + 关系 + 实例数据）

@@ -23,16 +23,8 @@ from app.models.quality_rule import HealthStatus, QualityRule
 from app.models.relation import EntityRelation
 from app.models.action import EntityAction
 from app.models.scenario import ScenarioDict
-from app.models.scene import (
-    AipScene,
-    AipSceneExecution,
-    AipSceneTrigger,
-    AipSceneVersion,
-)
 from app.models.skill import Skill
 from app.models.skill_tool import SkillTool
-from app.models.skill_tool_ref import SkillToolRef
-from app.models.skill_version import SkillVersion
 from app.models.trace import AgentTrace
 from app.models.user import User
 from app.models.version import (
@@ -58,7 +50,6 @@ __all__ = [
     "OntologyVersion", "OntologyVersionEntity",
     "OntologyVersionAttribute", "OntologyVersionRelation",
     "OntologyVersionFunction", "OntologyVersionAction",
-    "AipScene", "AipSceneVersion", "AipSceneExecution", "AipSceneTrigger",
     "ScenarioDict",
     "BusinessDocument",
     # Data Plane
@@ -68,7 +59,7 @@ __all__ = [
     "ServiceMetric", "LLMCallRecord", "Alert",
     "McpCallLog",
     # Skill Generation Platform
-    "Skill", "SkillVersion", "SkillTool", "SkillToolRef",
+    "Skill", "SkillTool",
     # AI Code Conversation
     "AiCodeConversation",
     # Agent Test Conversation

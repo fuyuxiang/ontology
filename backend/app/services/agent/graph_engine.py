@@ -218,7 +218,7 @@ class GraphEngine(NodeHandlersMixin):
     def run_for_scene(self, input_params: dict | None = None) -> Generator[dict, None, None]:
         """AIP 场景模式入口：就绪队列执行，支持条件分支路由、并行、数据映射。"""
 
-        from app.services.aip.data_mapper import get_incoming_edges, resolve_node_input
+        from app.services.agent.graph_data_mapper import get_incoming_edges, resolve_node_input
 
         self.emit_node_io = True
         if not self.nodes:
@@ -485,7 +485,6 @@ class GraphEngine(NodeHandlersMixin):
             "action": self._exec_action,
             "actionSystem": self._exec_action,
             "function": self._exec_function,
-            "subscene": self._exec_subscene,
             "memoryNode": self._exec_passthrough,        # 子节点：仅作为元数据挂在 agent 上
             "toolNode": self._exec_passthrough,
             "skillNode": self._exec_passthrough,
