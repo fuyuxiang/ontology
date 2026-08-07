@@ -13,12 +13,6 @@ from app.repositories.monitor_repo import MonitorRepository
 from app.repositories.object_binding_repo import ObjectBindingRepository
 from app.repositories.quality_metric_repo import QualityMetricRepository
 from app.repositories.relation_repo import RelationRepository
-from app.repositories.scene_repo import (
-    AipSceneExecutionRepository,
-    AipSceneRepository,
-    AipSceneTriggerRepository,
-    AipSceneVersionRepository,
-)
 
 __all__ = [
     "BaseRepository",
@@ -26,11 +20,6 @@ __all__ = [
     "RelationRepository",
     "ActionRepository",
     "FunctionRepository",
-    "DataSourceRepository",
-    "AipSceneRepository",
-    "AipSceneVersionRepository",
-    "AipSceneExecutionRepository",
-    "AipSceneTriggerRepository",
     # Data Plane
     "ConnectionRepository",
     "AssetRepository",

@@ -3,7 +3,6 @@ import pytest
 from app.services.ontology_impact import (
     compute_breaking_changes,
     find_affected_agents,
-    find_affected_scenes,
 )
 
 
@@ -50,33 +49,6 @@ class TestComputeBreakingChanges:
             {"source_entity_id": "e1", "name": "Customer"},
         ])
         assert changes == []
-
-
-class TestFindAffectedScenes:
-    def test_scene_with_deleted_entity_binding(self):
-        scenes = [
-            {"id": "s1", "ontology_bindings": ["Customer", "Contract"]},
-            {"id": "s2", "ontology_bindings": ["Order"]},
-        ]
-        changes = [{"entity_name": "Contract", "change_type": "deleted", "source_entity_id": "e2"}]
-        affected = find_affected_scenes(scenes, changes)
-        assert affected == ["s1"]
-
-    def test_scene_with_renamed_entity_binding(self):
-        scenes = [
-            {"id": "s1", "ontology_bindings": ["OldCustomer"]},
-        ]
-        changes = [{"entity_name": "OldCustomer", "change_type": "renamed", "new_name": "Customer", "source_entity_id": "e1"}]
-        affected = find_affected_scenes(scenes, changes)
-        assert affected == ["s1"]
-
-    def test_no_affected_scenes(self):
-        scenes = [
-            {"id": "s1", "ontology_bindings": ["Order"]},
-        ]
-        changes = [{"entity_name": "Contract", "change_type": "deleted", "source_entity_id": "e2"}]
-        affected = find_affected_scenes(scenes, changes)
-        assert affected == []
 
 
 class TestFindAffectedAgents:

@@ -558,12 +558,6 @@ def create_entity(
         snapshot_after={"name": entity.name, "tier": entity.tier},
     )
     db.commit()
-    # 通知 AIP 事件总线
-    try:
-        from app.services.aip.event_bus import publish as aip_publish
-        aip_publish(entity.name, "created", {"id": entity.id, "name": entity.name})
-    except Exception:
-        pass
     return get_entity(entity.id, db)
 
 
@@ -604,12 +598,6 @@ def update_entity(
             changes=changes,
         )
     repo.commit()
-    if changes:
-        try:
-            from app.services.aip.event_bus import publish as aip_publish
-            aip_publish(entity.name, "updated", {"id": entity.id, "name": entity.name})
-        except Exception:
-            pass
     return get_entity(entity.id, db)
 
 
@@ -685,15 +673,8 @@ def delete_entity(
         target_id=entity.id, target_name=entity.name,
         snapshot_before={"name": entity.name, "tier": entity.tier},
     )
-    entity_name = entity.name
-    entity_id_v = entity.id
     repo.delete(entity)
     repo.commit()
-    try:
-        from app.services.aip.event_bus import publish as aip_publish
-        aip_publish(entity_name, "deleted", {"id": entity_id_v, "name": entity_name})
-    except Exception:
-        pass
 
 
 # ── 删除属性 ──────────────────────────────────────────────────

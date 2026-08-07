@@ -35,7 +35,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:visible', v: boolean): void
-  (e: 'navigate-to-binding', assetId: string): void
 }>()
 
 const asset = ref<Asset | null>(null)
@@ -102,10 +101,6 @@ async function doProfile() {
   }
 }
 
-function navigateToBinding() {
-  if (asset.value) emit('navigate-to-binding', asset.value.id)
-}
-
 function kindLabel(k: string) {
   return ({ table: '表', sql_view: 'SQL 视图', document: '文档' } as any)[k] || k
 }
@@ -123,7 +118,6 @@ const bodyProps = computed(() => ({
   profiling: profiling.value,
   onSyncSchema: doSyncSchema,
   onProfile: doProfile,
-  onNavigateToBinding: navigateToBinding,
 }))
 
 // 用一个轻量组件包装，避免主模板太长

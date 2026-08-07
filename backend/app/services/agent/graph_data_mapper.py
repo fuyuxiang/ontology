@@ -1,5 +1,5 @@
 """
-AIP 数据映射器 — 根据边上的 mapping 配置，从 context 中组装下游节点的输入。
+画布数据映射器 — 根据边上的 mapping 配置，从 context 中组装下游节点的输入。
 
 边的 mapping 格式（存在 edge.data.mapping 中）:
 [

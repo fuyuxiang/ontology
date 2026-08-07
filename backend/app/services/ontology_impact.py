@@ -8,7 +8,6 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from app.models.agent import Agent
-from app.models.scene import AipScene
 from app.models.version import OntologyVersion
 
 
@@ -39,19 +38,6 @@ def compute_breaking_changes(
             })
 
     return changes
-
-
-def find_affected_scenes(
-    scenes: list[dict],
-    changes: list[dict],
-) -> list[str]:
-    affected_names = {c["entity_name"] for c in changes}
-    result = []
-    for scene in scenes:
-        bindings = scene.get("ontology_bindings") or []
-        if any(name in affected_names for name in bindings):
-            result.append(scene["id"])
-    return result
 
 
 def find_affected_agents(
@@ -86,23 +72,13 @@ def mark_stale_dependents(
 
     changes = compute_breaking_changes(old_entities, new_entities)
     if not changes:
-        return {"breaking_changes": [], "affected_scenes": 0, "affected_agents": 0}
+        return {"breaking_changes": [], "affected_agents": 0}
 
     stale_detail = {
         "version_id": new_version.id,
         "published_at": datetime.utcnow().isoformat(),
         "breaking_changes": changes,
     }
-
-    scenes = db.query(AipScene).filter(AipScene.ontology_bindings.isnot(None)).all()
-    scene_dicts = [{"id": s.id, "ontology_bindings": s.ontology_bindings} for s in scenes]
-    affected_scene_ids = find_affected_scenes(scene_dicts, changes)
-
-    if affected_scene_ids:
-        db.query(AipScene).filter(AipScene.id.in_(affected_scene_ids)).update(
-            {"ontology_stale": True, "ontology_stale_detail": stale_detail},
-            synchronize_session="fetch",
-        )
 
     agents = db.query(Agent).filter(Agent.entity_ids.isnot(None)).all()
     agent_dicts = [{"id": a.id, "entity_ids": a.entity_ids} for a in agents]
@@ -116,6 +92,5 @@ def mark_stale_dependents(
 
     return {
         "breaking_changes": changes,
-        "affected_scenes": len(affected_scene_ids),
         "affected_agents": len(affected_agent_ids),
     }

@@ -103,9 +103,6 @@
       <!-- 右：建模视角 + usage -->
       <a-col :span="10">
         <h4 class="adb-title">建模 / 使用</h4>
-        <a-button type="primary" size="small" @click="onNavigateToBinding">
-          在 ObjectType 编辑器中绑定
-        </a-button>
 
         <a-descriptions size="small" :column="1" class="adb-usage">
           <a-descriptions-item label="被绑定的 ObjectType">
@@ -165,7 +162,6 @@ defineProps<{
   profiling: boolean
   onSyncSchema: () => void
   onProfile: () => void
-  onNavigateToBinding: () => void
 }>()
 
 const schemaCols = [

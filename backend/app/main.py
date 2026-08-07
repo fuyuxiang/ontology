@@ -70,9 +70,6 @@ from app.api.v1.agents import router as agents_router
 from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
 from app.api.v1.ai_code import router as ai_code_router
 from app.api.v1.ai_ontology import router as ai_ontology_router
-from app.api.v1.aip_executions import router as aip_executions_router
-from app.api.v1.aip_scenes import router as aip_scenes_router
-from app.api.v1.aip_webhooks import router as aip_webhooks_router
 from app.api.v1.builder import router as builder_router
 from app.api.v1.business_documents import router as business_documents_router
 from app.api.v1.copilot import router as copilot_router
@@ -94,7 +91,6 @@ from app.api.v1.doc_builder import router as doc_builder_router
 from app.api.v1.evals import router as evals_router
 from app.api.v1.functions import router as functions_router
 from app.api.v1.governance import router as governance_router
-from app.api.v1.impact_analysis import router as impact_analysis_router
 
 # datasources_router 已废弃，数据接入统一走 data_plane/connections + assets
 from app.api.v1.models import router as models_router
@@ -110,8 +106,6 @@ from app.api.v1.resolution import router as resolution_router
 from app.api.v1.scenarios import router as scenarios_router
 from app.api.v1.shared_attributes import router as shared_attrs_router
 from app.api.v1.shared_refs import router as shared_refs_router
-from app.api.v1.skill_gen import router as skill_gen_router
-from app.api.v1.skills import router as skills_router
 from app.api.v1.system_config import router as system_config_router
 from app.api.v1.traces import router as traces_router
 
@@ -137,13 +131,6 @@ async def lifespan(app: FastAPI):
     # Neo4j 初始化暂时跳过（需要修复 numpy/pandas 版本冲突后启用）
     # 基础功能（实体CRUD、规则、看板）不依赖 Neo4j
     logger.info("服务启动完成（Neo4j 待配置）")
-
-    # 启动 AIP 调度器（schedule 触发器轮询）
-    try:
-        from app.services.aip.scheduler import start_scheduler
-        start_scheduler()
-    except Exception as e:
-        logger.warning(f"AIP 调度器启动失败: {e}")
 
     # 注册 Data Plane 跨模块事件 handler
     try:
@@ -221,7 +208,6 @@ app.include_router(scenarios_router, prefix="/api/v1")
 app.include_router(models_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 app.include_router(agents_open_router, prefix="/api/v1")
-app.include_router(skills_router, prefix="/api/v1")
 app.include_router(resolution_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
 app.include_router(prompt_templates_router, prefix="/api/v1")
@@ -234,9 +220,6 @@ app.include_router(evals_router, prefix="/api/v1")
 app.include_router(actions_router, prefix="/api/v1")
 app.include_router(functions_router, prefix="/api/v1")
 app.include_router(monitor_router, prefix="/api/v1")
-app.include_router(aip_scenes_router, prefix="/api/v1")
-app.include_router(aip_executions_router, prefix="/api/v1")
-app.include_router(aip_webhooks_router, prefix="/api/v1")
 app.include_router(builder_router, prefix="/api/v1")
 app.include_router(business_documents_router, prefix="/api/v1")
 app.include_router(shared_refs_router, prefix="/api/v1")
@@ -256,10 +239,8 @@ app.include_router(dp_mapping_router, prefix="/api/v1")
 app.include_router(ai_builder_v2_router, prefix="/api/v1")
 app.include_router(doc_builder_router, prefix="/api/v1")
 app.include_router(ontology_mapping_router, prefix="/api/v1")
-app.include_router(skill_gen_router, prefix="/api/v1")
 app.include_router(registry_router, prefix="/api/v1")
 app.include_router(system_config_router, prefix="/api/v1")
-app.include_router(impact_analysis_router, prefix="/api/v1")
 app.include_router(ai_code_router, prefix="/api/v1")
 
 # ── MCP 端点 ──
