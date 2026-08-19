@@ -38,7 +38,7 @@ class OracleConnector:
         return {"table": table_name, "columns": columns, "rows": rows}
 
     def get_table_schema(self, conn: Any, table_name: str, database: str) -> list[dict]:
-        raise RuntimeError(f"暂不支持 oracle 的 schema 查询")
+        raise RuntimeError("暂不支持 oracle 的 schema 查询")
 
     def execute_sql(self, conn: Any, sql: str) -> dict:
         cur = conn.cursor()

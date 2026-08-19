@@ -1,8 +1,11 @@
+import json as _json
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.deps import require_user
 from app.database import get_db
 from app.models import EntityAttribute, EntityRelation, OntologyEntity
@@ -28,6 +31,7 @@ from app.schemas.entity import (
     RelationOut,
 )
 from app.services.audit import write_audit
+from app.services.copilot import get_llm_client
 
 router = APIRouter(prefix="/entities", tags=["entities"])
 
@@ -768,14 +772,6 @@ def delete_attribute(
 
 
 # ── AI 智能提取本体 ──────────────────────────────────────────
-
-import json as _json
-
-from pydantic import BaseModel
-
-from app.config import settings
-from app.services.copilot import get_llm_client
-
 
 class _ExtractedAttr(BaseModel):
     name: str

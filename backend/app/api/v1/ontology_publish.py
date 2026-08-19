@@ -70,7 +70,7 @@ def list_versions(status: str | None = None, db: Session = Depends(get_db)):
 
 @router.get("/versions/active")
 def get_active_version(db: Session = Depends(get_db)):
-    v = db.query(OntologyVersion).filter(OntologyVersion.is_active == True).first()
+    v = db.query(OntologyVersion).filter(OntologyVersion.is_active.is_(True)).first()
     if not v:
         return None
     return _version_detail(v, db)
@@ -265,7 +265,7 @@ def preview_impact(version_id: str, db: Session = Depends(get_db)):
     v = _get_version(version_id, db)
 
     old_active = db.query(OntologyVersion).filter(
-        OntologyVersion.is_active == True, OntologyVersion.id != v.id
+        OntologyVersion.is_active.is_(True), OntologyVersion.id != v.id
     ).first()
 
     old_entities = []
@@ -326,12 +326,12 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User =
 
     # 只失活同一本体下的活动版本
     old_active = db.query(OntologyVersion).filter(
-        OntologyVersion.is_active == True, OntologyVersion.ontology_id == v.ontology_id,
+        OntologyVersion.is_active.is_(True), OntologyVersion.ontology_id == v.ontology_id,
         OntologyVersion.id != v.id
     ).first()
 
     db.query(OntologyVersion).filter(
-        OntologyVersion.is_active == True, OntologyVersion.ontology_id == v.ontology_id
+        OntologyVersion.is_active.is_(True), OntologyVersion.ontology_id == v.ontology_id
     ).update({"is_active": False})
     v.status = "published"
     v.is_active = True
@@ -440,12 +440,12 @@ def quick_publish(req: QuickPublishRequest, db: Session = Depends(get_db), user:
     _sync_relations(version, db)
 
     old_active = db.query(OntologyVersion).filter(
-        OntologyVersion.is_active == True,
+        OntologyVersion.is_active.is_(True),
         OntologyVersion.id != version.id,
         OntologyVersion.ontology_id == req.ontology_id,
     ).first()
     db.query(OntologyVersion).filter(
-        OntologyVersion.is_active == True,
+        OntologyVersion.is_active.is_(True),
         OntologyVersion.id != version.id,
         OntologyVersion.ontology_id == req.ontology_id,
     ).update({"is_active": False})

@@ -26,7 +26,7 @@ def get_overview(db: Session = Depends(get_db)):
 
     avg_ms = db.query(func.avg(McpCallLog.duration_ms)).filter(McpCallLog.called_at >= today_start).scalar() or 0
     error_count = db.query(func.count(McpCallLog.id)).filter(
-        McpCallLog.called_at >= today_start, McpCallLog.is_error == True
+        McpCallLog.called_at >= today_start, McpCallLog.is_error.is_(True)
     ).scalar() or 0
     error_rate = round(error_count / total_today, 4) if total_today > 0 else 0
 

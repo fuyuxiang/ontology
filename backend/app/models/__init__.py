@@ -1,3 +1,4 @@
+from app.models.action import EntityAction
 from app.models.agent import Agent, ModelRegistry
 from app.models.agent_test_conversation import AgentTestConversation  # noqa: F401
 from app.models.ai_code_conversation import AiCodeConversation  # noqa: F401
@@ -21,8 +22,9 @@ from app.models.prompt_template import PromptTemplate
 from app.models.quality_metric import QualityMetric
 from app.models.quality_rule import HealthStatus, QualityRule
 from app.models.relation import EntityRelation
-from app.models.action import EntityAction
 from app.models.scenario import ScenarioDict
+from app.models.shared_attribute import SharedAttribute
+from app.models.shared_ref import OntologySharedRef
 from app.models.skill import Skill
 from app.models.skill_tool import SkillTool
 from app.models.trace import AgentTrace
@@ -37,8 +39,6 @@ from app.models.version_components import (
     OntologyVersionAction,
     OntologyVersionFunction,
 )
-from app.models.shared_ref import OntologySharedRef
-from app.models.shared_attribute import SharedAttribute
 
 __all__ = [
     "OntologyEntity", "EntityAttribute", "EntityRelation",

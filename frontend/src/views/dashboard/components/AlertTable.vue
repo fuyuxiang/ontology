@@ -5,7 +5,7 @@
         <span style="font-size: 12px; color: #888;">未处理</span>
       </a-badge>
     </template>
-    <a-table :dataSource="alerts" :columns="columns" :pagination="false"
+    <a-table :data-source="alerts" :columns="columns" :pagination="false"
              size="small" :scroll="{ y: 320 }" row-key="id">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'level'">

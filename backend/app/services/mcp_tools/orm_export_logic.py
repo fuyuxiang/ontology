@@ -14,9 +14,8 @@ from app.models.action import EntityAction
 from app.models.entity import OntologyEntity
 from app.models.function import OntologyFunction
 from app.models.shared_ref import OntologySharedRef
-from app.services.action_executors import get_executor, run_executor_sync
+from app.services.action_executors import run_executor_sync
 from app.services.function_runtime import FunctionRuntimeExecutor
-from app.services.function_runtime.models import ExecContext
 from app.services.function_runtime.registry import FunctionRegistry
 from app.services.function_runtime.sandbox import UnifiedSandbox
 from app.services.mcp_tools.mcp_config import (

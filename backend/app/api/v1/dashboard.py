@@ -92,10 +92,10 @@ class DashboardRepository:
                 for d in datasources
             ],
             "recent_activities": [
-                {"id": l.id, "action": l.action, "target_type": l.target_type,
-                 "target_name": l.target_name, "user_name": l.user_name,
-                 "created_at": l.timestamp.isoformat() if l.timestamp else None}
-                for l in recent_logs
+                {"id": entry.id, "action": entry.action, "target_type": entry.target_type,
+                 "target_name": entry.target_name, "user_name": entry.user_name,
+                 "created_at": entry.timestamp.isoformat() if entry.timestamp else None}
+                for entry in recent_logs
             ],
         }
 

@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.core.deps import require_user
 from app.config import settings
+from app.core.deps import require_user
 from app.database import get_db
 from app.models import OntologyEntity
 from app.models.function import OntologyFunction

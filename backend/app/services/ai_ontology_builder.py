@@ -16,7 +16,7 @@ import logging
 import re
 import uuid
 from collections.abc import Generator
-from enum import Enum
+from enum import StrEnum
 
 from sqlalchemy.orm import Session
 
@@ -27,7 +27,7 @@ from app.services.ontology_constraints import build_constraint_prompt, validate_
 logger = logging.getLogger(__name__)
 
 
-class BuildPhase(str, Enum):
+class BuildPhase(StrEnum):
     SCENARIO = "scenario"
     MATERIALS = "materials"
     CLARIFY = "clarify"
@@ -338,7 +338,7 @@ class AIOntologyBuilder:
         previous_qa = ""
         if state.clarify_qa:
             qa_lines = [f"Q: {qa['question']}\nA: {qa['answer']}" for qa in state.clarify_qa]
-            previous_qa = f"\n\n## 已追问过的问题（不要重复）\n" + "\n".join(qa_lines)
+            previous_qa = "\n\n## 已追问过的问题（不要重复）\n" + "\n".join(qa_lines)
 
         resp = self._call_llm(system=prompt, user=f"请分析材料并决定是否需要追问。{previous_qa}")
         try:

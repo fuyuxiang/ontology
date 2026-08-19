@@ -7,8 +7,8 @@ import json
 import logging
 from typing import Any
 
-from app.models.function import OntologyFunction
 from app.models.action import EntityAction
+from app.models.function import OntologyFunction
 from app.models.skill import Skill
 from app.services.skill_executor import execute_skill
 

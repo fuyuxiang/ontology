@@ -1,14 +1,13 @@
 """
 文件导入服务：支持 JSON（V1.1 本体规范）和 OWL/TTL 格式
 """
-import json
 from dataclasses import dataclass, field
 
 from sqlalchemy.orm import Session
 
+from app.models.action import EntityAction
 from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.relation import EntityRelation
-from app.models.action import EntityAction
 
 
 @dataclass

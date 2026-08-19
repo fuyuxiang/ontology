@@ -110,7 +110,7 @@ class ReadPythonFileTool(MCPTool):
         if not os.path.exists(file_path):
             return {"success": False, "message": f"文件不存在: {file_path}"}
 
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
         return {"success": True, "content": content, "file_path": file_path}
 

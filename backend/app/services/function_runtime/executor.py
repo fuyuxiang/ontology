@@ -8,7 +8,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.services.function_runtime.models import ExecContext, ExecResult, FunctionMeta
+from app.services.function_runtime.models import ExecContext, ExecResult
 from app.services.function_runtime.registry import FunctionRegistry
 from app.services.function_runtime.sandbox import UnifiedSandbox
 
@@ -192,7 +192,7 @@ class FunctionRuntimeExecutor:
                 return None
             columns = result["columns"]
             row = result["rows"][0]
-            return dict(zip(columns, row))
+            return dict(zip(columns, row, strict=True))
 
         def query_objects(entity_name: str, filters: dict, limit: int = 100) -> list[dict]:
             entity_id = _resolve_entity_id(entity_name)
@@ -202,7 +202,7 @@ class FunctionRuntimeExecutor:
             if result.get("error") or not result.get("rows"):
                 return []
             columns = result["columns"]
-            return [dict(zip(columns, row)) for row in result["rows"]]
+            return [dict(zip(columns, row, strict=True)) for row in result["rows"]]
 
         def update_object(entity_name: str, record_id: str, updates: dict) -> bool:
             raise NotImplementedError("update_object 尚未实现，不支持写回操作")
@@ -214,5 +214,5 @@ class FunctionRuntimeExecutor:
         }
 
     def _read_source(self, source_path: str) -> str:
-        with open(source_path, "r", encoding="utf-8") as f:
+        with open(source_path, encoding="utf-8") as f:
             return f.read()

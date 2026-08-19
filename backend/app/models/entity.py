@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
@@ -27,9 +29,9 @@ class OntologyEntity(Base):
     created_by: Mapped[str | None] = mapped_column(String(36))
     publish_config: Mapped[dict | None] = mapped_column(JSON)
 
-    attributes: Mapped[list["EntityAttribute"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
-    actions: Mapped[list["EntityAction"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
-    functions: Mapped[list["OntologyFunction"]] = relationship(back_populates="entity", cascade="all, delete-orphan")
+    attributes: Mapped[list[EntityAttribute]] = relationship(back_populates="entity", cascade="all, delete-orphan")
+    actions: Mapped[list[EntityAction]] = relationship(back_populates="entity", cascade="all, delete-orphan")  # noqa: F821
+    functions: Mapped[list[OntologyFunction]] = relationship(back_populates="entity", cascade="all, delete-orphan")  # noqa: F821
 
 
 class EntityAttribute(Base):
@@ -48,4 +50,4 @@ class EntityAttribute(Base):
     data_status: Mapped[str] = mapped_column(String(20), default="未确认来源")
     shared_attribute_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("ontology_shared_attributes.id", ondelete="SET NULL"), nullable=True)
 
-    entity: Mapped["OntologyEntity"] = relationship(back_populates="attributes")
+    entity: Mapped[OntologyEntity] = relationship(back_populates="attributes")

@@ -49,6 +49,9 @@ const props = withDefaults(defineProps<{
   rows: 10,
   showDryRun: true,
   placeholder: 'SELECT * FROM <asset> WHERE id = :uid LIMIT :lim',
+  assetId: undefined,
+  params: undefined,
+  purpose: undefined,
 })
 
 const emit = defineEmits<{

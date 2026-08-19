@@ -464,7 +464,6 @@ class GraphEngine(NodeHandlersMixin):
             "llm-inference": self._exec_llm_inference,
             "llmAgent": self._exec_llm_inference,        # AIP 别名
             "skill": self._exec_skill,
-            "skillNode": self._exec_skill,               # AIP 别名
             "intent-recognition": self._exec_intent_recognition,
             "agent": self._exec_agent,
             "agentNode": self._exec_agent,               # AIP 别名

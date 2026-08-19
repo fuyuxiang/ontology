@@ -10,12 +10,10 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.models import OntologyEntity
 from app.services.agent.prompt_builder import build_system_prompt
 from app.services.agent.tool_router import ToolRouter
 from app.services.agent_tools import agent_tool_definitions
 from app.services.copilot import get_llm_client
-from app.services.data_plane.entity_data_service import EntityDataService
 
 logger = logging.getLogger(__name__)
 

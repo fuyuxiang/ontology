@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from datetime import datetime
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
@@ -33,4 +35,4 @@ class OntologyFunction(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    entity: Mapped["app.models.entity.OntologyEntity"] = relationship(back_populates="functions")  # type: ignore[name-defined]
+    entity: Mapped[app.models.entity.OntologyEntity] = relationship(back_populates="functions")  # noqa: F821

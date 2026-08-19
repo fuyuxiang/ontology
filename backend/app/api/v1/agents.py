@@ -520,7 +520,7 @@ def acknowledge_stale(agent_id: str, db: Session = Depends(get_db)):
         return {"message": "该 Agent 没有过期标记"}
 
     from app.models.version import OntologyVersion
-    active_version = db.query(OntologyVersion).filter(OntologyVersion.is_active == True).first()
+    active_version = db.query(OntologyVersion).filter(OntologyVersion.is_active.is_(True)).first()
     agent.ontology_stale = False
     agent.ontology_stale_detail = None
     agent.ontology_version_id = active_version.id if active_version else None

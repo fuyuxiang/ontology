@@ -18,9 +18,9 @@ from collections.abc import Generator
 from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.models.action import EntityAction
 from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.function import OntologyFunction
-from app.models.action import EntityAction
 from app.models.skill import Skill
 from app.services.agent.tool_router import ToolRouter
 from app.services.copilot import get_llm_client

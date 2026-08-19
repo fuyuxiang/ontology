@@ -4,18 +4,68 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.actions import router as actions_router
+from app.api.v1.agents import open_router as agents_open_router
+from app.api.v1.agents import router as agents_router
+from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
+from app.api.v1.ai_code import router as ai_code_router
+from app.api.v1.ai_ontology import router as ai_ontology_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.auth import seed_admin
+from app.api.v1.builder import router as builder_router
+from app.api.v1.business_documents import router as business_documents_router
+from app.api.v1.copilot import router as copilot_router
+from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.data_plane.assets import router as dp_assets_router
+from app.api.v1.data_plane.audit import router as dp_audit_router
+from app.api.v1.data_plane.compat import install as install_compat_middleware
+from app.api.v1.data_plane.connections import router as dp_connections_router
+from app.api.v1.data_plane.events import router as dp_events_router
+from app.api.v1.data_plane.execute import router as dp_execute_router
+from app.api.v1.data_plane.lineage import router as dp_lineage_router
+from app.api.v1.data_plane.mapping import router as dp_mapping_router
+from app.api.v1.data_plane.object_bindings import router as dp_bindings_router
+from app.api.v1.data_plane.probes import router as dp_probes_router
+from app.api.v1.data_plane.quality import router as dp_quality_router
+from app.api.v1.doc_builder import router as doc_builder_router
 from app.api.v1.entities import router as entities_router
+from app.api.v1.evals import router as evals_router
+from app.api.v1.functions import router as functions_router
+from app.api.v1.governance import router as governance_router
+from app.api.v1.mcp import router as mcp_router
+from app.api.v1.mcp_stats import router as mcp_stats_router
+from app.api.v1.models import router as models_router
+from app.api.v1.monitor import router as monitor_router
+from app.api.v1.ontology_api import router as ontology_api_router
+from app.api.v1.ontology_mapping import router as ontology_mapping_router
+from app.api.v1.ontology_publish import router as ontology_publish_router
+from app.api.v1.osdk import router as osdk_router
+from app.api.v1.prompt_templates import router as prompt_templates_router
+from app.api.v1.registry import router as registry_router
+from app.api.v1.relations import router as relations_router
+from app.api.v1.resolution import router as resolution_router
+from app.api.v1.scenarios import router as scenarios_router
+from app.api.v1.shared_attributes import router as shared_attrs_router
+from app.api.v1.shared_refs import router as shared_refs_router
+from app.api.v1.system_config import router as system_config_router
+from app.api.v1.traces import router as traces_router
 from app.config import settings
 from app.database import Base, SessionLocal, engine
 from app.db_compat import ensure_legacy_schema_compat
 from app.models import *  # noqa: F401,F403 — 确保所有模型注册
+from app.models.system_config import SystemConfig
+from app.services.mcp_tools import (  # noqa: F401  — 触发工具注册
+    data_query,
+    metadata,  # noqa: F401
+    orm_export_logic,
+    python_workspace,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def _seed_system_config(db):
     """初始化默认系统配置项（幂等：已存在则跳过）"""
-    from app.models.system_config import SystemConfig
     defaults = [
         # basic
         ("basic", "system_name", "本体管理平台", "系统名称"),
@@ -63,53 +113,6 @@ def _seed_system_config(db):
     if added:
         db.commit()
         logger.info(f"系统配置初始化完成：新增 {added} 项")
-
-from app.api.v1.actions import router as actions_router
-from app.api.v1.agents import open_router as agents_open_router
-from app.api.v1.agents import router as agents_router
-from app.api.v1.ai_builder_v2 import router as ai_builder_v2_router
-from app.api.v1.ai_code import router as ai_code_router
-from app.api.v1.ai_ontology import router as ai_ontology_router
-from app.api.v1.builder import router as builder_router
-from app.api.v1.business_documents import router as business_documents_router
-from app.api.v1.copilot import router as copilot_router
-from app.api.v1.dashboard import router as dashboard_router
-from app.api.v1.data_plane.assets import router as dp_assets_router
-from app.api.v1.data_plane.audit import router as dp_audit_router
-from app.api.v1.data_plane.compat import install as install_compat_middleware
-
-# ── Data Plane（M1 新增 7 个 router）──
-from app.api.v1.data_plane.connections import router as dp_connections_router
-from app.api.v1.data_plane.events import router as dp_events_router
-from app.api.v1.data_plane.execute import router as dp_execute_router
-from app.api.v1.data_plane.lineage import router as dp_lineage_router
-from app.api.v1.data_plane.mapping import router as dp_mapping_router
-from app.api.v1.data_plane.object_bindings import router as dp_bindings_router
-from app.api.v1.data_plane.probes import router as dp_probes_router
-from app.api.v1.data_plane.quality import router as dp_quality_router
-from app.api.v1.doc_builder import router as doc_builder_router
-from app.api.v1.evals import router as evals_router
-from app.api.v1.functions import router as functions_router
-from app.api.v1.governance import router as governance_router
-
-# datasources_router 已废弃，数据接入统一走 data_plane/connections + assets
-from app.api.v1.models import router as models_router
-from app.api.v1.monitor import router as monitor_router
-from app.api.v1.ontology_api import router as ontology_api_router
-from app.api.v1.ontology_mapping import router as ontology_mapping_router
-from app.api.v1.ontology_publish import router as ontology_publish_router
-from app.api.v1.osdk import router as osdk_router
-from app.api.v1.prompt_templates import router as prompt_templates_router
-from app.api.v1.registry import router as registry_router
-from app.api.v1.relations import router as relations_router
-from app.api.v1.resolution import router as resolution_router
-from app.api.v1.scenarios import router as scenarios_router
-from app.api.v1.shared_attributes import router as shared_attrs_router
-from app.api.v1.shared_refs import router as shared_refs_router
-from app.api.v1.system_config import router as system_config_router
-from app.api.v1.traces import router as traces_router
-
-logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -244,11 +247,7 @@ app.include_router(system_config_router, prefix="/api/v1")
 app.include_router(ai_code_router, prefix="/api/v1")
 
 # ── MCP 端点 ──
-from app.api.v1.mcp import router as mcp_router  # noqa: E402
-import app.services.mcp_tools as _mcp_tools_init  # noqa: E402, F401 — 触发工具注册
 app.include_router(mcp_router, prefix="/api/v1")
-
-from app.api.v1.mcp_stats import router as mcp_stats_router  # noqa: E402
 app.include_router(mcp_stats_router, prefix="/api/v1")
 
 

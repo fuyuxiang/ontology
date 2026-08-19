@@ -292,7 +292,7 @@ class EntityDataService:
             return {"error": f"资产 '{asset_name}' 未关联连接"}
         tbl = table_name or self.get_table_name(asset)
         if not tbl:
-            return {"error": f"需要提供 table_name 或资产需配置表（locator.table）"}
+            return {"error": "需要提供 table_name 或资产需配置表（locator.table）"}
         return self._conn_svc.get_table_schema(asset.connection_id, tbl)
 
     def list_assets(self, *, kind: str | None = None) -> list[dict]:

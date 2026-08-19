@@ -1,17 +1,17 @@
 <template>
   <a-drawer :open="open" :title="`新建结构化资产`" width="640"
             @update:open="(v: boolean) => emit('update:open', v)" destroy-on-close>
-    <a-tabs v-model:activeKey="kind">
+    <a-tabs v-model:active-key="kind">
       <a-tab-pane key="table" tab="表 (table)">
         <a-form layout="vertical">
           <a-form-item label="连接 *">
             <a-select v-model:value="form.connection_id" :options="connOptions"
-                      :loading="!connStore.items.length" show-search optionFilterProp="label"
+                      :loading="!connStore.items.length" show-search option-filter-prop="label"
                       @change="onConnectionChange" />
           </a-form-item>
           <a-form-item label="表名 *">
             <a-select v-model:value="form.table" :options="tableOptions" allow-clear
-                      :loading="loadingTables" show-search optionFilterProp="label" />
+                      :loading="loadingTables" show-search option-filter-prop="label" />
           </a-form-item>
           <a-form-item label="资产名称 *">
             <a-input v-model:value="form.name" placeholder="如 用户主表" />
@@ -39,7 +39,7 @@
         <a-form layout="vertical">
           <a-form-item label="基于 table 资产 *">
             <a-select v-model:value="viewForm.base_asset_id" :options="baseTableOptions"
-                      show-search optionFilterProp="label" />
+                      show-search option-filter-prop="label" />
           </a-form-item>
           <a-form-item label="资产名称 *">
             <a-input v-model:value="viewForm.name" placeholder="如 用户数量视图" />

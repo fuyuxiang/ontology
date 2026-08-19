@@ -122,7 +122,6 @@ class ToolRouter:
             relations.append({"direction": "out", "name": r.name, "target": all_entities.get(r.to_entity_id, "?"), "cardinality": r.cardinality})
         for r in rels_to:
             relations.append({"direction": "in", "name": r.name, "source": all_entities.get(r.from_entity_id, "?"), "cardinality": r.cardinality})
-        rules = []
         result = {
             "name": entity.name, "name_cn": entity.name_cn, "tier": entity.tier,
             "description": entity.description or "",
@@ -356,7 +355,7 @@ class ToolRouter:
         user_content = (
             f"## 业务上下文\n{ctx or '（无）'}\n\n"
             f"## 结构化资产 Schema\n" + ("\n\n".join(ds_blocks) or "（无）") + "\n\n"
-            f"## 非结构化资产\n" + ("\n\n".join(doc_blocks) or "（无）")
+            "## 非结构化资产\n" + ("\n\n".join(doc_blocks) or "（无）")
         )[:18000]
 
         client = get_llm_client()
@@ -372,7 +371,7 @@ class ToolRouter:
                 timeout=120,
             )
         except Exception as e:
-            return {"error": f"LLM 调用失败: {e}"}, f"LLM 调用失败", 0
+            return {"error": f"LLM 调用失败: {e}"}, "LLM 调用失败", 0
 
         text = (resp.choices[0].message.content or "").strip()
         if text.startswith("```"):

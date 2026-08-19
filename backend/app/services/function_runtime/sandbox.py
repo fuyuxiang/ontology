@@ -156,8 +156,8 @@ class UnifiedSandbox:
                 raise ValueError(f"函数 '{func_name}' not found in code")
             result = sandbox_globals[func_name](namespace.get("params", {}))
             return result
-        except _SandboxTimeout:
-            raise TimeoutError(f"函数执行超时 (>{timeout}s)")
+        except _SandboxTimeout as err:
+            raise TimeoutError(f"函数执行超时 (>{timeout}s)") from err
         finally:
             if use_alarm:
                 signal.alarm(0)

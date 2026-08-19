@@ -5,10 +5,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.entity import EntityAttribute, OntologyEntity
-from app.models.object_binding import ObjectBinding
-from app.models.function import OntologyFunction
 from app.models.action import EntityAction
+from app.models.entity import EntityAttribute, OntologyEntity
+from app.models.function import OntologyFunction
+from app.models.object_binding import ObjectBinding
 from app.models.shared_ref import OntologySharedRef
 from app.services.mcp_tools.registry import MCPTool, register
 from app.services.mcp_tools.resolve import resolve_ontology_id

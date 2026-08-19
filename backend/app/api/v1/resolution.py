@@ -229,7 +229,7 @@ def get_resolution_stats(
         None,
     )
     if not asset:
-        raise HTTPException(status_code=400, detail=f"未找到数据源")
+        raise HTTPException(status_code=400, detail="未找到数据源")
 
     exec_svc = ExecuteService(db)
 

@@ -112,35 +112,43 @@ def _parse_metadata_topics(resp: bytes) -> list[str]:
     """粗暴但够用的 MetadataResponse v1 解析（只取 topic name 列表）。"""
     pos = 4  # correlation_id
     # brokers array
-    (broker_n,) = struct.unpack_from(">i", resp, pos); pos += 4
+    (broker_n,) = struct.unpack_from(">i", resp, pos)
+    pos += 4
     for _ in range(broker_n):
         # node_id i32, host: short-string, port i32, rack: nullable short-string
         pos += 4
-        (host_len,) = struct.unpack_from(">h", resp, pos); pos += 2 + max(0, host_len)
+        (host_len,) = struct.unpack_from(">h", resp, pos)
+        pos += 2 + max(0, host_len)
         pos += 4
-        (rack_len,) = struct.unpack_from(">h", resp, pos); pos += 2
+        (rack_len,) = struct.unpack_from(">h", resp, pos)
+        pos += 2
         if rack_len > 0:
             pos += rack_len
     # controller_id i32
     pos += 4
     # topics array
-    (topic_n,) = struct.unpack_from(">i", resp, pos); pos += 4
+    (topic_n,) = struct.unpack_from(">i", resp, pos)
+    pos += 4
     out: list[str] = []
     for _ in range(topic_n):
-        (err_code,) = struct.unpack_from(">h", resp, pos); pos += 2
-        (name_len,) = struct.unpack_from(">h", resp, pos); pos += 2
+        (err_code,) = struct.unpack_from(">h", resp, pos)
+        pos += 2
+        (name_len,) = struct.unpack_from(">h", resp, pos)
+        pos += 2
         name = resp[pos:pos + name_len].decode("utf-8", errors="replace")
         pos += name_len
         # is_internal bool
         pos += 1
         # partitions array (跳过)
-        (part_n,) = struct.unpack_from(">i", resp, pos); pos += 4
+        (part_n,) = struct.unpack_from(">i", resp, pos)
+        pos += 4
         for _ in range(part_n):
             # err_code i16, partition_id i32, leader i32
             pos += 2 + 4 + 4
             # replicas / isr arrays
             for _ in range(2):
-                (n,) = struct.unpack_from(">i", resp, pos); pos += 4
+                (n,) = struct.unpack_from(">i", resp, pos)
+                pos += 4
                 pos += 4 * n
         if err_code == 0:
             out.append(name)

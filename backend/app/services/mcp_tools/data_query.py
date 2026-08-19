@@ -1,18 +1,15 @@
 """数据查询工具 — ontology_query_instances + ontology_complex_sql_execute + ontology_object_find"""
 from __future__ import annotations
 
-import re
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.asset import Asset
 from app.models.entity import EntityAttribute, OntologyEntity
-from app.models.object_binding import ObjectBinding
 from app.models.shared_ref import OntologySharedRef
 from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
-from app.services.mcp_tools.mcp_config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, MAX_RETURN_ROWS
+from app.services.mcp_tools.mcp_config import DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE
 from app.services.mcp_tools.registry import MCPTool, register
 from app.services.mcp_tools.resolve import resolve_ontology_id
 
@@ -221,7 +218,7 @@ class ComplexSqlTool(MCPTool):
             return {"error": result["error"]}
 
         columns = result["columns"]
-        items = [dict(zip(columns, row)) for row in result["rows"]]
+        items = [dict(zip(columns, row, strict=True)) for row in result["rows"]]
         return {
             "items": items,
             "page_size": page_size,

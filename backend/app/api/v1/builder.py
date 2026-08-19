@@ -580,7 +580,7 @@ async def auto_map(body: AutoMapRequest, db: Session = Depends(get_db)):
 
         # 第二层：对象名 → 表名 匹配，找出 top-N 相关表
         table_scores: list[tuple[int, float]] = []
-        for idx, (asset_id, table_name, schema) in enumerate(asset_index):
+        for idx, (_asset_id, table_name, _schema) in enumerate(asset_index):
             name_sim = _table_name_similarity(obj_label, obj.name, table_name)
             table_scores.append((idx, name_sim))
 

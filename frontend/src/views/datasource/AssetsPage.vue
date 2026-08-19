@@ -13,7 +13,7 @@
     </div>
 
     <!-- 二级 tab：结构化 / 非结构化 -->
-    <a-tabs v-model:activeKey="activeCategory" class="ap-tabs" @change="onCategoryChange">
+    <a-tabs v-model:active-key="activeCategory" class="ap-tabs" @change="onCategoryChange">
       <a-tab-pane key="all" tab="全部" />
       <a-tab-pane key="structured" tab="结构化" />
       <a-tab-pane key="unstructured" tab="非结构化" />

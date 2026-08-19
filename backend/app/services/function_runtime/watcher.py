@@ -3,8 +3,6 @@ from __future__ import annotations
 import ast
 import hashlib
 import logging
-import os
-import re
 from pathlib import Path
 
 from app.services.function_runtime.models import FunctionMeta, ParamSchema
@@ -22,8 +20,8 @@ class FunctionWatcher:
 
     def start(self) -> None:
         try:
-            from watchdog.observers import Observer
             from watchdog.events import FileSystemEventHandler
+            from watchdog.observers import Observer
 
             class _Handler(FileSystemEventHandler):
                 def __init__(self, watcher: FunctionWatcher):
@@ -58,7 +56,7 @@ class FunctionWatcher:
 
     def scan_file(self, path: str) -> list[FunctionMeta]:
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 code = f.read()
         except (OSError, UnicodeDecodeError) as e:
             logger.warning(f"Cannot read {path}: {e}")
