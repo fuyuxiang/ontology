@@ -18,8 +18,8 @@
 
     <!-- Step content -->
     <div class="ai-builder__content">
-      <StepBusinessInput v-if="step === 0" @next="onDomainSelected" />
-      <StepDomainDrill v-else-if="step === 1" :domains="selectedDomains" :business-desc="businessDesc" @next="onTablesSelected" />
+      <StepBusinessInput v-if="step === 0" @next="onBusinessEntered" />
+      <StepAssetPicker v-else-if="step === 1" :business-desc="businessDesc" @next="onTablesSelected" />
       <StepDocumentPicker v-else-if="step === 2" :business-desc="businessDesc" @next="onDocsSelected" />
       <StepExtraction v-else-if="step === 3" :table-names="selectedTables" :document-keys="selectedDocs" :business-desc="businessDesc" @next="onExtractionDone" />
       <div v-else-if="step === 4" class="ai-builder__review">
@@ -38,7 +38,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { useBuilderStore } from '../../store/builder'
 import StepBusinessInput from './components/ai/StepBusinessInput.vue'
-import StepDomainDrill from './components/ai/StepDomainDrill.vue'
+import StepAssetPicker from './components/ai/StepAssetPicker.vue'
 import StepDocumentPicker from './components/ai/StepDocumentPicker.vue'
 import StepExtraction from './components/ai/StepExtraction.vue'
 import Step2Review from './components/Step2Review.vue'
@@ -59,7 +59,6 @@ const returnPath = computed(() => {
 const steps = ['业务描述', '选择数据表', '选择文档', 'AI提取', '专家审核', '水合验证']
 const step = ref(0)
 const businessDesc = ref('')
-const selectedDomains = ref<string[]>([])
 const selectedTables = ref<string[]>([])
 const selectedDocs = ref<string[]>([])
 
@@ -68,8 +67,7 @@ const session = computed(() => {
   return sessions.value.find(s => s.buildMethod === 'chat' && s.status === 'drafting') || null
 })
 
-function onDomainSelected(payload: { domains: string[]; businessDesc: string }) {
-  selectedDomains.value = payload.domains
+function onBusinessEntered(payload: { businessDesc: string }) {
   businessDesc.value = payload.businessDesc
   step.value = 1
 }

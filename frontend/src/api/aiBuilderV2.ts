@@ -1,26 +1,17 @@
 import client from './client'
 
-export interface DomainMatchResult {
-  domains: string[]
-  reason: string
-  all_domains: string[]
-}
-
 export interface TableInfo {
+  asset_id: string
   table_name: string
   table_desc: string
-  layering: string
-  cycle: string
+  kind: string
+  domain: string | null
 }
 
 export interface FieldInfo {
   field_name: string
   field_desc: string
   field_type: string
-  field_length: string
-  is_partition: string
-  field_handle: string
-  field_source_desc: string
 }
 
 export interface DocInfo {
@@ -30,30 +21,12 @@ export interface DocInfo {
   last_modified: string | null
 }
 
-export function getDomains() {
-  return client.get<{ domains: string[] }>('/ai-builder/domains')
-}
-
-export function getSubDomains(domain1: string) {
-  return client.get<{ sub_domains: string[] }>(`/ai-builder/domains/${encodeURIComponent(domain1)}/sub-domains`)
-}
-
-export function getThemes(domain1: string, domain2: string) {
-  return client.get<{ themes: string[] }>(`/ai-builder/domains/${encodeURIComponent(domain1)}/${encodeURIComponent(domain2)}/themes`)
-}
-
-export function getTables(domain1: string, domain2: string, domain3?: string) {
-  const params: Record<string, string> = { domain1, domain2 }
-  if (domain3) params.domain3 = domain3
-  return client.get<{ tables: TableInfo[] }>('/ai-builder/tables', { params })
+export function listTables() {
+  return client.get<{ tables: TableInfo[] }>('/ai-builder/tables')
 }
 
 export function getTableSchema(tableName: string) {
   return client.get<{ table_name: string; fields: FieldInfo[] }>(`/ai-builder/tables/${encodeURIComponent(tableName)}/schema`)
-}
-
-export function matchDomain(businessDesc: string) {
-  return client.post<DomainMatchResult>('/ai-builder/match-domain', { business_desc: businessDesc })
 }
 
 export interface RecommendTablesResult {
@@ -61,12 +34,9 @@ export interface RecommendTablesResult {
   recommended: string[]
 }
 
-export function recommendTables(businessDesc: string, domains: string[], subDomains?: string[], themes?: string[]) {
+export function recommendTables(businessDesc: string) {
   return client.post<RecommendTablesResult>('/ai-builder/recommend-tables', {
     business_desc: businessDesc,
-    domains,
-    sub_domains: subDomains || [],
-    themes: themes || [],
   })
 }
 

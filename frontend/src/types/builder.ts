@@ -1,6 +1,6 @@
 // ── 本体构建器类型定义 ──
 
-export type ScenarioId = 'refund-root-cause' | 'enterprise-qa' | 'fttr-renewal' | string
+export type ScenarioId = string
 export type SceneTone = 'slate' | 'purple' | 'blue'
 
 export interface ScenarioCard {
@@ -205,7 +205,7 @@ export interface UploadRecord {
   mimeCategory: AssetCategory
 }
 
-// ── 数据源样例 ──
+// ── 数据源候选项 ──
 export interface SampleDataSource {
   id: string
   fileName: string
