@@ -1,4 +1,4 @@
-"""AI Builder V2 API — 主题域下钻式本体构建"""
+"""AI Builder V2 API — 基于已注册数据资产构建本体。"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
@@ -7,60 +7,28 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.services import ai_builder_v2, dwd_catalog, minio_docs
+from app.services import ai_builder_v2, asset_catalog, minio_docs
 
 router = APIRouter(prefix="/ai-builder", tags=["AI Builder V2"])
 
 
-@router.get("/domains")
-def list_domains(db: Session = Depends(get_db)):
-    return {"domains": dwd_catalog.get_domains(db)}
-
-
-@router.get("/domains/{domain1}/sub-domains")
-def list_sub_domains(domain1: str, db: Session = Depends(get_db)):
-    return {"sub_domains": dwd_catalog.get_sub_domains(domain1, db)}
-
-
-@router.get("/domains/{domain1}/{domain2}/themes")
-def list_themes(domain1: str, domain2: str, db: Session = Depends(get_db)):
-    return {"themes": dwd_catalog.get_themes(domain1, domain2, db)}
-
-
 @router.get("/tables")
-def list_tables(domain1: str = Query(...), domain2: str = Query(...), domain3: str = Query(None), db: Session = Depends(get_db)):
-    return {"tables": dwd_catalog.get_tables(domain1, domain2, domain3, db)}
+def list_tables(db: Session = Depends(get_db)):
+    return {"tables": asset_catalog.get_tables(db)}
 
 
 @router.get("/tables/{table_name}/schema")
 def get_table_schema(table_name: str, db: Session = Depends(get_db)):
-    return {"table_name": table_name, "fields": dwd_catalog.get_table_schema(table_name, db)}
-
-
-class MatchDomainRequest(BaseModel):
-    business_desc: str
-
-
-@router.post("/match-domain")
-def match_domain(req: MatchDomainRequest, db: Session = Depends(get_db)):
-    return ai_builder_v2.match_domain(req.business_desc, db)
+    return {"table_name": table_name, "fields": asset_catalog.get_table_schema(table_name, db)}
 
 
 class RecommendTablesRequest(BaseModel):
     business_desc: str
-    domains: list[str]
-    sub_domains: list[str] = []
-    themes: list[str] = []
 
 
 @router.post("/recommend-tables")
 def recommend_tables(req: RecommendTablesRequest, db: Session = Depends(get_db)):
-    tables = dwd_catalog.get_tables_by_domains(
-        req.domains,
-        req.sub_domains if req.sub_domains else None,
-        req.themes if req.themes else None,
-        db,
-    )
+    tables = asset_catalog.get_tables(db)
     recommended = ai_builder_v2.recommend_tables(req.business_desc, tables, db)
     return {"tables": tables, "recommended": recommended}
 
