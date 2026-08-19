@@ -17,7 +17,7 @@
             <a-input v-model:value="form.name" placeholder="如 用户主表" />
           </a-form-item>
           <a-form-item label="别名（可选，跨模块引用用）">
-            <a-input v-model:value="form.alias" placeholder="如 mnp.user_info" />
+            <a-input v-model:value="form.alias" placeholder="如 domain.user_info" />
           </a-form-item>
           <a-form-item label="领域 (domain)">
             <a-input v-model:value="form.domain" />
@@ -42,7 +42,7 @@
                       show-search optionFilterProp="label" />
           </a-form-item>
           <a-form-item label="资产名称 *">
-            <a-input v-model:value="viewForm.name" placeholder="如 mnp.user_count" />
+            <a-input v-model:value="viewForm.name" placeholder="如 用户数量视图" />
           </a-form-item>
           <a-form-item label="别名">
             <a-input v-model:value="viewForm.alias" placeholder="对应的 alias" />

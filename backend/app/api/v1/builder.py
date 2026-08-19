@@ -93,8 +93,8 @@ _EXTRACT_PROMPT = """你是本体建模专家，需要从用户提供的业务�
 - **对象**（Object）— 业务实体，如客户、订单
 - **属性**（Property）— 对象上的字段
 - **关系**（Relation）— 对象之间的关联
-- **规则**（Rule）— 业务约束，如"客户连续 3 个月不下单视为流失风险"
-- **动作**（Action）— 业务操作，如"触发挽留外呼"
+- **规则**（Rule）— 业务约束，如"订单金额必须大于零"
+- **动作**（Action）— 业务操作，如"发送审核通知"
 
 ## 输入
 你将看到一份业务文档的纯文本（可能含有表格、章节）。请通读全文，识别业务对象、属性、关系，
@@ -702,14 +702,12 @@ def suggest_columns(body: SuggestColumnsRequest, db: Session = Depends(get_db)):
     results = []
 
     for prop in body.properties:
-
-        class _FakeAttr:
-            pass
-
-        attr = _FakeAttr()
-        attr.name = prop.get("name", "")
-        attr.type = prop.get("type", "")
-        attr.description = prop.get("description", "")
+        from types import SimpleNamespace
+        attr = SimpleNamespace(
+            name=prop.get("name", ""),
+            type=prop.get("type", ""),
+            description=prop.get("description", ""),
+        )
 
         candidates = []
         for col in columns:

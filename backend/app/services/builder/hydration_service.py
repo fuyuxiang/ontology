@@ -198,6 +198,7 @@ class HydrationService:
         instantiate_status = "pass"
         total_props = 0
         matched_props = 0
+        high_confidence_props = 0
         unmatched_props: list[str] = []
 
         # 如果没有任何可用资产 schema，直接跳过逐属性匹配
@@ -218,6 +219,7 @@ class HydrationService:
         _objs_to_check = [] if _skip_instantiate else req.objects
         for obj in _objs_to_check:
             obj_matched = 0
+            obj_high_confidence = 0
             obj_total = len(obj.properties)
             total_props += obj_total
 
@@ -285,6 +287,7 @@ class HydrationService:
                                     all_columns.append(col_copy)
                     if found:
                         obj_matched += 1
+                        obj_high_confidence += 1
                         yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
                                "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} ✓"}
                         continue
@@ -295,6 +298,7 @@ class HydrationService:
                             t_cols = table_columns.get(st_lower, [])
                             if any(c.get("name") == effective_column for c in t_cols):
                                 obj_matched += 1
+                                obj_high_confidence += 1
                                 yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
                                        "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} (via {prop.source_table}) ✓"}
                                 continue
@@ -315,32 +319,33 @@ class HydrationService:
                         found_in_any = any(c.get("name") == effective_column for c in t_cols)
                     if found_in_any:
                         obj_matched += 1
+                        obj_high_confidence += 1
                         yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
                                "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} ✓"}
                         continue
-                    # 如果 schema 全空但有声明式的 source_field，信任声明
+                    # schema 为空时不能把声明式映射当作已验证结果
                     if not all_columns and (prop.source_field or prop.source_column):
-                        obj_matched += 1
-                        yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
-                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} (声明式，schema 未同步)"}
+                        unmatched_props.append(f"{obj.name}.{prop.name}")
+                        yield {"type": "phase_log", "phase": "instantiate", "level": "WARN",
+                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} (schema 未同步，无法验证)"}
                         continue
 
                 # 启发式打分找最佳匹配
                 best_score = 0.0
                 best_col = None
                 if _heuristic_score and all_columns:
-                    # 构造临时 EntityAttribute-like 对象
-                    class _FakeAttr:
+                    # 构造仅供评分使用的 EntityAttribute-like 对象
+                    class _ScoringAttr:
                         def __init__(self, p):
                             self.name = p.name
                             self.type = p.type
                             self.description = p.displayName or ""
                             self.required = p.required
 
-                    fake_attr = _FakeAttr(prop)
+                    scoring_attr = _ScoringAttr(prop)
                     for col in all_columns:
                         try:
-                            score, _ = _heuristic_score(fake_attr, col)
+                            score, _ = _heuristic_score(scoring_attr, col)
                             if score > best_score:
                                 best_score = score
                                 best_col = col
@@ -349,6 +354,8 @@ class HydrationService:
 
                 if best_score >= 0.5 and best_col:
                     obj_matched += 1
+                    if best_score >= 0.8:
+                        obj_high_confidence += 1
                     tier_label = _tier(best_score) if _tier else ("high" if best_score >= 0.8 else "medium")
                     yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
                            "msg": f"{obj.displayName or obj.name}.{prop.name}: → {best_col['name']} ({tier_label}, {best_score:.2f})"}
@@ -358,6 +365,7 @@ class HydrationService:
                            "msg": f"{obj.displayName or obj.name}.{prop.name}: 未找到匹配列"}
 
             matched_props += obj_matched
+            high_confidence_props += obj_high_confidence
             obj_status = "pass" if obj_matched == obj_total else ("warn" if obj_matched > obj_total * 0.5 else "error")
             yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
                    "msg": f"{obj.displayName or obj.name}: {obj_matched}/{obj_total} 属性映射命中"}
@@ -375,7 +383,7 @@ class HydrationService:
             "metrics": [
                 {"label": "字段映射命中", "value": f"{matched_props}/{total_props}",
                  "tone": "pass" if matched_props == total_props else "warn"},
-                {"label": "映射准确率", "value": mapping_rate,
+                {"label": "映射命中率", "value": mapping_rate,
                  "tone": "pass" if matched_props == total_props else "warn"},
                 {"label": "映射耗时", "value": f"{instantiate_elapsed}s"},
             ],
@@ -383,7 +391,7 @@ class HydrationService:
         phase_results.append({"key": "instantiate", "label": "本体实例化", "status": instantiate_status,
                               "metrics": [
                                   {"label": "字段映射命中", "value": f"{matched_props}/{total_props}"},
-                                  {"label": "映射准确率", "value": mapping_rate},
+                                  {"label": "映射命中率", "value": mapping_rate},
                                   {"label": "映射耗时", "value": f"{instantiate_elapsed}s"},
                               ]})
 
@@ -391,11 +399,12 @@ class HydrationService:
         yield {"type": "phase_progress", "phase": "match", "progress": 0.55}
         match_status = "pass"
         matched_relations = 0
+        relation_count = 0
         total_relations = len(req.relations)
 
         # 构建对象查找映射（支持 name 和 displayName 作为 key，兼容前端可能传 id 的情况）
         obj_map: dict[str, HydrateObject] = {}
-        for idx, o in enumerate(req.objects):
+        for o in req.objects:
             obj_map[o.name] = o
             if o.displayName and o.displayName not in obj_map:
                 obj_map[o.displayName] = o
@@ -470,6 +479,7 @@ class HydrationService:
                     yield {"type": "phase_log", "phase": "match", "level": "OK",
                            "msg": f"关系 {rel.displayName or rel.name}: JOIN 验证通过, 匹配 {cnt:,} 行"}
                     matched_relations += 1
+                    relation_count += cnt
                 except Exception as e:
                     yield {"type": "phase_log", "phase": "match", "level": "WARN",
                            "msg": f"关系 {rel.displayName or rel.name}: JOIN 验证失败 - {e}"}
@@ -477,20 +487,19 @@ class HydrationService:
             elif src_asset_obj and tgt_asset_obj and src_asset_obj.connection_id != tgt_asset_obj.connection_id:
                 yield {"type": "phase_log", "phase": "match", "level": "WARN",
                        "msg": f"关系 {rel.displayName or rel.name}: 跨连接跳过 JOIN 验证"}
-                matched_relations += 1  # 跨连接视为结构匹配
+                match_status = "warn"
             else:
                 yield {"type": "phase_log", "phase": "match", "level": "WARN",
                        "msg": f"关系 {rel.displayName or rel.name}: 跳过 JOIN 验证 (资产信息不完整)"}
-                matched_relations += 1
+                match_status = "warn"
 
         relation_accuracy = f"{matched_relations / total_relations * 100:.1f}%" if total_relations else "N/A"
-        relation_count = total_rows * max(1, total_relations)  # 估算关系实例数
         yield {"type": "phase_progress", "phase": "match", "progress": 0.75}
         yield {
             "type": "phase_complete", "phase": "match", "status": match_status,
             "metrics": [
                 {"label": "关系实例数", "value": f"{relation_count:,}"},
-                {"label": "关系映射准确率", "value": relation_accuracy,
+                {"label": "关系验证通过率", "value": relation_accuracy,
                  "tone": "pass" if match_status == "pass" else "warn"},
                 {"label": "匹配覆盖率", "value": f"{matched_relations}/{total_relations}",
                  "tone": "pass" if matched_relations == total_relations else "warn"},
@@ -499,7 +508,7 @@ class HydrationService:
         phase_results.append({"key": "match", "label": "关系映射验证", "status": match_status,
                               "metrics": [
                                   {"label": "关系实例数", "value": f"{relation_count:,}"},
-                                  {"label": "关系映射准确率", "value": relation_accuracy},
+                                  {"label": "关系验证通过率", "value": relation_accuracy},
                                   {"label": "匹配覆盖率", "value": f"{matched_relations}/{total_relations}"},
                               ]})
 
@@ -571,8 +580,8 @@ class HydrationService:
                            "msg": f"{obj.displayName or obj.name}.{prop.name}: 空值检查失败 - {e}"}
 
         strategy_elapsed = round(time.time() - strategy_start, 1)
-        high_confidence = matched_props
-        manual_review = total_props - matched_props
+        high_confidence = high_confidence_props
+        manual_review = total_props - high_confidence_props
         yield {"type": "phase_progress", "phase": "strategy", "progress": 1.0}
         yield {
             "type": "phase_complete", "phase": "strategy", "status": strategy_status,

@@ -10,7 +10,7 @@ from collections.abc import Generator
 from openai import OpenAI
 from sqlalchemy.orm import Session
 
-from app.services import dwd_catalog
+from app.services import asset_catalog
 
 logger = logging.getLogger(__name__)
 
@@ -63,15 +63,10 @@ def _filter_tables_prompt(ontology_summary: str, tables_text: str) -> str:
 
 
 def get_all_tables_summary(db: Session | None = None) -> list[dict]:
-    from app.services.dwd_catalog import _TABLE_LIST_ASSET_NAME, _execute, _find_asset
-    if not db:
-        return []
-    asset = _find_asset(db, _TABLE_LIST_ASSET_NAME)
-    if not asset:
-        return []
-    sql = "SELECT table_name, table_desc FROM dwd_table_list ORDER BY serial_number"
-    rows = _execute(db, asset, sql)
-    return [{"table_name": r[0], "table_desc": r[1] or ""} for r in rows]
+    return [
+        {"table_name": item["table_name"], "table_desc": item["table_desc"] or ""}
+        for item in asset_catalog.get_tables(db)
+    ]
 
 
 _MAPPING_PROMPT_TEMPLATE = """你是本体映射专家。将本体中的实体、属性、关系精确映射到数据表及字段。
@@ -119,7 +114,7 @@ _MAPPING_PROMPT_TEMPLATE = """你是本体映射专家。将本体中的实体�
 def map_entities_and_relations(ontology: dict, candidate_table_names: list[str], db: Session | None = None) -> dict:
     schemas = {}
     for tn in candidate_table_names:
-        fields = dwd_catalog.get_table_schema(tn, db)
+        fields = asset_catalog.get_table_schema(tn, db)
         schemas[tn] = [
             {"field_name": f["field_name"], "field_desc": f["field_desc"], "field_type": f["field_type"]}
             for f in fields

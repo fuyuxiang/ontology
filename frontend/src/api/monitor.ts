@@ -56,6 +56,7 @@ export interface AgentActivityResponse {
 
 export interface PlatformStatsResponse {
   total_datasources: number
+  total_rules: number
 }
 
 export interface DashboardOverview {

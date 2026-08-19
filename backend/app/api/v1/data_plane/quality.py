@@ -5,7 +5,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -263,7 +263,7 @@ def _get_entity_quality_data(db: Session, entity_id: str, svc: QualityRuleServic
             if dim_key and STATUS_RANK.get(status, 0) > STATUS_RANK.get(dim_status[dim_key], 0):
                 dim_status[dim_key] = status
 
-    score = round(pass_rules / total_rules * 100) if total_rules > 0 else 100
+    score = round(pass_rules / total_rules * 100) if total_rules > 0 else 0
     return {
         "entity_id": entity_id,
         "entity_name": entity.name,
@@ -302,7 +302,7 @@ def quality_dashboard(db: Session = Depends(get_db)):
         worst = max(data["dimensions"].values(), key=lambda s: STATUS_RANK.get(s, 0))
         summary[worst] = summary.get(worst, 0) + 1
 
-    overall_score = round(total_pass / total_rules * 100) if total_rules > 0 else 100
+    overall_score = round(total_pass / total_rules * 100) if total_rules > 0 else 0
     entities.sort(key=lambda e: e["score"])
 
     # Recent issues
@@ -342,11 +342,32 @@ def quality_dashboard(db: Session = Depends(get_db)):
             occurred_at=hs.ran_at,
         ))
 
+    # 每天每条规则只取最后一次真实评估结果，不补造缺失日期。
+    trend_rows = (
+        db.query(HS)
+        .filter(HS.ran_at >= datetime.utcnow() - timedelta(days=7))
+        .order_by(HS.ran_at.asc())
+        .all()
+    )
+    daily_latest: dict[str, dict[str, str]] = {}
+    for status in trend_rows:
+        day = status.ran_at.date().isoformat()
+        daily_latest.setdefault(day, {})[status.rule_id] = status.status
+    trend = []
+    for day, statuses_by_rule in sorted(daily_latest.items()):
+        statuses = list(statuses_by_rule.values())
+        healthy = sum(1 for status in statuses if status == "healthy")
+        trend.append({
+            "date": day,
+            "score": round(healthy / len(statuses) * 100) if statuses else 0,
+            "evaluated_rules": len(statuses),
+        })
+
     return DashboardResponse(
         overall_score=overall_score,
         summary=summary,
         entities=[DashboardEntity(**e) for e in entities],
-        trend=[],
+        trend=trend,
         recent_issues=recent_issues,
     )
 

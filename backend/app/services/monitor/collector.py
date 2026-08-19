@@ -17,10 +17,6 @@ logger = logging.getLogger(__name__)
 SERVICES = [
     {"name": "后端API", "check": "http", "url": "http://localhost:8001/api/health"},
     {"name": "数据库", "check": "db"},
-    {"name": "规则引擎", "check": "memory"},
-    {"name": "函数运行时", "check": "memory"},
-    {"name": "Agent 服务", "check": "memory"},
-    {"name": "本体引擎", "check": "memory"},
     {"name": "图数据库", "check": "neo4j"},
     {"name": "大模型网关", "check": "http", "url": "https://dashscope.aliyuncs.com"},
     {"name": "MinIO", "check": "minio"},
@@ -120,7 +116,7 @@ async def _check_service(svc: dict) -> tuple[str, str, float | None]:
         elif check == "redis":
             status, ms = await _check_redis()
         else:
-            status, ms = "healthy", None
+            raise ValueError(f"Unsupported health check: {check}")
     except Exception:
         status, ms = "unhealthy", None
     return name, status, ms

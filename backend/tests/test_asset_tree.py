@@ -37,9 +37,9 @@ def test_get_tree_groups_by_connection():
     mock_conn1.database = "biz_db"
 
     mock_conn2 = MagicMock()
-    mock_conn2.name = "数仓"
+    mock_conn2.name = "分析库"
     mock_conn2.type = "postgresql"
-    mock_conn2.database = "dw"
+    mock_conn2.database = "analytics"
 
     def mock_get(cid):
         return {"c1": mock_conn1, "c2": mock_conn2}.get(cid)

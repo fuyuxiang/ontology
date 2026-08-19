@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.core.deps import require_user
 from app.database import get_db
 from app.models import EntityAttribute, EntityRelation, OntologyEntity
+from app.models.object_binding import ObjectBinding
+from app.models.quality_rule import QualityRule
 from app.models.user import User
 from app.repositories import EntityRepository
 from app.schemas.entity import (
@@ -30,6 +32,26 @@ from app.services.audit import write_audit
 router = APIRouter(prefix="/entities", tags=["entities"])
 
 
+def _get_rule_counts(db: Session, entity_ids: list[str]) -> dict[str, int]:
+    if not entity_ids:
+        return {}
+    rows = (
+        db.query(
+            ObjectBinding.object_type_id,
+            func.count(func.distinct(QualityRule.id)),
+        )
+        .join(QualityRule, QualityRule.asset_id == ObjectBinding.asset_id)
+        .filter(
+            ObjectBinding.object_type_id.in_(entity_ids),
+            ObjectBinding.status == "active",
+            QualityRule.enabled.is_(True),
+        )
+        .group_by(ObjectBinding.object_type_id)
+        .all()
+    )
+    return {entity_id: count for entity_id, count in rows}
+
+
 @router.get("", response_model=list[EntityListItem])
 def list_entities(
     tier: int | None = None,
@@ -49,6 +71,7 @@ def list_entities(
 
     entity_ids = [e.id for e in entities]
     rel_counts = repo.get_relation_counts(entity_ids)
+    rule_counts = _get_rule_counts(db, entity_ids)
 
     result = []
     for e in entities:
@@ -59,7 +82,7 @@ def list_entities(
             relation_count=rel_counts.get(e.id, 0),
             function_count=len(e.functions),
             action_count=len(e.actions),
-            rule_count=0,
+            rule_count=rule_counts.get(e.id, 0),
             datasource_name=(e.config_json or {}).get("datasource_name"),
             scenario_codes=e.scenario_codes,
             is_shared=e.id in shared_ids,
@@ -115,6 +138,7 @@ def get_full_graph(db: Session = Depends(get_db)):
     repo = EntityRepository(db)
     entities = repo.list_with_filters()
     relations = repo.get_all_relations()
+    rule_counts = _get_rule_counts(db, [e.id for e in entities])
 
     nodes = []
     for e in entities:
@@ -123,7 +147,7 @@ def get_full_graph(db: Session = Depends(get_db)):
             id=e.id, name=e.name, name_cn=e.name_cn,
             tier=e.tier, status=e.status, relation_count=rc,
             action_count=len(e.actions),
-            rule_count=0,
+            rule_count=rule_counts.get(e.id, 0),
             function_count=len(e.functions),
         ))
 

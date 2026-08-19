@@ -10,9 +10,9 @@ const STORAGE_KEY = 'owl-editor-draft'
 function createEmptyOntology(): OwlOntology {
   return {
     id: uid('ont'),
-    iri: 'http://example.org/ontology',
+    iri: '',
     annotations: [],
-    namespaces: [{ prefix: 'ex', iri: 'http://example.org/ontology#' }],
+    namespaces: [],
     classes: [],
     objectProperties: [],
     dataProperties: [],

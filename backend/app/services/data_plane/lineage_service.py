@@ -12,11 +12,11 @@ import logging
 
 from sqlalchemy.orm import Session
 
+from app.models.action import EntityAction
 from app.models.asset import Asset
 from app.models.connection import Connection
 from app.models.entity import OntologyEntity
 from app.models.lineage_edge import LineageEdge
-from app.models.action import EntityAction
 from app.repositories.lineage_edge_repo import LineageEdgeRepository
 
 logger = logging.getLogger(__name__)
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # 仅这些 purpose 前缀会让 execution.completed 写血缘 ad-hoc 边。
 # 避免 probe.* 等"治理动作"也产生大量节点。
-LINEAGE_PURPOSE_PREFIXES = ("mnp.", "scene.", "scenes.", "action.write", "ontology.", "copilot.")
+LINEAGE_PURPOSE_PREFIXES = ("scene.", "scenes.", "action.write", "ontology.", "copilot.")
 
 
 class LineageService:

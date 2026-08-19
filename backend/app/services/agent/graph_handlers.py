@@ -214,7 +214,7 @@ class NodeHandlersMixin:
         return result.get("data", {}), result.get("summary", "skill 执行完成")
 
     def _exec_intent_recognition(self, data: dict, context: dict, question: str):
-        extract_fields = data.get("extract_fields", "churn_id")
+        extract_fields = data.get("extract_fields", "entity_id")
         prompt = (
             f"从用户输入中提取以下字段: {extract_fields}\n"
             f"用户输入: {question}\n\n"

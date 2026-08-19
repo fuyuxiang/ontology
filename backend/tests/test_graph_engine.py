@@ -64,14 +64,14 @@ def test_lookup_in_context_direct_key():
 
 def test_lookup_in_context_dotted_path():
     eng = _make_engine()
-    ctx = {"node1": {"result": {"risk": "high"}}}
-    assert eng._lookup_in_context("node1.result.risk", ctx) == "high"
+    ctx = {"node1": {"result": {"status": "active"}}}
+    assert eng._lookup_in_context("node1.result.status", ctx) == "active"
 
 
 def test_lookup_in_context_search_in_node_outputs():
     eng = _make_engine()
-    ctx = {"node1": {"churn_rate": 0.3}}
-    assert eng._lookup_in_context("churn_rate", ctx) == 0.3
+    ctx = {"node1": {"completion_rate": 0.3}}
+    assert eng._lookup_in_context("completion_rate", ctx) == 0.3
 
 
 def test_lookup_in_context_missing_returns_none():
@@ -84,8 +84,8 @@ def test_lookup_in_context_missing_returns_none():
 
 def test_resolve_template_question_placeholder():
     eng = _make_engine()
-    out = eng._resolve_template("问题是: {question}", {"question": "为什么退单"})
-    assert out == "问题是: 为什么退单"
+    out = eng._resolve_template("问题是: {question}", {"question": "为什么失败"})
+    assert out == "问题是: 为什么失败"
 
 
 def test_resolve_template_node_value():
@@ -122,4 +122,3 @@ def test_skip_subtree_marks_descendants():
     eng._skip_subtree("b", children, skipped)
     assert "b" in skipped
     assert "c" in skipped
-

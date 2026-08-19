@@ -4,7 +4,7 @@
 不存储业务行数据；只存元数据/契约/统计。
 
 kind 三种：
-- table     —— 数据仓库治理表 / 业务库的表（结构化主形态）
+- table     —— 关系数据库中的表（结构化主形态）
 - sql_view  —— 受限的参数化视图（结构化）
 - document  —— 非结构化资产，由 locator.source_type 区分 5 种形态：
               file | oss | directory | api | mq
@@ -24,7 +24,7 @@ class Asset(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     alias: Mapped[str | None] = mapped_column(String(120), unique=True)
-        # 可选短别名（业务模块迁移高频使用：mnp.user_count / scenes.bb.overview）
+        # 可选短别名（跨模块引用使用，例如 domain.asset_metric）
     description: Mapped[str | None] = mapped_column(Text)
 
     kind: Mapped[str] = mapped_column(String(20), nullable=False)
@@ -46,7 +46,7 @@ class Asset(Base):
     schema_synced_at: Mapped[datetime | None] = mapped_column(DateTime)
     primary_key: Mapped[list | None] = mapped_column(JSON, default=list)
     profile: Mapped[dict | None] = mapped_column(JSON)
-        # {"row_count":40929,"max_updated_at":"...","null_ratio":{...},"sampled_at":"..."}
+        # 保存行数、最近更新时间、空值率和采样时间等统计元数据
 
     # ── 非结构化资产用 ──
     document_source_type: Mapped[str | None] = mapped_column(String(20))

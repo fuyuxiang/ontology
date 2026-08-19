@@ -109,8 +109,8 @@ class TestEndToEnd:
         assert registry.get("factor_calc").description == "计算因子"
 
         # Write v2 with updated description
-        updated = LOGIC_CODE.replace("计算因子", "计算折损因子v2")
+        updated = LOGIC_CODE.replace("计算因子", "计算调整因子v2")
         with open(file_path, "w") as f:
             f.write(updated)
         watcher._on_file_changed(file_path)
-        assert registry.get("factor_calc").description == "计算折损因子v2"
+        assert registry.get("factor_calc").description == "计算调整因子v2"

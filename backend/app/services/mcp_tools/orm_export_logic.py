@@ -167,7 +167,7 @@ class RunLogicTool(MCPTool):
 @register
 class RunActionTool(MCPTool):
     name = "ontology_run_action"
-    description = "在对象上执行已绑定的 action（写库/改数据，高风险）。仅在用户明确授权时调用。"
+    description = "在对象上执行已绑定的 action（会写库或改数据）。仅在用户明确授权时调用。"
 
     def input_schema(self) -> dict:
         return {

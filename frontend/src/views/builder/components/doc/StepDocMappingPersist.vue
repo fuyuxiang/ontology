@@ -110,15 +110,8 @@
 
             <!-- 未注册提示 -->
             <div v-if="!selectedItem.asset_registered" class="step-persist__alert step-persist__alert--error">
-              <strong>资产未注册：</strong>该实体对应的数据资产尚未在系统中注册。
+              <strong>资产未注册：</strong>请先在数据接入页面注册并同步结构，然后重新执行映射。
               <div class="step-persist__unregistered-actions">
-                <button
-                  class="step-persist__btn step-persist__btn--sm"
-                  :class="{ 'step-persist__btn--active': registerSet.has(selectedItem.entity_name) }"
-                  @click="toggleRegister(selectedItem.entity_name)"
-                >
-                  {{ registerSet.has(selectedItem.entity_name) ? '✓ 已选择注册' : '一键注册' }}
-                </button>
                 <button
                   class="step-persist__btn step-persist__btn--sm step-persist__btn--secondary"
                   :class="{ 'step-persist__btn--active-secondary': skipSet.has(selectedItem.entity_name) }"
@@ -178,7 +171,7 @@
         </button>
       </div>
       <p v-if="hasUnhandledConflicts" class="step-persist__hint">请处理所有冲突后再继续</p>
-      <p v-else-if="hasUnhandledUnregistered" class="step-persist__hint">请对所有未注册资产选择"注册"或"跳过"</p>
+      <p v-else-if="hasUnhandledUnregistered" class="step-persist__hint">请跳过未注册资产后再继续</p>
     </template>
 
     <div v-else-if="!loading" class="step-persist__empty">暂无映射数据</div>
@@ -213,8 +206,7 @@ const selectedEntity = ref<string>('')
 
 // conflict: entity_name -> 'overwrite' | 'keep'
 const conflictActions = reactive<Record<string, 'overwrite' | 'keep'>>({})
-// unregistered: sets of entity names chosen to register or skip
-const registerSet = reactive<Set<string>>(new Set())
+// unregistered: entity names chosen to skip
 const skipSet = reactive<Set<string>>(new Set())
 
 const selectedItem = computed(() =>
@@ -249,26 +241,14 @@ const hasUnhandledConflicts = computed(() =>
 )
 
 const hasUnhandledUnregistered = computed(() =>
-  items.value.some(
-    i => !i.asset_registered && !registerSet.has(i.entity_name) && !skipSet.has(i.entity_name),
-  ),
+  items.value.some(i => !i.asset_registered && !skipSet.has(i.entity_name)),
 )
-
-function toggleRegister(name: string) {
-  if (registerSet.has(name)) {
-    registerSet.delete(name)
-  } else {
-    registerSet.add(name)
-    skipSet.delete(name)
-  }
-}
 
 function toggleSkip(name: string) {
   if (skipSet.has(name)) {
     skipSet.delete(name)
   } else {
     skipSet.add(name)
-    registerSet.delete(name)
   }
 }
 
@@ -317,8 +297,6 @@ async function onApply() {
         entity_id: i.entity_id,
         asset_id: i.asset_id,
         conflict_action: i.conflict ? (conflictActions[i.entity_name] ?? null) : null,
-        register_asset: !i.asset_registered && registerSet.has(i.entity_name),
-        table_name: i.table_name,
         field_mappings: (i.field_mappings || [])
           .filter(fm => fm.attribute_id && fm.source_column)
           .map(fm => ({ attribute_id: fm.attribute_id!, source_column: fm.source_column })),

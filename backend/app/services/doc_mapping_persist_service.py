@@ -75,16 +75,11 @@ def apply_mappings(items: list[dict], db: Session) -> dict:
         entity_id = item.get("entity_id")
         asset_id = item.get("asset_id")
         conflict_action = item.get("conflict_action")
-        register_asset = item.get("register_asset", False)
-        table_name = item.get("table_name")
         field_mappings = item.get("field_mappings", [])
 
         if not entity_id:
             skipped += 1
             continue
-
-        if register_asset and not asset_id:
-            asset_id = _register_asset(table_name, db)
 
         if not asset_id:
             skipped += 1
@@ -110,26 +105,3 @@ def apply_mappings(items: list[dict], db: Session) -> dict:
         binding_ids.append(binding.id)
 
     return {"created": created, "updated": updated, "skipped": skipped, "binding_ids": binding_ids}
-
-
-def _register_asset(table_name: str, db: Session) -> str | None:
-    if not table_name:
-        return None
-    from app.services.data_plane.asset_service import AssetService
-    svc = AssetService(db)
-    asset = svc.register(
-        name=table_name,
-        kind="table",
-        locator={"table": table_name},
-        connection_id=_get_dwd_connection_id(db),
-    )
-    return asset.id
-
-
-def _get_dwd_connection_id(db: Session) -> str | None:
-    from app.models.connection import Connection
-    conn = db.query(Connection).filter(
-        Connection.enabled == True,
-        Connection.database == "dwd",
-    ).first()
-    return conn.id if conn else None

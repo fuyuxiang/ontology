@@ -196,7 +196,7 @@
     <div v-if="showCreateDialog" class="modal-overlay" @click.self="showCreateDialog = false">
       <div class="modal-box">
         <h3>创建新版本</h3>
-        <div class="form-group"><label>版本名称</label><input v-model="newVersion.name" placeholder="如: 2024Q1 发布" /></div>
+        <div class="form-group"><label>版本名称</label><input v-model="newVersion.name" placeholder="请输入版本名称" /></div>
         <div class="form-group"><label>描述</label><textarea v-model="newVersion.description" rows="3" placeholder="可选"></textarea></div>
         <div class="modal-actions">
           <button class="btn-secondary" @click="showCreateDialog = false">取消</button>
@@ -665,7 +665,6 @@ function formatTime(iso: string) {
 .impact-dialog__tag--del { color: #dc2626; }
 .impact-dialog__tag--ren { color: #d97706; }
 </style>
-
 
 
 

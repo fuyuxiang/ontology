@@ -75,7 +75,7 @@
                 <div>中文名</div><div>英文名</div><div>类型</div><div></div>
               </div>
               <div v-for="p in selected.properties" :key="p.id" class="prop-row">
-                <input v-model="p.displayName" placeholder="例如：客户姓名" @blur="syncBlur" />
+                <input v-model="p.displayName" placeholder="中文属性名" @blur="syncBlur" />
                 <input v-model="p.name" placeholder="snake_case" @blur="syncBlur" />
                 <select v-model="p.type" @change="syncBlur">
                   <option value="string">string</option>
@@ -117,10 +117,10 @@
             </select>
           </label>
           <label>正向关系名
-            <input v-model="relForm.label" placeholder="例如：下单、持有、负责" />
+            <input v-model="relForm.label" placeholder="关系名称" />
           </label>
           <label>反向关系名
-            <input v-model="relForm.inverseLabel" placeholder="例如：被下单、归属于、被负责" />
+            <input v-model="relForm.inverseLabel" placeholder="反向关系名称" />
           </label>
           <label>基数
             <select v-model="relForm.cardinality">
@@ -160,7 +160,7 @@
     <div v-if="csvOpen" class="modal-mask" @click.self="csvOpen = false">
       <div class="modal-card">
         <div class="modal-head">批量粘贴 CSV — name,displayName,tier,description</div>
-        <textarea v-model="csvText" rows="10" placeholder="Customer,客户,1,客户主信息&#10;Order,订单,2,客户下的订单"></textarea>
+        <textarea v-model="csvText" rows="10" placeholder="在此粘贴 CSV 内容"></textarea>
         <div class="modal-actions">
           <button class="btn btn-ghost" @click="csvOpen = false">取消</button>
           <button class="btn btn-primary" @click="commitCsv">导入</button>

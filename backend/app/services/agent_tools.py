@@ -87,10 +87,10 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
     ),
     AgentToolSpec(
         name="execute_action",
-        description="执行或模拟执行一个业务动作（如携转风险评估、触发维系策略），返回执行结果和预期效果。",
+        description="执行或模拟执行一个已注册的业务动作，返回执行结果和预期效果。",
         parameters={
-            "action_name": {"type": "string", "description": "动作名称（如'触发维系策略'或英文名'TriggerRetentionStrategy'）"},
-            "params": {"type": "object", "description": "动作所需参数（如 {\"user_id\": \"123\", \"risk_level\": \"high\"}）"},
+            "action_name": {"type": "string", "description": "已注册的动作名称"},
+            "params": {"type": "object", "description": "动作所需参数"},
             "dry_run": {"type": "boolean", "description": "是否模拟执行，默认 true"},
         },
         required=("action_name",),
@@ -101,7 +101,7 @@ AGENT_TOOL_SPECS: tuple[AgentToolSpec, ...] = (
         name="list_business_datasources",
         description="列出当前可用的业务数据源（数据资产），按业务领域和关键字筛选；返回 display_card=asset_picker，前端会渲染为多选卡片让用户勾选。仅在用户描述完业务后、确认资产前调用。",
         parameters={
-            "domain": {"type": "string", "description": "业务领域，如政企、宽带、退单。可为空字符串"},
+            "domain": {"type": "string", "description": "业务领域，可为空字符串"},
             "keywords": {"type": "array", "items": {"type": "string"}, "description": "关键词列表（可选）"},
         },
         required=("domain",),

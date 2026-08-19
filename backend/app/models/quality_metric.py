@@ -1,7 +1,7 @@
 """QualityMetric — Asset 治理质量指标。
 
 由 ProbeService 触发探针后写入。前端"数据质量"页只读这张表。
-不重做数据仓库的整体质量体系，只关注本体平台关心的指标：
+不重做外部数据平台的整体质量体系，只关注本体平台关心的指标：
 - row_count / freshness_seconds / null_ratio / distinct_count / pk_uniqueness / schema_drift
 """
 from datetime import datetime

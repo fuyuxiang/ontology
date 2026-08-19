@@ -388,7 +388,7 @@ const categoryFilter = ref<string>('all')
 const capabilities = ref<Capabilities>({} as Capabilities)
 
 const CATEGORIES: { key: ConnectionCategory; label: string; glyph: string; color: string; hint: string }[] = [
-  { key: 'database',       label: '数据库',     glyph: 'DB',  color: '#3b82f6', hint: '关系数据库 / 数仓' },
+  { key: 'database',       label: '数据库',     glyph: 'DB',  color: '#3b82f6', hint: '关系数据库 / 分析库' },
   { key: 'object_storage', label: '对象存储',   glyph: 'S3',  color: '#10b981', hint: 'S3 / OSS / MinIO' },
   { key: 'file_transfer',  label: '文件传输',   glyph: 'FTP', color: '#f59e0b', hint: 'FTP / SFTP / HDFS' },
   { key: 'message_queue',  label: '消息队列',   glyph: 'MQ',  color: '#8b5cf6', hint: 'Kafka / Pulsar' },

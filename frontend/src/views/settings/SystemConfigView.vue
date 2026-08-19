@@ -140,7 +140,7 @@
         <div class="modal-form__row">
           <div class="modal-form__field">
             <label class="modal-form__label">模型名称 <span class="modal-form__required">*</span></label>
-            <a-input v-model:value="modelForm.name" placeholder="如：Claude Sonnet 4" />
+            <a-input v-model:value="modelForm.name" placeholder="模型名称" />
           </div>
           <div class="modal-form__field">
             <label class="modal-form__label">提供商</label>
@@ -149,7 +149,7 @@
         </div>
         <div class="modal-form__field">
           <label class="modal-form__label">模型 ID <span class="modal-form__required">*</span></label>
-          <a-input v-model:value="modelForm.model_id" placeholder="如：claude-sonnet-4-20250514" />
+          <a-input v-model:value="modelForm.model_id" placeholder="供应商模型 ID" />
         </div>
         <div class="modal-form__field">
           <label class="modal-form__label">API Key</label>
@@ -257,12 +257,7 @@ const providerOptions = [
 const sceneOptions = computed(() => modelScenes.value.map(s => ({ label: s.label, value: s.key })))
 function sceneLabel(key: string) { return modelScenes.value.find(s => s.key === key)?.label || key }
 
-const changeHistory = ref([
-  { user: 'admin', time: '2026-06-08 14:30', desc: '修改了「AI配置」→ 添加模型 DeepSeek V3', type: 'create' },
-  { user: 'admin', time: '2026-06-08 10:15', desc: '修改了「AI配置」→ 默认模型改为 Claude Sonnet 4', type: 'update' },
-  { user: 'admin', time: '2026-06-07 16:45', desc: '修改了「通知配置」→ SMTP 服务器已配置', type: 'create' },
-  { user: '系统', time: '2026-06-07 09:00', desc: '系统初始化：默认配置已写入', type: 'init' },
-])
+const changeHistory = ref<Array<{ user: string; time: string; desc: string; type: string }>>([])
 
 function getGroupItems(group: string): ConfigItem[] { return configData.value[group] || [] }
 function isTextField(key: string) { return ['system_name', 'local_path', 'smtp_host', 'smtp_username', 'base_url', 'webhook_url', 'smtp_from_name', 'client_id', 'redirect_uri'].some(k => key.includes(k)) }
@@ -312,7 +307,6 @@ async function handleSave(group: string) {
     await systemConfigApi.save(group, items)
     success('保存成功')
     for (const item of items) originalValues[item.key] = item.value
-    changeHistory.value.unshift({ user: 'admin', time: new Date().toLocaleString('zh-CN'), desc: `修改了「${groupList.value.find(g => g.key === group)?.label || group}」配置`, type: 'update' })
   } catch (e: any) { error(e?.response?.data?.detail || '保存失败') } finally { saving.value = false }
 }
 
@@ -359,7 +353,6 @@ async function handleSaveModel() {
     await systemConfigApi.saveAiModels(models)
     success(modelModalIsEdit.value ? '模型已更新' : '模型已添加')
     modelModalOpen.value = false; fetchAiModels()
-    changeHistory.value.unshift({ user: 'admin', time: new Date().toLocaleString('zh-CN'), desc: `${modelModalIsEdit.value ? '修改' : '添加'}了AI模型「${modelForm.name}」`, type: modelModalIsEdit.value ? 'update' : 'create' })
   } catch (e: any) { error(e?.response?.data?.detail || '保存失败') }
 }
 

@@ -54,7 +54,7 @@ export function parseOwlXml(xml: string): OwlOntology {
   const doc = parser.parseFromString(xml, 'application/xml')
   const root = doc.documentElement
 
-  const ontologyIRI = root.getAttribute('ontologyIRI') || 'http://example.org/ontology'
+  const ontologyIRI = root.getAttribute('ontologyIRI') || ''
   const versionIRI = root.getAttribute('versionIRI') || undefined
 
   const namespaces: OwlNamespace[] = []

@@ -12,7 +12,7 @@
 
 调用形态：
     ExecuteService(db).execute(ExecuteRequest(asset_id, sql, params, purpose, ...))
-    ExecuteService(db).execute_alias("mnp.user_count", {"uid":"u1"}, purpose="mnp.dashboard")
+    ExecuteService(db).execute_alias("domain.asset_metric", {"id":"value"}, purpose="domain.dashboard")
     ExecuteService(db).dry_run(...)
 """
 from __future__ import annotations
@@ -435,7 +435,7 @@ class ExecuteService:
         _cache.invalidate_prefix("")  # 简化：没有 asset 维度索引时全部清空
 
     # ── 受限"原生连接"通道（连接级 SQL，跳过 Asset 表白名单）─────────────
-    # 仅供已迁移但 SQL 高度动态的场景使用（如 broadband 大量 JOIN/UPDATE）。
+    # 仅供已迁移但 SQL 高度动态的场景使用。
     # 仍走：AST / 参数化 / 限流 / 审计 / 脱敏 / 凭据加密。
     # 与 execute() 的区别：白名单从"Asset locator"放宽到"Connection 内任意表"，
     # 适合那些 SQL 高度动态、不便于全部抽为 sql_view 的业务。

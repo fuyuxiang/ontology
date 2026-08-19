@@ -173,7 +173,7 @@ function fillTestTemplate() {
   const tmpl: Record<string, any> = {}
   for (const p of form.value.input_params) {
     if (!p.name) continue
-    const defaults: Record<string, any> = { number: 0, boolean: false, json: {}, date: '2026-01-01', string: '' }
+    const defaults: Record<string, any> = { number: 0, boolean: false, json: {}, date: new Date().toISOString().slice(0, 10), string: '' }
     tmpl[p.name] = defaults[p.type] ?? ''
   }
   testInput.value = JSON.stringify(tmpl, null, 2)

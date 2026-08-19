@@ -165,7 +165,7 @@ class UnifiedSandbox:
 
 
 def _build_ontology_runtime_shim(call_function=None, ontology_helpers=None):
-    """Build a fake ontology_runtime module for sandbox execution."""
+    """Build an isolated ontology_runtime module for sandbox execution."""
     import types
     shim = types.ModuleType("ontology_runtime")
 

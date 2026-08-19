@@ -56,21 +56,21 @@ class TestOntologyAttribute:
 class TestOntologyEntity:
     def test_valid_entity(self):
         entity = OntologyEntity(
-            name="BroadbandOrder",
-            name_cn="宽带订单",
+            name="ServiceRequest",
+            name_cn="服务请求",
             tier=2,
-            description="宽带业务订单",
+            description="通用服务请求",
             attributes=[
                 OntologyAttribute(name="order_id", display_name="订单号", type="string", required=True, description="唯一标识")
             ],
         )
-        assert entity.name == "BroadbandOrder"
+        assert entity.name == "ServiceRequest"
 
     def test_invalid_name_not_pascal_case(self):
         with pytest.raises(ValidationError):
             OntologyEntity(
-                name="broadband_order",
-                name_cn="宽带订单",
+                name="service_request",
+                name_cn="服务请求",
                 tier=2,
                 description="desc",
                 attributes=[
@@ -81,8 +81,8 @@ class TestOntologyEntity:
     def test_empty_attributes(self):
         with pytest.raises(ValidationError):
             OntologyEntity(
-                name="BroadbandOrder",
-                name_cn="宽带订单",
+                name="ServiceRequest",
+                name_cn="服务请求",
                 tier=2,
                 description="desc",
                 attributes=[],
@@ -171,7 +171,7 @@ class TestBuildConstraintPrompt:
         assert "T2" in prompt
         assert "T3" in prompt
 
-    def test_contains_telecom_knowledge(self):
+    def test_contains_domain_knowledge(self):
         # 平台层不预置具体领域知识；传入 domain_knowledge 时应写入 prompt
         prompt = build_constraint_prompt(domain_knowledge="用户在配置里录入的领域知识")
         assert "用户在配置里录入的领域知识" in prompt

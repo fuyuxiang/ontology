@@ -105,8 +105,6 @@ export interface MappingApplyItem {
   entity_id: string | null
   asset_id: string | null
   conflict_action: 'overwrite' | 'keep' | null
-  register_asset: boolean
-  table_name: string | null
   field_mappings: Array<{ attribute_id: string; source_column: string | null }>
 }
 

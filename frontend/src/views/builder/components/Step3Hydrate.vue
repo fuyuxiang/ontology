@@ -35,7 +35,7 @@
         </div>
         <div class="step3-success-stat">
           <div class="num">{{ drillResult?.attributionAccuracy || 'N/A' }}</div>
-          <div class="label">映射准确率</div>
+          <div class="label">映射命中率</div>
         </div>
       </div>
       <div class="step3-success__cta">

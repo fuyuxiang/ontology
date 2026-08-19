@@ -75,8 +75,6 @@ class MappingApplyItem(BaseModel):
     entity_id: str | None = None
     asset_id: str | None = None
     conflict_action: str | None = None
-    register_asset: bool = False
-    table_name: str | None = None
     field_mappings: list[dict] = []
 
 

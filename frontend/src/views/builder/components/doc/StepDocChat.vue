@@ -36,7 +36,7 @@
       </div>
 
       <div class="step-chat__input-area">
-        <textarea class="step-chat__input" v-model="userInput" placeholder="输入修正指令，如：把客户实体拆分为个人客户和企业客户..." rows="2" @keydown.enter.ctrl="sendMessage" :disabled="streaming"></textarea>
+        <textarea class="step-chat__input" v-model="userInput" placeholder="输入修正指令..." rows="2" @keydown.enter.ctrl="sendMessage" :disabled="streaming"></textarea>
         <div class="step-chat__actions">
           <button class="step-chat__btn" :disabled="!userInput.trim() || streaming" @click="sendMessage">发送</button>
           <button class="step-chat__btn step-chat__btn--confirm" :disabled="!latestOntology || streaming" @click="emit('next', latestOntology!)">

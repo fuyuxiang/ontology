@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import Agent, OntologyEntity
 from app.models.asset import Asset
+from app.models.quality_rule import QualityRule
 from app.models.skill import Skill
 from app.repositories.monitor_repo import MonitorRepository
 from app.schemas.monitor import (
@@ -155,7 +156,7 @@ def get_platform_stats(db: Session = Depends(get_db)):
     ) or 0
     return PlatformStatsResponse(
         total_datasources=total_datasources,
-        total_rules=0,
+        total_rules=db.scalar(select(func.count(QualityRule.id))) or 0,
     )
 
 

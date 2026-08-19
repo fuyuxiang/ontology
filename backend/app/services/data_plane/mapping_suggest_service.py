@@ -77,8 +77,6 @@ ZH_HINTS: dict[str, list[str]] = {
     "费用": ["fee", "amount", "cost"],
     "订单": ["order"],
     "工单": ["ticket", "order", "wo"],
-    "携入": ["mnp_in", "port_in", "in"],
-    "携出": ["mnp_out", "port_out", "out"],
     "渠道": ["channel"],
     "工程师": ["engineer"],
     "回访": ["callback", "feedback"],

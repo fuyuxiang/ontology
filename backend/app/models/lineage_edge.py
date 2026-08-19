@@ -1,7 +1,7 @@
 """LineageEdge — 本体侧血缘边。
 
 血缘范围严格限定在：Asset → ObjectType → Action 这一段。
-不画上游（Connection→Asset 是 Asset 自身属性，不写边；数据仓库内部 ETL 不可见，不越界）。
+不画上游（Connection→Asset 是 Asset 自身属性，不写边；外部系统内部链路不可见，不越界）。
 不画下游平台外资源。
 
 source_kind / target_kind 取值：asset | object_type | action | rule

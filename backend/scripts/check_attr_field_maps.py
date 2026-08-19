@@ -9,7 +9,7 @@
 - 仅对带 schema_snapshot 的 Asset 才有意义；无 snapshot 的明确标注
 
 执行（工作目录 backend/）：
-    python -m scripts.check_attr_field_maps --entity InstallChurn   # 单个对象
+    python -m scripts.check_attr_field_maps --entity ServiceRecord  # 单个对象
     python -m scripts.check_attr_field_maps --all                   # 扫所有有 snapshot 的对象
     python -m scripts.check_attr_field_maps --all --json           # 结构化输出
 """
@@ -165,7 +165,7 @@ def _print_text(results: list[dict[str, Any]]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="对比 EntityAttribute 与 Asset.schema_snapshot")
-    parser.add_argument("--entity", help="单个本体对象 name（如 InstallChurn）")
+    parser.add_argument("--entity", help="单个本体对象 name（如 ServiceRecord）")
     parser.add_argument("--all", action="store_true", help="扫所有有 binding 的对象")
     parser.add_argument("--json", action="store_true", help="输出结构化 JSON")
     args = parser.parse_args()

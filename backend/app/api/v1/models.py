@@ -94,10 +94,12 @@ def test_model(mid: str, db: Session = Depends(get_db)):
     m = db.get(ModelRegistry, mid)
     if not m:
         raise HTTPException(404, "Model not found")
+    if not m.api_key:
+        return {"ok": False, "error": "API key is not configured"}
     try:
         from openai import OpenAI
         client = OpenAI(
-            api_key=m.api_key or "sk-placeholder",
+            api_key=m.api_key,
             base_url=m.api_base or "https://api.openai.com/v1",
         )
         cfg = m.config_json or {}

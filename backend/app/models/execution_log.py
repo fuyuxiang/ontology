@@ -24,7 +24,7 @@ class ExecutionLog(Base):
         String(36), ForeignKey("connections.id", ondelete="SET NULL"), index=True
     )
     purpose: Mapped[str] = mapped_column(String(80), nullable=False)
-        # 必填：mnp.dashboard / scene.bb.list / builder.preview / probe.null_ratio / action.write
+        # 必填：domain.dashboard / scene.list / builder.preview / probe.null_ratio / action.write
     sql_hash: Mapped[str] = mapped_column(String(64), nullable=False)
         # sha256(sql + sorted(params))
     sql_preview: Mapped[str] = mapped_column(Text, default="")

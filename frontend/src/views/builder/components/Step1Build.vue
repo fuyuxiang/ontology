@@ -144,7 +144,7 @@ const draft = ref<DraftPayload | null>(null)
 const selectedDsIds = ref<string[]>([])
 const selectedDocIds = ref<string[]>([])
 
-const placeholder = computed(() => '描述你想构建本体的业务场景（例如：政企客户经营）...')
+const placeholder = computed(() => '描述你想构建本体的业务场景...')
 
 const draftObjectsForCanvas = computed<OntologyObjectDraft[]>(() => {
   if (!draft.value) return []

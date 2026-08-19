@@ -40,7 +40,7 @@ def test_merge_mapping_into_ontology():
         "entities": [
             {
                 "name": "Customer",
-                "table": "dwd_crm_customer",
+                "table": "entity_records",
                 "confidence": 0.92,
                 "properties": [
                     {"name": "customerName", "field": "cust_name", "fieldType": "varchar", "confidence": 0.95},
@@ -54,9 +54,9 @@ def test_merge_mapping_into_ontology():
                 "source": "Order",
                 "target": "Customer",
                 "sourceField": "cust_id",
-                "sourceTable": "dwd_order_main",
+                "sourceTable": "related_records",
                 "targetField": "id",
-                "targetTable": "dwd_crm_customer",
+                "targetTable": "entity_records",
                 "confidence": 0.88,
             }
         ],
@@ -64,12 +64,12 @@ def test_merge_mapping_into_ontology():
 
     result = _merge_mapping_into_ontology(ontology, mapping)
 
-    assert result["entities"][0]["table"] == "dwd_crm_customer"
+    assert result["entities"][0]["table"] == "entity_records"
     assert result["entities"][0]["confidence"] == 0.92
     assert result["entities"][0]["properties"][0]["field"] == "cust_name"
     assert result["entities"][0]["properties"][1]["field"] == "mobile"
     assert result["relations"][0]["sourceField"] == "cust_id"
-    assert result["relations"][0]["targetTable"] == "dwd_crm_customer"
+    assert result["relations"][0]["targetTable"] == "entity_records"
     assert result["relations"][0]["confidence"] == 0.88
 
 
@@ -95,25 +95,25 @@ def test_map_ontology_stream_success(mock_map, mock_client, mock_tables):
     from app.services.ontology_mapping_service import map_ontology_stream
 
     mock_tables.return_value = [
-        {"table_name": "dwd_crm_customer", "table_desc": "客户主表"},
+        {"table_name": "entity_records", "table_desc": "实体记录表"},
     ]
 
     mock_resp = MagicMock()
     mock_resp.choices = [MagicMock()]
     mock_resp.choices[0].message.content = json.dumps({
-        "candidates": [{"entity": "Customer", "tables": ["dwd_crm_customer"]}]
+        "candidates": [{"entity": "Customer", "tables": ["entity_records"]}]
     })
     mock_client.return_value.chat.completions.create.return_value = mock_resp
 
     mock_map.return_value = {
-        "entities": [{"name": "Customer", "table": "dwd_crm_customer", "confidence": 0.9, "properties": []}],
+        "entities": [{"name": "Customer", "table": "entity_records", "confidence": 0.9, "properties": []}],
         "relations": [],
     }
 
     events = list(map_ontology_stream(SAMPLE_ONTOLOGY))
     result_events = [e for e in events if "result" in e]
     assert len(result_events) == 1
-    assert "dwd_crm_customer" in result_events[0]
+    assert "entity_records" in result_events[0]
 
 
 @patch("app.services.ontology_mapping_service.get_all_tables_summary")

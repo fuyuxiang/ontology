@@ -297,7 +297,6 @@ const TOOL_META: Record<string, [ToolStage, string]> = {
   list_rules: ['logic', '读取本体规则'],
   evaluate_rule: ['logic', '评估规则'],
   evaluate_all_rules: ['logic', '评估全部规则'],
-  screen_users_by_rule: ['logic', '按规则筛查'],
   // 执行动作：有副作用的业务动作
   execute_action: ['action', '执行动作'],
   ontology_run_action: ['action', '执行动作函数'],
@@ -331,7 +330,6 @@ function stepTarget(step: ThinkStep): string {
     case 'entity_detail':
       return d.entity_cn || d.entity || ''
     case 'evaluate_single':
-    case 'screen':
       return d.rule_name || ''
     case 'action':
       return d.action_name || ''
@@ -387,10 +385,6 @@ function stepFacts(step: ThinkStep): { label: string; value: string }[] {
     case 'evaluate_single':
       out.push({ label: '规则', value: d.rule_name || '' })
       out.push({ label: '结果', value: `${d.triggered ? '触发' : '未触发'}（命中 ${d.matched_count}/${d.total_count}）` })
-      break
-    case 'screen':
-      if (d.risk_level) out.push({ label: '风险', value: d.risk_level })
-      if (d.matched_users != null) out.push({ label: '命中人数', value: `${d.matched_users}` })
       break
     case 'action':
       out.push({ label: '结果', value: d.success ? '成功' : '失败' })
