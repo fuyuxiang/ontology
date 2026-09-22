@@ -11,6 +11,7 @@ bcrypt==4.0.*
 python-multipart==0.0.*
 redis==5.2.*
 openai>=1.0
+httpx==0.28.*
 neo4j==5.27.*
 rdflib>=7.0
 boto3>=1.34

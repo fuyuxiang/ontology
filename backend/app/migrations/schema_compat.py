@@ -13,6 +13,11 @@ def _get_cols(inspector, table: str) -> set:
     return {c["name"] for c in inspector.get_columns(table)}
 
 
+def _supports_alter_column_set_default(conn) -> bool:
+    """PostgreSQL / MySQL / MariaDB accept ALTER COLUMN ... SET DEFAULT; SQLite does not."""
+    return conn.dialect.name in ("postgresql", "mysql", "mariadb")
+
+
 def _migrate_rename_schema_json(conn, inspector, tables):
     for tbl in ("ontology_entities", "ontology_version_entities"):
         if tbl in tables:
@@ -173,7 +178,7 @@ def _migrate_ontology_functions(conn, inspector, tables):
         _add.append("ALTER TABLE ontology_functions ADD COLUMN tags JSON")
     if "is_derived_property" not in cols:
         _add.append("ALTER TABLE ontology_functions ADD COLUMN is_derived_property TINYINT NOT NULL DEFAULT 0")
-    else:
+    elif _supports_alter_column_set_default(conn):
         _add.append("ALTER TABLE ontology_functions ALTER COLUMN is_derived_property SET DEFAULT 0")
     if "entity_ids" not in cols:
         _add.append("ALTER TABLE ontology_functions ADD COLUMN entity_ids JSON")
