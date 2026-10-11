@@ -34,6 +34,7 @@ class GraphEngine(NodeHandlersMixin):
         model_config: dict | None = None,
         emit_node_io: bool = False,
         runtime_executor=None,
+        runtime_context: dict | None = None,
     ):
         self.db = db
         self.nodes = {n["id"]: n for n in nodes_json}
@@ -41,10 +42,21 @@ class GraphEngine(NodeHandlersMixin):
         self.system_prompt = system_prompt
         self.model_name = model_name or settings.LLM_MODEL
         self.model_config = model_config or {}
-        self._tool_router = ToolRouter(db, runtime_executor=runtime_executor)
+        self._runtime_executor = runtime_executor
+        self._runtime_context = runtime_context
+        if runtime_context is not None:
+            if not model_name:
+                from app.services.llm_resolver import get_model_name
+                self.model_name = get_model_name(db, scene="agent")
+            from app.services.agent.managed_runtime import ManagedToolRouter
+            self._tool_router = ManagedToolRouter(db, runtime_context, runtime_executor)
+        else:
+            self._tool_router = ToolRouter(db, runtime_executor=runtime_executor)
         self._client = get_llm_client(
             api_key=self.model_config.get("api_key"),
             api_base=self.model_config.get("api_base"),
+            db=db,
+            scene="agent",
         )
         # 当 True 时，每个节点会额外 yield 结构化的 node_started/node_finished/node_failed 事件，
         # 包含输入/输出/耗时等真实数据，给 AIP 场景执行落库使用
@@ -56,8 +68,11 @@ class GraphEngine(NodeHandlersMixin):
     def run(self, question: str) -> Generator[dict, None, None]:
         """按拓扑排序执行画布节点，yield SSE 事件"""
         topo_order = self._topological_sort()
-        if not topo_order:
-            yield {"type": "content", "content": "画布为空或存在循环依赖，无法执行。"}
+        if not topo_order or (self._runtime_context is not None and len(topo_order) != len(self.nodes)):
+            if self._runtime_context is not None:
+                yield {"type": "error", "message": "画布为空或存在循环依赖，无法执行。"}
+            else:
+                yield {"type": "content", "content": "画布为空或存在循环依赖，无法执行。"}
             yield {"type": "done", "suggestions": []}
             return
 
@@ -81,9 +96,9 @@ class GraphEngine(NodeHandlersMixin):
                 }
 
             # Skill nodes with streaming support: yield per-step events
-            if ntype == "skill" and data.get("skill_id"):
+            if self._runtime_context is None and ntype == "skill" and data.get("skill_id"):
                 skill = self.db.get(Skill, data["skill_id"])
-                if skill and has_skill_stream(skill.code_ref):
+                if skill and skill.skill_type not in ("instruction", "instructions") and has_skill_stream(skill.code_ref):
                     input_mapping = data.get("input_mapping", {})
                     params = {}
                     for param_name, source in input_mapping.items():
@@ -130,9 +145,9 @@ class GraphEngine(NodeHandlersMixin):
                     continue
 
             # Agent nodes with streaming skill: yield per-step events then LLM post-process
-            if ntype == "agent" and data.get("skill_id"):
+            if self._runtime_context is None and ntype == "agent" and data.get("skill_id"):
                 skill = self.db.get(Skill, data["skill_id"])
-                if skill and has_skill_stream(skill.code_ref):
+                if skill and skill.skill_type not in ("instruction", "instructions") and has_skill_stream(skill.code_ref):
                     # Resolve params from upstream context
                     params = {}
                     input_mapping = data.get("input_mapping", {})
@@ -188,7 +203,13 @@ class GraphEngine(NodeHandlersMixin):
 
             failed = False
             try:
-                result, summary = self._execute_node(ntype, data, context, question)
+                if self._runtime_context is not None and ntype in ("agent", "agentNode", "llm-inference", "llmAgent"):
+                    result, summary = yield from self._exec_agent_loop(node_id, data, context, node_started_at)
+                else:
+                    result, summary = self._execute_node(ntype, data, context, question)
+                if self._runtime_context is not None:
+                    yield from self._managed_node_events(result, node_id)
+                    self._raise_managed_failure(result)
                 context[node_id] = result
             except Exception as e:
                 logger.error(f"节点 {node_id} ({ntype}) 执行失败: {e}")
@@ -197,14 +218,20 @@ class GraphEngine(NodeHandlersMixin):
                 context[node_id] = result
                 failed = True
 
-            tool_runs.append({"tool": f"[{label}]", "arguments": {"node_type": ntype}, "summary": summary, "resultCount": 1})
-            yield {"type": "tool_result", "tool": f"[{label}]", "summary": summary, "resultCount": 1, "detail": None}
+            tool_runs.append({"tool": f"[{label}]", "arguments": {"node_type": ntype}, "summary": summary,
+                              "resultCount": int(not failed), "success": not failed})
+            yield {"type": "tool_result", "tool": f"[{label}]", "summary": summary,
+                   "resultCount": int(not failed), "detail": None, "result": result}
             self._record_node_io(node_id, ntype, label, data, result, summary, node_started_at, status="failed" if failed else "success")
             if self.emit_node_io:
                 if failed:
                     yield self._make_node_failed_event(node_id, ntype, label, result.get("error", summary), node_started_at)
                 else:
                     yield self._make_node_finished_event(node_id, ntype, label, result, summary, node_started_at)
+            if failed and self._runtime_context is not None:
+                yield {"type": "error", "message": summary, "node_id": node_id}
+                yield {"type": "done", "suggestions": [], "actions": []}
+                return
 
         if tool_runs:
             yield {"type": "tool_summary", "toolRuns": tool_runs}
@@ -223,6 +250,9 @@ class GraphEngine(NodeHandlersMixin):
         self.emit_node_io = True
         if not self.nodes:
             yield {"type": "scene_failed", "error": "画布为空"}
+            return
+        if self._runtime_context is not None and len(self._topological_sort()) != len(self.nodes):
+            yield {"type": "scene_failed", "error": "画布存在循环依赖，无法执行"}
             return
 
         context: dict[str, Any] = {
@@ -290,10 +320,15 @@ class GraphEngine(NodeHandlersMixin):
 
             try:
                 # Agent 节点特殊处理：使用 ReAct Loop
-                if ntype in ("agentNode",) and self._should_use_agent_loop(data):
+                managed_agent = self._runtime_context is not None and ntype in ("agent", "agentNode", "llm-inference", "llmAgent")
+                if managed_agent or (ntype == "agentNode" and self._should_use_agent_loop(data)):
                     result, summary = yield from self._exec_agent_loop(node_id, data, context, node_started_at)
                 else:
                     result, summary = self._execute_node(ntype, data, context, "")
+
+                if self._runtime_context is not None:
+                    yield from self._managed_node_events(result, node_id)
+                    self._raise_managed_failure(result)
 
                 context[node_id] = result
                 self._record_node_io(node_id, ntype, label, data, result, summary, node_started_at, status="success")
@@ -311,7 +346,7 @@ class GraphEngine(NodeHandlersMixin):
                 self._record_node_io(node_id, ntype, label, data, err, str(e), node_started_at, status="failed")
                 yield self._make_node_failed_event(node_id, ntype, label, str(e), node_started_at)
                 executed.add(node_id)
-                if data.get("on_error", "continue") == "stop":
+                if self._runtime_context is not None or data.get("on_error", "continue") == "stop":
                     yield {"type": "scene_failed", "failed_node": node_id, "error": str(e)}
                     return
 
@@ -369,7 +404,7 @@ class GraphEngine(NodeHandlersMixin):
 
     def _should_use_agent_loop(self, data: dict) -> bool:
         """判断 Agent 节点是否应使用 ReAct loop（有绑定本体类型或 skill）。"""
-        return bool(data.get("objectTypes")) or bool(data.get("skill_ids"))
+        return getattr(self, "_runtime_context", None) is not None or bool(data.get("objectTypes")) or bool(data.get("skill_ids"))
     def _record_node_io(
         self, node_id: str, ntype: str, label: str,
         input_data: dict, output_data: Any, summary: str,
@@ -456,6 +491,8 @@ class GraphEngine(NodeHandlersMixin):
         return order
 
     def _execute_node(self, ntype: str, data: dict, context: dict, question: str) -> tuple[Any, str]:
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._execute_managed_node(ntype, data, context, question)
         handlers = {
             "ontology-query": self._exec_ontology_query,
             "ontologyQuery": self._exec_ontology_query,  # AIP 别名
@@ -521,6 +558,13 @@ class GraphEngine(NodeHandlersMixin):
     # ── 辅助方法 ──────────────────────────────────────
 
     def _generate_final_answer(self, context: dict, question: str) -> str:
+        if getattr(self, "_runtime_context", None) is not None:
+            # An Agent node already generated a scoped answer. Do not run a second
+            # unscoped model which could describe simulations as completed writes.
+            for value in reversed(list(context.values())):
+                if isinstance(value, dict) and value.get("answer"):
+                    return value["answer"]
+            return json.dumps(self._collect_final_output(context), ensure_ascii=False, default=str)
         upstream = self._collect_upstream_data(context)
         messages = []
         if self.system_prompt:

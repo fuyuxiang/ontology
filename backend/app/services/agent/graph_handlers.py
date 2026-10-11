@@ -81,6 +81,8 @@ class NodeHandlersMixin:
 
     def _exec_agent_loop(self, node_id: str, data: dict, context: dict, started_at: float):
         """执行 Agent ReAct loop，yield 事件，返回 (result, summary)。"""
+        if getattr(self, "_runtime_context", None) is not None:
+            return (yield from self._managed_agent_steps(data, context, context.get("question", ""), node_id=node_id))
         from app.services.agent.node_agent_loop import AgentNodeRunner
 
         # 收集挂载的 skill/tool ID（从子节点边获取）
@@ -97,6 +99,11 @@ class NodeHandlersMixin:
                 skill_ids.append(child_data["skill_id"])
             elif child_type == "toolNode" and child_data.get("tool_id"):
                 tool_ids.append(child_data["tool_id"])
+
+        for skill_id in skill_ids:
+            skill = self.db.get(Skill, skill_id)
+            if skill and skill.skill_type in ("instruction", "instructions"):
+                raise ValueError("业务指引技能必须通过已授权运行时加载")
 
         node_data = {**data, "skill_ids": skill_ids, "tool_ids": tool_ids}
         runner = AgentNodeRunner(
@@ -131,6 +138,159 @@ class NodeHandlersMixin:
         summary = f"Agent 推理完成 ({len(rounds_info)} 轮)"
         return result, summary
 
+    def _execute_managed_node(self, ntype: str, data: dict, context: dict, question: str):
+        """Managed canvas nodes cannot enter the legacy effectful handlers."""
+        if ntype in {"datasource", "notification", "httpCall", "write-back", "writebackOntology", "action", "actionSystem"}:
+            return self._exec_managed_action(data, context, question)
+        if ntype == "function":
+            return self._exec_managed_function(data, context, question)
+        if ntype == "skill":
+            return self._exec_managed_skill(data, context, question)
+        if ntype in {"agent", "agentNode", "llm-inference", "llmAgent"}:
+            return self._exec_managed_agent(data, context, question)
+        safe_handlers = {
+            "ontology-query": self._exec_ontology_query, "ontologyQuery": self._exec_ontology_query,
+            "ontology-relation": self._exec_ontology_relation,
+            "intent-recognition": self._exec_intent_recognition, "output": self._exec_output,
+            "condition": self._exec_condition, "loop": self._exec_loop, "merge": self._exec_merge,
+            "parallel": self._exec_parallel, "human-approval": self._exec_human_approval,
+            "variable-assign": self._exec_variable_assign, "api-response": self._exec_api_response,
+            "memoryNode": self._exec_passthrough, "toolNode": self._exec_passthrough,
+            "skillNode": self._exec_passthrough, "input": self._exec_passthrough,
+            "start": self._exec_passthrough, "end": self._exec_output,
+        }
+        handler = safe_handlers.get(ntype)
+        if not handler:
+            return {"error": f"节点类型 {ntype} 未提供授权执行方式"}, "节点执行被拒绝"
+        return handler(data, context, question)
+
+    def _managed_params(self, data: dict, context: dict) -> dict:
+        params = data.get("params") or data.get("_mapped_input") or {}
+        if not isinstance(params, dict):
+            raise ValueError("能力参数必须为对象")
+        def resolve(value):
+            if isinstance(value, str):
+                return self._resolve_template(value, context)
+            if isinstance(value, dict):
+                return {k: resolve(v) for k, v in value.items()}
+            if isinstance(value, list):
+                return [resolve(v) for v in value]
+            return value
+        return resolve(params)
+
+    def _exec_managed_action(self, data: dict, context: dict, question: str):
+        action_id = data.get("action_id")
+        if not action_id:
+            name = data.get("action_name")
+            matches = [a["id"] for a in self._tool_router.actions.values() if a["name"] == name] if name else []
+            if len(matches) == 1:
+                action_id = matches[0]
+        if not action_id:
+            return {"error": "此节点必须显式映射到当前授权范围内已发布的 Action"}, "直接外部调用或写操作被拒绝"
+        result, summary, _ = self._tool_router.execute("run_action", {
+            "action_id": action_id, "params": self._managed_params(data, context)})
+        return result, summary
+
+    def _exec_managed_function(self, data: dict, context: dict, question: str):
+        function_id = data.get("function_id") or data.get("func_id")
+        if not function_id:
+            return {"error": "必须指定当前授权范围内的 Function"}, "未指定授权函数"
+        result, summary, _ = self._tool_router.execute("run_function", {
+            "function_id": function_id, "params": self._managed_params(data, context)})
+        return result, summary
+
+    def _exec_managed_skill(self, data: dict, context: dict, question: str):
+        skill_id = data.get("skill_id")
+        skill = self._tool_router.skills.get(skill_id)
+        if not skill:
+            return {"error": "技能未在当前应用发布配置中挂载"}, "技能加载被拒绝"
+        requested = data.get("version") or data.get("skill_version")
+        if requested is not None and requested != skill.get("version"):
+            return {"error": "画布技能版本与固定挂载版本不一致"}, "技能版本不匹配"
+        result, summary, _ = self._tool_router.execute("load_skill", {"skill_id": skill_id})
+        return result, summary
+
+    def _managed_agent_steps(self, data: dict, context: dict, question: str, node_id=None):
+        """Use the same scoped Agent runtime as regular chat, streaming real calls."""
+        from app.services.agent.orchestrator import AgentService
+        requested_skills = list(data.get("skill_ids") or [])
+        if data.get("skill_id"):
+            requested_skills.append(data["skill_id"])
+        if node_id:
+            for edge in self.edges:
+                child = self.nodes.get(edge.get("target"), {})
+                if edge.get("source") == node_id and child.get("type") == "skillNode":
+                    skill_id = (child.get("data") or {}).get("skill_id")
+                    if skill_id:
+                        requested_skills.append(skill_id)
+        if not set(requested_skills).issubset(self._tool_router.skills):
+            raise ValueError("画布请求了未挂载的业务技能")
+        types = data.get("objectTypes") or []
+        if not isinstance(types, list) or not set(types).issubset(self._tool_router.entities):
+            raise ValueError("画布请求了当前授权范围以外的业务对象")
+        prefix = "\n\n".join(p for p in (self.system_prompt,
+            data.get("system_prompt"), data.get("agent_prompt"), data.get("prompt")) if isinstance(p, str) and p)
+        service = AgentService(self.db, system_prompt_prefix=prefix or None,
+            model_name=self.model_name, model_config=self.model_config,
+            runtime_executor=self._runtime_executor, runtime_context=self._runtime_context)
+        mapped = data.get("_mapped_input") or context.get("input_params") or {}
+        question = question or context.get("question") or "请根据上游数据完成当前业务任务"
+        upstream = self._collect_upstream_data(context)
+        if mapped:
+            question += "\n任务输入：" + json.dumps(mapped, ensure_ascii=False, default=str)
+        if upstream != "无上游数据":
+            question += "\n上游节点结果：" + upstream
+        answer_parts, final_answer, tool_runs = [], "", []
+        for event in service.ask(question):
+            event = dict(event)
+            event["node_id"] = node_id
+            event_type = event.get("type")
+            if event_type == "error":
+                raise RuntimeError(event.get("message") or "Agent 执行失败")
+            if event_type == "content":
+                answer_parts.append(event.get("content", ""))
+            elif event_type == "answer":
+                final_answer = event.get("content", "")
+            elif event_type == "tool_summary":
+                tool_runs = event.get("toolRuns") or []
+                yield event
+            elif event_type != "done":
+                yield event
+        final_answer = final_answer or "".join(answer_parts)
+        if not final_answer:
+            raise RuntimeError("Agent 未产生有效业务回答")
+        result = {"answer": final_answer, "tool_runs": tool_runs}
+        return result, f"授权 Agent 执行完成 ({len(tool_runs)} 次工具调用)"
+
+    def _exec_managed_agent(self, data: dict, context: dict, question: str):
+        # Synchronous direct handler callers still receive the complete trace;
+        # run/run_for_scene use the streaming variant above.
+        iterator = self._managed_agent_steps(data, context, question)
+        events = []
+        while True:
+            try:
+                events.append(next(iterator))
+            except StopIteration as finished:
+                result, summary = finished.value
+                result["_managed_events"] = events
+                return result, summary
+
+    @staticmethod
+    def _managed_node_events(result, node_id):
+        if not isinstance(result, dict):
+            return
+        for event in result.pop("_managed_events", []):
+            yield {**event, "node_id": node_id}
+        if result.get("skill_loaded"):
+            yield {"type": "skill_load", **result["skill_loaded"], "node_id": node_id}
+        if result.get("pending_action"):
+            yield {"type": "action_pending", **result["pending_action"], "node_id": node_id}
+
+    @staticmethod
+    def _raise_managed_failure(result):
+        if isinstance(result, dict) and (result.get("error") or result.get("success") is False):
+            raise RuntimeError(str(result.get("error") or result.get("message") or "授权能力执行失败"))
+
     def _exec_ontology_query(self, data: dict, context: dict, question: str):
         entity_type = data.get("ontology_type", "")
         if not entity_type:
@@ -145,6 +305,8 @@ class NodeHandlersMixin:
     # PLACEHOLDER_MORE_HANDLERS
 
     def _exec_datasource(self, data: dict, context: dict, question: str):
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_action(data, context, question)
         sql = data.get("sql", "")
         if not sql:
             return {"info": "未配置 SQL"}, "未配置 SQL"
@@ -160,6 +322,8 @@ class NodeHandlersMixin:
         return result, summary
 
     def _exec_llm_inference(self, data: dict, context: dict, question: str):
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_agent(data, context, question)
         prompt_template = data.get("prompt", "")
         if not prompt_template:
             prompt_template = "根据以下信息回答用户问题：\n\n上下文：{upstream}\n\n问题：{question}"
@@ -184,12 +348,16 @@ class NodeHandlersMixin:
             return {"error": str(e)}, f"LLM 调用失败: {e}"
 
     def _exec_skill(self, data: dict, context: dict, question: str):
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_skill(data, context, question)
         skill_id = data.get("skill_id", "")
         if not skill_id:
             return {"error": "未配置 skill"}, "未配置 skill"
         skill = self.db.get(Skill, skill_id)
         if not skill:
             return {"error": f"Skill {skill_id} 不存在"}, "Skill 不存在"
+        if skill.skill_type in ("instruction", "instructions"):
+            return {"error": "业务指引技能必须通过已授权运行时加载"}, "技能类型不支持旧执行器"
 
         input_mapping = data.get("input_mapping", {})
         params = {}
@@ -246,6 +414,8 @@ class NodeHandlersMixin:
 
     def _exec_agent(self, data: dict, context: dict, question: str):
         """Agent 节点：接收上游参数，调度绑定的 skill，对结果做 LLM 加工"""
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_agent(data, context, question)
         skill_id = data.get("skill_id", "")
         if not skill_id:
             return {"error": "Agent 节点未绑定技能"}, "未绑定技能"
@@ -253,6 +423,8 @@ class NodeHandlersMixin:
         skill = self.db.get(Skill, skill_id)
         if not skill:
             return {"error": f"Skill {skill_id} 不存在"}, "Skill 不存在"
+        if skill.skill_type in ("instruction", "instructions"):
+            return {"error": "业务指引技能必须通过已授权运行时加载"}, "技能类型不支持旧执行器"
 
         # Build params from upstream context (intent-recognition output)
         params = {}
@@ -385,6 +557,8 @@ class NodeHandlersMixin:
         return {"merged": True}, "分支合并完成"
 
     def _exec_notification(self, data: dict, context: dict, question: str):
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_action(data, context, question)
         notify_type = data.get("notify_type") or data.get("actionType") or "sms"
         target = data.get("target") or data.get("targetObjectType") or ""
         msg = data.get("message", "")
@@ -411,6 +585,8 @@ class NodeHandlersMixin:
 
     def _exec_action(self, data: dict, context: dict, question: str):
         """AIP action 节点：调用 EntityAction 的 ActionExecutor."""
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_action(data, context, question)
         action_id = data.get("action_id") or ""
         action_name = data.get("action_name") or data.get("apiName") or ""
         params = dict(data.get("params") or {})
@@ -447,6 +623,8 @@ class NodeHandlersMixin:
 
     def _exec_function(self, data: dict, context: dict, question: str):
         """AIP function 节点：调用 OntologyFunction（表达式 / Python 体）."""
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_function(data, context, question)
         func_id = data.get("function_id") or data.get("func_id") or ""
         if not func_id:
             return {"error": "未指定 function_id"}, "未指定函数"
@@ -483,6 +661,8 @@ class NodeHandlersMixin:
         """真正把上游数据写回本体实例表。
         data: { target_ontology / targetObjectType, operation: create/update/upsert, mapping: {col: srcRef} }
         """
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_action(data, context, question)
         target = data.get("target_ontology") or data.get("targetObjectType") or ""
         if not target:
             return {"error": "未指定写回对象"}, "未指定写回对象"
@@ -541,6 +721,8 @@ class NodeHandlersMixin:
         """HTTP 调用节点：调用外部 API。
         data: { url, method, headers, body, timeout }
         """
+        if getattr(self, "_runtime_context", None) is not None:
+            return self._exec_managed_action(data, context, question)
         import requests
         url = data.get("url", "")
         if not url:

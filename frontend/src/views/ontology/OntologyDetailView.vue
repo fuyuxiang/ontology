@@ -52,6 +52,9 @@
           <a class="detail-nav__item" :class="{ active: activeTab === 'graph' }" @click="activeTab = 'graph'">
             <span class="detail-nav__icon">🕸️</span> 本体图谱
           </a>
+          <a class="detail-nav__item" :class="{ active: activeTab === 'application-references' }" @click="activeTab = 'application-references'">
+            <span class="detail-nav__icon">◎</span> 应用引用
+          </a>
 
           <div class="detail-nav__section">更多</div>
           <a class="detail-nav__item" :class="{ active: activeTab === 'shared-attrs' }" @click="activeTab = 'shared-attrs'">
@@ -299,6 +302,8 @@
           </div>
         </div>
 
+        <OntologyApplicationReferences v-else-if="activeTab === 'application-references' && scenario" :ontology-id="scenario.id" />
+
         <!-- 其他 tab 占位 -->
         <div v-else class="tab-placeholder">
           <p class="text-caption">{{ activeTabLabel }} — 开发中</p>
@@ -321,6 +326,7 @@ import FunctionsView from '../logic/FunctionsView.vue'
 import ActionsView from '../logic/ActionsView.vue'
 import EntityAttrPanel from './EntityAttrPanel.vue'
 import SemanticCanvas from '../builder/components/graph/SemanticCanvas.vue'
+import OntologyApplicationReferences from '../skills/OntologyApplicationReferences.vue'
 
 const vClickOutside = {
   mounted(el: any, binding: any) {
@@ -1126,5 +1132,18 @@ watch(activeTab, (tab) => {
 
 .graph-container :deep(.canvas-wrap) {
   height: 100%;
+}
+@media (max-width: 768px) {
+  .ontology-detail { margin: -16px -12px; height: auto; min-height: 100%; }
+  .ontology-detail__topbar { flex-wrap: wrap; height: auto; padding: 12px; gap: 10px; }
+  .ontology-detail__title { min-width: 0; overflow-wrap: anywhere; }
+  .ontology-detail__actions { flex-wrap: wrap; gap: 6px; }
+  .ontology-detail__body { flex-direction: column; }
+  .ontology-detail__sidebar { width: 100%; min-width: 0; border-right: 0; border-bottom: 1px solid #e2e8f0; }
+  .detail-nav { display: flex; overflow-x: auto; padding: 8px; gap: 4px; }
+  .detail-nav__section { display: none; }
+  .detail-nav__item { flex: 0 0 auto; white-space: nowrap; padding: 8px 10px; }
+  .ontology-detail__content { padding: 16px 12px; min-width: 0; }
+  .overview-stats, .overview-info-grid, .overview-tables { grid-template-columns: 1fr; }
 }
 </style>

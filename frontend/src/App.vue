@@ -46,6 +46,7 @@ onMounted(() => {
 }
 .app-main {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -55,5 +56,8 @@ onMounted(() => {
   overflow-y: auto;
   background: var(--neutral-50);
   padding: 24px 32px;
+}
+@media (max-width: 768px) {
+  .app-content { padding: 16px 12px; }
 }
 </style>

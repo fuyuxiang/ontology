@@ -41,6 +41,12 @@ const router = createRouter({
     { path: '/agent/manage/new', name: 'agent-new', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '新建智能体' } },
     { path: '/agent/manage/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
 
+    { path: '/skills', name: 'skills-list', component: () => import('../views/skills/SkillsListView.vue'), meta: { title: '业务技能' } },
+    { path: '/skills/new', name: 'skill-new', component: () => import('../views/skills/SkillDetailView.vue'), meta: { title: '新建业务技能' } },
+    { path: '/skills/:id', name: 'skill-detail', component: () => import('../views/skills/SkillDetailView.vue'), meta: { title: '技能详情' } },
+    { path: '/agent/skills', redirect: '/skills' },
+    { path: '/agent/skills/:id', redirect: to => `/skills/${to.params.id}` },
+
     // 运维与安全中心
     { path: '/ops/config', name: 'ops-config', component: () => import('../views/settings/SystemConfigView.vue'), meta: { title: '系统配置' } },
 

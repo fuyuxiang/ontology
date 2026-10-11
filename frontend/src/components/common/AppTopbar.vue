@@ -39,6 +39,8 @@ const initial = computed(() => userName.value.charAt(0).toUpperCase())
 
 const breadcrumbs = computed(() => {
   const title = route.meta.title as string | undefined
+  if (route.path.startsWith('/skills')) return route.name === 'skills-list' ? [{ label: '本体应用' }, { label: '业务技能' }] : [{ label: '本体应用' }, { label: '业务技能', path: '/skills' }, { label: title || '技能详情' }]
+  if (route.path.startsWith('/agent/manage')) return route.name === 'agent-manage' ? [{ label: '本体应用' }, { label: '智能体应用' }] : [{ label: '本体应用' }, { label: '智能体应用', path: '/agent/manage' }, { label: title || '智能体详情' }]
   if (title) return [{ label: title }]
   return [{ label: '首页' }]
 })
@@ -99,5 +101,13 @@ const breadcrumbs = computed(() => {
   font-size: 13px;
   font-weight: 500;
   color: var(--neutral-700);
+}
+@media (max-width: 768px) {
+  .topbar { padding: 0 12px 0 52px; gap: 8px; }
+  .topbar__left { min-width: 0; flex: 1; overflow: hidden; }
+  .topbar__left :deep(.ontology-breadcrumb) { min-width: 0; white-space: nowrap; overflow: hidden; font-size: 11px; }
+  .topbar__left :deep(.ontology-breadcrumb__item) { min-width: 0; flex-shrink: 1; text-overflow: ellipsis; overflow: hidden; }
+  .topbar__user-name, .topbar__icon-btn, .topbar__divider { display: none; }
+  .topbar__user { padding: 4px; }
 }
 </style>

@@ -1,5 +1,9 @@
 <template>
-  <aside class="sidebar">
+  <button v-if="isMobile" ref="mobileToggle" class="sidebar-mobile-toggle" type="button" :aria-expanded="mobileOpen" aria-controls="platform-navigation" :aria-label="mobileOpen ? '关闭导航' : '打开导航'" @click="toggleMobileNavigation">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path v-if="mobileOpen" d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path v-else d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </button>
+  <button v-if="isMobile && mobileOpen" class="sidebar-mobile-overlay" aria-label="关闭导航菜单" @click="closeMobileNavigation"></button>
+  <aside id="platform-navigation" ref="sidebarElement" class="sidebar" :class="{ 'sidebar--mobile-open': mobileOpen }" :inert="isMobile && !mobileOpen ? true : undefined" :aria-hidden="isMobile && !mobileOpen ? true : undefined">
     <div class="sidebar__logo">
       <img src="/images/ontology/BONC.png" alt="BONC" class="sidebar__logo-img" />
       <span class="sidebar__logo-divider"></span>
@@ -55,10 +59,21 @@
 </template>
 
 <script setup lang="ts">
-import { reactive } from 'vue'
+import { reactive, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
+const isMobile = ref(window.innerWidth <= 768)
+const mobileOpen = ref(false)
+const mobileToggle = ref<HTMLButtonElement | null>(null)
+const sidebarElement = ref<HTMLElement | null>(null)
+function resizeNavigation() { isMobile.value = window.innerWidth <= 768; if (!isMobile.value) mobileOpen.value = false }
+function closeMobileNavigation() { mobileOpen.value = false; nextTick(() => mobileToggle.value?.focus()) }
+function toggleMobileNavigation() { if (mobileOpen.value) closeMobileNavigation(); else { mobileOpen.value = true; nextTick(() => sidebarElement.value?.querySelector<HTMLAnchorElement>('.sidebar__item')?.focus()) } }
+function navigationKey(event: KeyboardEvent) { if (!isMobile.value || !mobileOpen.value) return; if (event.key === 'Escape') { event.preventDefault(); closeMobileNavigation() }; if (event.key === 'Tab') { const links = sidebarElement.value?.querySelectorAll<HTMLAnchorElement>('a.sidebar__item'); if (!links?.length) return; const first = links[0]; const last = links[links.length - 1]; if (event.shiftKey && document.activeElement === first) { event.preventDefault(); mobileToggle.value?.focus() } else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); mobileToggle.value?.focus() } else if (document.activeElement === mobileToggle.value) { event.preventDefault(); (event.shiftKey ? last : first)?.focus() } } }
+watch(() => route.path, () => { if (isMobile.value) mobileOpen.value = false })
+onMounted(() => { window.addEventListener('resize', resizeNavigation); document.addEventListener('keydown', navigationKey) })
+onBeforeUnmount(() => { window.removeEventListener('resize', resizeNavigation); document.removeEventListener('keydown', navigationKey) })
 
 interface NavItem {
   path: string
@@ -125,6 +140,7 @@ const navGroups: NavGroup[] = [
   ]},
   { label: '本体应用', items: [
     { path: '/agent/manage', label: '智能体应用', icon: ico.agent },
+    { path: '/skills', label: '业务技能', icon: ico.rule },
   ]},
 ]
 </script>
@@ -257,5 +273,14 @@ const navGroups: NavGroup[] = [
   height: 1px;
   background: var(--sidebar-border);
   margin: 8px 12px;
+}
+.sidebar-mobile-toggle { display: none; }
+@media (max-width: 768px) {
+  .sidebar { position: fixed; inset: 0 auto 0 0; width: 240px; min-width: 240px; height: 100vh; height: 100dvh; z-index: 1100; transform: translateX(-100%); transition: transform 180ms ease; background: var(--sidebar-bg, #fff); box-shadow: 8px 0 32px rgba(15, 23, 42, .14); }
+  .sidebar--mobile-open { transform: translateX(0); }
+  .sidebar__logo { padding-right: 48px; }
+  .sidebar-mobile-toggle { display: flex; align-items: center; justify-content: center; position: fixed; top: 12px; left: 12px; width: 32px; height: 32px; background: #fff; color: #334155; border: 1px solid #e2e8f0; border-radius: 6px; z-index: 1110; cursor: pointer; }
+  .sidebar-mobile-overlay { position: fixed; inset: 0; z-index: 1090; background: rgba(15, 23, 42, .3); border: 0; padding: 0; }
+  .sidebar--mobile-open .sidebar__logo { padding-top: 58px; }
 }
 </style>

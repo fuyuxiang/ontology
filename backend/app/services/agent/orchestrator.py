@@ -28,16 +28,28 @@ class AgentService:
         model_name: str | None = None,
         model_config: dict | None = None,
         runtime_executor=None,
+        runtime_context: dict | None = None,
     ):
         self.db = db
         self._system_prompt_prefix = system_prompt_prefix
         self._model_name = model_name or settings.LLM_MODEL
         self._model_config = model_config or {}
+        self._runtime_context = runtime_context
+        if runtime_context and "api_key" in self._model_config and not self._model_config["api_key"]:
+            raise ValueError("所选模型尚未配置有效凭证，请在模型设置中完成配置")
+        if not model_name:
+            from app.services.llm_resolver import get_model_name
+            self._model_name = get_model_name(db, scene="agent")
         self.client = get_llm_client(
             api_key=self._model_config.get("api_key"),
             api_base=self._model_config.get("api_base"),
+            db=db, scene="agent",
         )
-        self._tool_router = ToolRouter(db, runtime_executor=runtime_executor)
+        if runtime_context:
+            from app.services.agent.managed_runtime import ManagedToolRouter
+            self._tool_router = ManagedToolRouter(db, runtime_context, runtime_executor)
+        else:
+            self._tool_router = ToolRouter(db, runtime_executor=runtime_executor)
 
     # ── public ──────────────────────────────────────────────
 
@@ -53,7 +65,7 @@ class AgentService:
             yield {"type": "answer", "content": "请输入您的问题。", "suggestions": []}
             return
 
-        system_prompt = build_system_prompt(self.db, entity_id, None)
+        system_prompt = self._tool_router.system_prompt() if self._runtime_context else build_system_prompt(self.db, entity_id, None)
         if self._system_prompt_prefix:
             system_prompt = self._system_prompt_prefix + "\n\n" + system_prompt
         messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
@@ -64,7 +76,7 @@ class AgentService:
                 messages.append({"role": role, "content": content})
         messages.append({"role": "user", "content": question})
         tool_runs: list[dict[str, Any]] = []
-        tool_defs = agent_tool_definitions()
+        tool_defs = self._tool_router.definitions() if self._runtime_context else agent_tool_definitions()
 
         temperature = self._model_config.get("temperature", 0)
 
@@ -74,22 +86,24 @@ class AgentService:
         prev_tool_signature: str | None = None
         repeat_count = 0
 
-        for _round in range(self.MAX_TOOL_ROUNDS):
+        max_rounds = self._runtime_context.get("max_tool_rounds", self.MAX_TOOL_ROUNDS) if self._runtime_context else self.MAX_TOOL_ROUNDS
+        for _round in range(max_rounds):
             # 最后一轮预留给强制作答，避免跑满后只能扔一句道歉、丢弃已查数据
-            if _round == self.MAX_TOOL_ROUNDS - 1:
+            if _round == max_rounds - 1:
                 force_answer = True
             try:
+                options = {"tools": tool_defs, "tool_choice": "none" if force_answer else "auto"} if tool_defs else {}
                 stream = self.client.chat.completions.create(
                     model=self._model_name,
                     messages=messages,
-                    tools=tool_defs,
-                    tool_choice="none" if force_answer else "auto",
+                    **options,
                     temperature=temperature,
                     max_tokens=self._model_config.get("max_tokens", 4096),
                     stream=True,
                 )
             except Exception as e:
                 logger.error(f"LLM 调用失败: {e}")
+                yield {"type": "error", "message": f"AI 服务调用失败: {e}"}
                 yield {"type": "answer", "content": f"AI 服务调用失败: {e}", "suggestions": []}
                 return
 
@@ -124,6 +138,7 @@ class AgentService:
                                 emitted_len = len(answer_so_far)
             except Exception as e:
                 logger.error(f"LLM 流式读取失败: {e}")
+                yield {"type": "error", "message": f"AI 服务调用失败: {e}"}
                 yield {"type": "answer", "content": f"AI 服务调用失败: {e}", "suggestions": []}
                 return
 
@@ -171,21 +186,32 @@ class AgentService:
 
             for tc in ordered:
                 tool_name = tc["name"]
+                parse_error = None
                 try:
                     tool_args = json.loads(tc["arguments"] or "{}")
                 except json.JSONDecodeError:
                     tool_args = {}
+                    parse_error = "工具参数不是有效 JSON，请重新构造参数"
 
                 yield {"type": "tool_start", "tool": tool_name, "arguments": tool_args}
 
-                result, summary, result_count = self._tool_router.execute(tool_name, tool_args)
+                if parse_error:
+                    result, summary, result_count = {"error": parse_error}, parse_error, 0
+                else:
+                    result, summary, result_count = self._tool_router.execute(tool_name, tool_args)
                 detail = self._extract_tool_detail(tool_name, tool_args, result)
+                if isinstance(result, dict):
+                    if result.get("skill_loaded"):
+                        yield {"type": "skill_load", **result["skill_loaded"]}
+                    if result.get("pending_action"):
+                        yield {"type": "action_pending", **result["pending_action"]}
 
                 tool_runs.append({
                     "tool": tool_name,
                     "arguments": tool_args,
                     "summary": summary,
                     "resultCount": result_count,
+                    "success": not (isinstance(result, dict) and (result.get("error") or result.get("success") is False)),
                 })
 
                 yield {
@@ -194,6 +220,7 @@ class AgentService:
                     "summary": summary,
                     "resultCount": result_count,
                     "detail": detail,
+                    "result": result,
                 }
 
                 messages.append({
@@ -202,6 +229,7 @@ class AgentService:
                     "content": json.dumps(result, ensure_ascii=False, default=str),
                 })
 
+        yield {"type": "error", "message": "推理轮次已达上限，运行未完成"}
         yield {"type": "content", "content": "抱歉，推理轮次已达上限，请尝试简化问题。"}
         yield {"type": "done", "suggestions": []}
 

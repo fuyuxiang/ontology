@@ -47,6 +47,7 @@ from app.api.v1.resolution import router as resolution_router
 from app.api.v1.scenarios import router as scenarios_router
 from app.api.v1.shared_attributes import router as shared_attrs_router
 from app.api.v1.shared_refs import router as shared_refs_router
+from app.api.v1.skills import router as skills_router
 from app.api.v1.system_config import router as system_config_router
 from app.api.v1.traces import router as traces_router
 from app.config import settings
@@ -60,6 +61,7 @@ from app.services.mcp_tools import (  # noqa: F401  — 触发工具注册
     orm_export_logic,
     python_workspace,
 )
+from app.services.skill_test_runner import run_skill_case
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +191,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.state.skill_test_runner = run_skill_case
+
 _cors_origins = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()] if settings.CORS_ORIGINS else ["http://localhost:5173"]
 app.add_middleware(
     CORSMiddleware,
@@ -211,6 +215,7 @@ app.include_router(scenarios_router, prefix="/api/v1")
 app.include_router(models_router, prefix="/api/v1")
 app.include_router(agents_router, prefix="/api/v1")
 app.include_router(agents_open_router, prefix="/api/v1")
+app.include_router(skills_router, prefix="/api/v1")
 app.include_router(resolution_router, prefix="/api/v1")
 app.include_router(governance_router, prefix="/api/v1")
 app.include_router(prompt_templates_router, prefix="/api/v1")

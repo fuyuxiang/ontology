@@ -1,1253 +1,1288 @@
 <template>
-  <div class="agent-detail">
-    <!-- Top bar -->
-    <div class="agent-detail__topbar">
-      <div class="agent-detail__topbar-left">
-        <button class="agent-detail__btn agent-detail__btn--ghost" @click="router.push('/agent/manage')">
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          返回
-        </button>
-        <span class="agent-detail__divider"></span>
-        <input
-          class="agent-detail__name-input"
-          v-model="form.name"
-          placeholder="未命名智能体"
-        />
-        <span class="agent-detail__status-tag" :class="statusClass">
-          {{ current?.status === 'published' ? '已发布' : '草稿' }}
-        </span>
-        <span class="agent-detail__dirty" v-if="isDirty">
-          <svg width="6" height="6" viewBox="0 0 6 6"><circle cx="3" cy="3" r="3" fill="#f59e0b"/></svg>
-          未保存
-        </span>
-      </div>
-      <div class="agent-detail__topbar-right">
-        <button class="agent-detail__btn" @click="saveAgent" :disabled="saving">
-          {{ saving ? '保存中...' : '保存' }}
-        </button>
-        <button class="agent-detail__btn agent-detail__btn--primary" @click="publishAgent" v-if="current && current.status === 'draft'">
-          发布
-        </button>
-        <button class="agent-detail__btn agent-detail__btn--danger" @click="unpublishAgent" v-if="current && current.status === 'published'">
-          下线
-        </button>
-      </div>
-    </div>
-
-    <!-- Ontology stale banner -->
-    <div v-if="current?.ontology_stale" class="agent-detail__stale-banner">
-      <span class="agent-detail__stale-icon">⚠</span>
-      <span class="agent-detail__stale-text">该 Agent 依赖的本体实体已发生变更</span>
-      <button class="agent-detail__stale-btn" @click="showStaleDetail = !showStaleDetail">查看变更</button>
-      <button class="agent-detail__stale-btn agent-detail__stale-btn--ack" @click="ackStale">确认已知</button>
-    </div>
-    <div v-if="showStaleDetail && current?.ontology_stale_detail" class="agent-detail__stale-detail">
-      <ul>
-        <li v-for="c in current.ontology_stale_detail.breaking_changes" :key="c.entity_name">
-          <strong>{{ c.entity_name }}</strong> —
-          <span v-if="c.change_type === 'deleted'">已删除</span>
-          <span v-else>改名为 {{ c.new_name }}</span>
-        </li>
-      </ul>
-    </div>
-
-    <!-- Body: left form + right chat -->
-    <div class="agent-detail__body">
-      <!-- Left: Config form -->
-      <div class="agent-detail__left">
-        <div class="agent-detail__form-group">
-          <label class="agent-detail__label">描述</label>
-          <textarea class="agent-detail__textarea" v-model="form.description" rows="2" placeholder="智能体描述"></textarea>
+  <div class="aw" @keydown.esc="drawer = null">
+    <div v-if="loading" class="aw-empty">正在加载智能体配置…</div>
+    <template v-else>
+      <header class="aw-header">
+        <div class="aw-row">
+          <button class="aw-icon" aria-label="返回智能体列表" @click="router.push('/agent/manage')">
+            ←
+          </button>
+          <h1>{{ form.name || '未命名智能体' }}</h1>
+          <span class="aw-pill aw-amber">编辑草稿</span
+          ><span v-if="current?.current_version" class="aw-pill aw-green"
+            >{{ current.status === 'published' ? '在线' : '最近发布' }} v{{
+              current.current_version
+            }}</span
+          ><small class="aw-muted">{{ isDirty ? '未保存 · 待验证' : '已保存' }}</small>
         </div>
-        <div class="agent-detail__form-group">
-          <label class="agent-detail__label">关联本体</label>
-          <select class="agent-detail__select" v-model="selectedOntologyId" @change="onOntologyChange">
-            <option value="">请选择本体</option>
-            <option v-for="s in scenarioStore.scenarios" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
-        </div>
-        <div class="agent-detail__form-group agent-detail__form-group--grow">
-          <label class="agent-detail__label">系统提示词</label>
-          <textarea class="agent-detail__textarea agent-detail__textarea--tall" v-model="form.system_prompt" placeholder="系统提示词"></textarea>
-        </div>
-      </div>
-
-      <!-- Right: Chat test -->
-      <div class="agent-detail__right">
-        <div class="agent-detail__chat-header">
-          <span class="agent-detail__chat-title">对话测试</span>
-          <select
-            class="agent-detail__conv-select"
-            v-if="!isNew && current"
-            :value="activeConversationId || ''"
-            :disabled="streaming"
-            @change="selectConversation(($event.target as HTMLSelectElement).value)"
+        <div class="aw-row">
+          <button class="aw-button" :disabled="saving || chatBusy || !canEdit" @click="saveAgent">
+            {{ saving ? '保存中…' : '保存草稿' }}</button
+          ><button
+            class="aw-button aw-primary"
+            :disabled="!current || chatBusy || !canEdit"
+            @click="drawer = 'publish'"
           >
-            <option value="" disabled>选择会话</option>
-            <option v-for="c in conversations" :key="c.id" :value="c.id">{{ c.title }}</option>
-          </select>
-          <button
-            class="agent-detail__btn agent-detail__btn--ghost"
-            @click="newConversation"
-            :disabled="!current || isNew || streaming"
-          >+ 新会话</button>
-          <button
-            class="agent-detail__btn agent-detail__btn--ghost"
-            v-if="activeConversationId"
-            :disabled="streaming"
-            @click="removeConversation(activeConversationId)"
-          >删除会话</button>
+            发布
+          </button>
         </div>
-        <div class="agent-detail__chat-body" v-if="!current || isNew">
-          <div class="agent-detail__chat-placeholder">请先保存智能体后测试</div>
-        </div>
-        <div class="agent-detail__chat-body" v-else>
-          <div class="agent-detail__messages" ref="messagesRef">
-            <div v-for="(msg, i) in messages" :key="i" class="agent-detail__message" :class="`agent-detail__message--${msg.role}`">
-              <!-- 思考过程：意图识别 → 本体查询 → 逻辑计算 → 执行动作 → 生成回答 -->
-              <div
-                v-if="msg.role === 'assistant' && msg.steps && msg.steps.length"
-                class="agent-detail__think"
-              >
-                <button class="agent-detail__think-head" @click="msg.stepsOpen = !msg.stepsOpen">
-                  <svg
-                    class="agent-detail__think-caret"
-                    :class="{ 'is-open': msg.stepsOpen }"
-                    viewBox="0 0 16 16" fill="none"
-                  ><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  <span class="agent-detail__think-title">思考过程</span>
-                  <span class="agent-detail__think-count">{{ displaySteps(msg).length }} 步</span>
-                </button>
-                <div v-show="msg.stepsOpen" class="agent-detail__think-steps">
-                  <div
-                    v-for="(step, si) in displaySteps(msg)"
-                    :key="si"
-                    class="agent-detail__step"
+      </header>
+      <div v-if="error" class="aw-alert aw-error" role="alert">
+        {{ error }}<button class="aw-link" @click="error = ''">关闭</button>
+      </div>
+      <div v-if="notice" class="aw-alert aw-success" role="status">{{ notice }}</div>
+      <div v-if="!canEdit" class="aw-alert">
+        当前账号可查看与调试，修改配置、发布和行动授权需要编辑者或管理员权限。
+      </div>
+      <div v-if="current?.ontology_stale" class="aw-alert">
+        依赖本体已经变化，请核对版本与技能依赖并重新测试。<button
+          class="aw-link"
+          @click="configTab = '本体与能力'"
+        >
+          检查依赖
+        </button>
+      </div>
+      <nav class="aw-tabs" aria-label="智能体工作台">
+        <button
+          v-for="tab in workspaceTabs"
+          :key="tab"
+          :aria-selected="workspaceTab === tab"
+          :class="{ active: workspaceTab === tab }"
+          :disabled="chatBusy && workspaceTab !== tab"
+          @click="selectWorkspaceTab(tab)"
+        >
+          {{ tab }}
+        </button>
+      </nav>
+      <div v-show="workspaceTab === '配置与调试'" class="aw-workbody">
+        <section class="aw-config" aria-label="智能体配置">
+          <nav class="aw-subtabs" aria-label="配置分区">
+            <button
+              v-for="tab in configTabs"
+              :key="tab"
+              :class="{ active: configTab === tab }"
+              :aria-selected="configTab === tab"
+              @click="configTab = tab"
+            >
+              {{ tab }}
+            </button>
+          </nav>
+          <fieldset :disabled="chatBusy || saving || !canEdit">
+            <template v-if="configTab === '基本设置'">
+              <label class="aw-field"
+                ><span>智能体名称 <b>*</b></span
+                ><input v-model="form.name" maxlength="100" placeholder="输入智能体名称" /></label
+              ><label class="aw-field"
+                ><span>业务目标</span
+                ><textarea
+                  v-model="form.description"
+                  rows="4"
+                  placeholder="希望智能体帮助完成什么业务任务？"
+                ></textarea></label
+              ><label class="aw-field"
+                ><span>模型</span
+                ><select v-model="form.model_id">
+                  <option value="">平台默认模型</option>
+                  <option v-for="model in activeModels" :key="model.id" :value="model.id">
+                    {{ model.name }} · {{ model.model_name }}
+                  </option>
+                  <option
+                    v-if="form.model_id && !activeModels.some((m) => m.id === form.model_id)"
+                    :value="form.model_id"
+                    disabled
                   >
-                    <span class="agent-detail__step-dot" :class="`agent-detail__step-dot--${step.stage}`"></span>
-                    <div class="agent-detail__step-body">
-                      <div class="agent-detail__step-line">
-                        <span class="agent-detail__step-tag" :class="`agent-detail__step-tag--${step.stage}`">{{ STAGE_LABELS[step.stage] }}</span>
-                        <span class="agent-detail__step-label">{{ step.label }}</span>
-                        <span v-if="stepTarget(step)" class="agent-detail__step-target" :class="`agent-detail__step-target--${step.stage}`">{{ stepTarget(step) }}</span>
-                        <span v-if="(step.repeat || 1) > 1" class="agent-detail__step-repeat">×{{ step.repeat }}</span>
-                        <span
-                          v-if="step.summary == null && streaming && i === messages.length - 1"
-                          class="agent-detail__step-running"
-                        >进行中…</span>
-                      </div>
-                      <div v-if="step.summary" class="agent-detail__step-summary">{{ step.summary }}</div>
-                      <div v-if="stepFacts(step).length" class="agent-detail__step-facts">
-                        <span v-for="(f, fi) in stepFacts(step)" :key="fi" class="agent-detail__fact">
-                          <span class="agent-detail__fact-k">{{ f.label }}</span>
-                          <span class="agent-detail__fact-v">{{ f.value }}</span>
-                        </span>
-                      </div>
-                    </div>
+                    原模型已停用或不可访问
+                  </option></select
+                ><small>使用平台已配置且可用的模型。</small></label
+              ><label class="aw-field"
+                ><span>标签</span
+                ><input v-model="form.tagsStr" placeholder="用逗号分隔，例如：设备运维,分析"
+              /></label>
+            </template>
+            <template v-else-if="configTab === '本体与能力'">
+              <h2>业务上下文</h2>
+              <label class="aw-field"
+                ><span>关联已发布本体 <b>*</b></span
+                ><select v-model="form.ontology_id" @change="changeOntology">
+                  <option value="">请选择本体</option>
+                  <option
+                    v-for="ontology in ontologies"
+                    :key="ontology.ontology_id"
+                    :value="ontology.ontology_id"
+                  >
+                    {{ ontology.name }}
+                  </option>
+                </select></label
+              ><label class="aw-field"
+                ><span>固定本体版本 <b>*</b></span
+                ><select
+                  v-model="form.ontology_version_id"
+                  :disabled="!form.ontology_id"
+                  @change="changeOntologyVersion"
+                >
+                  <option value="">请选择已发布版本</option>
+                  <option v-for="version in ontologyVersions" :key="version.id" :value="version.id">
+                    v{{ version.version_number }} · {{ version.name
+                    }}{{ version.is_active ? '（当前）' : '' }}
+                  </option>
+                  <option
+                    v-if="
+                      form.ontology_version_id &&
+                      !ontologyVersions.some((v) => v.id === form.ontology_version_id)
+                    "
+                    :value="form.ontology_version_id"
+                    disabled
+                  >
+                    原本体版本不可用
+                  </option>
+                </select></label
+              >
+              <div v-if="catalogLoading" class="aw-muted">正在读取版本对象与能力…</div>
+              <div v-else-if="form.ontology_version_id" class="aw-card">
+                <div class="aw-row aw-between">
+                  <h3>可访问的对象范围</h3>
+                  <button
+                    class="aw-link"
+                    @click="form.entity_ids = catalog.entities.map(entitySourceId)"
+                  >
+                    选择全部
+                  </button>
+                </div>
+                <label v-for="entity in catalog.entities" :key="entity.id" class="aw-checkbox"
+                  ><input
+                    v-model="form.entity_ids"
+                    type="checkbox"
+                    :value="entitySourceId(entity)"
+                  /><span>{{ entity.name_cn || entity.display_name || entity.name }}</span></label
+                >
+                <p v-if="!catalog.entities.length" class="aw-muted">该发布版本没有可用对象。</p>
+                <small class="aw-muted">技能依赖对象必须在所选范围内。</small>
+              </div>
+              <div class="aw-row aw-between aw-section-title">
+                <h2>挂载的业务技能</h2>
+                <button
+                  class="aw-link"
+                  :disabled="!form.ontology_version_id || catalogLoading"
+                  @click="openSkillDrawer"
+                >
+                  + 添加技能
+                </button>
+              </div>
+              <p v-if="!form.skill_bindings.length" class="aw-empty aw-empty-compact">
+                尚未挂载技能，从已发布技能中选择业务能力。
+              </p>
+              <article
+                v-for="binding in form.skill_bindings"
+                :key="binding.skill_id"
+                class="aw-card aw-skill-card"
+              >
+                <div class="aw-row aw-between">
+                  <h3>{{ boundSkill(binding)?.name || skillName(binding.skill_id) }}</h3>
+                  <span class="aw-pill aw-blue">v{{ binding.version }}</span>
+                </div>
+                <p class="aw-muted">
+                  {{ boundSkill(binding)?.description || '正在读取固定版本…' }}
+                </p>
+                <div class="aw-row">
+                  <span class="aw-pill"
+                    >{{ boundSkill(binding)?.entity_ids?.length || 0 }} 项对象依赖</span
+                  ><span class="aw-pill"
+                    >{{ boundSkill(binding)?.tools?.length || 0 }} 项逻辑 / 动作</span
+                  >
+                </div>
+                <p v-for="problem in bindingProblems(binding)" :key="problem" class="aw-text-error">
+                  {{ problem }}
+                </p>
+                <footer class="aw-row aw-between">
+                  <small>固定使用已发布版本</small>
+                  <div class="aw-row">
+                    <button class="aw-link" @click="router.push(`/skills/${binding.skill_id}`)">
+                      查看</button
+                    ><button
+                      v-if="latestSkillVersion(binding.skill_id) > binding.version"
+                      class="aw-link"
+                      @click="reviewUpgrade(binding)"
+                    >
+                      升级到 v{{ latestSkillVersion(binding.skill_id) }}</button
+                    ><button class="aw-link aw-danger" @click="unmountSkill(binding)">卸载</button>
                   </div>
+                </footer>
+              </article>
+              <div
+                v-if="availableFunctions.length || availableActions.length"
+                class="aw-section-title"
+              >
+                <h2>本体基础能力</h2>
+                <p class="aw-muted aw-small">逻辑和动作在本体中维护，挂载技能不会扩大访问权限。</p>
+                <div class="aw-row">
+                  <span v-for="item in availableFunctions" :key="item.id" class="aw-pill aw-blue"
+                    >逻辑 · {{ item.name }}</span
+                  ><span v-for="item in availableActions" :key="item.id" class="aw-pill aw-amber"
+                    >动作 · {{ item.name }}</span
+                  >
                 </div>
               </div>
-              <div class="agent-detail__bubble" :class="`agent-detail__bubble--${msg.role}`">
-                <span v-if="msg.status && !msg.content" class="agent-detail__thinking">
-                  <span class="agent-detail__thinking-dots"><i></i><i></i><i></i></span>
-                  <span class="agent-detail__thinking-text">{{ msg.status }}</span>
-                </span>
-                <div
-                  v-else-if="msg.role === 'assistant'"
-                  class="agent-detail__markdown"
-                  v-html="renderMarkdownSafe(msg.content)"
-                ></div>
-                <template v-else>{{ msg.content }}</template>
-              </div>
-              <!-- 本体调用链：把本轮命中的本体对象/逻辑函数/动作串成一条思维链 -->
-              <div
-                v-if="msg.role === 'assistant' && !streaming && msg.content && messageChain(msg).length"
-                class="agent-detail__chain"
-              >
-                <span class="agent-detail__chain-title">本体调用链</span>
-                <template v-for="(node, ni) in messageChain(msg)" :key="ni">
-                  <span class="agent-detail__chain-node" :class="`agent-detail__chain-node--${node.stage}`">
-                    <span class="agent-detail__chain-stage">{{ node.label }}</span>
-                    <span v-if="node.target" class="agent-detail__chain-target">{{ node.target }}</span>
-                  </span>
-                  <span v-if="ni < messageChain(msg).length - 1" class="agent-detail__chain-arrow">→</span>
-                </template>
-              </div>
-              <div
-                v-if="msg.role === 'assistant' && !streaming && msg.content"
-                class="agent-detail__msg-actions"
-              >
-                <button class="agent-detail__download-btn" @click="copyMessage(msg.content, i)">
-                  <svg viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="8" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/><path d="M11 5V3.5A1.5 1.5 0 009.5 2h-6A1.5 1.5 0 002 3.5v6A1.5 1.5 0 003.5 11H5" stroke="currentColor" stroke-width="1.3"/></svg>
-                  {{ copiedIdx === i ? '已复制' : '复制' }}
-                </button>
-                <button
-                  v-if="looksLikeMarkdown(msg.content)"
-                  class="agent-detail__download-btn"
-                  @click="downloadHtml(msg.content, form.name || '智能体分析报告')"
-                >
-                  <svg viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0L5 7m3 3l3-3M3 13h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  下载 HTML
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="agent-detail__dirty-hint" v-if="isDirty">配置已修改，保存后测试最新配置</div>
-          <div class="agent-detail__chat-input">
-            <textarea class="agent-detail__textarea" v-model="chatInput" rows="2" placeholder="输入消息...（回车发送，Shift+Enter 换行）" @keydown.enter.exact.prevent="sendMessage"></textarea>
-            <button class="agent-detail__btn agent-detail__btn--primary" @click="sendMessage" :disabled="!chatInput.trim() || streaming">发送</button>
-          </div>
-        </div>
+            </template>
+            <template v-else
+              ><label class="aw-field"
+                ><span>行为指引</span
+                ><textarea
+                  v-model="form.system_prompt"
+                  rows="13"
+                  placeholder="定义智能体目标、如何使用证据、信息不足时的处理与输出要求。"
+                ></textarea>
+              </label>
+              <h2>业务动作策略</h2>
+              <label class="aw-checkbox"
+                ><input v-model="form.action_mode" type="radio" value="simulation" /><span
+                  ><strong>模拟执行</strong
+                  ><small>首次默认使用模拟模式，业务写操作只返回预览。</small></span
+                ></label
+              ><label class="aw-checkbox"
+                ><input v-model="form.action_mode" type="radio" value="confirm" /><span
+                  ><strong>执行前授权确认</strong
+                  ><small
+                    >展示待执行动作和参数，由当前用户授权或拒绝；后端检查执行权限。</small
+                  ></span
+                ></label
+              ><label class="aw-field"
+                ><span>最多工具调用轮次</span
+                ><input
+                  v-model.number="form.max_tool_rounds"
+                  type="number"
+                  min="2"
+                  max="20" /></label
+            ></template>
+          </fieldset>
+        </section>
+        <AgentChatPanel
+          :key="current?.id || 'new'"
+          :agent-id="current?.id || null"
+          :agent-name="form.name"
+          :dirty="isDirty"
+          :action-mode="form.action_mode"
+          :can-authorize="canEdit"
+          @busy="markChatBusy"
+          @activity="refreshActivity"
+          @inspect="openRun"
+        />
       </div>
-    </div>
+      <section v-if="workspaceTab === '运行记录'" class="aw-page">
+        <div class="aw-row aw-between">
+          <h2>运行记录</h2>
+          <button class="aw-link" @click="loadRuns">刷新</button>
+        </div>
+        <p v-if="!current" class="aw-empty">保存智能体后查看运行记录。</p>
+        <p v-else-if="runsLoading" class="aw-empty">正在加载运行记录…</p>
+        <p v-else-if="!runs.length" class="aw-empty">
+          暂无运行记录，完成对话调试后可查看执行过程。
+        </p>
+        <div v-else class="aw-table-wrap">
+          <table class="aw-table">
+            <thead>
+              <tr>
+                <th>业务问题</th>
+                <th>运行时间</th>
+                <th>状态</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="run in runs" :key="run.id">
+                <td>{{ run.question }}</td>
+                <td>{{ formatTime(run.started_at) }}</td>
+                <td>
+                  <span
+                    class="aw-pill"
+                    :class="
+                      ['error', 'failed', 'cancelled', 'pending_confirmation'].includes(run.status)
+                        ? 'aw-amber'
+                        : 'aw-green'
+                    "
+                    >{{ runStatus(run.status) }}</span
+                  >
+                </td>
+                <td><button class="aw-link" @click="openRun(run.id)">查看过程</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <section v-if="workspaceTab === '发布与接入'" class="aw-page">
+        <div class="aw-two">
+          <section>
+            <h2>已发布版本</h2>
+            <div class="aw-card">
+              <strong>{{
+                current?.current_version ? `v${current.current_version}` : '尚未发布'
+              }}</strong>
+              <p class="aw-muted">发布时固定模型、行为指引、本体版本、技能版本与动作策略。</p>
+            </div>
+            <h2 v-if="publishedSnapshot" class="aw-section-title">在线依赖快照</h2>
+            <dl v-if="publishedSnapshot" class="aw-info">
+              <dt>本体版本</dt>
+              <dd>{{ snapshotOntologyName }} · {{ snapshotVersionLabel }}</dd>
+              <dt>业务技能</dt>
+              <dd>
+                <div v-for="binding in publishedBindings" :key="binding.skill_id">
+                  {{ skillName(binding.skill_id) }} v{{ binding.version }}
+                </div>
+              </dd>
+              <dt>动作策略</dt>
+              <dd>
+                {{
+                  publishedSnapshot.tools_config?.action_mode === 'confirm'
+                    ? '执行前授权确认'
+                    : '模拟执行'
+                }}
+              </dd>
+            </dl>
+          </section>
+          <section>
+            <h2>接入方式</h2>
+            <div v-if="!current?.current_version || current.status !== 'published'" class="aw-card">
+              <strong>{{ current?.current_version ? '应用已下线' : '发布后可接入' }}</strong>
+              <p class="aw-muted">完成配置与调试，发布业务应用后查看调用信息。</p>
+            </div>
+            <p v-else-if="!canEdit" class="aw-muted">
+              查看应用密钥与接入示例需要编辑者或管理员权限。
+            </p>
+            <template v-else
+              ><div v-if="apiLoading" class="aw-muted">正在读取接入信息…</div>
+              <div v-else-if="apiInfo" class="aw-card">
+                <h3>应用 API</h3>
+                <code class="aw-code">POST {{ apiInfo.endpoint }}</code
+                ><button class="aw-link" @click="copyApi">复制调用示例</button>
+                <details>
+                  <summary>查看调用示例（包含应用密钥）</summary>
+                  <pre>{{ apiInfo.curl }}</pre>
+                </details>
+              </div>
+              <button
+                class="aw-link aw-danger"
+                :disabled="saving || !canEdit"
+                @click="unpublishAgent"
+              >
+                下线应用
+              </button></template
+            >
+          </section>
+        </div>
+        <div class="aw-row aw-between aw-section-title">
+          <h2>版本历史</h2>
+          <button class="aw-link" @click="loadVersions">刷新</button>
+        </div>
+        <p v-if="versionsLoading" class="aw-muted">正在读取版本…</p>
+        <p v-else-if="!versions.length" class="aw-empty aw-empty-compact">尚无发布版本。</p>
+        <div v-for="version in versions" :key="version.id" class="aw-version-row">
+          <div>
+            <strong>v{{ version.version }}</strong>
+            <p class="aw-muted">
+              {{ version.description || '发布快照' }} · {{ formatTime(version.published_at) }}
+            </p>
+          </div>
+          <button
+            v-if="version.version !== current?.current_version"
+            class="aw-link"
+            :disabled="saving || !canEdit"
+            @click="rollback(version)"
+          >
+            回滚到此版本</button
+          ><span v-else class="aw-pill aw-green">当前版本</span>
+        </div>
+      </section>
+    </template>
+    <Teleport to="body"
+      ><div
+        v-if="drawer"
+        class="aw-overlay"
+        @click.self="drawer = null"
+        @keydown.esc="drawer = null"
+      >
+        <section class="aw-drawer" role="dialog" aria-modal="true" :aria-label="drawerTitle">
+          <header class="aw-row aw-between">
+            <h2>{{ drawerTitle }}</h2>
+            <button class="aw-icon" aria-label="关闭" @click="drawer = null">×</button>
+          </header>
+          <template v-if="drawer === 'skills'"
+            ><p class="aw-muted">
+              选择可访问的已发布技能，固定版本后挂载。依赖必须在当前本体和对象范围内。
+            </p>
+            <p v-if="drawerLoading" class="aw-empty">正在检查技能版本依赖…</p>
+            <p v-else-if="!skillCandidates.length" class="aw-empty">没有可访问的已发布技能。</p>
+            <article v-for="candidate in skillCandidates" :key="candidate.skill.id" class="aw-card">
+              <div class="aw-row">
+                <input
+                  v-model="candidate.selected"
+                  type="checkbox"
+                  :aria-label="`挂载${candidate.skill.name}`"
+                  :disabled="
+                    candidate.problems.length > 0 ||
+                    form.skill_bindings.some((b) => b.skill_id === candidate.skill.id)
+                  "
+                />
+                <h3>{{ candidate.skill.name }}</h3>
+              </div>
+              <p class="aw-muted">{{ candidate.skill.description }}</p>
+              <label class="aw-field"
+                ><span>固定发布版本</span
+                ><select
+                  v-model.number="candidate.version"
+                  @change="loadCandidateVersion(candidate)"
+                >
+                  <option
+                    v-for="version in candidate.versions"
+                    :key="version.version"
+                    :value="version.version"
+                  >
+                    v{{ version.version }}
+                  </option>
+                </select></label
+              >
+              <p v-for="problem in candidate.problems" :key="problem" class="aw-text-error">
+                {{ problem }}
+              </p>
+              <span v-if="!candidate.problems.length" class="aw-pill aw-green">依赖匹配</span
+              ><span
+                v-if="form.skill_bindings.some((b) => b.skill_id === candidate.skill.id)"
+                class="aw-pill"
+                >已挂载</span
+              >
+            </article>
+            <footer class="aw-drawer-footer">
+              <button
+                class="aw-button aw-primary"
+                :disabled="
+                  drawerLoading || !skillCandidates.some((c) => c.selected && !c.problems.length)
+                "
+                @click="attachSkills"
+              >
+                添加选中技能
+              </button>
+            </footer></template
+          >
+          <template v-else-if="drawer === 'upgrade'"
+            ><p class="aw-muted">升级技能不会自动改变在线应用。保存并调试草稿后重新发布。</p>
+            <p v-if="drawerLoading" class="aw-empty">正在读取版本变更…</p>
+            <template v-else-if="upgrade"
+              ><h3>
+                {{ upgrade.skill.name }} · v{{ upgrade.from.version }} → v{{ upgrade.to.version }}
+              </h3>
+              <div class="aw-two">
+                <section>
+                  <h3>当前版本</h3>
+                  <p>{{ upgrade.from.description }}</p>
+                  <pre>{{ upgrade.from.prompt_template }}</pre>
+                  <details>
+                    <summary>输入、输出与依赖</summary>
+                    <pre>{{ JSON.stringify(upgradeDependencies(upgrade.from), null, 2) }}</pre>
+                  </details>
+                </section>
+                <section>
+                  <h3>目标版本</h3>
+                  <p>{{ upgrade.to.description }}</p>
+                  <pre>{{ upgrade.to.prompt_template }}</pre>
+                  <details>
+                    <summary>输入、输出与依赖</summary>
+                    <pre>{{ JSON.stringify(upgradeDependencies(upgrade.to), null, 2) }}</pre>
+                  </details>
+                </section>
+              </div>
+              <p v-for="problem in upgrade.problems" :key="problem" class="aw-text-error">
+                {{ problem }}
+              </p>
+              <footer class="aw-drawer-footer">
+                <button
+                  class="aw-button aw-primary"
+                  :disabled="!!upgrade.problems.length"
+                  @click="applyUpgrade"
+                >
+                  使用目标版本
+                </button>
+              </footer></template
+            ></template
+          >
+          <template v-else-if="drawer === 'publish'"
+            ><p class="aw-muted">发布业务应用配置，固定本体、技能与执行策略。</p>
+            <div class="aw-card">
+              <strong>{{ form.name }} · {{ form.skill_bindings.length }} 项技能</strong>
+              <p>
+                {{ selectedOntology?.name || '尚未选择本体' }} ·
+                {{ selectedVersion ? `v${selectedVersion.version_number}` : '尚未选择版本' }}
+              </p>
+            </div>
+            <div class="aw-publish-check">
+              <span>草稿配置</span
+              ><span class="aw-pill" :class="isDirty ? 'aw-amber' : 'aw-green'">{{
+                isDirty ? '待保存' : '已保存'
+              }}</span>
+            </div>
+            <div class="aw-publish-check">
+              <span>联合调试</span
+              ><span class="aw-pill" :class="testPassed ? 'aw-green' : 'aw-amber'">{{
+                testPassed ? '通过' : '待验证'
+              }}</span>
+            </div>
+            <div class="aw-publish-check">
+              <span>执行策略</span
+              ><span class="aw-pill">{{
+                form.action_mode === 'confirm' ? '执行前授权确认' : '模拟执行'
+              }}</span>
+            </div>
+            <p v-for="problem in publishProblems" :key="problem" class="aw-text-error">
+              {{ problem }}
+            </p>
+            <footer class="aw-drawer-footer">
+              <button
+                class="aw-button aw-primary"
+                :disabled="publishing || publishProblems.length > 0"
+                @click="publishAgent"
+              >
+                {{ publishing ? '发布中…' : '确认发布' }}
+              </button>
+            </footer></template
+          >
+          <template v-else-if="drawer === 'run'"
+            ><p v-if="drawerLoading" class="aw-empty">正在读取运行详情…</p>
+            <template v-else-if="selectedRun"
+              ><h3>{{ selectedRun.question }}</h3>
+              <p>{{ runStatus(selectedRun.status) }} · {{ formatTime(selectedRun.started_at) }}</p>
+              <div v-if="selectedRun.error" class="aw-alert aw-error">{{ selectedRun.error }}</div>
+              <div class="aw-markdown" v-html="renderMarkdownSafe(selectedRun.answer || '')"></div>
+              <details
+                v-for="(step, index) in selectedRun.steps || selectedRun.tool_runs || []"
+                :key="index"
+                class="aw-card"
+              >
+                <summary>{{ step.label || step.tool }} · {{ step.summary }}</summary>
+                <pre>{{ JSON.stringify(step, null, 2) }}</pre>
+              </details>
+              <h3 v-if="selectedRun.pending_actions?.length">业务动作</h3>
+              <article
+                v-for="pending in selectedRun.pending_actions || []"
+                :key="pending.pending_id"
+                class="aw-card"
+              >
+                <strong>{{ pending.action_name }}</strong>
+                <p>{{ pending.summary }}</p>
+                <pre>{{ JSON.stringify(pending.params, null, 2) }}</pre>
+                <p>状态：{{ runStatus(pending.status || 'pending') }}</p>
+                <pre v-if="pending.result">{{ JSON.stringify(pending.result, null, 2) }}</pre>
+                <div v-if="!pending.status || pending.status === 'pending'" class="aw-row">
+                  <button
+                    class="aw-button aw-primary"
+                    :disabled="!!deciding || !canEdit"
+                    @click="decideRunAction(pending.pending_id, true)"
+                  >
+                    授权并执行</button
+                  ><button
+                    class="aw-button"
+                    :disabled="!!deciding || !canEdit"
+                    @click="decideRunAction(pending.pending_id, false)"
+                  >
+                    拒绝执行
+                  </button>
+                </div>
+              </article></template
+            ></template
+          >
+          <p v-if="drawerError" class="aw-alert aw-error" role="alert">{{ drawerError }}</p>
+        </section>
+      </div></Teleport
+    >
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { agentsApi, type AgentItem, type ConversationSummary } from '../../api/agents'
-import { entityApi } from '../../api/ontology'
-import { useScenarioStore } from '../../store/scenarios'
-import { authHeaders } from '../../utils/authHeaders'
-import { renderMarkdownSafe } from '@/utils/sanitize'
-import { looksLikeMarkdown, downloadHtml, copyText } from '@/utils/markdownExport'
+import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
+import {
+  agentsApi,
+  modelsApi,
+  type AgentItem,
+  type AgentRun,
+  type AgentSkillBinding,
+  type AgentVersion,
+  type ApiInfo,
+  type ModelRegistry,
+} from '../../api/agents'
+import { ontologyPublishApi } from '../../api/ontologyPublish'
+import {
+  skillsApi,
+  skillError,
+  type SkillCatalog,
+  type SkillCatalogItem,
+  type SkillItem,
+  type SkillVersion,
+} from '../../api/skills'
+import { copyText } from '../../utils/markdownExport'
+import { renderMarkdownSafe } from '../../utils/sanitize'
+import AgentChatPanel from './components/AgentChatPanel.vue'
+import { useAuthStore } from '../../store/auth'
 
+interface OntologyVersion {
+  id: string
+  version_number: string
+  name: string
+  status: string
+  is_active: boolean
+}
+interface PublishedOntology {
+  ontology_id: string
+  code: string
+  name: string
+  active_version?: OntologyVersion
+  versions: OntologyVersion[]
+}
+interface PinnedSkill extends SkillItem {
+  version: number
+}
+interface Candidate {
+  skill: SkillItem
+  version: number
+  versions: SkillVersion[]
+  snapshot: PinnedSkill | null
+  selected: boolean
+  problems: string[]
+}
 const route = useRoute()
 const router = useRouter()
-
-const isNew = computed(() => route.name === 'agent-new')
-
-const entities = ref<{ id: string; name: string; name_cn?: string; ontology_id?: string }[]>([])
+const authStore = useAuthStore()
+const canEdit = computed(() => ['admin', 'editor'].includes(authStore.user?.role || ''))
+const workspaceTabs = ['配置与调试', '运行记录', '发布与接入'] as const
+const configTabs = ['基本设置', '本体与能力', '行为规则'] as const
+const workspaceTab = ref<(typeof workspaceTabs)[number]>('配置与调试')
+const configTab = ref<(typeof configTabs)[number]>('基本设置')
 const current = ref<AgentItem | null>(null)
+const loading = ref(true)
 const saving = ref(false)
-const streaming = ref(false)
-const showStaleDetail = ref(false)
-const scenarioStore = useScenarioStore()
-const selectedOntologyId = ref('')
-
+const publishing = ref(false)
+const chatBusy = ref(false)
+const error = ref('')
+const notice = ref('')
+const ontologies = ref<PublishedOntology[]>([])
+const models = ref<ModelRegistry[]>([])
+const skills = ref<SkillItem[]>([])
+const emptyCatalog = (): SkillCatalog => ({
+  ontology_versions: [],
+  entities: [],
+  functions: [],
+  actions: [],
+  assets: [],
+})
+const catalog = ref<SkillCatalog>(emptyCatalog())
+const catalogLoading = ref(false)
+const pinned = reactive<Record<string, PinnedSkill>>({})
+const pinErrors = reactive<Record<string, string>>({})
 const form = reactive({
   name: '',
   description: '',
   tagsStr: '',
+  model_id: '',
   system_prompt: '',
+  ontology_id: '',
+  ontology_version_id: '',
   entity_ids: [] as string[],
+  skill_bindings: [] as AgentSkillBinding[],
+  action_mode: 'simulation' as 'simulation' | 'confirm',
+  max_tool_rounds: 12,
 })
-
-let savedSnapshot = ''
-
-const messagesRef = ref<HTMLElement | null>(null)
-const chatInput = ref('')
-
-// 思考过程阶段：意图识别 → 本体查询 → 逻辑计算 → 执行动作 → 生成回答
-// intent / answer 为前端合成阶段；ontology / logic / action 来自工具调用
-type ThinkStage = 'intent' | 'ontology' | 'logic' | 'action' | 'answer'
-interface ThinkStep {
-  stage: ThinkStage
-  tool?: string          // 工具类步骤才有；合成步骤为空
-  label: string
-  arguments?: any
-  summary?: string | null
-  resultCount?: number | null
-  detail?: any
-  repeat?: number         // 相邻重复步骤折叠后的次数，>1 时以 ×N 展示
+const savedSnapshot = ref('')
+const versions = ref<AgentVersion[]>([])
+const runs = ref<AgentRun[]>([])
+const apiInfo = ref<ApiInfo | null>(null)
+const versionsLoading = ref(false)
+const runsLoading = ref(false)
+const apiLoading = ref(false)
+const selectedRun = ref<AgentRun | null>(null)
+const deciding = ref('')
+const drawer = ref<'skills' | 'upgrade' | 'publish' | 'run' | null>(null)
+const drawerLoading = ref(false)
+const drawerError = ref('')
+const skillCandidates = ref<Candidate[]>([])
+const upgrade = ref<{
+  skill: SkillItem
+  from: PinnedSkill
+  to: PinnedSkill
+  problems: string[]
+} | null>(null)
+let loadGeneration = 0
+let catalogGeneration = 0
+let savingNew = false
+const activeModels = computed(() =>
+  models.value.filter(
+    (m) => m.status === 'active' && (!m.capabilities?.length || m.capabilities.includes('chat')),
+  ),
+)
+const selectedOntology = computed(() =>
+  ontologies.value.find((o) => o.ontology_id === form.ontology_id),
+)
+const ontologyVersions = computed(
+  () =>
+    selectedOntology.value?.versions.filter((v) => ['published', 'approved'].includes(v.status)) ||
+    [],
+)
+const selectedVersion = computed(() =>
+  ontologyVersions.value.find((v) => v.id === form.ontology_version_id),
+)
+function inSelectedObjectScope(item: SkillCatalogItem) {
+  return (
+    form.entity_ids.length > 0 &&
+    (!item.entity_id || form.entity_ids.includes(String(item.entity_id)))
+  )
 }
-interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-  status?: string
-  steps?: ThinkStep[]
-  stepsOpen?: boolean  // 思考过程时间线是否展开
-}
-const messages = ref<ChatMessage[]>([])
-
-const conversations = ref<ConversationSummary[]>([])
-const activeConversationId = ref<string | null>(null)
-
-const copiedIdx = ref(-1)
-let copiedTimer: ReturnType<typeof setTimeout> | undefined
-async function copyMessage(content: string, idx: number) {
-  const ok = await copyText(content)
-  if (!ok) return
-  copiedIdx.value = idx
-  clearTimeout(copiedTimer)
-  copiedTimer = setTimeout(() => { copiedIdx.value = -1 }, 1500)
-}
-
-// 工具英文名 → [阶段, 中文名]。阶段用于思考过程时间线分组：
-// ontology 本体查询 / logic 逻辑计算 / action 执行动作
-type ToolStage = 'ontology' | 'logic' | 'action'
-const TOOL_META: Record<string, [ToolStage, string]> = {
-  // 本体查询：读模型/结构、取数、查实例
-  describe_ontology_model: ['ontology', '读取本体模型'],
-  get_entity_detail: ['ontology', '读取实体详情'],
-  query_entity_data: ['ontology', '查询实体数据'],
-  ontology_query_instances: ['ontology', '查询实体实例'],
-  ontology_get_attr_mapping: ['ontology', '读取属性映射'],
-  ontology_complex_sql: ['ontology', '执行复杂查询'],
-  ontology_list_capabilities: ['ontology', '列出本体能力'],
-  query_datasource: ['ontology', '查询数据源'],
-  list_datasources: ['ontology', '查询数据源列表'],
-  get_table_schema: ['ontology', '读取表结构'],
-  list_business_datasources: ['ontology', '查询业务数据源'],
-  list_business_documents: ['ontology', '查询业务文档'],
-  analyze_assets_for_ontology: ['ontology', '分析资产生成本体'],
-  // 逻辑计算：执行逻辑函数、规则评估/筛查
-  ontology_run_logic: ['logic', '执行逻辑函数'],
-  list_rules: ['logic', '读取本体规则'],
-  evaluate_rule: ['logic', '评估规则'],
-  evaluate_all_rules: ['logic', '评估全部规则'],
-  // 执行动作：有副作用的业务动作
-  execute_action: ['action', '执行动作'],
-  ontology_run_action: ['action', '执行动作函数'],
-}
-function toolMeta(tool: string): [ToolStage, string] {
-  // 画布节点工具名形如 "[节点标签]"，归为执行动作并去掉方括号
-  if (tool.startsWith('[') && tool.endsWith(']')) return ['action', tool.slice(1, -1)]
-  return TOOL_META[tool] || ['ontology', tool]
-}
-
-// 阶段中文名与展示顺序（意图识别 → 本体查询 → 逻辑计算 → 执行动作 → 生成回答）
-const STAGE_LABELS: Record<ThinkStage, string> = {
-  intent: '意图识别',
-  ontology: '本体查询',
-  logic: '逻辑计算',
-  action: '执行动作',
-  answer: '生成回答',
-}
-
-// 从一步思考过程里提炼「调用了哪个本体对象/哪个逻辑函数/哪些数据」的目标标签，
-// 供时间线上高亮展示，让用户看清每一步落在哪个本体资产上。
-function stepTarget(step: ThinkStep): string {
-  const d = step.detail || {}
-  switch (d.type) {
-    case 'logic_run':
-    case 'action_run':
-      return d.callable || ''
-    case 'instance_query':
-    case 'entity_query':
-      return d.entity_cn || d.entity || ''
-    case 'entity_detail':
-      return d.entity_cn || d.entity || ''
-    case 'evaluate_single':
-      return d.rule_name || ''
-    case 'action':
-      return d.action_name || ''
-    default:
-      break
-  }
-  // 退化到入参里的实体/函数名
-  const a = step.arguments || {}
-  return a.callable_name || a.entity_name || a.action_name || ''
-}
-
-// 把一步的关键 detail 拆成若干「键: 值」小标签，展示数据来源、筛选条件、耗时、调用链等。
-function stepFacts(step: ThinkStep): { label: string; value: string }[] {
-  const d = step.detail || {}
-  const out: { label: string; value: string }[] = []
-  const fmtObj = (o: any) => {
-    if (!o || typeof o !== 'object') return String(o ?? '')
-    const parts = Object.entries(o).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`)
-    return parts.join('、')
-  }
-  switch (d.type) {
-    case 'logic_run':
-    case 'action_run':
-      if (d.params && Object.keys(d.params).length) out.push({ label: '入参', value: fmtObj(d.params) })
-      if (Array.isArray(d.call_trace) && d.call_trace.length) out.push({ label: '调用链', value: d.call_trace.join(' → ') })
-      if (d.execution_ms != null) out.push({ label: '耗时', value: `${d.execution_ms}ms` })
-      if (d.error) out.push({ label: '错误', value: String(d.error) })
-      break
-    case 'instance_query':
-    case 'entity_query':
-      if (d.datasource) out.push({ label: '数据源', value: d.datasource })
-      if (d.table) out.push({ label: '数据表', value: d.table })
-      if (d.filters && Object.keys(d.filters).length) out.push({ label: '筛选', value: fmtObj(d.filters) })
-      if (d.row_count != null) out.push({ label: '记录数', value: `${d.row_count}` })
-      break
-    case 'sql_query':
-      if (d.sql) out.push({ label: 'SQL', value: d.sql })
-      if (d.row_count != null) out.push({ label: '返回', value: `${d.row_count} 行` })
-      break
-    case 'attr_mapping':
-      for (const m of (d.mappings || [])) out.push({ label: m.entity, value: m.table })
-      break
-    case 'ontology_model':
-      if (d.entities?.length) out.push({ label: '本体对象', value: d.entities.join('、') })
-      out.push({ label: '规模', value: `${d.entity_count} 对象 / ${d.relation_count} 关系` })
-      break
-    case 'capabilities':
-      for (const f of (d.functions || [])) out.push({ label: f.type === 'action' ? '动作' : '逻辑', value: f.name })
-      break
-    case 'entity_detail':
-      out.push({ label: '结构', value: `${d.attr_count ?? 0} 属性 / ${d.relation_count ?? 0} 关系` })
-      break
-    case 'evaluate_single':
-      out.push({ label: '规则', value: d.rule_name || '' })
-      out.push({ label: '结果', value: `${d.triggered ? '触发' : '未触发'}（命中 ${d.matched_count}/${d.total_count}）` })
-      break
-    case 'action':
-      out.push({ label: '结果', value: d.success ? '成功' : '失败' })
-      break
-    default:
-      break
-  }
-  return out
-}
-
-// 把相邻的重复步骤折叠成一条：模型常对同一实体反复查询，时间线里会出现大量
-// 「同阶段+同标签+同目标+同摘要+同记录数」的连续步骤，这里按签名合并并记次数，
-// 使思考过程时间线保持简洁。签名不含耗时/入参细节，仅看用户可感知的展示要素。
-function dedupeSteps(steps: ThinkStep[] | undefined): ThinkStep[] {
-  if (!steps || !steps.length) return []
-  const sig = (s: ThinkStep) =>
-    [s.stage, s.label, stepTarget(s), s.summary ?? '', s.resultCount ?? ''].join('¦')
-  const out: ThinkStep[] = []
-  let prevSig = ''
-  for (const s of steps) {
-    const cur = sig(s)
-    const last = out[out.length - 1]
-    if (last && cur === prevSig) {
-      last.repeat = (last.repeat || 1) + 1
-      continue
-    }
-    out.push({ ...s, repeat: 1 })
-    prevSig = cur
-  }
-  return out
-}
-
-// 去重结果按 steps 数组引用缓存，避免模板里多处（计数/时间线/调用链）重复计算。
-// 流式过程中 steps 被原地 push，引用不变，故用长度参与 key 让缓存随之失效。
-const _dedupeCache = new WeakMap<ThinkStep[], { len: number; out: ThinkStep[] }>()
-function displaySteps(msg: ChatMessage): ThinkStep[] {
-  const steps = msg.steps
-  if (!steps || !steps.length) return []
-  const cached = _dedupeCache.get(steps)
-  if (cached && cached.len === steps.length) return cached.out
-  const out = dedupeSteps(steps)
-  _dedupeCache.set(steps, { len: steps.length, out })
-  return out
-}
-
-// 汇总整条消息的「本体调用链」思维链：把每一步压成一个链路节点，供答复下方展示。
-interface ChainNode { stage: ThinkStage; label: string; target: string }
-function messageChain(msg: ChatMessage): ChainNode[] {
-  const steps = displaySteps(msg)
-  if (!steps.length) return []
-  return steps.map(s => ({
-    stage: s.stage,
-    label: STAGE_LABELS[s.stage],
-    target: stepTarget(s),
-  }))
-}
-
-function formToPayload() {
+const availableFunctions = computed(() => catalog.value.functions.filter(inSelectedObjectScope))
+const availableActions = computed(() => catalog.value.actions.filter(inSelectedObjectScope))
+const isNew = computed(() => route.name === 'agent-new')
+const isDirty = computed(() => JSON.stringify(payload()) !== savedSnapshot.value)
+const testPassed = computed(
+  () => !chatBusy.value && !isDirty.value && current.value?.last_test?.passed === true,
+)
+const drawerTitle = computed(
+  () =>
+    (
+      ({
+        skills: '添加业务技能',
+        upgrade: '检查技能升级',
+        publish: '发布智能体',
+        run: '运行详情',
+      }) as Record<string, string>
+    )[drawer.value || ''] || '',
+)
+const publishedSnapshot = computed(
+  () => versions.value.find((v) => v.version === current.value?.current_version)?.config_snapshot,
+)
+const publishedBindings = computed<AgentSkillBinding[]>(
+  () =>
+    publishedSnapshot.value?.skill_bindings ||
+    publishedSnapshot.value?.tools_config?.skill_bindings ||
+    [],
+)
+const snapshotOntologyName = computed(
+  () =>
+    ontologies.value.find(
+      (o) =>
+        o.ontology_id ===
+        (publishedSnapshot.value?.ontology_id ||
+          publishedSnapshot.value?.tools_config?.ontology_id),
+    )?.name || '本体',
+)
+const snapshotVersionLabel = computed(() => {
+  const id =
+    publishedSnapshot.value?.ontology_version_id ||
+    publishedSnapshot.value?.tools_config?.ontology_version_id
+  const version = ontologies.value.flatMap((o) => o.versions).find((v) => v.id === id)
+  return version ? `v${version.version_number} · ${version.name}` : '原版本不可访问'
+})
+const publishProblems = computed(() => {
+  const problems: string[] = []
+  if (!current.value) problems.push('请先保存智能体。')
+  if (!form.name.trim()) problems.push('请填写智能体名称。')
+  if (isDirty.value) problems.push('配置已修改，请保存草稿。')
+  if (!selectedVersion.value) problems.push('请选择可用的已发布本体版本。')
+  if (!form.entity_ids.length) problems.push('请选择可访问的对象范围。')
+  if (form.model_id && !activeModels.value.some((m) => m.id === form.model_id))
+    problems.push('当前模型已停用或不可访问。')
+  for (const binding of form.skill_bindings)
+    problems.push(...bindingProblems(binding).map((p) => `${skillName(binding.skill_id)}：${p}`))
+  if (!testPassed.value) problems.push('当前草稿尚未通过联合调试。')
+  return problems
+})
+function payload(): Partial<AgentItem> {
   return {
-    name: form.name || '未命名智能体',
+    name: form.name.trim(),
     description: form.description,
-    tags: form.tagsStr.split(',').map(t => t.trim()).filter(Boolean),
+    tags: form.tagsStr
+      .split(/[,，]/)
+      .map((t) => t.trim())
+      .filter(Boolean),
+    model_id: form.model_id || null,
     system_prompt: form.system_prompt,
-    entity_ids: form.entity_ids,
+    entity_ids: [...form.entity_ids],
+    tools_config: {
+      ...(current.value?.tools_config || {}),
+      ontology_id: form.ontology_id || null,
+      ontology_version_id: form.ontology_version_id || null,
+      skill_bindings: form.skill_bindings.map((b) => ({ ...b })),
+      action_mode: form.action_mode,
+      max_tool_rounds: form.max_tool_rounds,
+    },
   }
 }
-
-const isDirty = computed(() => JSON.stringify(formToPayload()) !== savedSnapshot)
-
-const statusClass = computed(() => {
-  const s = current.value?.status || 'draft'
-  return `agent-detail__status-tag--${s}`
-})
-
-function loadFormFromAgent(a: AgentItem) {
-  form.name = a.name
-  form.description = a.description
-  form.tagsStr = (a.tags || []).join(', ')
-  form.system_prompt = a.system_prompt
-  form.entity_ids = a.entity_ids || []
-  current.value = a
-  savedSnapshot = JSON.stringify(formToPayload())
+function hydrate(agent: AgentItem) {
+  current.value = agent
+  const config = agent.tools_config || {}
+  Object.assign(form, {
+    name: agent.name || '',
+    description: agent.description || '',
+    tagsStr: (agent.tags || []).join(', '),
+    model_id: agent.model_id || '',
+    system_prompt: agent.system_prompt || '',
+    ontology_id: agent.ontology_id || config.ontology_id || '',
+    ontology_version_id: agent.ontology_version_id || config.ontology_version_id || '',
+    entity_ids: [...(agent.entity_ids || [])],
+    skill_bindings: (agent.skill_bindings || config.skill_bindings || []).map(
+      (b: AgentSkillBinding) => ({ ...b }),
+    ),
+    action_mode: config.action_mode === 'confirm' ? 'confirm' : 'simulation',
+    max_tool_rounds: config.max_tool_rounds || 12,
+  })
+  savedSnapshot.value = JSON.stringify(payload())
+}
+function entitySourceId(entity: SkillCatalogItem) {
+  return String(entity.source_entity_id || entity.id)
+}
+function skillName(id: string) {
+  return skills.value.find((s) => s.id === id)?.name || '不可访问的技能'
+}
+function pinKey(binding: AgentSkillBinding) {
+  return `${binding.skill_id}:${binding.version}`
+}
+function boundSkill(binding: AgentSkillBinding) {
+  return pinned[pinKey(binding)]
+}
+function latestSkillVersion(id: string) {
+  return skills.value.find((s) => s.id === id)?.current_version || 0
+}
+function snapshotProblems(snapshot: PinnedSkill | null) {
+  if (!snapshot) return ['无法读取已发布技能版本。']
+  const problems: string[] = []
+  if (snapshot.ontology_id !== form.ontology_id) problems.push('本体范围不匹配。')
+  if (snapshot.ontology_version_id !== form.ontology_version_id)
+    problems.push('技能固定的本体版本与当前版本不一致。')
+  if ((snapshot.entity_ids || []).some((id) => !form.entity_ids.includes(id)))
+    problems.push('技能依赖对象不在授权范围内。')
+  if (
+    (snapshot.tools || []).some(
+      (t) =>
+        !(t.type === 'action' ? catalog.value.actions : catalog.value.functions).some(
+          (item) => item.id === t.id,
+        ),
+    )
+  )
+    problems.push('依赖逻辑或动作在本体版本中不可用。')
+  if (
+    (snapshot.asset_refs || []).some((id) => !catalog.value.assets.some((item) => item.id === id))
+  )
+    problems.push('依赖资料不可访问。')
+  return problems
+}
+function bindingProblems(binding: AgentSkillBinding) {
+  const skill = skills.value.find((s) => s.id === binding.skill_id)
+  if (pinErrors[pinKey(binding)]) return [pinErrors[pinKey(binding)]!]
+  if (!skill || skill.status !== 'active') return ['技能已归档或不可访问。']
+  if (!boundSkill(binding)) return ['正在读取固定版本…']
+  return snapshotProblems(boundSkill(binding))
+}
+async function fetchPinned(id: string, version: number): Promise<PinnedSkill> {
+  const result = await skillsApi.version(id, version)
+  const snapshot = result.snapshot_json || result.snapshot || result.definition
+  if (!snapshot) throw new Error('发布版本未提供依赖快照')
+  const value = { ...snapshot, version }
+  pinned[`${id}:${version}`] = value
+  delete pinErrors[`${id}:${version}`]
+  return value
+}
+async function loadPins() {
+  await Promise.all(
+    form.skill_bindings.map(async (binding) => {
+      try {
+        await fetchPinned(binding.skill_id, binding.version)
+      } catch (e) {
+        pinErrors[pinKey(binding)] = skillError(e)
+      }
+    }),
+  )
+}
+async function loadCatalog() {
+  const generation = ++catalogGeneration
+  catalog.value = emptyCatalog()
+  catalogLoading.value = false
+  if (!form.ontology_id || !form.ontology_version_id) return
+  catalogLoading.value = true
+  try {
+    const result = await skillsApi.catalog(form.ontology_id, form.ontology_version_id)
+    if (generation === catalogGeneration) catalog.value = result
+  } catch (e) {
+    if (generation === catalogGeneration) error.value = skillError(e)
+  } finally {
+    if (generation === catalogGeneration) catalogLoading.value = false
+  }
+}
+async function changeOntology() {
+  form.ontology_version_id = ''
+  form.entity_ids = []
+  form.skill_bindings = []
+  await loadCatalog()
+}
+async function changeOntologyVersion() {
+  form.entity_ids = []
+  await loadCatalog()
 }
 async function saveAgent() {
+  if (saving.value || chatBusy.value || !canEdit.value) return
+  if (!isNew.value && !current.value) {
+    error.value = '智能体尚未加载，请刷新后重试。'
+    return
+  }
+  if (!form.name.trim()) {
+    error.value = '请填写智能体名称。'
+    configTab.value = '基本设置'
+    return
+  }
+  if (
+    !Number.isInteger(form.max_tool_rounds) ||
+    form.max_tool_rounds < 2 ||
+    form.max_tool_rounds > 20
+  ) {
+    error.value = '工具调用轮次应为 2–20。'
+    return
+  }
   saving.value = true
+  error.value = ''
+  notice.value = ''
   try {
-    const payload = formToPayload()
-    let result: AgentItem
+    const data = payload()
+    const result = current.value
+      ? await agentsApi.update(current.value.id, data)
+      : await agentsApi.create(data)
+    hydrate(result)
+    notice.value = '草稿已保存，请调试验证当前配置。'
     if (isNew.value) {
-      result = await agentsApi.create(payload)
-      router.replace(`/agent/manage/${result.id}`)
-    } else {
-      result = await agentsApi.update(route.params.id as string, payload)
+      savingNew = true
+      await router.replace(`/agent/manage/${result.id}`)
+      savingNew = false
     }
-    loadFormFromAgent(result)
+  } catch (e) {
+    error.value = skillError(e)
   } finally {
     saving.value = false
   }
 }
-
-async function publishAgent() {
-  if (!current.value) return
-  const result = await agentsApi.publish(current.value.id)
-  loadFormFromAgent(result)
-}
-
-async function unpublishAgent() {
-  if (!current.value) return
-  const result = await agentsApi.update(current.value.id, { status: 'draft' } as any)
-  loadFormFromAgent(result)
-}
-
-async function ackStale() {
-  if (!current.value) return
-  await agentsApi.acknowledgeStale(current.value.id)
-  current.value.ontology_stale = false
-  current.value.ontology_stale_detail = null
-  showStaleDetail.value = false
-}
-
-async function loadConversations() {
-  if (!current.value || isNew.value) return
-  conversations.value = await agentsApi.listConversations(current.value.id).catch(() => [])
-}
-
-// 历史会话的步骤（后端字段为 category=ontology/logic/action）还原为前端阶段模型，
-// 首尾补上"意图识别""生成回答"合成阶段，与实时展示保持一致
-function restoreSteps(raw: any): ThinkStep[] | undefined {
-  if (!Array.isArray(raw) || raw.length === 0) return undefined
-  const toolSteps: ThinkStep[] = raw.map((s: any) => ({
-    stage: (['ontology', 'logic', 'action'].includes(s.category) ? s.category : 'ontology') as ThinkStage,
-    tool: s.tool,
-    label: s.label || s.tool || '',
-    arguments: s.arguments,
-    summary: s.summary,
-    resultCount: s.resultCount,
-    detail: s.detail,
-  }))
-  return [
-    { stage: 'intent', label: '理解问题、规划调用', summary: '' },
-    ...toolSteps,
-    { stage: 'answer', label: '输出分析结论', summary: '' },
-  ]
-}
-
-async function selectConversation(cid: string) {
-  if (!current.value) return
-  activeConversationId.value = cid
+async function openSkillDrawer() {
+  drawer.value = 'skills'
+  drawerLoading.value = true
+  drawerError.value = ''
+  skillCandidates.value = []
   try {
-    const detail = await agentsApi.getConversation(current.value.id, cid)
-    messages.value = detail.messages.map((m: any) => ({
-      role: m.role,
-      content: m.content,
-      steps: restoreSteps(m.steps),
-      stepsOpen: false,  // 历史回看默认收起，可点开
-    }))
-  } catch {
-    messages.value = []
-    await loadConversations()
-  }
-  await nextTick()
-  scrollToBottom()
-}
-
-async function newConversation() {
-  if (!current.value) return
-  const conv = await agentsApi.createConversation(current.value.id)
-  activeConversationId.value = conv.id
-  messages.value = []
-  chatInput.value = ''
-  await loadConversations()
-}
-
-async function removeConversation(cid: string) {
-  if (!current.value) return
-  await agentsApi.deleteConversation(current.value.id, cid)
-  if (activeConversationId.value === cid) {
-    activeConversationId.value = null
-    messages.value = []
-  }
-  await loadConversations()
-  const first = conversations.value[0]
-  if (!activeConversationId.value && first) await selectConversation(first.id)
-}
-
-// 把最近一个还在"进行中"的步骤收尾。合成阶段（意图识别/生成回答）没有
-// 工具返回，用空串占位标记完成，避免一直显示"进行中…"
-function finishRunningStep(msg: ChatMessage) {
-  const running = [...(msg.steps || [])].reverse().find(s => s.summary == null)
-  if (running && (running.stage === 'intent' || running.stage === 'answer')) {
-    running.summary = ''
-  }
-}
-
-async function sendMessage() {
-  const text = chatInput.value.trim()
-  if (!text || !current.value || streaming.value) return
-
-  // 先确保有会话：在 push 气泡、置 streaming=true 之前创建，
-  // 避免创建失败时留下卡在“思考中…”的气泡并把发送锁死。
-  if (!activeConversationId.value) {
-    try {
-      const conv = await agentsApi.createConversation(current.value.id)
-      activeConversationId.value = conv.id
-    } catch (e) {
-      console.error('创建会话失败', e)
-      alert('创建会话失败，请稍后重试')
-      return
-    }
-  }
-
-  chatInput.value = ''
-  messages.value.push({ role: 'user', content: text })
-  messages.value.push({
-    role: 'assistant',
-    content: '',
-    status: '思考中…',
-    // 意图识别为首个合成阶段：从发问到首个工具调用/正文之间
-    steps: [{ stage: 'intent', label: '理解问题、规划调用' }],
-    stepsOpen: true,
-  })
-  streaming.value = true
-
-  await nextTick()
-  scrollToBottom()
-
-  try {
-    const response = await fetch(`/api/v1/agents/${current.value.id}/chat`, {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ question: text, conversation_id: activeConversationId.value }),
-    })
-    const reader = response.body!.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-    const lastIdx = messages.value.length - 1
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const data = line.slice(6)
-        if (data === '[DONE]') break
-        try {
-          const evt = JSON.parse(data)
-          const cur = messages.value[lastIdx]
-          if (!cur.steps) cur.steps = []
-          if (evt.type === 'content') {
-            // 正文分块（orchestrator / graph_engine 均以 content 事件流式输出）
-            cur.status = undefined  // 正文开始，清除阶段提示
-            if (!cur.content) {
-              // 正文首次到达：收尾意图识别阶段，补入"生成回答"合成阶段
-              finishRunningStep(cur)
-              cur.steps.push({ stage: 'answer', label: '输出分析结论' })
-            }
-            cur.content += evt.content
-          } else if (evt.type === 'answer') {
-            // 出错兜底：后端直接返回完整答复
-            cur.status = undefined
-            cur.content = evt.content
-          } else if (evt.type === 'tool_start') {
-            // 工具调用开始：收尾上一阶段，累积一步思考过程 + 气泡提示
-            finishRunningStep(cur)
-            const [stage, label] = toolMeta(evt.tool)
-            cur.steps.push({ stage, tool: evt.tool, label, arguments: evt.arguments })
-            cur.stepsOpen = true  // 流式过程中自动展开时间线
-            if (!cur.content) cur.status = `正在${label}…`
-          } else if (evt.type === 'tool_result') {
-            // 工具返回：回填该步骤的结果摘要与详情
-            const step = [...cur.steps].reverse().find(
-              s => s.tool === evt.tool && s.summary == null,
-            )
-            if (step) {
-              step.summary = evt.summary
-              step.resultCount = evt.resultCount
-              step.detail = evt.detail
-            }
-            if (!cur.content && evt.summary) cur.status = evt.summary
+    const candidates = await Promise.all(
+      skills.value
+        .filter((s) => s.status === 'active' && s.current_version > 0)
+        .map(async (skill) => {
+          const versions = await skillsApi.versions(skill.id)
+          const candidate: Candidate = {
+            skill,
+            versions,
+            version: skill.current_version,
+            snapshot: null,
+            selected: false,
+            problems: [],
           }
-        } catch { /* skip non-json lines */ }
-      }
-      await nextTick()
-      scrollToBottom()
-    }
+          try {
+            candidate.snapshot = await fetchPinned(skill.id, candidate.version)
+            candidate.problems = snapshotProblems(candidate.snapshot)
+          } catch (e) {
+            candidate.problems = [skillError(e)]
+          }
+          return candidate
+        }),
+    )
+    skillCandidates.value = candidates
+  } catch (e) {
+    drawerError.value = skillError(e)
   } finally {
-    streaming.value = false
-    const cur = messages.value[messages.value.length - 1]
-    if (cur && cur.role === 'assistant') {
-      // 流结束后若气泡仍无正文，清掉阶段提示并给出兜底文案，避免卡在“思考中”
-      if (!cur.content) {
-        cur.status = undefined
-        cur.content = '（未返回内容）'
-      }
-      finishRunningStep(cur)  // 收尾"生成回答"阶段
-      // 答复已出，自动收起思考过程时间线，可手动点开回看
-      if (cur.content && cur.steps && cur.steps.length) cur.stepsOpen = false
-    }
-  }
-  await loadConversations()
-}
-
-function scrollToBottom() {
-  if (messagesRef.value) {
-    messagesRef.value.scrollTop = messagesRef.value.scrollHeight
+    drawerLoading.value = false
   }
 }
-
-function onOntologyChange() {
-  if (!selectedOntologyId.value) {
-    form.entity_ids = []
+async function loadCandidateVersion(candidate: Candidate) {
+  const requestedVersion = candidate.version
+  candidate.selected = false
+  candidate.problems = ['正在检查依赖…']
+  try {
+    const snapshot = await fetchPinned(candidate.skill.id, requestedVersion)
+    if (candidate.version !== requestedVersion) return
+    candidate.snapshot = snapshot
+    candidate.problems = snapshotProblems(candidate.snapshot)
+  } catch (e) {
+    if (candidate.version === requestedVersion) candidate.problems = [skillError(e)]
+  }
+}
+function upgradeDependencies(skill: PinnedSkill) {
+  return {
+    ontology_version_id: skill.ontology_version_id,
+    entity_ids: skill.entity_ids,
+    tools: skill.tools,
+    asset_refs: skill.asset_refs,
+    input_schema: skill.input_schema,
+    output_schema: skill.output_schema,
+  }
+}
+function attachSkills() {
+  for (const c of skillCandidates.value)
+    if (
+      c.selected &&
+      !c.problems.length &&
+      !form.skill_bindings.some((b) => b.skill_id === c.skill.id)
+    )
+      form.skill_bindings.push({ skill_id: c.skill.id, version: c.version })
+  drawer.value = null
+}
+function unmountSkill(binding: AgentSkillBinding) {
+  if (
+    window.confirm(`从当前草稿卸载「${skillName(binding.skill_id)}」？重新保存、调试和发布后生效。`)
+  )
+    form.skill_bindings = form.skill_bindings.filter((b) => b.skill_id !== binding.skill_id)
+}
+async function reviewUpgrade(binding: AgentSkillBinding) {
+  drawer.value = 'upgrade'
+  drawerError.value = ''
+  drawerLoading.value = true
+  upgrade.value = null
+  try {
+    const skill = skills.value.find((s) => s.id === binding.skill_id)!
+    const [from, to] = await Promise.all([
+      fetchPinned(binding.skill_id, binding.version),
+      fetchPinned(binding.skill_id, skill.current_version),
+    ])
+    upgrade.value = { skill, from, to, problems: snapshotProblems(to) }
+  } catch (e) {
+    drawerError.value = skillError(e)
+  } finally {
+    drawerLoading.value = false
+  }
+}
+function applyUpgrade() {
+  if (!upgrade.value || upgrade.value.problems.length) return
+  const binding = form.skill_bindings.find((b) => b.skill_id === upgrade.value!.skill.id)
+  if (binding) binding.version = upgrade.value.to.version
+  drawer.value = null
+}
+async function refreshActivity() {
+  if (!current.value) return
+  try {
+    const latest = await agentsApi.get(current.value.id)
+    current.value = latest
+    if (workspaceTab.value === '运行记录') await loadRuns()
+  } catch (e) {
+    error.value = skillError(e)
+  }
+}
+function markChatBusy(value: boolean) {
+  chatBusy.value = value
+  if (value && current.value) current.value.last_test = null
+}
+async function loadRuns() {
+  if (!current.value) return
+  runsLoading.value = true
+  try {
+    runs.value = await agentsApi.runs(current.value.id)
+  } catch (e) {
+    error.value = skillError(e)
+  } finally {
+    runsLoading.value = false
+  }
+}
+async function loadVersions() {
+  if (!current.value) return
+  versionsLoading.value = true
+  try {
+    versions.value = await agentsApi.versions(current.value.id)
+  } catch (e) {
+    error.value = skillError(e)
+  } finally {
+    versionsLoading.value = false
+  }
+}
+async function loadApi() {
+  apiInfo.value = null
+  if (!canEdit.value) return
+  if (!current.value?.current_version || current.value.status !== 'published') return
+  apiLoading.value = true
+  try {
+    apiInfo.value = await agentsApi.apiInfo(current.value.id)
+  } catch (e) {
+    error.value = skillError(e)
+  } finally {
+    apiLoading.value = false
+  }
+}
+async function selectWorkspaceTab(tab: (typeof workspaceTabs)[number]) {
+  workspaceTab.value = tab
+  if (tab === '运行记录') await loadRuns()
+  if (tab === '发布与接入') await Promise.all([loadVersions(), loadApi()])
+}
+async function publishAgent() {
+  if (!current.value || publishProblems.value.length) return
+  publishing.value = true
+  drawerError.value = ''
+  try {
+    const result = await agentsApi.publish(current.value.id)
+    hydrate(result)
+    drawer.value = null
+    notice.value = `智能体 v${result.current_version} 已发布。`
+    await Promise.all([loadVersions(), loadApi()])
+  } catch (e) {
+    drawerError.value = skillError(e)
+  } finally {
+    publishing.value = false
+  }
+}
+async function unpublishAgent() {
+  if (!current.value || !window.confirm('下线后外部应用将无法调用此智能体，确认下线？')) return
+  saving.value = true
+  try {
+    current.value = await agentsApi.update(current.value.id, { status: 'draft' })
+    apiInfo.value = null
+    notice.value = '应用已下线。'
+  } catch (e) {
+    error.value = skillError(e)
+  } finally {
+    saving.value = false
+  }
+}
+async function rollback(version: AgentVersion) {
+  if (
+    !current.value ||
+    !window.confirm(
+      `回滚到 v${version.version}？${isDirty.value ? '当前未保存修改将被替换。' : ''}`,
+    )
+  )
     return
+  saving.value = true
+  try {
+    hydrate(await agentsApi.rollback(current.value.id, version.version))
+    await Promise.all([loadCatalog(), loadPins(), loadVersions(), loadApi()])
+    notice.value = `已回滚到 v${version.version}。`
+  } catch (e) {
+    error.value = skillError(e)
+  } finally {
+    saving.value = false
   }
-  const matched = entities.value.filter((e: any) => e.ontology_id === selectedOntologyId.value)
-  form.entity_ids = matched.map(e => e.id)
 }
-
-onMounted(async () => {
-  await scenarioStore.fetchScenarios()
-  const entityList = await entityApi.list()
-  entities.value = entityList as any
-
-  if (!isNew.value) {
-    const agent = await agentsApi.get(route.params.id as string)
-    loadFormFromAgent(agent)
-    // 反推选中的本体
-    if (form.entity_ids.length > 0) {
-      const firstEntity = entities.value.find(e => e.id === form.entity_ids[0])
-      if (firstEntity?.ontology_id) {
-        selectedOntologyId.value = firstEntity.ontology_id
-      }
-    }
-    await loadConversations()
-    if (conversations.value.length > 0) {
-      await selectConversation(conversations.value[0].id)
-    }
+async function copyApi() {
+  if (apiInfo.value && !(await copyText(apiInfo.value.curl)))
+    error.value = '复制失败，请手动复制调用示例。'
+}
+async function openRun(id: string) {
+  if (!current.value) return
+  drawer.value = 'run'
+  drawerLoading.value = true
+  drawerError.value = ''
+  selectedRun.value = null
+  try {
+    selectedRun.value = await agentsApi.run(current.value.id, id)
+  } catch (e) {
+    drawerError.value = skillError(e)
+  } finally {
+    drawerLoading.value = false
   }
+}
+async function decideRunAction(pendingId: string, approve: boolean) {
+  if (!current.value || !selectedRun.value) return
+  deciding.value = pendingId
+  try {
+    await agentsApi.confirmAction(current.value.id, pendingId, approve)
+    selectedRun.value = await agentsApi.run(current.value.id, selectedRun.value.id)
+    await loadRuns()
+  } catch (e) {
+    drawerError.value = skillError(e)
+  } finally {
+    deciding.value = ''
+  }
+}
+function runStatus(status: string) {
+  return (
+    (
+      {
+        ok: '完成',
+        completed: '完成',
+        success: '完成',
+        error: '失败',
+        failed: '失败',
+        running: '运行中',
+        pending: '等待授权',
+        pending_action: '等待授权',
+        pending_confirmation: '等待授权',
+        approved: '已授权执行',
+        rejected: '已拒绝执行',
+        expired: '授权已过期',
+        executing: '行动正在执行',
+        cancelled: '已中止',
+      } as Record<string, string>
+    )[status] || status
+  )
+}
+function formatTime(value?: string) {
+  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+}
+watch(drawer, () => {
+  drawerError.value = ''
+})
+watch(
+  () => route.fullPath,
+  async () => {
+    if (savingNew) return
+    const generation = ++loadGeneration
+    loading.value = true
+    error.value = ''
+    notice.value = ''
+    current.value = null
+    drawer.value = null
+    versions.value = []
+    runs.value = []
+    apiInfo.value = null
+    chatBusy.value = false
+    catalog.value = emptyCatalog()
+    workspaceTab.value = '配置与调试'
+    configTab.value = isNew.value ? '基本设置' : '本体与能力'
+    Object.assign(form, {
+      name: '',
+      description: '',
+      tagsStr: '',
+      model_id: '',
+      system_prompt: '',
+      ontology_id: '',
+      ontology_version_id: '',
+      entity_ids: [],
+      skill_bindings: [],
+      action_mode: 'simulation',
+      max_tool_rounds: 12,
+    })
+    savedSnapshot.value = JSON.stringify(payload())
+    if (!authStore.user) await authStore.fetchUser()
+    const results = await Promise.allSettled([
+      modelsApi.list(),
+      ontologyPublishApi.listPublishedOntologies(),
+      skillsApi.list(),
+      isNew.value ? Promise.resolve(null) : agentsApi.get(String(route.params.id)),
+    ])
+    if (generation !== loadGeneration) return
+    const [modelResult, ontologyResult, skillResult, agentResult] = results
+    if (modelResult.status === 'fulfilled') models.value = modelResult.value
+    else error.value = skillError(modelResult.reason)
+    if (ontologyResult.status === 'fulfilled') ontologies.value = ontologyResult.value
+    else error.value = skillError(ontologyResult.reason)
+    if (skillResult.status === 'fulfilled') skills.value = skillResult.value
+    else error.value = skillError(skillResult.reason)
+    if (agentResult.status === 'fulfilled' && agentResult.value) {
+      hydrate(agentResult.value)
+      await Promise.all([loadCatalog(), loadPins()])
+    } else if (agentResult.status === 'rejected') error.value = skillError(agentResult.reason)
+    if (generation === loadGeneration) loading.value = false
+  },
+  { immediate: true },
+)
+onBeforeRouteLeave(() => {
+  if (chatBusy.value) return window.confirm('离开页面将中止调试响应，确认离开？')
+  if (isDirty.value) return window.confirm('当前草稿尚未保存，确认离开？')
+})
+onBeforeRouteUpdate(() => {
+  if (!savingNew && (isDirty.value || chatBusy.value))
+    return window.confirm('当前配置尚未保存或仍在调试，确认切换智能体？')
+})
+onBeforeUnmount(() => {
+  loadGeneration++
+  catalogGeneration++
 })
 </script>
-<style scoped>
-.agent-detail {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
-}
-.agent-detail__topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 48px;
-  padding: 0 16px;
-  border-bottom: 1px solid var(--neutral-200, #e5e7eb);
-  flex-shrink: 0;
-}
-.agent-detail__topbar-left,
-.agent-detail__topbar-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.agent-detail__divider {
-  width: 1px;
-  height: 20px;
-  background: var(--neutral-200, #e5e7eb);
-  margin: 0 4px;
-}
-.agent-detail__name-input {
-  border: none;
-  outline: none;
-  font-size: 15px;
-  font-weight: 600;
-  background: transparent;
-  width: 180px;
-  padding: 4px 8px;
-  border-radius: 4px;
-}
-.agent-detail__name-input:hover,
-.agent-detail__name-input:focus {
-  background: var(--neutral-100, #f3f4f6);
-}
-.agent-detail__status-tag {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: var(--neutral-100, #f3f4f6);
-  color: var(--neutral-500, #6b7280);
-}
-.agent-detail__status-tag--published {
-  background: #d1fae5;
-  color: #059669;
-}
-.agent-detail__dirty {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #f59e0b;
-}
-.agent-detail__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border: 1px solid var(--neutral-200, #e5e7eb);
-  border-radius: 6px;
-  background: #fff;
-  font-size: 13px;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-.agent-detail__btn:hover { background: var(--neutral-100, #f3f4f6); }
-.agent-detail__btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.agent-detail__btn--ghost { border: none; background: transparent; }
-.agent-detail__btn--primary {
-  background: var(--semantic-600, #2563eb);
-  color: #fff;
-  border-color: var(--semantic-600, #2563eb);
-}
-.agent-detail__btn--primary:hover { background: var(--semantic-700, #1d4ed8); }
-.agent-detail__btn--danger {
-  background: #fff;
-  color: #dc2626;
-  border-color: #fca5a5;
-}
-.agent-detail__btn--danger:hover { background: #fef2f2; }
-.agent-detail__body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
-}
-.agent-detail__left {
-  width: 420px;
-  flex-shrink: 0;
-  border-right: 1px solid var(--neutral-200, #e5e7eb);
-  padding: 20px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.agent-detail__right {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.agent-detail__form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.agent-detail__form-group--grow {
-  flex: 1;
-  min-height: 0;
-}
-.agent-detail__label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--neutral-700, #374151);
-}
-.agent-detail__input,
-.agent-detail__select,
-.agent-detail__textarea {
-  padding: 8px 10px;
-  border: 1px solid var(--neutral-200, #e5e7eb);
-  border-radius: 6px;
-  font-size: 13px;
-  outline: none;
-  transition: border-color 0.15s;
-}
-.agent-detail__input:focus,
-.agent-detail__select:focus,
-.agent-detail__textarea:focus {
-  border-color: var(--semantic-400, #60a5fa);
-}
-.agent-detail__textarea--tall {
-  flex: 1;
-  min-height: 120px;
-  resize: vertical;
-}
-.agent-detail__select[multiple] {
-  min-height: 80px;
-}
-.agent-detail__chat-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--neutral-200, #e5e7eb);
-  flex-shrink: 0;
-}
-.agent-detail__chat-title {
-  font-size: 14px;
-  font-weight: 600;
-}
-.agent-detail__chat-body {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.agent-detail__chat-placeholder {
-  margin: auto;
-  font-size: 14px;
-  color: var(--neutral-400, #9ca3af);
-}
-.agent-detail__messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.agent-detail__message {
-  max-width: 88%;
-  min-width: 0;
-}
-.agent-detail__message--user {
-  align-self: flex-end;
-}
-.agent-detail__message--assistant {
-  align-self: flex-start;
-}
-.agent-detail__bubble {
-  width: fit-content;
-  max-width: 100%;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-.agent-detail__bubble--user {
-  background: var(--semantic-600, #2563eb);
-  color: #fff;
-}
-.agent-detail__bubble--assistant {
-  background: var(--neutral-100, #f3f4f6);
-  color: var(--neutral-800, #1f2937);
-}
-.agent-detail__thinking {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--neutral-500, #6b7280);
-  white-space: normal;  /* 覆盖气泡的 pre-wrap，避免模板换行被当成真实换行 */
-}
-/* 思考过程时间线 */
-.agent-detail__think {
-  margin-bottom: 6px;
-  border: 1px solid var(--neutral-200, #e5e7eb);
-  border-radius: 8px;
-  background: #fafbfc;
-  overflow: hidden;
-}
-.agent-detail__think-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  width: 100%;
-  padding: 6px 10px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--neutral-600, #4b5563);
-}
-.agent-detail__think-head:hover {
-  background: var(--neutral-100, #f3f4f6);
-}
-.agent-detail__think-caret {
-  width: 12px;
-  height: 12px;
-  color: var(--neutral-400, #9ca3af);
-  transition: transform 0.15s;
-}
-.agent-detail__think-caret.is-open {
-  transform: rotate(90deg);
-}
-.agent-detail__think-title {
-  font-weight: 500;
-}
-.agent-detail__think-count {
-  color: var(--neutral-400, #9ca3af);
-}
-.agent-detail__think-steps {
-  padding: 4px 10px 8px 12px;
-  display: flex;
-  flex-direction: column;
-}
-.agent-detail__step {
-  position: relative;
-  display: flex;
-  gap: 8px;
-  padding: 4px 0;
-}
-/* 竖向连接线 */
-.agent-detail__step:not(:last-child)::before {
-  content: '';
-  position: absolute;
-  left: 4px;
-  top: 14px;
-  bottom: -4px;
-  width: 1px;
-  background: var(--neutral-200, #e5e7eb);
-}
-.agent-detail__step-dot {
-  flex: none;
-  width: 9px;
-  height: 9px;
-  margin-top: 4px;
-  border-radius: 50%;
-  z-index: 1;
-}
-.agent-detail__step-dot--intent { background: #64748b; }
-.agent-detail__step-dot--ontology { background: #2563eb; }
-.agent-detail__step-dot--logic { background: #7c3aed; }
-.agent-detail__step-dot--action { background: #ea580c; }
-.agent-detail__step-dot--answer { background: #059669; }
-.agent-detail__step-body {
-  flex: 1;
-  min-width: 0;
-}
-.agent-detail__step-line {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.agent-detail__step-tag {
-  flex: none;
-  padding: 0 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  line-height: 18px;
-}
-.agent-detail__step-tag--intent { background: #f1f5f9; color: #64748b; }
-.agent-detail__step-tag--ontology { background: #eff6ff; color: #2563eb; }
-.agent-detail__step-tag--logic { background: #f5f3ff; color: #7c3aed; }
-.agent-detail__step-tag--action { background: #fff7ed; color: #ea580c; }
-.agent-detail__step-tag--answer { background: #ecfdf5; color: #059669; }
-.agent-detail__step-label {
-  font-size: 12px;
-  color: var(--neutral-700, #374151);
-}
-.agent-detail__step-running {
-  font-size: 11px;
-  color: var(--neutral-400, #9ca3af);
-}
-.agent-detail__step-summary {
-  margin-top: 2px;
-  font-size: 11px;
-  color: var(--neutral-500, #6b7280);
-  line-height: 1.5;
-  word-break: break-word;
-}
-/* 每步调用目标：本体对象名 / 逻辑函数名 / 动作名 */
-.agent-detail__step-target {
-  flex: none;
-  max-width: 100%;
-  padding: 0 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  line-height: 18px;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  background: var(--neutral-100, #f3f4f6);
-  color: var(--neutral-700, #374151);
-  word-break: break-all;
-}
-.agent-detail__step-target--ontology { background: #eff6ff; color: #1d4ed8; }
-.agent-detail__step-target--logic { background: #f5f3ff; color: #6d28d9; }
-.agent-detail__step-target--action { background: #fff7ed; color: #c2410c; }
-/* 折叠重复步骤的次数角标 */
-.agent-detail__step-repeat {
-  flex: none;
-  padding: 0 5px;
-  border-radius: 8px;
-  font-size: 10px;
-  line-height: 16px;
-  font-weight: 600;
-  background: var(--neutral-200, #e5e7eb);
-  color: var(--neutral-600, #4b5563);
-}
-/* 每步关键事实：数据源 / 数据表 / 筛选 / 调用链 / 耗时 等 */
-.agent-detail__step-facts {
-  margin-top: 3px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.agent-detail__fact {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  padding: 1px 6px;
-  border: 1px solid var(--neutral-200, #e5e7eb);
-  border-radius: 4px;
-  background: #fff;
-  font-size: 11px;
-  line-height: 16px;
-}
-.agent-detail__fact-k {
-  flex: none;
-  color: var(--neutral-400, #9ca3af);
-}
-.agent-detail__fact-v {
-  color: var(--neutral-700, #374151);
-  word-break: break-all;
-}
-/* 本体调用链：答复下方的横向思维链 */
-.agent-detail__chain {
-  margin-top: 6px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 5px;
-  padding: 8px 10px;
-  border: 1px dashed var(--neutral-200, #e5e7eb);
-  border-radius: 8px;
-  background: #fafbfc;
-}
-.agent-detail__chain-title {
-  flex: none;
-  margin-right: 2px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--neutral-500, #6b7280);
-}
-.agent-detail__chain-node {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: var(--neutral-100, #f3f4f6);
-  font-size: 11px;
-  line-height: 18px;
-}
-.agent-detail__chain-node--intent { background: #f1f5f9; color: #475569; }
-.agent-detail__chain-node--ontology { background: #eff6ff; color: #1d4ed8; }
-.agent-detail__chain-node--logic { background: #f5f3ff; color: #6d28d9; }
-.agent-detail__chain-node--action { background: #fff7ed; color: #c2410c; }
-.agent-detail__chain-node--answer { background: #ecfdf5; color: #047857; }
-.agent-detail__chain-stage {
-  font-weight: 500;
-}
-.agent-detail__chain-target {
-  padding-left: 4px;
-  border-left: 1px solid currentColor;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  opacity: 0.85;
-}
-.agent-detail__chain-arrow {
-  color: var(--neutral-400, #9ca3af);
-  font-size: 12px;
-}
-.agent-detail__msg-actions {
-  margin-top: 4px;
-  display: flex;
-  gap: 4px;
-}
-.agent-detail__download-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 7px;
-  border: 1px solid var(--neutral-200, #e5e7eb);
-  border-radius: 5px;
-  background: #fff;
-  color: var(--neutral-500, #6b7280);
-  font-size: 11px;
-  line-height: 1.5;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.agent-detail__download-btn svg {
-  width: 11px;
-  height: 11px;
-}
-.agent-detail__download-btn:hover {
-  border-color: var(--semantic-400, #60a5fa);
-  color: var(--semantic-600, #2563eb);
-  background: #f0f7ff;
-}
-.agent-detail__thinking-dots {
-  display: inline-flex;
-  gap: 3px;
-}
-.agent-detail__thinking-dots i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--neutral-400, #9ca3af);
-  animation: agent-detail-blink 1.4s infinite both;
-}
-.agent-detail__thinking-dots i:nth-child(2) { animation-delay: 0.2s; }
-.agent-detail__thinking-dots i:nth-child(3) { animation-delay: 0.4s; }
-@keyframes agent-detail-blink {
-  0%, 80%, 100% { opacity: 0.25; }
-  40% { opacity: 1; }
-}
-.agent-detail__dirty-hint {
-  padding: 6px 16px;
-  font-size: 12px;
-  color: #f59e0b;
-  background: #fffbeb;
-  text-align: center;
-}
-.agent-detail__chat-input {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--neutral-200, #e5e7eb);
-  align-items: flex-end;
-}
-.agent-detail__chat-input .agent-detail__textarea {
-  flex: 1;
-  resize: none;
-}
-.agent-detail__stale-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #fef3c7;
-  border-bottom: 1px solid #fde68a;
-  font-size: 13px;
-}
-.agent-detail__stale-icon { color: #d97706; }
-.agent-detail__stale-text { flex: 1; color: #92400e; }
-.agent-detail__stale-btn {
-  padding: 4px 10px;
-  border: 1px solid #d97706;
-  border-radius: 4px;
-  background: transparent;
-  color: #d97706;
-  cursor: pointer;
-  font-size: 12px;
-}
-.agent-detail__stale-btn--ack {
-  background: #d97706;
-  color: #fff;
-}
-.agent-detail__stale-detail {
-  padding: 8px 16px;
-  background: #fffbeb;
-  border-bottom: 1px solid #fde68a;
-  font-size: 12px;
-}
-.agent-detail__stale-detail ul { margin: 0; padding-left: 16px; }
-.agent-detail__stale-detail li { margin: 2px 0; }
-.agent-detail__conv-select {
-  max-width: 160px;
-  padding: 4px 8px;
-  border: 1px solid var(--neutral-200, #e5e7eb);
-  border-radius: 4px;
-  font-size: 12px;
-}
-</style>
+<style src="../../styles/agent-workbench.css"></style>

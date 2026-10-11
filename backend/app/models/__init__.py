@@ -1,5 +1,6 @@
 from app.models.action import EntityAction
 from app.models.agent import Agent, ModelRegistry
+from app.models.agent_runtime import AgentPendingAction, AgentRun, AgentVersion
 from app.models.agent_test_conversation import AgentTestConversation  # noqa: F401
 from app.models.ai_code_conversation import AiCodeConversation  # noqa: F401
 from app.models.asset import Asset
@@ -27,6 +28,7 @@ from app.models.shared_attribute import SharedAttribute
 from app.models.shared_ref import OntologySharedRef
 from app.models.skill import Skill
 from app.models.skill_tool import SkillTool
+from app.models.skill_version import SkillTestRun, SkillVersion
 from app.models.trace import AgentTrace
 from app.models.user import User
 from app.models.version import (
@@ -45,7 +47,7 @@ __all__ = [
     "EntityAction", "OntologyFunction",
     "AuditLog", "User",
     "DashboardConfig",
-    "ModelRegistry", "Agent", "PromptTemplate",
+    "ModelRegistry", "Agent", "PromptTemplate", "AgentPendingAction", "AgentRun", "AgentVersion",
     "AgentTrace", "EvalSuite", "EvalCase", "EvalRun", "EvalResult",
     "OntologyVersion", "OntologyVersionEntity",
     "OntologyVersionAttribute", "OntologyVersionRelation",
@@ -59,7 +61,7 @@ __all__ = [
     "ServiceMetric", "LLMCallRecord", "Alert",
     "McpCallLog",
     # Skill Generation Platform
-    "Skill", "SkillTool",
+    "Skill", "SkillTool", "SkillVersion", "SkillTestRun",
     # AI Code Conversation
     "AiCodeConversation",
     # Agent Test Conversation
