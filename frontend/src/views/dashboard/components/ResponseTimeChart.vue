@@ -23,12 +23,19 @@
         </div>
       </div>
     </template>
-    <div ref="chartEl" style="height: 260px;"></div>
+    <a-alert v-if="loadError" type="error" show-icon :message="loadError" style="margin-bottom:12px">
+      <template #action><a-button size="small" @click="reload">重试</a-button></template>
+    </a-alert>
+    <div class="chart-content">
+      <div ref="chartEl" style="height: 260px;"></div>
+      <a-empty v-if="isEmpty && !loadError" class="chart-empty" :description="timeRange === 'custom' && !customRange ? '请选择开始和结束时间' : '该时间范围暂无响应记录'" />
+    </div>
   </a-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { Alert as AAlert, Button as AButton, Empty as AEmpty } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import * as echarts from 'echarts'
 import { monitorApi, type ResponseHistoryPoint } from '../../../api/monitor'
@@ -38,6 +45,11 @@ const chartEl = ref<HTMLElement>()
 const timeRange = ref('1')
 const customRange = ref<[Dayjs, Dayjs] | null>(null)
 let chart: echarts.ECharts | null = null
+let requestId = 0
+let disposed = false
+let resizeObserver: ResizeObserver | null = null
+const loadError = ref('')
+const isEmpty = ref(false)
 
 const SERVICE_COLORS: Record<string, string> = {
   '后端API': '#5c7cfa', '数据库': '#20c997', '规则引擎': '#7950f2',
@@ -48,27 +60,49 @@ const SERVICE_COLORS: Record<string, string> = {
 function onRangeChange() {
   if (timeRange.value !== 'custom') {
     fetchData()
+  } else {
+    ++requestId
+    chart?.hideLoading()
+    if (customRange.value) fetchCustomData()
+    else { chart?.clear(); isEmpty.value = true; loadError.value = '' }
   }
 }
 
 async function fetchData() {
   const hours = parseInt(timeRange.value)
   if (isNaN(hours)) return
-  const data = await monitorApi.responseHistory(hours)
-  renderChart(data)
+  await loadHistory(hours)
 }
 
 async function fetchCustomData() {
   if (!customRange.value) return
   const [start, end] = customRange.value
-  const hours = Math.ceil((end.valueOf() - start.valueOf()) / (1000 * 60 * 60))
-  if (hours <= 0) return
-  const data = await monitorApi.responseHistory(hours)
-  // Filter data to custom range
-  const startTime = start.toISOString()
-  const endTime = end.toISOString()
-  const filtered = data.filter(d => d.collected_at >= startTime && d.collected_at <= endTime)
-  renderChart(filtered)
+  if (end.valueOf() <= start.valueOf()) return
+  // API 按“距现在多少小时”取记录，历史自定义范围需要从其开始时间查询。
+  const hours = Math.max(1, Math.ceil((Date.now() - start.valueOf()) / (1000 * 60 * 60)))
+  await loadHistory(hours, [start.valueOf(), end.valueOf()])
+}
+
+function reload() { return timeRange.value === 'custom' ? fetchCustomData() : fetchData() }
+
+async function loadHistory(hours: number, range?: [number, number]) {
+  const request = ++requestId
+  loadError.value = ''
+  chart?.showLoading('default', { text: '加载中…' })
+  try {
+    const data = await monitorApi.responseHistory(hours)
+    if (disposed || request !== requestId) return
+    const filtered = range ? data.filter(point => {
+      const time = new Date(toChartTime(point.collected_at)).getTime()
+      return time >= range[0] && time <= range[1]
+    }) : data
+    renderChart(filtered)
+    isEmpty.value = filtered.length === 0
+  } catch (e: any) {
+    if (!disposed && request === requestId) loadError.value = e.response?.data?.detail || '响应记录加载失败，请重试'
+  } finally {
+    if (request === requestId) chart?.hideLoading()
+  }
 }
 
 function renderChart(data: ResponseHistoryPoint[]) {
@@ -119,7 +153,7 @@ function renderChart(data: ResponseHistoryPoint[]) {
 }
 
 function toChartTime(value: string) {
-  return value.endsWith('Z') ? value : `${value}Z`
+  return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`
 }
 
 function formatCollectedAt(value: string) {
@@ -133,8 +167,20 @@ function formatCollectedAt(value: string) {
 }
 
 onMounted(() => {
+  if (chartEl.value) {
+    chart = echarts.init(chartEl.value)
+    resizeObserver = new ResizeObserver(() => chart?.resize())
+    resizeObserver.observe(chartEl.value)
+  }
   nextTick(fetchData)
-  window.addEventListener('resize', () => chart?.resize())
+})
+
+onBeforeUnmount(() => {
+  disposed = true
+  ++requestId
+  resizeObserver?.disconnect()
+  chart?.dispose()
+  chart = null
 })
 </script>
 
@@ -150,5 +196,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
+.chart-content { position: relative; }
+.chart-empty { position: absolute; inset: 30px 0 0; background: var(--neutral-0, #fff); padding-top: 24px; }
 </style>

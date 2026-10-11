@@ -7,6 +7,7 @@ export const useConnectionStore = defineStore('connection', () => {
   const items = ref<Connection[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  let listRequest = 0
 
   const stats = computed(() => {
     const total = items.value.length
@@ -18,14 +19,16 @@ export const useConnectionStore = defineStore('connection', () => {
   })
 
   async function fetchList(params?: { type?: string; category?: string; status?: string; q?: string }) {
+    const request = ++listRequest
     loading.value = true
     error.value = null
     try {
-      items.value = await api.listConnections(params)
+      const rows = await api.listConnections(params)
+      if (request === listRequest) items.value = rows
     } catch (e: any) {
-      error.value = e.message
+      if (request === listRequest) error.value = e.response?.data?.detail || e.message || '数据源加载失败'
     } finally {
-      loading.value = false
+      if (request === listRequest) loading.value = false
     }
   }
 

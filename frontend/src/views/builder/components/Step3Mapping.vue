@@ -10,13 +10,13 @@
         </div>
         <span class="mapping-progress-pct">{{ Math.round(progressPct) }}%</span>
       </div>
-      <button class="mapping-auto-btn secondary" :disabled="autoMapping" @click="runAutoMap">
+      <button class="mapping-auto-btn secondary" :disabled="autoMapping || suggesting" @click="runAutoMap">
         {{ autoMapping ? '推荐中...' : '一键推荐' }}
       </button>
       <button
         class="mapping-next-btn"
         :class="{ active: allMapped }"
-        :disabled="!allMapped"
+        :disabled="!allMapped || autoMapping || suggesting"
         @click="finishMapping"
       >开始数据验证 →</button>
     </header>
@@ -80,6 +80,7 @@
                   <td>
                     <a-select
                       v-model:value="p.source_column"
+                      :disabled="autoMapping"
                       placeholder="选择字段"
                       :options="columnOptionsForProp(p)"
                       :filter-option="filterOption"
@@ -153,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
 import { authHeaders } from '../../../utils/authHeaders'
@@ -165,6 +166,8 @@ const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void }>()
 
 const store = useBuilderStore()
+let mounted = true
+const suggestionRequests = new Map<string, number>()
 const objects = computed(() => props.session.ontologyObjects || [])
 
 const selectedObjId = ref(objects.value[0]?.id || '')
@@ -177,7 +180,8 @@ const expandedConns = reactive(new Set<string | null>())
 const expandedTables = reactive(new Set<string>())
 
 const bindings = ref<Record<string, AssetTreeTable>>({})
-const suggesting = ref(false)
+const pendingSuggestions = ref(0)
+const suggesting = computed(() => pendingSuggestions.value > 0)
 const autoMapping = ref(false)
 
 const totalPropCount = computed(() => objects.value.reduce((s, o) => s + o.properties.length, 0))
@@ -224,16 +228,25 @@ function onDropTable(e: DragEvent, objId: string) {
 }
 
 async function bindTable(objId: string, tbl: AssetTreeTable) {
+  if (autoMapping.value) return
+  if (bindings.value[objId]?.asset_id !== tbl.asset_id) unbindTable(objId)
   bindings.value[objId] = tbl
+  const obj = objects.value.find(o => o.id === objId)
+  if (obj) obj.backing_asset_ids = [tbl.asset_id]
+  syncStore()
   await runSuggestForObj(objId)
   syncStore()
 }
 function unbindTable(objId: string) {
+  if (autoMapping.value) return
+  suggestionRequests.set(objId, (suggestionRequests.get(objId) || 0) + 1)
   delete bindings.value[objId]
   const obj = objects.value.find(o => o.id === objId)
   if (obj) {
+    obj.backing_asset_ids = []
     for (const p of obj.properties) {
-      ;(p as any).source_column = undefined
+      p.source_asset_id = undefined
+      p.source_column = undefined
       ;(p as any)._confidence_score = 0
       ;(p as any)._candidates = undefined
     }
@@ -246,12 +259,15 @@ async function runSuggestForObj(objId: string) {
   const tbl = bindings.value[objId]
   if (!obj || !tbl) return
 
-  suggesting.value = true
+  const request = (suggestionRequests.get(objId) || 0) + 1
+  suggestionRequests.set(objId, request)
+  ++pendingSuggestions.value
   try {
     const resp = await suggestColumns(
       tbl.asset_id,
       obj.properties.map((p: any) => ({ name: p.name, type: p.type, description: p.description }))
     )
+    if (!mounted || suggestionRequests.get(objId) !== request || bindings.value[objId]?.asset_id !== tbl.asset_id) return
     for (const sug of resp.suggestions) {
       const prop = obj.properties.find((p: any) => p.name === sug.property_name)
       if (prop && sug.candidates.length > 0) {
@@ -259,9 +275,9 @@ async function runSuggestForObj(objId: string) {
       }
     }
   } catch {
-    message.warning('字段推荐失败，可手动选择')
+    if (mounted && suggestionRequests.get(objId) === request) message.warning('字段推荐失败，可手动选择')
   } finally {
-    suggesting.value = false
+    --pendingSuggestions.value
   }
 }
 
@@ -274,11 +290,11 @@ function columnOptionsForProp(p: any) {
   const opts: { label: string; value: string }[] = []
   for (const c of candidates) {
     const tierTag = c.tier === 'high' ? '★ ' : c.tier === 'medium' ? '☆ ' : ''
-    opts.push({ label: `${tierTag}${c.column} (${c.column_type || ''})`, value: `${tbl.asset_id}::${c.column}` })
+    opts.push({ label: `${tierTag}${c.column} (${c.column_type || ''})`, value: c.column })
   }
   for (const col of tbl.columns) {
     if (!candidateNames.has(col.name)) {
-      opts.push({ label: `${col.name} (${col.type})`, value: `${tbl.asset_id}::${col.name}` })
+      opts.push({ label: `${col.name} (${col.type})`, value: col.name })
     }
   }
   return opts
@@ -290,8 +306,8 @@ function filterOption(input: string, option: any) {
 
 function onColumnChange(p: any, val: string | undefined) {
   if (val) {
-    const [assetId, col] = val.split('::')
-    p.source_asset_id = assetId
+    const col = val
+    p.source_asset_id = bindings.value[selectedObjId.value]?.asset_id
     p.source_column = val
     const cand = (p._candidates || []).find((c: any) => c.column === col)
     ;(p as any)._confidence_score = cand ? cand.score : 1
@@ -321,6 +337,7 @@ function confidenceLabel(p: any) {
 }
 
 async function runAutoMap() {
+  if (autoMapping.value || suggesting.value || !objects.value.length) return
   autoMapping.value = true
   try {
     const resp = await fetch('/api/v1/builder/auto-map', {
@@ -335,6 +352,7 @@ async function runAutoMap() {
     })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const data = await resp.json()
+    if (!mounted) return
     const mappings = data.mappings || {}
     for (const obj of objects.value) {
       const m = mappings[obj.id]
@@ -346,11 +364,12 @@ async function runAutoMap() {
           .find(t => t.asset_id === firstTable.asset_id)
         if (treeTable) bindings.value[obj.id] = treeTable
       }
+      if (m.matched_tables?.length) obj.backing_asset_ids = m.matched_tables.map((table: any) => table.asset_id)
       if (m.property_mappings) {
         for (const [pName, pm] of Object.entries(m.property_mappings) as any) {
           const prop = obj.properties.find((p: any) => p.name === pName)
           if (prop && pm.column) {
-            ;(prop as any).source_column = `${pm.asset_id}::${pm.column}`
+            ;(prop as any).source_column = pm.column
             ;(prop as any).source_asset_id = pm.asset_id
             ;(prop as any)._confidence_score = pm.score || 0.5
           }
@@ -367,10 +386,11 @@ async function runAutoMap() {
 }
 
 function syncStore() {
-  store.patchActive({ ontologyObjects: objects.value })
+  if (mounted) store.updateSession(props.session.sessionId, { ontologyObjects: objects.value })
 }
 
 function finishMapping() {
+  if (!allMapped.value || autoMapping.value || suggesting.value) return
   syncStore()
   emit('next')
 }
@@ -379,7 +399,19 @@ onMounted(async () => {
   treeLoading.value = true
   try {
     const resp = await fetchAssetTree()
+    if (!mounted) return
     assetTree.value = resp.tree
+    const tables = resp.tree.flatMap(connection => connection.tables)
+    for (const obj of objects.value) {
+      const assetId = obj.backing_asset_ids?.[0] || obj.properties.find(prop => prop.source_asset_id)?.source_asset_id
+      const table = tables.find(item => item.asset_id === assetId)
+      if (table) bindings.value[obj.id] = table
+      for (const property of obj.properties) {
+        const prefix = `${property.source_asset_id}::`
+        if (property.source_asset_id && property.source_column?.startsWith(prefix)) property.source_column = property.source_column.slice(prefix.length)
+      }
+    }
+    syncStore()
     if (resp.tree.length > 0) expandedConns.add(resp.tree[0].connection_id)
   } catch (e: any) {
     message.error('加载数据资产失败：' + (e.message || e))
@@ -387,6 +419,7 @@ onMounted(async () => {
     treeLoading.value = false
   }
 })
+onUnmounted(() => { mounted = false })
 </script>
 
 <style scoped>

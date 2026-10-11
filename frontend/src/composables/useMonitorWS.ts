@@ -13,6 +13,7 @@ export function useMonitorWS() {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+  let stopped = false
 
   function getWsUrl(): string {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
@@ -21,7 +22,7 @@ export function useMonitorWS() {
   }
 
   function connect() {
-    if (ws?.readyState === WebSocket.OPEN) return
+    if (stopped || ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return
 
     ws = new WebSocket(getWsUrl())
 
@@ -53,7 +54,7 @@ export function useMonitorWS() {
     ws.onclose = () => {
       connected.value = false
       if (heartbeatTimer) clearInterval(heartbeatTimer)
-      reconnectTimer = setTimeout(connect, 5000)
+      if (!stopped) reconnectTimer = setTimeout(connect, 5000)
     }
 
     ws.onerror = () => {
@@ -62,6 +63,8 @@ export function useMonitorWS() {
   }
 
   function disconnect() {
+    stopped = true
+    connected.value = false
     if (reconnectTimer) clearTimeout(reconnectTimer)
     if (heartbeatTimer) clearInterval(heartbeatTimer)
     ws?.close()

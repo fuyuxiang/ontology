@@ -10,10 +10,10 @@
       <a-statistic title="连接总数" :value="store.stats.total">
         <template #prefix><DatabaseOutlined style="color:#3b82f6" /></template>
       </a-statistic>
-      <a-statistic title="在线" :value="store.stats.enabled" :value-style="{ color: '#10b981' }">
+      <a-statistic title="已启用" :value="store.stats.enabled" :value-style="{ color: '#10b981' }">
         <template #prefix><CheckCircleOutlined style="color:#10b981" /></template>
       </a-statistic>
-      <a-statistic title="离线" :value="store.stats.stopped" :value-style="{ color: '#6b7280' }" />
+      <a-statistic title="已禁用" :value="store.stats.stopped" :value-style="{ color: '#6b7280' }" />
       <a-statistic v-if="store.stats.error > 0" title="异常" :value="store.stats.error"
                    :value-style="{ color: '#ef4444' }" />
       <span class="cp-spacer" />
@@ -28,10 +28,13 @@
                       allow-clear @search="onSearch" @change="onSearch" />
       <a-segmented v-model:value="categoryFilter" :options="categoryFilters" @change="onSearch" />
     </div>
+    <a-alert v-if="store.error" type="error" show-icon message="数据源加载失败" :description="store.error" class="cp-load-error">
+      <template #action><a-button size="small" @click="load">重试</a-button></template>
+    </a-alert>
 
     <!-- 表格 -->
     <a-table size="middle" :columns="columns" :data-source="store.items"
-             :loading="store.loading" :pagination="{ pageSize: 20 }" row-key="id">
+             :loading="store.loading" :pagination="{ current: currentPage, pageSize: 20, onChange: (page: number) => currentPage = page }" :scroll="{ x: 1120 }" row-key="id">
       <template #bodyCell="{ column, record }">
         <template v-if="column.key === 'category'">
           <a-tag :color="categoryColor(record.category)">{{ categoryLabel(record.category) }}</a-tag>
@@ -40,7 +43,7 @@
           <a-tag :color="typeColor(record.type)">{{ record.type }}</a-tag>
         </template>
         <template v-else-if="column.key === 'endpoint'">
-          <code class="cp-mono">{{ endpointBrief(record as Connection) }}</code>
+          <code class="cp-mono" :title="endpointBrief(record as Connection)">{{ endpointBrief(record as Connection) }}</code>
         </template>
         <template v-else-if="column.key === 'status'">
           <span class="cp-status">
@@ -55,7 +58,7 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4" wrap>
-            <a-button type="link" size="small" :loading="testing === record.id" @click="testOne(record as Connection)">
+            <a-button type="link" size="small" :loading="testing === record.id" :disabled="!!testing && testing !== record.id" @click="testOne(record as Connection)">
               <template #icon><LinkOutlined /></template>测试
             </a-button>
             <a-button type="link" size="small" @click="openBrowser(record as Connection)">
@@ -67,45 +70,51 @@
         </template>
       </template>
       <template #emptyText>
-        <a-empty description="暂无数据源，点击「新增数据源」添加" />
+        <a-empty v-if="!store.error" :description="search || categoryFilter !== 'all' ? '没有匹配的数据源，请调整搜索或筛选条件' : '暂无数据源，点击「新增数据源」添加'" />
       </template>
     </a-table>
 
     <!-- 删除确认（按资产引用数提示，支持级联） -->
     <a-modal :open="del_.open" title="删除数据源" :confirm-loading="del_.loading"
              :ok-text="del_.cascade ? '级联删除' : '删除'" ok-type="danger" cancel-text="取消"
-             :ok-button-props="{ disabled: del_.assetCount > 0 && !del_.cascade }"
+             :ok-button-props="{ disabled: del_.checking || !!del_.error || (del_.assetCount > 0 && !del_.cascade) }"
+             :cancel-button-props="{ disabled: del_.loading }" :closable="!del_.loading" :mask-closable="!del_.loading" :keyboard="!del_.loading"
              @ok="confirmDelete" @cancel="del_.open = false"
              @update:open="(v) => del_.open = v" destroy-on-close>
       <a-spin :spinning="del_.checking">
         <p>确认删除数据源「<b>{{ del_.name }}</b>」？</p>
-        <template v-if="del_.assetCount > 0">
+        <a-alert v-if="del_.error" type="error" show-icon :message="del_.error">
+          <template #action><a-button size="small" @click="checkDeleteAssets">重试</a-button></template>
+        </a-alert>
+        <template v-else-if="del_.assetCount > 0">
           <p style="color:#ef4444">该数据源下有 <b>{{ del_.assetCount }}</b> 个资产。直接删除会被拒绝。</p>
           <a-checkbox v-model:checked="del_.cascade">
             同时删除这 {{ del_.assetCount }} 个资产（含对象绑定、质量规则等下游引用，<b>不可恢复</b>）
           </a-checkbox>
         </template>
-        <p v-else style="color:#6b7280">该数据源下没有资产，可直接删除。</p>
+        <p v-else-if="!del_.checking" style="color:#6b7280">该数据源下没有资产，可直接删除。</p>
       </a-spin>
     </a-modal>
 
     <!-- 第一步：选大类（仅新建时显示） -->
-    <a-modal :open="picker.open" title="选择数据源类型" width="720" :footer="null"
+    <a-modal :open="picker.open" title="选择数据源类型" :width="720" :footer="null"
              @update:open="(v) => picker.open = v" destroy-on-close>
       <div class="cp-cat-grid">
-        <div v-for="cat in CATEGORIES" :key="cat.key" class="cp-cat-card"
+        <button v-for="cat in CATEGORIES" :key="cat.key" type="button" class="cp-cat-card"
+             :disabled="!(capabilities[cat.key] && capabilities[cat.key].length)"
              :class="{ 'cp-cat-card--disabled': !(capabilities[cat.key] && capabilities[cat.key].length) }"
              @click="selectCategory(cat.key)">
           <div class="cp-cat-card__icon" :style="{ background: cat.color }">{{ cat.glyph }}</div>
           <div class="cp-cat-card__title">{{ cat.label }}</div>
           <div class="cp-cat-card__sub">{{ (capabilities[cat.key] || []).join(' · ') || '后端未启用' }}</div>
           <div class="cp-cat-card__hint">{{ cat.hint }}</div>
-        </div>
+        </button>
       </div>
     </a-modal>
 
     <!-- 第二步：表单抽屉（新建/编辑共用） -->
     <a-drawer :open="modal.open" :title="modalTitle" width="560"
+              :closable="!saving" :mask-closable="!saving" :keyboard="!saving"
               @update:open="(v) => modal.open = v" destroy-on-close>
       <a-form layout="vertical">
         <a-form-item label="连接名称 *">
@@ -253,16 +262,20 @@
     </a-drawer>
 
     <!-- 浏览弹窗（按 category 切换内容） -->
-    <a-modal :open="browser.open" :title="`浏览：${browser.title}`" width="720" :footer="null"
+    <a-modal :open="browser.open" :title="`浏览：${browser.title}`" :width="720" :footer="null"
+             :closable="!bulkSaving && !singleSaving" :mask-closable="!bulkSaving && !singleSaving" :keyboard="!bulkSaving && !singleSaving"
              @update:open="(v) => browser.open = v">
-      <a-spin :spinning="browser.loading">
+      <a-spin :spinning="browser.loading || bulkSaving">
+        <a-alert v-if="browser.error" type="error" show-icon :message="browser.error" style="margin-bottom:12px">
+          <template #action><a-button size="small" @click="reloadBrowser">重试</a-button></template>
+        </a-alert>
         <!-- 批量操作工具条（除 API 外通用） -->
         <div v-if="browser.category !== 'api'" class="cp-bulk-bar">
           <a-checkbox :checked="allSelected" :indeterminate="someSelected" @change="toggleAll">
             全选 <span class="cp-muted">（已选 {{ browser.selected.length }}/{{ totalRows }}）</span>
           </a-checkbox>
           <span class="cp-spacer" />
-          <a-button type="primary" :disabled="browser.selected.length === 0"
+          <a-button type="primary" :disabled="browser.loading || !!singleSaving || browser.selected.length === 0"
                     :loading="bulkSaving" @click="bulkRegister">
             批量注册为 Asset（{{ browser.selected.length }}）
           </a-button>
@@ -282,7 +295,7 @@
                   <a-checkbox :checked="browser.selected.includes(item)" @change="toggleOne(item)">
                     {{ item }}
                   </a-checkbox>
-                  <a-button type="link" size="small" @click="registerAsAsset(item)">注册为 Asset</a-button>
+                  <a-button type="link" size="small" :loading="singleSaving === item" :disabled="!!singleSaving && singleSaving !== item" @click="registerAsAsset(item)">注册为 Asset</a-button>
                 </a-list-item>
               </template>
             </a-list>
@@ -300,7 +313,7 @@
                   <code class="cp-mono">{{ item.key }}</code>
                   <span class="cp-muted" style="margin-left:8px">{{ formatSize(item.size) }}</span>
                 </a-checkbox>
-                <a-button type="link" size="small" @click="registerObjectAsAsset(item)">注册为 Asset</a-button>
+                <a-button type="link" size="small" :loading="singleSaving === item.key" :disabled="!!singleSaving && singleSaving !== item.key" @click="registerObjectAsAsset(item)">注册为 Asset</a-button>
               </a-list-item>
             </template>
           </a-list>
@@ -317,13 +330,13 @@
                   <a-checkbox v-if="!item.is_dir"
                               :checked="browser.selected.includes(item.name)"
                               @change="toggleOne(item.name)" />
-                  <span :style="item.is_dir ? 'color:#3b82f6;cursor:pointer' : ''"
-                        @click="item.is_dir && enterPath(item.name)">
+                  <button v-if="item.is_dir" type="button" class="cp-path-link" @click="enterPath(item.name)">📁 {{ item.name }}</button>
+                  <span v-else>
                     {{ item.is_dir ? '📁' : '📄' }} {{ item.name }}
                   </span>
                   <span class="cp-muted" style="margin-left:8px">{{ formatSize(item.size) }}</span>
                 </span>
-                <a-button v-if="!item.is_dir" type="link" size="small" @click="registerPathAsAsset(item)">
+                <a-button v-if="!item.is_dir" type="link" size="small" :loading="singleSaving === item.name" :disabled="!!singleSaving && singleSaving !== item.name" @click="registerPathAsAsset(item)">
                   注册为 Asset
                 </a-button>
               </a-list-item>
@@ -339,7 +352,7 @@
                 <a-checkbox :checked="browser.selected.includes(item)" @change="toggleOne(item)">
                   <code class="cp-mono">{{ item }}</code>
                 </a-checkbox>
-                <a-button type="link" size="small" @click="registerTopicAsAsset(item)">注册为 Asset</a-button>
+                <a-button type="link" size="small" :loading="singleSaving === item" :disabled="!!singleSaving && singleSaving !== item" @click="registerTopicAsAsset(item)">注册为 Asset</a-button>
               </a-list-item>
             </template>
           </a-list>
@@ -358,7 +371,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
-  Button as AButton, Checkbox as ACheckbox, Col as ACol, Divider as ADivider, Drawer as ADrawer, Empty as AEmpty,
+  Alert as AAlert, Button as AButton, Checkbox as ACheckbox, Col as ACol, Divider as ADivider, Drawer as ADrawer, Empty as AEmpty,
   Form as AForm, FormItem as AFormItem, Input as AInput, InputNumber as AInputNumber,
   InputPassword as AInputPassword, InputSearch as AInputSearch, List as AList,
   ListItem as AListItem, Modal as AModal, Row as ARow,
@@ -376,6 +389,7 @@ import {
   getCapabilities, getCredentialMask, listObjects, listPaths, listTablesOfConnection, listTopics,
 } from '../../api/connection'
 import { listAssets } from '../../api/asset'
+import type { AssetCreate } from '../../types/asset'
 import type {
   Capabilities, Connection, ConnectionCategory,
   ObjectEntry, PathEntry,
@@ -386,6 +400,7 @@ const assetStore = useAssetStore()
 const search = ref('')
 const categoryFilter = ref<string>('all')
 const capabilities = ref<Capabilities>({} as Capabilities)
+const currentPage = ref(1)
 
 const CATEGORIES: { key: ConnectionCategory; label: string; glyph: string; color: string; hint: string }[] = [
   { key: 'database',       label: '数据库',     glyph: 'DB',  color: '#3b82f6', hint: '关系数据库 / 分析库' },
@@ -401,13 +416,13 @@ const categoryFilters = computed(() => [
 ])
 
 const columns = [
-  { title: '名称', dataIndex: 'name', key: 'name', ellipsis: true },
+  { title: '名称', dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
   { title: '分类', key: 'category', width: 110 },
   { title: '类型', key: 'type', width: 110 },
-  { title: '端点', key: 'endpoint', ellipsis: true },
+  { title: '端点', key: 'endpoint', width: 230, ellipsis: true },
   { title: '权限', key: 'writable', width: 80 },
   { title: '状态', key: 'status', width: 110 },
-  { title: '操作', key: 'actions', width: 280 },
+  { title: '操作', key: 'actions', width: 280, fixed: 'right' as const },
 ]
 
 const testing = ref<string | null>(null)
@@ -417,7 +432,7 @@ const picker = reactive({ open: false })
 const modal = reactive({ open: false, editingId: '' as string })
 const del_ = reactive({
   open: false, checking: false, loading: false, cascade: false,
-  id: '', name: '', assetCount: 0,
+  id: '', name: '', assetCount: 0, error: '',
 })
 type FormShape = {
   name: string
@@ -446,7 +461,7 @@ const paramBool = reactive<Record<string, boolean>>({})
 const credStr = reactive<Record<string, string>>({})
 
 const browser = reactive({
-  open: false, loading: false, connId: '', category: 'database' as ConnectionCategory,
+  open: false, loading: false, error: '', connId: '', category: 'database' as ConnectionCategory,
   title: '',
   databases: [] as string[],
   tables: [] as string[],
@@ -458,6 +473,9 @@ const browser = reactive({
   selected: [] as string[],
 })
 const bulkSaving = ref(false)
+const singleSaving = ref<string | null>(null)
+let browserRequest = 0
+let deleteRequest = 0
 
 const totalRows = computed(() => {
   if (browser.category === 'database') return browser.tables.length
@@ -516,7 +534,7 @@ function buildFilters() {
   if (categoryFilter.value !== 'all') f.category = categoryFilter.value
   return f
 }
-function onSearch() { load() }
+function onSearch() { currentPage.value = 1; load() }
 
 function openCreate() {
   modal.editingId = ''
@@ -566,8 +584,9 @@ function openEdit(record: Connection) {
   }
   // 回填遮罩凭据，让用户知道当前已配了什么
   getCredentialMask(record.id).then(mask => {
+    if (!modal.open || modal.editingId !== record.id) return
     for (const [k, v] of Object.entries(mask)) {
-      credStr[k] = v
+      if (!credStr[k]) credStr[k] = v
     }
   }).catch(() => {})
   modal.open = true
@@ -590,6 +609,7 @@ function buildCredential(): Record<string, unknown> | null {
 }
 
 async function save() {
+  if (saving.value) return
   saving.value = true
   try {
     if (modal.editingId) {
@@ -609,9 +629,9 @@ async function save() {
       await store.update(modal.editingId, payload as any)
       message.success('已更新')
     } else {
-      if (!form.name) { message.error('请填写连接名称'); return }
+      if (!form.name.trim()) { message.error('请填写连接名称'); return }
       const payload: Record<string, unknown> = {
-        name: form.name, category: form.category, type: form.type,
+        name: form.name.trim(), category: form.category, type: form.type,
         host: form.host || '', port: form.port || 0,
         database: form.database, params: buildParams(),
         pool_size: form.pool_size, rate_limit_qps: form.rate_limit_qps,
@@ -635,31 +655,43 @@ async function save() {
 }
 
 async function testOne(record: Connection) {
+  if (testing.value) return
   testing.value = record.id
   try {
     const r = await store.test(record.id)
     if (r.success) message.success(`连接成功（${r.latency_ms}ms）`)
     else message.error(r.message)
     await load()
+  } catch (e: any) {
+    message.error(e.response?.data?.detail || e.message || '连接测试失败，请重试')
   } finally { testing.value = null }
 }
 
 async function openDelete(record: Connection) {
   Object.assign(del_, {
     open: true, checking: true, loading: false, cascade: false,
-    id: record.id, name: record.name, assetCount: 0,
+    id: record.id, name: record.name, assetCount: 0, error: '',
   })
+  await checkDeleteAssets()
+}
+
+async function checkDeleteAssets() {
+  const request = ++deleteRequest
+  const id = del_.id
+  del_.checking = true
+  del_.error = ''
   try {
-    const assets = await listAssets({ connection_id: record.id, status: '' })
-    del_.assetCount = assets.length
-  } catch {
-    del_.assetCount = 0
+    const assets = await listAssets({ connection_id: id, status: '' })
+    if (request === deleteRequest && del_.id === id) del_.assetCount = assets.length
+  } catch (e: any) {
+    if (request === deleteRequest && del_.id === id) del_.error = e.response?.data?.detail || '无法确认资产引用，请重试后再删除'
   } finally {
-    del_.checking = false
+    if (request === deleteRequest && del_.id === id) del_.checking = false
   }
 }
 
 async function confirmDelete() {
+  if (del_.loading || del_.checking || del_.error || (del_.assetCount > 0 && !del_.cascade)) return
   del_.loading = true
   try {
     await store.remove(del_.id, del_.cascade)
@@ -674,7 +706,7 @@ async function confirmDelete() {
 
 async function openBrowser(record: Connection) {
   Object.assign(browser, {
-    open: true, loading: true, connId: record.id, category: record.category,
+    open: true, loading: true, error: '', connId: record.id, category: record.category,
     title: record.name,
     databases: [], tables: [], objects: [], paths: [], topics: [],
     prefix: '', path: '/', selected: [],
@@ -683,25 +715,33 @@ async function openBrowser(record: Connection) {
 }
 
 async function reloadBrowser() {
+  const request = ++browserRequest
+  const { connId, category, prefix, path } = browser
   browser.loading = true
+  browser.error = ''
   browser.selected = []
+  browser.tables = []; browser.objects = []; browser.paths = []; browser.topics = []
   try {
-    if (browser.category === 'database') {
+    if (category === 'database') {
       browser.databases = []
-      const conn = store.items.find(c => c.id === browser.connId)
+      const conn = store.items.find(c => c.id === connId)
       if (conn?.database) browser.databases = [conn.database]
-      browser.tables = await listTablesOfConnection(browser.connId)
-    } else if (browser.category === 'object_storage') {
-      browser.objects = await listObjects(browser.connId, browser.prefix, 200)
-    } else if (browser.category === 'file_transfer') {
-      browser.paths = await listPaths(browser.connId, browser.path || '/', 200)
-    } else if (browser.category === 'message_queue') {
-      browser.topics = await listTopics(browser.connId)
+      const tables = await listTablesOfConnection(connId)
+      if (request === browserRequest) browser.tables = tables
+    } else if (category === 'object_storage') {
+      const objects = await listObjects(connId, prefix, 200)
+      if (request === browserRequest) browser.objects = objects
+    } else if (category === 'file_transfer') {
+      const paths = await listPaths(connId, path || '/', 200)
+      if (request === browserRequest) browser.paths = paths
+    } else if (category === 'message_queue') {
+      const topics = await listTopics(connId)
+      if (request === browserRequest) browser.topics = topics
     }
   } catch (e: any) {
-    message.error(e.response?.data?.detail || e.message)
+    if (request === browserRequest) browser.error = e.response?.data?.detail || e.message || '列表加载失败，请重试'
   } finally {
-    browser.loading = false
+    if (request === browserRequest) browser.loading = false
   }
 }
 
@@ -711,60 +751,53 @@ function enterPath(name: string) {
   reloadBrowser()
 }
 
-async function registerAsAsset(table: string) {
-  try {
-    await assetStore.create({ name: table, kind: 'table', connection_id: browser.connId, locator: { table } })
-    message.success(`已注册资产：${table}`)
-  } catch (e: any) {
-    message.error(e.response?.data?.detail || e.message)
-  }
+function registerAsAsset(table: string) {
+  return registerPayload({ name: table, kind: 'table', connection_id: browser.connId, locator: { table } }, table)
 }
 
-async function registerObjectAsAsset(obj: ObjectEntry) {
-  try {
-    await assetStore.create({
+function registerObjectAsAsset(obj: ObjectEntry) {
+  return registerPayload({
       name: obj.key, kind: 'document', connection_id: browser.connId,
       locator: { source_type: 's3', key: obj.key },
-    } as any)
-    message.success(`已注册资产：${obj.key}`)
-  } catch (e: any) {
-    message.error(e.response?.data?.detail || e.message)
-  }
+    }, obj.key)
 }
 
-async function registerPathAsAsset(p: PathEntry) {
-  try {
-    const fullPath = (browser.path.endsWith('/') ? browser.path : browser.path + '/') + p.name
-    await assetStore.create({
+function registerPathAsAsset(p: PathEntry) {
+  const fullPath = (browser.path.endsWith('/') ? browser.path : browser.path + '/') + p.name
+  return registerPayload({
       name: p.name, kind: 'document', connection_id: browser.connId,
       locator: { source_type: 'file', path: fullPath },
-    } as any)
-    message.success(`已注册资产：${p.name}`)
-  } catch (e: any) {
-    message.error(e.response?.data?.detail || e.message)
-  }
+    }, p.name)
 }
 
-async function registerTopicAsAsset(topic: string) {
+function registerTopicAsAsset(topic: string) {
+  return registerPayload({
+    name: topic, kind: 'document', connection_id: browser.connId,
+    locator: { source_type: 'mq', topic },
+  }, topic)
+}
+
+async function registerPayload(payload: AssetCreate, name: string) {
+  if (singleSaving.value || bulkSaving.value) return
+  singleSaving.value = name
   try {
-    await assetStore.create({
-      name: topic, kind: 'document', connection_id: browser.connId,
-      locator: { source_type: 'mq', topic },
-    } as any)
-    message.success(`已注册资产：${topic}`)
+    await assetStore.create(payload)
+    message.success(`已注册资产：${name}`)
   } catch (e: any) {
     message.error(e.response?.data?.detail || e.message)
+  } finally {
+    singleSaving.value = null
   }
 }
 
 async function bulkRegister() {
-  if (browser.selected.length === 0) return
+  if (bulkSaving.value || singleSaving.value || browser.loading || browser.selected.length === 0) return
+  const payloads = browser.selected.map(key => ({ key, payload: buildAssetPayload(key) }))
   bulkSaving.value = true
   let ok = 0
   const failed: { key: string; reason: string }[] = []
-  for (const sel of [...browser.selected]) {
+  for (const { key: sel, payload } of payloads) {
     try {
-      const payload = buildAssetPayload(sel)
       if (!payload) continue
       await assetStore.create(payload as any)
       ok += 1
@@ -856,6 +889,7 @@ watch(() => form.type, (t) => {
     if (def[t] && !modal.editingId) form.port = def[t]
   }
 })
+watch(() => browser.open, (open) => { if (!open) { ++browserRequest; browser.loading = false } })
 
 onMounted(async () => {
   try {
@@ -870,29 +904,31 @@ onMounted(async () => {
 <style scoped>
 .cp-page { padding: 24px; }
 .cp-page__header { margin-bottom: 16px; }
-.cp-page__title { font-size: 24px; font-weight: 600; color: #111827; margin: 0; }
-.cp-page__subtitle { font-size: 13px; color: #6b7280; margin-top: 4px; }
+.cp-page__title { font-size: 24px; font-weight: 600; color: var(--neutral-900, #111827); margin: 0; }
+.cp-page__subtitle { font-size: 13px; color: var(--neutral-600, #6b7280); margin-top: 4px; }
 .cp-stats {
   display: flex; align-items: center; gap: 32px; padding: 16px;
-  background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  margin-bottom: 12px;
+  background: var(--neutral-0, #fff); border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  margin-bottom: 12px; flex-wrap: wrap;
 }
 .cp-spacer { flex: 1; }
 .cp-toolbar {
-  display: flex; gap: 12px; align-items: center; padding: 12px 16px;
-  background: #fff; border-radius: 8px; margin-bottom: 12px;
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; padding: 12px 16px;
+  background: var(--neutral-0, #fff); border-radius: 8px; margin-bottom: 12px;
 }
 .cp-status { display: inline-flex; align-items: center; gap: 6px; }
+.cp-load-error { margin-bottom: 16px; }
+.cp-path-link { color: var(--primary, #2563eb); cursor: pointer; border: 0; background: none; padding: 0; font: inherit; text-align: left; overflow-wrap: anywhere; }
 .cp-status__dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.cp-mono { font-family: 'Menlo','Consolas',monospace; font-size: 12px; color: #4b5563; }
-.cp-muted { color: #9ca3af; font-size: 12px; }
-.cp-hint { color: #9ca3af; font-size: 11px; margin-left: 8px; }
-.cp-empty { padding: 32px; text-align: center; color: #6b7280; font-size: 13px; line-height: 1.7; }
+.cp-mono { font-family: 'Menlo','Consolas',monospace; font-size: 12px; color: var(--neutral-700, #4b5563); }
+.cp-muted { color: var(--neutral-600, #6b7280); font-size: 12px; }
+.cp-hint { color: var(--neutral-600, #6b7280); font-size: 11px; margin-left: 8px; }
+.cp-empty { padding: 32px; text-align: center; color: var(--neutral-600, #6b7280); font-size: 13px; line-height: 1.7; }
 
 .cp-bulk-bar {
   display: flex; align-items: center; gap: 12px;
   padding: 8px 12px; margin-bottom: 8px;
-  background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 6px;
+  background: var(--neutral-50, #f9fafb); border: 1px solid var(--neutral-200, #e5e7eb); border-radius: 6px;
 }
 
 .cp-cat-grid {
@@ -900,8 +936,8 @@ onMounted(async () => {
 }
 .cp-cat-card {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
-  padding: 18px 12px; border: 1px solid #e5e7eb; border-radius: 10px;
-  cursor: pointer; transition: all 0.15s; background: #fff;
+  padding: 18px 12px; border: 1px solid var(--neutral-200, #e5e7eb); border-radius: 10px;
+  cursor: pointer; transition: all 0.15s; background: var(--neutral-0, #fff); font: inherit;
 }
 .cp-cat-card:not(.cp-cat-card--disabled):hover {
   border-color: #3b82f6; box-shadow: 0 4px 12px rgba(59,130,246,0.1);
@@ -913,7 +949,12 @@ onMounted(async () => {
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-weight: 700; font-size: 14px;
 }
-.cp-cat-card__title { font-weight: 600; font-size: 14px; color: #111827; }
-.cp-cat-card__sub { font-size: 11px; color: #6b7280; }
-.cp-cat-card__hint { font-size: 11px; color: #9ca3af; }
+.cp-cat-card__title { font-weight: 600; font-size: 14px; color: var(--neutral-900, #111827); }
+.cp-cat-card__sub { font-size: 11px; color: var(--neutral-600, #6b7280); }
+.cp-cat-card__hint { font-size: 11px; color: var(--neutral-600, #6b7280); }
+.cp-cat-card:focus-visible, .cp-path-link:focus-visible { outline: 2px solid var(--primary, #2563eb); outline-offset: 3px; }
+.cp-bulk-bar { flex-wrap: wrap; }
+:deep(.ant-list-item) { gap: 12px; }
+:deep(.ant-list-item > .ant-checkbox-wrapper) { min-width: 0; overflow-wrap: anywhere; }
+:deep(.ant-list-item > .ant-btn) { flex-shrink: 0; }
 </style>

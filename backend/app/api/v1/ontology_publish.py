@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.agent import Agent
 from app.models.entity import OntologyEntity
 from app.models.relation import EntityRelation
+from app.models.scenario import ScenarioDict
 from app.models.user import User
 from app.models.version import (
     OntologyVersion,
@@ -37,6 +38,7 @@ router = APIRouter(prefix="/ontology-publish", tags=["ontology-publish"])
 class CreateVersionRequest(BaseModel):
     name: str
     description: str | None = None
+    ontology_id: str | None = None
 
 class UpdateVersionRequest(BaseModel):
     name: str | None = None
@@ -86,10 +88,18 @@ def get_version(version_id: str, db: Session = Depends(get_db)):
 
 @router.post("/versions")
 def create_version(req: CreateVersionRequest, db: Session = Depends(get_db), user: User = Depends(require_user)):
-    max_num = db.query(func.max(OntologyVersion.version_number)).scalar() or 0
+    if req.ontology_id and not db.get(ScenarioDict, req.ontology_id):
+        raise HTTPException(404, "本体不存在")
+    name = req.name.strip()
+    if not name:
+        raise HTTPException(422, "版本名称不能为空")
+    max_num = db.query(func.max(OntologyVersion.version_number)).filter(
+        OntologyVersion.ontology_id == req.ontology_id
+    ).scalar() or 0
     version = OntologyVersion(
         version_number=max_num + 1,
-        name=req.name,
+        name=name,
+        ontology_id=req.ontology_id,
         description=req.description,
         status="draft",
         created_by=user.id,
@@ -133,6 +143,14 @@ def add_entities(version_id: str, req: AddEntitiesRequest, db: Session = Depends
 
     existing_source_ids = {ve.source_entity_id for ve in v.entities}
     added = []
+
+    if v.ontology_id:
+        foreign_entities = db.query(OntologyEntity.id).filter(
+            OntologyEntity.id.in_(req.entity_ids),
+            (OntologyEntity.ontology_id != v.ontology_id) | OntologyEntity.ontology_id.is_(None),
+        ).first()
+        if foreign_entities:
+            raise HTTPException(400, "只能添加当前本体的对象")
 
     for eid in req.entity_ids:
         if eid in existing_source_ids:

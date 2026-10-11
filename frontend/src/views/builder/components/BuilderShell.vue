@@ -19,7 +19,9 @@
     <div class="ob-steps">
       <template v-for="(step, idx) in stepsForMethod" :key="step.key">
         <div
-          class="ob-step"
+          class="ob-step" role="button" :tabindex="idx + 1 <= currentStep ? 0 : -1"
+          :aria-current="currentStep === idx + 1 ? 'step' : undefined"
+          @keydown.enter="onStepClick(idx + 1)" @keydown.space.prevent="onStepClick(idx + 1)"
           :class="{ 'ob-step--active': currentStep === idx + 1, 'ob-step--done': currentStep > idx + 1 }"
           @click="onStepClick(idx + 1)"
         >
@@ -141,9 +143,22 @@ const versionLabel = computed(() => {
   return '草稿 · v0.1'
 })
 
-watch(() => props.session.status, (s) => {
-  if (s === 'pending_review' || s === 'reviewing') currentStep.value = Math.max(currentStep.value, 2)
-  else if (s === 'pending_hydration' || s === 'hydrating' || s === 'pending_publish' || s === 'publishing' || s === 'published') currentStep.value = 3
+function stepForStatus() {
+  const status = props.session.status
+  if (status === 'pending_review' || status === 'reviewing') return 2
+  if (status === 'pending_hydration') return 3
+  if (status === 'hydrating' || status === 'pending_publish' || status === 'publishing' || status === 'published') {
+    return props.session.buildMethod === 'manual' ? 4 : 3
+  }
+  return 1
+}
+
+watch(() => props.session.sessionId, () => {
+  currentStep.value = stepForStatus()
+}, { immediate: true })
+
+watch(() => props.session.status, () => {
+  currentStep.value = Math.max(currentStep.value, stepForStatus())
 })
 
 function onStepClick(n: number) {
@@ -198,7 +213,7 @@ function goPrev() { currentStep.value = Math.max(1, currentStep.value - 1) }
   border-bottom: 1px solid #e2e8f0;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.02);
 }
-.ob-step {
+.ob-step { opacity: 1;
   display: flex; align-items: center; gap: 10px;
   cursor: pointer; transition: opacity 150ms ease;
 }
@@ -225,4 +240,5 @@ function goPrev() { currentStep.value = Math.max(1, currentStep.value - 1) }
 .ob-step--active + .ob-step-connector { background: linear-gradient(90deg, #4f46e5, #e2e8f0); }
 
 .ob-shell-body { flex: 1; overflow: hidden; }
+.ob-step:focus-visible { outline: 2px solid #4f46e5; outline-offset: 3px; border-radius: 6px; }
 </style>

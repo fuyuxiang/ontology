@@ -1,5 +1,6 @@
 <template>
   <a-card :bordered="false" class="health-card">
+    <a-empty v-if="!services.length" description="暂无服务健康记录" :image-style="{ height: '32px' }" />
     <div class="health-grid">
       <div v-for="svc in services" :key="svc.name" class="health-item"
            :class="{ unhealthy: svc.status === 'unhealthy', warning: svc.status === 'warning' }">
@@ -31,12 +32,12 @@ defineProps<{
   gap: 8px;
   padding: 8px 16px;
   border-radius: 6px;
-  background: var(--color-bg-container, #fafafa);
+  background: var(--neutral-50, #fafafa);
   min-width: 140px;
   transition: background 0.2s;
 }
 .health-item:hover {
-  background: var(--color-bg-elevated, #f0f0f0);
+  background: var(--neutral-100, #f0f0f0);
 }
 .status-dot {
   width: 10px;
@@ -58,5 +59,5 @@ defineProps<{
   flex-direction: column;
 }
 .name { font-size: 13px; font-weight: 500; }
-.latency { font-size: 11px; color: var(--color-text-secondary, #888); }
+.latency { font-size: 11px; color: var(--neutral-600, #6b7280); }
 </style>

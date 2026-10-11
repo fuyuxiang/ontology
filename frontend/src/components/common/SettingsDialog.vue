@@ -2,12 +2,29 @@
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="visible" class="settings-overlay" @click.self="emit('close')">
-        <div class="settings-dialog">
+        <div
+          ref="panel"
+          class="settings-dialog"
+          role="dialog"
+          aria-modal="true"
+          :aria-labelledby="titleId"
+          tabindex="-1"
+        >
           <div class="settings-dialog__header">
-            <h3 class="settings-dialog__title">系统设置</h3>
-            <button class="settings-dialog__close" @click="emit('close')">
+            <h3 :id="titleId" class="settings-dialog__title">系统设置</h3>
+            <button
+              type="button"
+              class="settings-dialog__close"
+              aria-label="关闭"
+              @click="emit('close')"
+            >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                <path
+                  d="M4 4l8 8M12 4l-8 8"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -18,7 +35,7 @@
                 <div class="settings-dialog__avatar">{{ initial }}</div>
                 <div>
                   <div class="settings-dialog__name">{{ authStore.user?.name || '用户' }}</div>
-                  <div class="settings-dialog__role">{{ authStore.user?.role || 'viewer' }}</div>
+                  <div class="settings-dialog__role">{{ roleLabel }}</div>
                 </div>
               </div>
             </div>
@@ -26,7 +43,15 @@
               <div class="settings-dialog__label">外观</div>
               <div class="settings-dialog__row">
                 <span>深色模式</span>
-                <button class="settings-dialog__toggle" :class="{ 'settings-dialog__toggle--on': themeStore.isDark }" @click="themeStore.toggle()">
+                <button
+                  type="button"
+                  class="settings-dialog__toggle"
+                  role="switch"
+                  aria-label="深色模式"
+                  :aria-checked="themeStore.isDark"
+                  :class="{ 'settings-dialog__toggle--on': themeStore.isDark }"
+                  @click="themeStore.toggle()"
+                >
                   <span class="settings-dialog__toggle-dot"></span>
                 </button>
               </div>
@@ -34,7 +59,20 @@
           </div>
           <div class="settings-dialog__footer">
             <button class="settings-dialog__governance" @click="goGovernance">
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l1.3 2.6 2.9.4-2.1 2 .5 2.9L8 7.9l-2.6 1.5.5-2.9-2.1-2 2.9-.4L8 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M4 11.5h8M5 13.5h6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                <path
+                  d="M8 1.5l1.3 2.6 2.9.4-2.1 2 .5 2.9L8 7.9l-2.6 1.5.5-2.9-2.1-2 2.9-.4L8 1.5z"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M4 11.5h8M5 13.5h6"
+                  stroke="currentColor"
+                  stroke-width="1.3"
+                  stroke-linecap="round"
+                />
+              </svg>
               <span>系统设置</span>
             </button>
             <button class="settings-dialog__logout" @click="handleLogout">退出登录</button>
@@ -46,19 +84,33 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../store/auth'
 import { useThemeStore } from '../../store/theme'
+import { useDialogFocus } from '../../composables/useDialogFocus'
 
-defineProps<{ visible: boolean }>()
+const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ close: [] }>()
 
 const authStore = useAuthStore()
 const themeStore = useThemeStore()
 const router = useRouter()
+const panel = ref<HTMLElement | null>(null)
+const titleId = useId()
+useDialogFocus(
+  () => props.visible,
+  panel,
+  () => emit('close'),
+)
 
 const initial = computed(() => (authStore.user?.name || 'U').charAt(0).toUpperCase())
+const roleLabel = computed(
+  () =>
+    ({ admin: '管理员', editor: '编辑者', operator: '操作员', viewer: '查看者' })[
+      authStore.user?.role || 'viewer'
+    ],
+)
 
 function handleLogout() {
   authStore.logout()
@@ -74,75 +126,178 @@ function goGovernance() {
 
 <style scoped>
 .settings-overlay {
-  position: fixed; inset: 0; z-index: 1000;
-  background: rgba(0,0,0,0.4);
-  display: flex; align-items: center; justify-content: center;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
 .settings-dialog {
-  width: 360px; background: var(--neutral-0);
-  border-radius: 12px; border: 1px solid var(--neutral-200);
+  width: min(360px, 100%);
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  background: var(--neutral-0);
+  border-radius: 12px;
+  border: 1px solid var(--neutral-200);
   box-shadow: var(--shadow-xl);
-  overflow: hidden;
 }
 .settings-dialog__header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid var(--neutral-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--neutral-200);
 }
-.settings-dialog__title { font-size: var(--text-h3-size); font-weight: 600; color: var(--neutral-800); }
+.settings-dialog__title {
+  font-size: var(--text-h3-size);
+  font-weight: 600;
+  color: var(--neutral-800);
+}
 .settings-dialog__close {
-  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-  border: none; background: transparent; border-radius: 6px;
-  color: var(--neutral-500); cursor: pointer;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  color: var(--neutral-500);
+  cursor: pointer;
 }
-.settings-dialog__close:hover { background: var(--neutral-100); }
-.settings-dialog__body { padding: 16px 20px; }
-.settings-dialog__section { margin-bottom: 20px; }
-.settings-dialog__section:last-child { margin-bottom: 0; }
-.settings-dialog__label { font-size: var(--text-caption-size); font-weight: 600; color: var(--neutral-400); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
-.settings-dialog__user { display: flex; align-items: center; gap: 12px; }
+.settings-dialog__close:hover {
+  background: var(--neutral-100);
+}
+.settings-dialog__body {
+  padding: 16px 20px;
+}
+.settings-dialog__section {
+  margin-bottom: 20px;
+}
+.settings-dialog__section:last-child {
+  margin-bottom: 0;
+}
+.settings-dialog__label {
+  font-size: var(--text-code-size);
+  font-weight: 600;
+  color: var(--neutral-600);
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
+}
+.settings-dialog__user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .settings-dialog__avatar {
-  width: 36px; height: 36px; border-radius: 50%;
-  background: var(--semantic-600); color: var(--neutral-0);
-  font-size: var(--text-body-size); font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--semantic-600);
+  color: var(--neutral-0);
+  font-size: var(--text-body-size);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.settings-dialog__name { font-size: var(--text-body-size); font-weight: 600; color: var(--neutral-800); }
-.settings-dialog__role { font-size: var(--text-code-size); color: var(--neutral-500); }
+.settings-dialog__name {
+  font-size: var(--text-body-size);
+  font-weight: 600;
+  color: var(--neutral-800);
+  overflow-wrap: anywhere;
+}
+.settings-dialog__role {
+  font-size: var(--text-code-size);
+  color: var(--neutral-500);
+}
 .settings-dialog__row {
-  display: flex; align-items: center; justify-content: space-between;
-  font-size: var(--text-body-size); color: var(--neutral-700);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--text-body-size);
+  color: var(--neutral-700);
 }
 .settings-dialog__toggle {
-  width: 40px; height: 22px; border-radius: 11px; border: none;
-  background: var(--neutral-300); cursor: pointer; position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  border: none;
+  background: var(--neutral-300);
+  cursor: pointer;
+  position: relative;
   transition: background 0.2s;
 }
-.settings-dialog__toggle--on { background: var(--semantic-600); }
-.settings-dialog__toggle-dot {
-  position: absolute; top: 2px; left: 2px;
-  width: 18px; height: 18px; border-radius: 50%;
-  background: var(--neutral-0); transition: transform 0.2s;
+.settings-dialog__toggle--on {
+  background: var(--semantic-600);
 }
-.settings-dialog__toggle--on .settings-dialog__toggle-dot { transform: translateX(18px); }
+.settings-dialog__toggle-dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--neutral-0);
+  transition: transform 0.2s;
+}
+.settings-dialog__toggle--on .settings-dialog__toggle-dot {
+  transform: translateX(18px);
+}
 .settings-dialog__footer {
-  padding: 12px 20px; border-top: 1px solid var(--neutral-200);
-  display: flex; flex-direction: column; gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--neutral-200);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .settings-dialog__governance {
-  width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--neutral-200);
-  background: transparent; color: var(--neutral-700);
-  font-size: var(--text-body-size); font-weight: 500; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--neutral-200);
+  background: transparent;
+  color: var(--neutral-700);
+  font-size: var(--text-body-size);
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   transition: all 0.15s;
 }
-.settings-dialog__governance:hover { background: var(--neutral-50); border-color: var(--semantic-500); color: var(--semantic-600); }
+.settings-dialog__governance:hover {
+  background: var(--neutral-50);
+  border-color: var(--semantic-500);
+  color: var(--semantic-600);
+}
 .settings-dialog__logout {
-  width: 100%; height: 36px; border-radius: 8px; border: 1px solid var(--neutral-200);
-  background: transparent; color: var(--neutral-600);
-  font-size: var(--text-body-size); font-weight: 500; cursor: pointer;
+  width: 100%;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid var(--neutral-200);
+  background: transparent;
+  color: var(--neutral-600);
+  font-size: var(--text-body-size);
+  font-weight: 500;
+  cursor: pointer;
   transition: all 0.15s;
 }
-.settings-dialog__logout:hover { background: var(--neutral-50); color: var(--status-error); border-color: var(--status-error); }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.settings-dialog__logout:hover {
+  background: var(--neutral-50);
+  color: var(--status-error);
+  border-color: var(--status-error);
+}
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>

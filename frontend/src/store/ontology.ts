@@ -10,6 +10,7 @@ export const useOntologyStore = defineStore('ontology', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const currentOntologyId = ref<string | null>(null)
+  let entitiesRequest = 0
 
   const tier1 = computed(() => entities.value.filter(e => e.tier === 1))
   const tier2 = computed(() => entities.value.filter(e => e.tier === 2))
@@ -22,6 +23,7 @@ export const useOntologyStore = defineStore('ontology', () => {
   ])
 
   async function fetchEntities(query?: { tier?: Tier; search?: string; ontology_id?: string }) {
+    const request = ++entitiesRequest
     loading.value = true
     error.value = null
     try {
@@ -29,11 +31,12 @@ export const useOntologyStore = defineStore('ontology', () => {
       if (!params.ontology_id && currentOntologyId.value) {
         params.ontology_id = currentOntologyId.value
       }
-      entities.value = await entityApi.list(params)
+      const items = await entityApi.list(params)
+      if (request === entitiesRequest) entities.value = items
     } catch (e: unknown) {
-      error.value = (e as Error).message
+      if (request === entitiesRequest) error.value = (e as Error).message
     } finally {
-      loading.value = false
+      if (request === entitiesRequest) loading.value = false
     }
   }
 

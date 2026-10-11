@@ -4,46 +4,71 @@
     <div class="logic-page__header">
       <div v-if="!embedded">
         <h1 class="text-display">逻辑管理</h1>
-        <p class="text-caption" style="margin-top: 4px;">计算逻辑管理</p>
+        <p class="text-caption" style="margin-top: 4px">计算逻辑管理</p>
       </div>
       <div class="logic-page__actions">
         <button class="btn-primary" @click="showCreateModal = true">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path
+              d="M7 2v10M2 7h10"
+              stroke="currentColor"
+              stroke-width="1.5"
+              stroke-linecap="round"
+            />
           </svg>
           新建逻辑
         </button>
       </div>
     </div>
 
-    <div class="master-detail">
+    <div v-if="error" class="logic-error" role="alert">
+      <span>{{ error }}</span>
+      <button class="btn-secondary" :disabled="loading" @click="fetchFunctions">重试</button>
+    </div>
+    <div class="master-detail" :aria-busy="loading">
       <div class="master-detail__list">
         <div class="master-detail__toolbar">
-          <input v-model="search" class="logic-search" placeholder="搜索逻辑名称..." />
+          <input
+            v-model="search"
+            class="logic-search"
+            aria-label="搜索逻辑"
+            placeholder="搜索逻辑名称..."
+          />
           <div class="logic-filter-tags">
             <button
-              v-for="f in filters" :key="f.value"
+              v-for="f in filters"
+              :key="f.value"
               class="filter-tag"
               :class="{ 'filter-tag--active': activeFilter === f.value }"
+              :aria-pressed="activeFilter === f.value"
               @click="activeFilter = f.value"
-            >{{ f.label }}</button>
+            >
+              {{ f.label }}
+            </button>
           </div>
         </div>
 
         <div class="master-detail__items">
-          <div
-            v-for="fn in filteredFunctions" :key="fn.id"
+          <button
+            type="button"
+            v-for="fn in filteredFunctions"
+            :key="fn.id"
             class="list-item"
             :class="{ 'list-item--active': selectedId === fn.id }"
+            :aria-pressed="selectedId === fn.id"
+            :title="fn.name"
             @click="selectedId = fn.id"
           >
             <span class="list-item__status" :class="`list-item__status--${fn.status}`"></span>
             <span class="list-item__name">{{ fn.name }}</span>
             <span class="list-item__badge priority--medium">{{ fn.logic_type }}</span>
             <span class="list-item__meta">{{ fn.entity_name || '—' }}</span>
-          </div>
-          <div v-if="filteredFunctions.length === 0" class="logic-empty">
-            <p class="text-caption">无匹配逻辑</p>
+          </button>
+          <div v-if="loading" class="logic-empty" role="status">正在加载逻辑…</div>
+          <div v-else-if="!error && filteredFunctions.length === 0" class="logic-empty">
+            <p class="text-caption">
+              {{ functions.length ? '无匹配逻辑，请调整搜索或筛选。' : '暂无逻辑，从新建开始。' }}
+            </p>
           </div>
         </div>
       </div>
@@ -59,7 +84,10 @@
             <div class="detail-meta-item">
               <span class="detail-meta-label">状态</span>
               <span class="detail-meta-value">
-                <span class="list-item__status" :class="`list-item__status--${selectedFn.status}`"></span>
+                <span
+                  class="list-item__status"
+                  :class="`list-item__status--${selectedFn.status}`"
+                ></span>
                 {{ selectedFn.status === 'active' ? '已激活' : '未激活' }}
               </span>
             </div>
@@ -69,7 +97,9 @@
             </div>
             <div class="detail-meta-item">
               <span class="detail-meta-label">返回类型</span>
-              <span class="detail-meta-value"><code>{{ selectedFn.return_type }}</code></span>
+              <span class="detail-meta-value"
+                ><code>{{ selectedFn.return_type }}</code></span
+              >
             </div>
             <div class="detail-meta-item">
               <span class="detail-meta-label">调用次数</span>
@@ -89,11 +119,27 @@
 
           <div class="detail-panel__actions">
             <button class="btn-sm-exec" @click="handleEdit(selectedFn)">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5l2 2L4 10l-2.5.5L2 8l6.5-6.5z" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M8.5 1.5l2 2L4 10l-2.5.5L2 8l6.5-6.5z"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
               编辑
             </button>
-            <button class="btn-sm-del" @click="handleDelete(selectedFn)">
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 3h8M4 3V2h4v1M3 3v7h6V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <button class="btn-sm-del" :disabled="!!deleting" @click="handleDelete(selectedFn)">
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M2 3h8M4 3V2h4v1M3 3v7h6V3"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
               删除
             </button>
           </div>
@@ -113,20 +159,22 @@
     <FunctionBuilderDrawer
       :visible="showAdd"
       :edit-id="editingFuncId"
-      @close="showAdd = false; editingFuncId = undefined"
+      @close="closeFunctionDrawer"
       @saved="onFuncSaved"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi, type FunctionItem } from '../../api/functions'
 import { useOntologyStore } from '../../store/ontology'
 import { useScenarioStore } from '../../store/scenarios'
 import FunctionBuilderDrawer from '../../components/logic/FunctionBuilderDrawer.vue'
 import FunctionCreateModal from '../../components/logic/FunctionCreateModal.vue'
+import { skillError } from '../../api/skills'
+import { useToast } from '../../composables/useToast'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 
 const props = defineProps<{ embedded?: boolean }>()
@@ -134,6 +182,12 @@ const props = defineProps<{ embedded?: boolean }>()
 const route = useRoute()
 const router = useRouter()
 const scenarioStore = useScenarioStore()
+const ontologyStore = useOntologyStore()
+const toast = useToast()
+const loading = ref(false)
+const error = ref('')
+const deleting = ref('')
+let listRequest = 0
 
 const functions = ref<FunctionItem[]>([])
 const search = ref('')
@@ -143,7 +197,9 @@ const showAdd = ref(false)
 const showCreateModal = ref(false)
 const editingFuncId = ref<string | undefined>()
 
-const selectedFn = computed(() => filteredFunctions.value.find(f => f.id === selectedId.value) || null)
+const selectedFn = computed(
+  () => filteredFunctions.value.find((f) => f.id === selectedId.value) || null,
+)
 
 const filters = [
   { label: '全部', value: 'all' },
@@ -152,32 +208,68 @@ const filters = [
 
 const filteredFunctions = computed(() => {
   let list = functions.value
-  if (activeFilter.value === 'active') list = list.filter(f => f.status === 'active')
+  if (activeFilter.value === 'active') list = list.filter((f) => f.status === 'active')
   if (search.value) {
-    const s = search.value.toLowerCase()
-    list = list.filter(f => f.name.toLowerCase().includes(s) || f.description.toLowerCase().includes(s))
+    const s = search.value.trim().toLowerCase()
+    list = list.filter(
+      (f) => f.name.toLowerCase().includes(s) || (f.description || '').toLowerCase().includes(s),
+    )
   }
   return list
 })
 
 async function fetchFunctions() {
+  const request = ++listRequest
+  loading.value = true
+  error.value = ''
   const query: Record<string, string> = {}
-  const ontologyStore = useOntologyStore()
-  if (props.embedded && ontologyStore.currentOntologyId) {
+  if (props.embedded && route.params.code && ontologyStore.currentOntologyId) {
     query.ontology_id = ontologyStore.currentOntologyId
   }
-  functions.value = await functionApi.list(query)
+  try {
+    const result = await functionApi.list(query)
+    if (request === listRequest) functions.value = result
+  } catch (e) {
+    if (request === listRequest) error.value = skillError(e, '逻辑列表加载失败')
+  } finally {
+    if (request === listRequest) loading.value = false
+  }
 }
+
+watch(filteredFunctions, (items) => {
+  if (!items.some((item) => item.id === selectedId.value)) selectedId.value = items[0]?.id || null
+})
+watch(
+  () => (props.embedded && route.params.code ? ontologyStore.currentOntologyId : null),
+  () => {
+    functions.value = []
+    selectedId.value = null
+    fetchFunctions()
+  },
+)
+onBeforeUnmount(() => {
+  listRequest++
+})
 
 /** 增删改后同步刷新本体统计，使详情页侧栏计数即时更新 */
 async function refreshAfterMutation() {
   await fetchFunctions()
-  if (props.embedded) await scenarioStore.refreshScenarios()
+  if (props.embedded) {
+    try {
+      await scenarioStore.refreshScenarios()
+    } catch {
+      toast.warning('操作已完成，本体统计更新失败，请刷新本体列表')
+    }
+  }
 }
 
 function onFuncCreated(_fn: { id: string; name: string }) {
   showCreateModal.value = false
   refreshAfterMutation()
+}
+function closeFunctionDrawer() {
+  showAdd.value = false
+  editingFuncId.value = undefined
 }
 
 function onFuncSaved(fn: { id: string; name: string }) {
@@ -188,7 +280,10 @@ function onFuncSaved(fn: { id: string; name: string }) {
     const sid = route.query.session_id as string
     const oid = route.query.object_id as string
     if (sid && oid) {
-      router.push({ path: '/builder', query: { session_id: sid, attach_to: oid, new_id: fn.id, kind: 'function' } })
+      router.push({
+        path: '/builder',
+        query: { session_id: sid, attach_to: oid, new_id: fn.id, kind: 'function' },
+      })
     }
   }
 }
@@ -203,10 +298,18 @@ function handleEdit(fn: FunctionItem) {
 }
 
 async function handleDelete(fn: FunctionItem) {
-  if (!confirm(`确定删除逻辑「${fn.name}」？`)) return
-  await functionApi.remove(fn.id)
-  if (selectedId.value === fn.id) selectedId.value = null
-  await refreshAfterMutation()
+  if (deleting.value || !confirm(`确定删除逻辑「${fn.name}」？`)) return
+  deleting.value = fn.id
+  try {
+    await functionApi.remove(fn.id)
+    functions.value = functions.value.filter((item) => item.id !== fn.id)
+    toast.success('逻辑已删除')
+    await refreshAfterMutation()
+  } catch (e) {
+    error.value = skillError(e, '删除逻辑失败')
+  } finally {
+    deleting.value = ''
+  }
 }
 
 onMounted(async () => {
@@ -224,12 +327,18 @@ onMounted(async () => {
 <style scoped>
 @import './logic-shared.css';
 
-.logic-page--embedded { padding: 0; max-width: none; }
-.logic-page--embedded .logic-page__header { margin-bottom: 16px; justify-content: flex-end; }
+.logic-page--embedded {
+  padding: 0;
+  max-width: none;
+}
+.logic-page--embedded .logic-page__header {
+  margin-bottom: 16px;
+  justify-content: flex-end;
+}
 
 .master-detail {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  grid-template-columns: minmax(260px, 32%) minmax(0, 1fr);
   gap: 1px;
   background: var(--neutral-200, #e5e5e5);
   border: 1px solid var(--neutral-200, #e5e5e5);
@@ -264,6 +373,12 @@ onMounted(async () => {
 }
 
 .list-item {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+  font-family: inherit;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -289,12 +404,20 @@ onMounted(async () => {
   flex-shrink: 0;
 }
 
-.list-item__status--active { background: var(--status-success, #22c55e); }
-.list-item__status--warning { background: var(--status-warning, #f59e0b); }
-.list-item__status--disabled, .list-item__status--inactive { background: var(--neutral-300, #d4d4d4); }
+.list-item__status--active {
+  background: var(--status-success, #22c55e);
+}
+.list-item__status--warning {
+  background: var(--status-warning, #f59e0b);
+}
+.list-item__status--disabled,
+.list-item__status--inactive {
+  background: var(--neutral-300, #d4d4d4);
+}
 
 .list-item__name {
   flex: 1;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
@@ -320,12 +443,14 @@ onMounted(async () => {
 }
 
 .master-detail__detail {
+  min-width: 0;
   background: var(--neutral-0, #fff);
   padding: 24px;
   overflow-y: auto;
 }
 
 .detail-panel__header {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -333,6 +458,8 @@ onMounted(async () => {
 }
 
 .detail-panel__title {
+  overflow-wrap: anywhere;
+  min-width: 0;
   font-size: 18px;
   font-weight: 600;
   margin: 0;
@@ -362,6 +489,8 @@ onMounted(async () => {
 }
 
 .detail-meta-value {
+  overflow-wrap: anywhere;
+  min-width: 0;
   font-size: 13px;
   font-weight: 500;
   color: var(--neutral-800, #333);
@@ -397,12 +526,15 @@ onMounted(async () => {
 }
 
 .detail-section-text {
+  overflow-wrap: anywhere;
+  line-height: 1.6;
   font-size: 13px;
   color: var(--neutral-700, #495057);
   margin: 0;
 }
 
 .detail-panel__actions {
+  flex-wrap: wrap;
   display: flex;
   gap: 8px;
   margin-top: 24px;
@@ -416,5 +548,36 @@ onMounted(async () => {
   justify-content: center;
   height: 100%;
   color: var(--neutral-400, #aaa);
+}
+.logic-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--status-error, #ef4444);
+  border-radius: 8px;
+  color: var(--status-error, #ef4444);
+  overflow-wrap: anywhere;
+}
+.list-item:focus-visible {
+  outline: 2px solid var(--semantic-500, #4c6ef5);
+  outline-offset: -2px;
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+@media (max-width: 900px) {
+  .master-detail {
+    grid-template-columns: minmax(220px, 38%) minmax(0, 1fr);
+  }
+  .master-detail__detail {
+    padding: 16px;
+  }
+  .detail-panel__meta {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

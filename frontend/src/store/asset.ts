@@ -11,6 +11,7 @@ export const useAssetStore = defineStore('asset', () => {
   const items = ref<Asset[]>([])
   const loading = ref(false)
   const error = ref<string | null>(null)
+  let listRequest = 0
   const usageCache = ref<Record<string, AssetWithUsage>>({})
 
   const stats = computed(() => {
@@ -32,15 +33,17 @@ export const useAssetStore = defineStore('asset', () => {
   })
 
   async function fetchList(params?: AssetFilters) {
+    const request = ++listRequest
     loading.value = true
     error.value = null
     try {
       // 后端的 status 默认是 'active'；明确传 undefined 让后端用默认
-      items.value = await api.listAssets(params)
+      const rows = await api.listAssets(params)
+      if (request === listRequest) items.value = rows
     } catch (e: any) {
-      error.value = e.message
+      if (request === listRequest) error.value = e.response?.data?.detail || e.message || '资产加载失败'
     } finally {
-      loading.value = false
+      if (request === listRequest) loading.value = false
     }
   }
 

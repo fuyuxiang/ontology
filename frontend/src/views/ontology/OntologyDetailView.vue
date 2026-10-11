@@ -9,69 +9,74 @@
       </button>
       <span class="ontology-detail__title">{{ scenario?.name || code }}</span>
       <div class="ontology-detail__actions">
-        <button class="btn-action">导入Excel</button>
-        <button class="btn-action">测试</button>
-        <button class="btn-action">仿真</button>
-        <button class="btn-action btn-action--primary" @click="publishOntology">发布</button>
-        <button class="btn-action">保存</button>
+        <button class="btn-action" disabled title="Excel 导入功能开发中">导入Excel</button>
+        <button class="btn-action" disabled title="本体测试功能开发中">测试</button>
+        <button class="btn-action" disabled title="本体仿真功能开发中">仿真</button>
+        <button class="btn-action btn-action--primary" :disabled="publishing || ontologyStore.loading" @click="publishOntology">{{ publishing ? '发布中…' : '发布' }}</button>
+        <button class="btn-action" disabled title="本体详情保存功能开发中">保存</button>
       </div>
     </div>
 
     <div class="ontology-detail__body">
       <aside class="ontology-detail__sidebar">
         <nav class="detail-nav">
-          <a class="detail-nav__item" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'overview' }" :aria-pressed="activeTab === 'overview'" @click="activeTab = 'overview'">
             <span class="detail-nav__icon">📊</span> 总览
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'history' }" @click="activeTab = 'history'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'history' }" :aria-pressed="activeTab === 'history'" @click="activeTab = 'history'">
             <span class="detail-nav__icon">📋</span> 历史
-          </a>
+          </button>
 
           <div class="detail-nav__section">本体资源</div>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'entities' }" @click="activeTab = 'entities'">
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'entities' }" :aria-pressed="activeTab === 'entities'" @click="activeTab = 'entities'">
             <span class="detail-nav__icon">🧩</span> 对象定义
             <span class="detail-nav__count">{{ entityCount }}</span>
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'relations' }" @click="activeTab = 'relations'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'relations' }" :aria-pressed="activeTab === 'relations'" @click="activeTab = 'relations'">
             <span class="detail-nav__icon">🔗</span> 关系定义
             <span class="detail-nav__count">{{ relationCount }}</span>
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'logic' }" @click="activeTab = 'logic'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'logic' }" :aria-pressed="activeTab === 'logic'" @click="activeTab = 'logic'">
             <span class="detail-nav__icon">⚡</span> 逻辑定义
             <span class="detail-nav__count">{{ logicCount }}</span>
-          </a>
+          </button>
 <!-- NAV_PLACEHOLDER -->
-          <a class="detail-nav__item" :class="{ active: activeTab === 'actions' }" @click="activeTab = 'actions'">
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'actions' }" :aria-pressed="activeTab === 'actions'" @click="activeTab = 'actions'">
             <span class="detail-nav__icon">▶️</span> 动作定义
             <span class="detail-nav__count">{{ actionCount }}</span>
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'api' }" @click="activeTab = 'api'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'api' }" :aria-pressed="activeTab === 'api'" @click="activeTab = 'api'">
             <span class="detail-nav__icon">🔌</span> 接口定义
             <span class="detail-nav__count">0</span>
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'graph' }" @click="activeTab = 'graph'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'graph' }" :aria-pressed="activeTab === 'graph'" @click="activeTab = 'graph'">
             <span class="detail-nav__icon">🕸️</span> 本体图谱
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'application-references' }" @click="activeTab = 'application-references'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'application-references' }" :aria-pressed="activeTab === 'application-references'" @click="activeTab = 'application-references'">
             <span class="detail-nav__icon">◎</span> 应用引用
-          </a>
+          </button>
 
           <div class="detail-nav__section">更多</div>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'shared-attrs' }" @click="activeTab = 'shared-attrs'">
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'shared-attrs' }" :aria-pressed="activeTab === 'shared-attrs'" @click="activeTab = 'shared-attrs'">
             <span class="detail-nav__icon">🏷️</span> 共享属性
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'groups' }" @click="activeTab = 'groups'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'groups' }" :aria-pressed="activeTab === 'groups'" @click="activeTab = 'groups'">
             <span class="detail-nav__icon">📁</span> 分组
-          </a>
-          <a class="detail-nav__item" :class="{ active: activeTab === 'tasks' }" @click="activeTab = 'tasks'">
+          </button>
+          <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'tasks' }" :aria-pressed="activeTab === 'tasks'" @click="activeTab = 'tasks'">
             <span class="detail-nav__icon">📝</span> 任务记录
-          </a>
+          </button>
         </nav>
       </aside>
 
       <main class="ontology-detail__content">
+        <div v-if="dataLoading || ontologyStore.loading" class="attr-panel__loading" role="status">本体资源加载中...</div>
+        <div v-else-if="loadError || ontologyStore.error" class="attr-panel__loading" role="alert">
+          <p>{{ loadError || ontologyStore.error }}</p>
+          <button class="btn-action" @click="loadData">重新加载</button>
+        </div>
         <!-- 总览 -->
-        <div v-if="activeTab === 'overview'" class="tab-overview">
+        <div v-else-if="activeTab === 'overview'" class="tab-overview">
           <h2 class="tab-title">总览</h2>
           <p class="tab-subtitle">本体「{{ scenario?.name }}」资源总览</p>
 
@@ -175,9 +180,9 @@
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 4L5 6.5 7.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
                 <div v-if="showBatchMenu" class="entities-dropdown__menu">
-                  <button class="entities-dropdown__item" @click="batchDelete" :disabled="selectedIds.length === 0">批量删除</button>
-                  <button class="entities-dropdown__item" @click="batchActivate" :disabled="selectedIds.length === 0">批量激活</button>
-                  <button class="entities-dropdown__item" @click="batchExport" :disabled="selectedIds.length === 0">批量导出</button>
+                  <button class="entities-dropdown__item" @click="batchDelete" :disabled="deleting || selectedIds.length === 0">{{ deleting ? '删除中…' : '批量删除' }}</button>
+                  <button class="entities-dropdown__item" disabled title="批量激活功能开发中">批量激活</button>
+                  <button class="entities-dropdown__item" disabled title="批量导出功能开发中">批量导出</button>
                 </div>
               </div>
               <div class="entities-dropdown" v-click-outside="() => showCreateMenu = false">
@@ -251,6 +256,7 @@
             <span class="relations-count">共 {{ allRelations.length }} 条</span>
           </div>
           <div v-if="relationsLoading" class="attr-panel__loading">加载中...</div>
+          <div v-else-if="relationsError" class="attr-panel__loading" role="alert"><p>{{ relationsError }}</p><button class="btn-action" @click="loadRelations">重新加载</button></div>
           <table v-else-if="allRelations.length" class="entities-table">
             <thead>
               <tr>
@@ -292,7 +298,9 @@
             <span class="graph-header__title">本体图谱</span>
             <span class="graph-header__desc">可视化展示本体对象与关系</span>
           </div>
-          <div class="graph-container">
+          <div v-if="relationsLoading" class="attr-panel__loading" role="status">图谱关系加载中...</div>
+          <div v-else-if="relationsError" class="attr-panel__loading" role="alert"><p>{{ relationsError }}</p><button class="btn-action" @click="loadRelations">重新加载</button></div>
+          <div v-else class="graph-container">
             <SemanticCanvas
               :objects="graphObjects"
               :relations="graphRelations"
@@ -315,6 +323,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
+import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { useOntologyStore } from '../../store/ontology'
@@ -365,6 +374,11 @@ const entitySearch = ref('')
 const selectedIds = ref<string[]>([])
 const showBatchMenu = ref(false)
 const showCreateMenu = ref(false)
+const deleting = ref(false)
+const publishing = ref(false)
+const dataLoading = ref(false)
+const loadError = ref('')
+let dataRequest = 0
 const selectedEntityId = ref<string | null>(null)
 const selectedEntity = computed(() => {
   if (!selectedEntityId.value) return null
@@ -420,36 +434,43 @@ async function deleteEntity(id: string) {
   }
 }
 
-function batchDelete() {
-  if (selectedIds.value.length === 0) return
+async function batchDelete() {
+  if (deleting.value || selectedIds.value.length === 0) return
   if (!confirm(`确定删除选中的 ${selectedIds.value.length} 个对象？`)) return
-  selectedIds.value.forEach(id => ontologyStore.removeEntity(id))
-  selectedIds.value = []
   showBatchMenu.value = false
-}
-
-function batchActivate() {
-  showBatchMenu.value = false
-}
-
-function batchExport() {
-  showBatchMenu.value = false
+  deleting.value = true
+  const ids = [...selectedIds.value]
+  try {
+    const results = await Promise.allSettled(ids.map(id => ontologyStore.removeEntity(id)))
+    const failedIds = ids.filter((_, index) => results[index]?.status === 'rejected')
+    selectedIds.value = failedIds
+    const removed = ids.length - failedIds.length
+    if (removed) message.success(`已删除 ${removed} 个对象`)
+    if (failedIds.length) message.error(`${failedIds.length} 个对象删除失败，已保留选择；请检查关联数据后重试`)
+    await scenarioStore.fetchScenarios(true).catch(() => message.warning('对象已处理，本体资源统计加载失败，请刷新'))
+  } finally {
+    deleting.value = false
+  }
 }
 
 async function publishOntology() {
-  if (!scenario.value) return
+  if (publishing.value || !scenario.value) return
+  const ontology = scenario.value
   if (ontologyStore.entities.length === 0) {
     alert('当前本体下没有对象，无法发布')
     return
   }
   if (!confirm(`确定发布本体「${scenario.value.name}」？将包含 ${ontologyStore.entities.length} 个对象。`)) return
+  publishing.value = true
   try {
-    const res = await ontologyPublishApi.quickPublish(scenario.value.id, scenario.value.name)
+    const res = await ontologyPublishApi.quickPublish(ontology.id, ontology.name)
     alert(`发布成功！${res.message}`)
     router.push('/ontology/publish')
   } catch (e: any) {
     const detail = e?.response?.data?.detail
     alert(typeof detail === 'string' ? detail : '发布失败')
+  } finally {
+    publishing.value = false
   }
 }
 
@@ -512,12 +533,31 @@ function goBack() {
 }
 
 async function loadData() {
+  const request = ++dataRequest
+  const requestedCode = code.value
+  dataLoading.value = true
+  loadError.value = ''
+  ++relationsRequest
+  selectedEntityId.value = null
+  selectedIds.value = []
+  showBatchMenu.value = false
+  showCreateMenu.value = false
   allRelations.value = []
   relationsLoaded.value = false
-  await scenarioStore.fetchScenarios()
-  const sc = scenarioStore.byCode(code.value)
-  if (sc) {
+  try {
+    await scenarioStore.fetchScenarios()
+    if (request !== dataRequest || code.value !== requestedCode) return
+    const sc = scenarioStore.byCode(requestedCode)
+    if (!sc) {
+      loadError.value = '本体不存在或已被删除，请返回本体列表'
+      return
+    }
     await ontologyStore.switchOntology(sc.id)
+    if (code.value === requestedCode && (activeTab.value === 'relations' || activeTab.value === 'graph')) await loadRelations()
+  } catch {
+    if (request === dataRequest) loadError.value = '本体资源加载失败，请重新加载'
+  } finally {
+    if (request === dataRequest) dataLoading.value = false
   }
 }
 
@@ -528,16 +568,24 @@ onActivated(loadData)
 const allRelations = ref<EntityRelationDetail[]>([])
 const relationsLoaded = ref(false)
 const relationsLoading = ref(false)
+const relationsError = ref('')
+let relationsRequest = 0
 
 async function loadRelations() {
   const ontologyId = scenario.value?.id
   if (!ontologyId) return
+  const request = ++relationsRequest
   relationsLoading.value = true
+  relationsError.value = ''
   try {
-    allRelations.value = await entityApi.relations(undefined, ontologyId)
+    const relations = await entityApi.relations(undefined, ontologyId)
+    if (request !== relationsRequest || scenario.value?.id !== ontologyId) return
+    allRelations.value = relations
     relationsLoaded.value = true
+  } catch {
+    if (request === relationsRequest) relationsError.value = '关系加载失败，请重新加载'
   } finally {
-    relationsLoading.value = false
+    if (request === relationsRequest) relationsLoading.value = false
   }
 }
 
@@ -610,6 +658,8 @@ watch(activeTab, (tab) => {
 }
 
 .btn-action:hover { background: var(--neutral-50, #fafafa); }
+.btn-action:disabled { color: var(--neutral-400); background: var(--neutral-50); cursor: not-allowed; }
+.btn-action:disabled:hover { background: var(--neutral-50); }
 .btn-action--primary {
   background: var(--primary, #2563eb);
   color: #fff;
@@ -633,6 +683,7 @@ watch(activeTab, (tab) => {
 }
 
 .detail-nav__item {
+  width: 100%; border: 0; background: transparent; font: inherit; text-align: left;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -644,6 +695,7 @@ watch(activeTab, (tab) => {
   text-decoration: none;
 }
 
+.detail-nav__item:focus-visible { outline: 2px solid var(--semantic-500); outline-offset: -2px; }
 .detail-nav__item:hover { background: var(--neutral-50, #fafafa); }
 .detail-nav__item.active {
   background: var(--primary-50, #eff6ff);
@@ -930,7 +982,7 @@ watch(activeTab, (tab) => {
   top: calc(100% + 4px);
   right: 0;
   min-width: 120px;
-  background: #fff;
+  background: var(--neutral-0);
   border: 1px solid var(--neutral-200, #e5e5e5);
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -1099,6 +1151,7 @@ watch(activeTab, (tab) => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 .graph-header {
@@ -1121,8 +1174,8 @@ watch(activeTab, (tab) => {
 }
 
 .graph-container {
-  height: calc(100vh - 200px);
-  min-height: 500px;
+  flex: 1;
+  min-height: 0;
   background: var(--neutral-0, #fff);
   border: 1px solid var(--neutral-100, #f0f0f0);
   border-radius: 8px;
@@ -1142,7 +1195,8 @@ watch(activeTab, (tab) => {
   .ontology-detail__sidebar { width: 100%; min-width: 0; border-right: 0; border-bottom: 1px solid #e2e8f0; }
   .detail-nav { display: flex; overflow-x: auto; padding: 8px; gap: 4px; }
   .detail-nav__section { display: none; }
-  .detail-nav__item { flex: 0 0 auto; white-space: nowrap; padding: 8px 10px; }
+  .detail-nav__item {
+  width: 100%; border: 0; background: transparent; font: inherit; text-align: left; flex: 0 0 auto; white-space: nowrap; padding: 8px 10px; }
   .ontology-detail__content { padding: 16px 12px; min-width: 0; }
   .overview-stats, .overview-info-grid, .overview-tables { grid-template-columns: 1fr; }
 }

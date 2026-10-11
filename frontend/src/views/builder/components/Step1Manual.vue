@@ -241,7 +241,8 @@ const nameErr = computed(() => {
 const canSubmit = computed(() => {
   if (!objects.value.length) return false
   for (const o of objects.value) {
-    if (!o.name || !o.displayName) return false
+    if (!/^[A-Z][A-Za-z0-9]*$/.test(o.name.trim()) || !o.displayName.trim()) return false
+    if (objects.value.some(other => other.id !== o.id && other.name.trim() === o.name.trim())) return false
     if (!o.properties.length) return false
   }
   return true
@@ -380,7 +381,7 @@ function commitCsv() {
 
 function confirmAll() {
   if (!canSubmit.value) {
-    message.warning('每个对象至少需要 1 个属性')
+    message.warning('请完善对象名称、避免重复英文名，并为每个对象添加至少一个属性')
     return
   }
   const connectedIds = new Set(relations.value.flatMap(r => [r.source, r.target]))

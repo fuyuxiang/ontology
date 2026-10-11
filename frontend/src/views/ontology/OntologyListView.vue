@@ -7,7 +7,7 @@
         <p class="page-banner__desc">提供本体设计器，支持以人机协同方式，基于 AI 快速自动化构建本体；也支持通过手动定义的形式自顶向...</p>
       </div>
       <div class="page-banner__actions">
-        <button class="btn-filled" @click="showCreate = true">
+        <button class="btn-filled" @click="showCreate = true; createError = ''">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           新建本体
         </button>
@@ -22,6 +22,8 @@
       </div>
     </div>
 
+    <div v-if="scenarioStore.loading" class="card-grid__empty" role="status">本体列表加载中...</div>
+    <div v-else-if="loadError" class="card-grid__empty" role="alert"><p>{{ loadError }}</p><button class="btn-cancel" @click="loadScenarios">重新加载</button></div>
     <!-- 卡片网格 -->
     <div class="card-grid">
       <div
@@ -40,7 +42,7 @@
           </div>
           <div class="onto-card__info">
             <div class="onto-card__name-row">
-              <span class="onto-card__name">{{ item.name }}</span>
+              <span class="onto-card__name" :title="item.name">{{ item.name }}</span>
             </div>
             <span class="onto-card__code">{{ item.code }}</span>
           </div>
@@ -67,28 +69,19 @@
           <span class="onto-card__status onto-card__status--active">已启用</span>
           <div class="onto-card__actions">
             <button class="onto-card__action-btn" @click.stop="goDetail(item.code)">详情</button>
-            <button class="onto-card__action-btn onto-card__action-btn--del" @click.stop="handleDelete(item)">
+            <button class="onto-card__action-btn onto-card__action-btn--del" :disabled="deletingId === item.id" :aria-label="`删除本体 ${item.name}`" @click.stop="handleDelete(item)">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5 4V3h4v1M4 4v7h6V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
         </div>
       </div>
 
-      <div v-if="filteredList.length === 0" class="card-grid__empty">
-        <p>无匹配本体</p>
+      <div v-if="filteredList.length === 0 && !scenarioStore.loading && !loadError" class="card-grid__empty">
+        <p>{{ search.trim() ? '未找到匹配本体，请调整搜索关键词' : '暂无本体，点击新建本体开始构建' }}</p>
       </div>
     </div>
 
-    <!-- 新建本体弹窗 -->
-    <Teleport to="body">
-      <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
-        <div class="modal-box">
-          <div class="modal-header">
-            <h3 class="modal-title">构建本体</h3>
-            <button class="modal-close" @click="showCreate = false">&times;</button>
-          </div>
-
-          <div class="modal-body">
+    <ModalDialog :visible="showCreate" title="构建本体" width="600px" @close="!creating && (showCreate = false)">
             <div class="modal-section-title"><span class="modal-section-bar"></span> 基础信息填写</div>
 
             <div class="modal-field">
@@ -115,15 +108,12 @@
               </div>
             </div>
 
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn-cancel" @click="showCreate = false">取消</button>
-            <button class="btn-filled" :disabled="!createForm.name || !createForm.code" @click="handleCreate">确认并前往构建</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+      <p v-if="createError" class="modal-error" role="alert">{{ createError }}</p>
+      <template #footer>
+        <button class="btn-cancel" :disabled="creating" @click="showCreate = false">取消</button>
+        <button class="btn-filled" :disabled="creating || !createForm.name.trim() || !createForm.code.trim()" @click="handleCreate">{{ creating ? '创建中…' : '确认并前往构建' }}</button>
+      </template>
+    </ModalDialog>
   </div>
 </template>
 
@@ -132,12 +122,18 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
 import { scenarioApi } from '../../api/scenarios'
+import { message } from 'ant-design-vue'
+import ModalDialog from '../../components/common/ModalDialog.vue'
 
 const router = useRouter()
 const scenarioStore = useScenarioStore()
 
 const search = ref('')
 const showCreate = ref(false)
+const creating = ref(false)
+const deletingId = ref<string | null>(null)
+const loadError = ref('')
+const createError = ref('')
 const createForm = reactive({ name: '', code: '', description: '' })
 
 const scenarios = computed(() => scenarioStore.scenarios)
@@ -153,29 +149,53 @@ function goDetail(code: string) {
   router.push(`/ontology/list/${code}`)
 }
 
+function errorText(error: any, fallback: string) {
+  const detail = error?.response?.data?.detail
+  return typeof detail === 'string' ? detail : error?.message || fallback
+}
+
 async function handleCreate() {
-  const created = await scenarioApi.create({
-    code: createForm.code,
-    name: createForm.name,
-    description: createForm.description || null,
-  })
-  showCreate.value = false
-  createForm.name = ''
-  createForm.code = ''
-  createForm.description = ''
-  await scenarioStore.fetchScenarios(true)
-  router.push(`/ontology/list/${created.code}`)
+  if (creating.value || !createForm.name.trim() || !createForm.code.trim()) return
+  creating.value = true
+  createError.value = ''
+  try {
+    const created = await scenarioApi.create({
+      code: createForm.code.trim(), name: createForm.name.trim(), description: createForm.description.trim() || null,
+    })
+    showCreate.value = false
+    createForm.name = ''
+    createForm.code = ''
+    createForm.description = ''
+    await loadScenarios()
+    router.push(`/ontology/list/${created.code}`)
+  } catch (error) {
+    createError.value = errorText(error, '本体创建失败，请重试')
+  } finally {
+    creating.value = false
+  }
 }
 
 async function handleDelete(item: any) {
-  if (!confirm(`确定删除本体「${item.name}」？`)) return
-  await scenarioApi.remove(item.id)
-  await scenarioStore.fetchScenarios(true)
+  if (deletingId.value || !confirm(`确定删除本体「${item.name}」？`)) return
+  deletingId.value = item.id
+  try {
+    await scenarioApi.remove(item.id)
+    message.success('本体已删除')
+    await loadScenarios()
+  } catch (error) {
+    message.error(errorText(error, '本体删除失败，请重试'))
+  } finally {
+    deletingId.value = null
+  }
 }
 
-onMounted(async () => {
-  await scenarioStore.fetchScenarios()
-})
+async function loadScenarios() {
+  loadError.value = ''
+  try { await scenarioStore.fetchScenarios(true) }
+  catch (error) { loadError.value = errorText(error, '本体列表加载失败') }
+}
+
+onMounted(loadScenarios)
 </script>
 
 <!-- STYLES -->
@@ -547,7 +567,7 @@ onMounted(async () => {
   background: var(--neutral-50, #fafafa);
 }
 
-.modal-input:focus { border-color: var(--primary, #2563eb); background: #fff; }
+.modal-input:focus { border-color: var(--primary, #2563eb); background: var(--neutral-0); }
 
 .modal-input-count {
   position: absolute;
@@ -590,4 +610,5 @@ onMounted(async () => {
 }
 
 .btn-cancel:hover { background: var(--neutral-50, #fafafa); }
+.modal-error { margin: 0; padding: 12px 24px; color: var(--color-error, #dc2626); font-size: 13px; overflow-wrap: anywhere; }
 </style>

@@ -4,19 +4,23 @@
     <div class="page-banner">
       <div class="page-banner__content">
         <div class="page-banner__title-row">
-          <button v-if="selectedOntology" class="btn-back" @click="backToGrid">&larr; 返回</button>
+          <button v-if="selectedOntology" class="btn-back" @click="backToGrid()" :disabled="saving">&larr; 返回</button>
           <h1 class="page-banner__title">{{ selectedOntology ? selectedOntology.name : '本体发布环境' }}</h1>
         </div>
         <p class="page-banner__desc">{{ selectedOntology ? `版本历史 · 共 ${selectedOntology.total_versions} 个版本` : '已发布本体一览，点击卡片查看版本历史' }}</p>
       </div>
     </div>
 
+    <div v-if="catalogError" class="load-state" role="alert"><p>{{ catalogError }}</p><button class="btn-secondary" @click="loadOntologies">重新加载</button></div>
+    <div v-if="!selectedOntology && catalogLoading" class="load-state" role="status">本体版本加载中...</div>
     <!-- 第一级：本体卡片网格 -->
     <div v-if="!selectedOntology" class="card-grid">
       <div
         v-for="onto in ontologies"
         :key="onto.ontology_id"
         class="onto-card"
+        role="button" tabindex="0"
+        @keydown.enter="selectOntology(onto)" @keydown.space.prevent="selectOntology(onto)"
         @click="selectOntology(onto)"
       >
         <div class="onto-card__top">
@@ -24,7 +28,7 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </div>
           <div class="onto-card__info">
-            <span class="onto-card__name">{{ onto.name }}</span>
+            <span class="onto-card__name" :title="onto.name">{{ onto.name }}</span>
             <span class="onto-card__code">{{ onto.code }}</span>
           </div>
           <span v-if="onto.active_version" class="onto-card__badge">v{{ onto.active_version.version_number }}</span>
@@ -35,11 +39,11 @@
           <span>{{ onto.total_versions }} 个版本</span>
         </div>
         <div class="onto-card__footer">
-          <span class="onto-card__status">已发布</span>
+          <span class="onto-card__status">{{ onto.active_version ? '已发布' : '暂无在线版本' }}</span>
           <span class="onto-card__time">{{ onto.active_version?.published_at ? formatTime(onto.active_version.published_at) : '—' }}</span>
         </div>
       </div>
-      <div v-if="!ontologies.length && !loading" class="empty-state">
+      <div v-if="!ontologies.length && !loading && !catalogError" class="empty-state">
         <p>暂无已发布的本体</p>
         <p class="empty-state__hint">在本体详情页点击"发布"按钮即可发布本体</p>
       </div>
@@ -48,18 +52,20 @@
     <!-- 第二级：版本历史详情 -->
     <div v-if="selectedOntology" class="publish-page__body">
       <div class="version-sidebar">
-        <button class="btn-primary btn-block" @click="showCreateDialog = true">创建新版本</button>
+        <button class="btn-primary btn-block" :disabled="loading" @click="showCreateDialog = true">创建新版本</button>
         <div class="version-list">
           <div
             v-for="v in filteredVersions"
             :key="v.id"
-            class="version-item"
+            class="version-item" role="button" tabindex="0"
+            :aria-current="selectedVersionId === v.id ? 'true' : undefined"
+            @keydown.enter="!saving && selectVersion(v.id)" @keydown.space.prevent="!saving && selectVersion(v.id)"
             :class="{ 'version-item--active': selectedVersionId === v.id }"
-            @click="selectVersion(v.id)"
+            @click="!saving && selectVersion(v.id)"
           >
             <div class="version-item__badge" :class="`version-item__badge--${v.status}`">v{{ v.version_number }}</div>
             <div class="version-item__info">
-              <span class="version-item__name">{{ v.name }}</span>
+              <span class="version-item__name" :title="v.name">{{ v.name }}</span>
               <span class="version-item__meta">{{ v.entity_count }} 个实体 · {{ formatStatus(v.status) }}</span>
             </div>
             <span v-if="v.is_active" class="version-item__active">当前</span>
@@ -69,7 +75,9 @@
       </div>
 
       <div class="version-main">
-        <template v-if="detail">
+        <div v-if="detailLoading" class="load-state" role="status">版本详情加载中...</div>
+        <div v-else-if="detailError" class="load-state" role="alert"><p>{{ detailError }}</p><button class="btn-secondary" @click="selectedVersionId && selectVersion(selectedVersionId)">重新加载</button></div>
+        <template v-else-if="detail">
           <div class="meta-card">
             <div class="meta-card__header">
               <h2>v{{ detail.version_number }} — {{ detail.name }}</h2>
@@ -95,7 +103,7 @@
           <section class="res-section">
             <div class="res-section__header">
               <h3>对象<span class="res-section__count">{{ detail.entities.length }}</span></h3>
-              <button v-if="detail.status === 'draft'" class="btn-link" @click="showEntitySelector = true">+ 添加实体</button>
+              <button v-if="detail.status === 'draft'" class="btn-link" @click="showEntitySelector = true" :disabled="loading">+ 添加实体</button>
             </div>
             <div v-if="detail.entities.length" class="res-grid">
               <div v-for="e in detail.entities" :key="e.id" class="res-card">
@@ -106,7 +114,7 @@
                 <p v-if="e.description" class="res-card__desc">{{ e.description }}</p>
                 <div class="res-card__foot">
                   <span class="res-card__tag">属性 {{ e.attribute_count }}</span>
-                  <button v-if="detail.status === 'draft'" class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)">移除</button>
+                  <button v-if="detail.status === 'draft'" class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)" :disabled="loading">移除</button>
                 </div>
               </div>
             </div>
@@ -176,13 +184,13 @@
             <template v-if="detail.status === 'draft'">
               <button class="btn-quiet" @click="runCheck" :disabled="loading">一致性检查</button>
               <button class="btn-quiet" @click="submitForApproval" :disabled="loading || !detail.entities.length">提交审批</button>
-              <button class="btn-quiet" @click="previewImpact">预览影响</button>
-              <button class="btn-quiet btn-quiet--danger" @click="deleteVersion">删除草稿</button>
+              <button class="btn-quiet" @click="previewImpact" :disabled="loading">预览影响</button>
+              <button class="btn-quiet btn-quiet--danger" @click="deleteVersion" :disabled="loading">删除草稿</button>
             </template>
             <template v-else-if="detail.status === 'pending_approval'">
               <button class="btn-quiet" @click="approveVersion" :disabled="loading">审批通过</button>
-              <button class="btn-quiet btn-quiet--danger" @click="showRejectDialog = true">驳回</button>
-              <button class="btn-quiet" @click="previewImpact">预览影响</button>
+              <button class="btn-quiet btn-quiet--danger" @click="showRejectDialog = true" :disabled="loading">驳回</button>
+              <button class="btn-quiet" @click="previewImpact" :disabled="loading">预览影响</button>
             </template>
             <template v-else-if="detail.status === 'published'">
               <button class="btn-quiet" @click="rollbackVersion" :disabled="loading">回滚到此版本</button>
@@ -192,76 +200,63 @@
         <div v-else class="version-empty-main"><span>← 选择一个版本查看详情</span></div>
       </div>
     </div>
-    <!-- 创建版本弹窗 -->
-    <div v-if="showCreateDialog" class="modal-overlay" @click.self="showCreateDialog = false">
-      <div class="modal-box">
-        <h3>创建新版本</h3>
-        <div class="form-group"><label>版本名称</label><input v-model="newVersion.name" placeholder="请输入版本名称" /></div>
-        <div class="form-group"><label>描述</label><textarea v-model="newVersion.description" rows="3" placeholder="可选"></textarea></div>
-        <div class="modal-actions">
-          <button class="btn-secondary" @click="showCreateDialog = false">取消</button>
-          <button class="btn-primary" :disabled="!newVersion.name.trim()" @click="createVersion">创建</button>
-        </div>
-      </div>
-    </div>
+    <ModalDialog :visible="showCreateDialog" title="创建新版本" width="400px" @close="!saving && (showCreateDialog = false)">
+      <div class="form-group"><label for="version-name">版本名称</label><input id="version-name" maxlength="200" v-model="newVersion.name" placeholder="请输入版本名称" /></div>
+      <div class="form-group"><label for="version-description">描述</label><textarea id="version-description" v-model="newVersion.description" rows="3" placeholder="可选"></textarea></div>
+      <template #footer>
+        <button class="btn-secondary" :disabled="saving" @click="showCreateDialog = false">取消</button>
+        <button class="btn-primary" :disabled="loading || !newVersion.name.trim()" @click="createVersion">{{ saving ? '创建中…' : '创建' }}</button>
+      </template>
+    </ModalDialog>
 
-    <!-- 添加实体弹窗 -->
-    <div v-if="showEntitySelector" class="modal-overlay" @click.self="showEntitySelector = false">
-      <div class="modal-box modal-box--wide">
-        <h3>选择实体</h3>
-        <div class="selector-list">
-          <label v-for="e in availableEntities" :key="e.id" class="selector-item">
-            <input type="checkbox" :value="e.id" v-model="selectedEntityIds" />
-            <span class="selector-item__name">{{ e.name_cn }}</span>
-            <span class="selector-item__en">{{ e.name }}</span>
-            <span class="selector-item__tier">T{{ e.tier }}</span>
-          </label>
-        </div>
-        <div class="modal-actions">
-          <button class="btn-secondary" @click="showEntitySelector = false">取消</button>
-          <button class="btn-primary" :disabled="!selectedEntityIds.length" @click="addEntities">添加 ({{ selectedEntityIds.length }})</button>
-        </div>
+    <ModalDialog :visible="showEntitySelector" title="选择实体" width="520px" @close="!saving && (showEntitySelector = false)">
+      <div class="selector-list">
+        <p v-if="!availableEntities.length" class="res-empty">当前本体暂无可添加对象</p>
+        <label v-for="e in availableEntities" :key="e.id" class="selector-item">
+          <input type="checkbox" :value="e.id" v-model="selectedEntityIds" :disabled="saving" />
+          <span class="selector-item__name">{{ e.name_cn }}</span>
+          <span class="selector-item__en">{{ e.name }}</span>
+          <span class="selector-item__tier">T{{ e.tier }}</span>
+        </label>
       </div>
-    </div>
+      <template #footer>
+        <button class="btn-secondary" :disabled="saving" @click="showEntitySelector = false">取消</button>
+        <button class="btn-primary" :disabled="loading || !selectedEntityIds.length" @click="addEntities">{{ saving ? '添加中…' : `添加 (${selectedEntityIds.length})` }}</button>
+      </template>
+    </ModalDialog>
 
-    <!-- 驳回弹窗 -->
-    <div v-if="showRejectDialog" class="modal-overlay" @click.self="showRejectDialog = false">
-      <div class="modal-box">
-        <h3>驳回版本</h3>
-        <div class="form-group"><label>驳回原因</label><textarea v-model="rejectReason" rows="3" placeholder="请说明驳回原因"></textarea></div>
-        <div class="modal-actions">
-          <button class="btn-secondary" @click="showRejectDialog = false">取消</button>
-          <button class="btn-danger" :disabled="!rejectReason.trim()" @click="rejectVersion">驳回</button>
-        </div>
-      </div>
-    </div>
+    <ModalDialog :visible="showRejectDialog" title="驳回版本" width="400px" @close="!saving && (showRejectDialog = false)">
+      <div class="form-group"><label for="version-reject-reason">驳回原因</label><textarea id="version-reject-reason" v-model="rejectReason" rows="3" placeholder="请说明驳回原因"></textarea></div>
+      <template #footer>
+        <button class="btn-secondary" :disabled="saving" @click="showRejectDialog = false">取消</button>
+        <button class="btn-danger" :disabled="loading || !rejectReason.trim()" @click="rejectVersion">{{ saving ? '提交中…' : '驳回' }}</button>
+      </template>
+    </ModalDialog>
 
-    <!-- 影响面预览 -->
-    <div v-if="showImpact" class="impact-overlay" @click.self="showImpact = false">
-      <div class="impact-dialog">
-        <div class="impact-dialog__header"><h3>发布影响预览</h3><button class="impact-dialog__close" @click="showImpact = false">&times;</button></div>
-        <div class="impact-dialog__body">
-          <div v-if="impactLoading" class="impact-dialog__loading">加载中...</div>
-          <template v-else-if="impactData">
-            <div v-if="!impactData.breaking_changes?.length && !impactData.affected_scenes?.length && !impactData.affected_agents?.length" class="impact-dialog__empty">无破坏性变更，可安全发布</div>
-            <template v-else>
-              <h4 v-if="impactData.breaking_changes?.length">破坏性变更</h4>
-              <ul v-if="impactData.breaking_changes?.length" class="impact-dialog__list"><li v-for="(c, i) in impactData.breaking_changes" :key="i"><span :class="c.type === 'removed' ? 'impact-dialog__tag--del' : 'impact-dialog__tag--ren'">{{ c.type === 'removed' ? '删除' : '重命名' }}</span> {{ c.name }}</li></ul>
-              <h4 v-if="impactData.affected_scenes?.length">受影响场景 ({{ impactData.affected_scenes.length }})</h4>
-              <ul v-if="impactData.affected_scenes?.length" class="impact-dialog__list"><li v-for="s in impactData.affected_scenes" :key="s.id">{{ s.name }}</li></ul>
-              <h4 v-if="impactData.affected_agents?.length">受影响智能体 ({{ impactData.affected_agents.length }})</h4>
-              <ul v-if="impactData.affected_agents?.length" class="impact-dialog__list"><li v-for="a in impactData.affected_agents" :key="a.id">{{ a.name }}</li></ul>
-            </template>
-          </template>
-        </div>
-      </div>
-    </div>
+    <ModalDialog :visible="showImpact" title="发布影响预览" width="780px" @close="closeImpact">
+      <div v-if="impactLoading" class="impact-dialog__loading">加载中...</div>
+      <div v-else-if="impactError" class="load-state" role="alert"><p>{{ impactError }}</p><button class="btn-secondary" @click="previewImpact">重新加载</button></div>
+      <template v-else-if="impactData">
+        <div v-if="!impactData.breaking_changes?.length && !impactData.affected_scenes?.length && !impactData.affected_agents?.length" class="impact-dialog__empty">无破坏性变更，可安全发布</div>
+        <template v-else>
+          <h4 v-if="impactData.breaking_changes?.length">破坏性变更</h4>
+          <ul v-if="impactData.breaking_changes?.length" class="impact-dialog__list"><li v-for="(c, i) in impactData.breaking_changes" :key="i"><span :class="c.type === 'removed' ? 'impact-dialog__tag--del' : 'impact-dialog__tag--ren'">{{ c.type === 'removed' ? '删除' : '重命名' }}</span> {{ c.name }}</li></ul>
+          <h4 v-if="impactData.affected_scenes?.length">受影响场景 ({{ impactData.affected_scenes.length }})</h4>
+          <ul v-if="impactData.affected_scenes?.length" class="impact-dialog__list"><li v-for="item in impactData.affected_scenes" :key="item.id">{{ item.name }}</li></ul>
+          <h4 v-if="impactData.affected_agents?.length">受影响智能体 ({{ impactData.affected_agents.length }})</h4>
+          <ul v-if="impactData.affected_agents?.length" class="impact-dialog__list"><li v-for="item in impactData.affected_agents" :key="item.id">{{ item.name }}</li></ul>
+        </template>
+      </template>
+      <template #footer><button class="btn-secondary" @click="closeImpact">关闭</button></template>
+    </ModalDialog>
   </div>
 </template>
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { get, post, del } from '../../api/client'
 import { ontologyPublishApi } from '../../api/ontologyPublish'
+import { message } from 'ant-design-vue'
+import ModalDialog from '../../components/common/ModalDialog.vue'
 
 interface OntologyCard {
   ontology_id: string; code: string; name: string; color: string | null
@@ -295,7 +290,17 @@ const detail = ref<VersionDetail | null>(null)
 const versionFunctions = ref<any[]>([])
 const versionActions = ref<any[]>([])
 const checkResult = ref<CheckResult | null>(null)
-const loading = ref(false)
+const catalogLoading = ref(false)
+const detailLoading = ref(false)
+const saving = ref(false)
+const loading = computed(() => catalogLoading.value || detailLoading.value || saving.value)
+const catalogError = ref('')
+const detailError = ref('')
+const impactError = ref('')
+let catalogRequest = 0
+let versionRequest = 0
+let entitiesRequest = 0
+let impactRequest = 0
 
 const showCreateDialog = ref(false)
 const showEntitySelector = ref(false)
@@ -327,53 +332,129 @@ onMounted(async () => {
   await loadOntologies()
 })
 
+function errorText(error: any, fallback: string): string {
+  const detail = error?.response?.data?.detail
+  return typeof detail === 'string' ? detail : error?.message || fallback
+}
+
+function resetDialogs() {
+  showCreateDialog.value = false
+  showEntitySelector.value = false
+  showRejectDialog.value = false
+  showImpact.value = false
+  selectedEntityIds.value = []
+  rejectReason.value = ''
+  newVersion.name = ''
+  newVersion.description = ''
+  impactData.value = null
+  impactError.value = ''
+  ++impactRequest
+}
+
 async function loadOntologies() {
-  loading.value = true
+  const request = ++catalogRequest
+  catalogLoading.value = true
+  catalogError.value = ''
   try {
-    ontologies.value = await ontologyPublishApi.listPublishedOntologies()
+    const items = await ontologyPublishApi.listPublishedOntologies()
+    if (request !== catalogRequest) return
+    ontologies.value = items
+    if (selectedOntology.value) {
+      const updated = items.find((o: OntologyCard) => o.ontology_id === selectedOntology.value?.ontology_id)
+      if (updated) selectedOntology.value = updated
+      else backToGrid(false)
+    }
+  } catch (error) {
+    if (request === catalogRequest) catalogError.value = errorText(error, '本体版本加载失败')
   } finally {
-    loading.value = false
+    if (request === catalogRequest) catalogLoading.value = false
   }
 }
 
 function selectOntology(onto: OntologyCard) {
+  if (saving.value) return
+  ++versionRequest
+  detailLoading.value = false
   selectedOntology.value = onto
   selectedVersionId.value = null
   detail.value = null
+  detailError.value = ''
   checkResult.value = null
+  resetDialogs()
   loadAllEntities()
-  if (onto.active_version) {
-    selectVersion(onto.active_version.id)
-  }
+  const initialVersion = onto.active_version || onto.versions[0]
+  if (initialVersion) selectVersion(initialVersion.id)
 }
 
-function backToGrid() {
+function backToGrid(reload = true) {
+  if (saving.value && reload) return
+  ++versionRequest
+  ++entitiesRequest
+  detailLoading.value = false
   selectedOntology.value = null
   selectedVersionId.value = null
   detail.value = null
+  detailError.value = ''
   versionFunctions.value = []
   versionActions.value = []
   checkResult.value = null
-  loadOntologies()
+  resetDialogs()
+  if (reload) loadOntologies()
 }
+
 async function loadAllEntities() {
-  const list = await get<{ items?: any[] } | any[]>('/entities')
-  const items = Array.isArray(list) ? list : (list.items || [])
-  allEntities.value = items.map((e: any) => ({ id: e.id, name: e.name, name_cn: e.name_cn, tier: e.tier }))
+  const ontologyId = selectedOntology.value?.ontology_id
+  if (!ontologyId) return
+  const request = ++entitiesRequest
+  allEntities.value = []
+  try {
+    const list = await get<{ items?: any[] } | any[]>('/entities', { params: { ontology_id: ontologyId } })
+    if (request !== entitiesRequest || selectedOntology.value?.ontology_id !== ontologyId) return
+    const items = Array.isArray(list) ? list : (list.items || [])
+    allEntities.value = items.map((e: any) => ({ id: e.id, name: e.name, name_cn: e.name_cn, tier: e.tier }))
+  } catch (error) {
+    if (request === entitiesRequest) message.error(errorText(error, '可添加对象加载失败'))
+  }
 }
 
 async function selectVersion(id: string) {
+  const request = ++versionRequest
   selectedVersionId.value = id
+  detail.value = null
+  detailError.value = ''
+  detailLoading.value = true
   checkResult.value = null
   versionFunctions.value = []
   versionActions.value = []
-  detail.value = await get(`/ontology-publish/versions/${id}`)
-  const [fns, acts] = await Promise.all([
-    ontologyPublishApi.listVersionFunctions(id).catch(() => []),
-    ontologyPublishApi.listVersionActions(id).catch(() => []),
-  ])
-  versionFunctions.value = fns || []
-  versionActions.value = acts || []
+  resetDialogs()
+  try {
+    const [version, fns, acts] = await Promise.all([
+      get<VersionDetail>(`/ontology-publish/versions/${id}`),
+      ontologyPublishApi.listVersionFunctions(id),
+      ontologyPublishApi.listVersionActions(id),
+    ])
+    if (request !== versionRequest) return
+    detail.value = version
+    versionFunctions.value = fns || []
+    versionActions.value = acts || []
+  } catch (error) {
+    if (request === versionRequest) detailError.value = errorText(error, '版本详情加载失败')
+  } finally {
+    if (request === versionRequest) detailLoading.value = false
+  }
+}
+
+async function performMutation(task: () => Promise<void>, success: string) {
+  if (saving.value || detailLoading.value) return
+  saving.value = true
+  try {
+    await task()
+    message.success(success)
+  } catch (error) {
+    message.error(errorText(error, '操作失败，请重试'))
+  } finally {
+    saving.value = false
+  }
 }
 
 // version_entity_id / from_entity_id 等引用的是 OntologyVersionEntity.id，映射回中文名
@@ -389,101 +470,131 @@ function formatCategory(cat: string): string {
 }
 
 async function createVersion() {
-  const v = await post<{ id: string }>('/ontology-publish/versions', { name: newVersion.name, description: newVersion.description || null })
-  showCreateDialog.value = false
-  newVersion.name = ''
-  newVersion.description = ''
-  await loadOntologies()
-  if (selectedOntology.value) {
-    const updated = ontologies.value.find(o => o.ontology_id === selectedOntology.value!.ontology_id)
-    if (updated) selectedOntology.value = updated
-  }
-  await selectVersion(v.id)
+  const ontologyId = selectedOntology.value?.ontology_id
+  const name = newVersion.name.trim()
+  if (!ontologyId || !name) return
+  await performMutation(async () => {
+    const version = await post<{ id: string }>('/ontology-publish/versions', {
+      ontology_id: ontologyId, name, description: newVersion.description.trim() || null,
+    })
+    resetDialogs()
+    await loadOntologies()
+    if (selectedOntology.value?.ontology_id === ontologyId) await selectVersion(version.id)
+  }, '版本草稿已创建')
 }
 
 async function deleteVersion() {
-  if (!detail.value) return
-  await del(`/ontology-publish/versions/${detail.value.id}`)
-  detail.value = null
-  selectedVersionId.value = null
+  const id = detail.value?.id
+  if (!id || !window.confirm('确定删除当前版本草稿？此操作无法撤销。')) return
+  await performMutation(async () => {
+    await del(`/ontology-publish/versions/${id}`)
+    if (selectedVersionId.value === id) {
+      ++versionRequest
+      detail.value = null
+      selectedVersionId.value = null
+    }
+    await loadOntologies()
+  }, '版本草稿已删除')
+}
+
+async function refreshVersion(id: string) {
   await loadOntologies()
-  if (selectedOntology.value) {
-    const updated = ontologies.value.find(o => o.ontology_id === selectedOntology.value!.ontology_id)
-    if (updated) selectedOntology.value = updated
-  }
+  if (selectedOntology.value && selectedVersionId.value === id) await selectVersion(id)
 }
 
 async function addEntities() {
-  if (!detail.value) return
-  loading.value = true
-  await post(`/ontology-publish/versions/${detail.value.id}/entities`, { entity_ids: selectedEntityIds.value })
-  selectedEntityIds.value = []
-  showEntitySelector.value = false
-  await selectVersion(detail.value.id)
-  loading.value = false
+  const id = detail.value?.id
+  if (!id || !selectedEntityIds.value.length) return
+  const entityIds = [...selectedEntityIds.value]
+  await performMutation(async () => {
+    await post(`/ontology-publish/versions/${id}/entities`, { entity_ids: entityIds })
+    selectedEntityIds.value = []
+    showEntitySelector.value = false
+    await refreshVersion(id)
+  }, '对象已添加到版本')
 }
 
 async function removeEntity(entityId: string) {
-  if (!detail.value) return
-  await del(`/ontology-publish/versions/${detail.value.id}/entities/${entityId}`)
-  await selectVersion(detail.value.id)
+  const id = detail.value?.id
+  if (!id) return
+  await performMutation(async () => {
+    await del(`/ontology-publish/versions/${id}/entities/${entityId}`)
+    await refreshVersion(id)
+  }, '对象已从版本移除')
 }
 
 async function runCheck() {
-  if (!detail.value) return
-  loading.value = true
-  checkResult.value = await get(`/ontology-publish/versions/${detail.value.id}/check`)
-  loading.value = false
+  const id = detail.value?.id
+  if (!id) return
+  await performMutation(async () => {
+    const result = await get<CheckResult>(`/ontology-publish/versions/${id}/check`)
+    if (selectedVersionId.value === id) checkResult.value = result
+  }, '一致性检查已完成')
 }
 
 async function submitForApproval() {
-  if (!detail.value) return
-  loading.value = true
-  try {
-    await post(`/ontology-publish/versions/${detail.value.id}/submit`)
-    await loadOntologies()
-    await selectVersion(detail.value.id)
-  } catch (e: any) {
-    checkResult.value = { passed: false, entity_issues: [], relation_issues: [], summary: e?.response?.data?.detail || '提交失败' }
-  }
-  loading.value = false
+  const id = detail.value?.id
+  if (!id) return
+  await performMutation(async () => {
+    await post(`/ontology-publish/versions/${id}/submit`)
+    await refreshVersion(id)
+  }, '版本已提交审批')
 }
 
 async function approveVersion() {
-  if (!detail.value) return
-  loading.value = true
-  await post(`/ontology-publish/versions/${detail.value.id}/approve`)
-  await loadOntologies()
-  await selectVersion(detail.value.id)
-  loading.value = false
+  const id = detail.value?.id
+  if (!id) return
+  await performMutation(async () => {
+    await post(`/ontology-publish/versions/${id}/approve`)
+    await refreshVersion(id)
+  }, '版本审批通过')
 }
 
 async function rejectVersion() {
-  if (!detail.value) return
-  await post(`/ontology-publish/versions/${detail.value.id}/reject`, { reason: rejectReason.value })
-  rejectReason.value = ''
-  showRejectDialog.value = false
-  await loadOntologies()
-  await selectVersion(detail.value.id)
+  const id = detail.value?.id
+  const reason = rejectReason.value.trim()
+  if (!id || !reason) return
+  await performMutation(async () => {
+    await post(`/ontology-publish/versions/${id}/reject`, { reason })
+    rejectReason.value = ''
+    showRejectDialog.value = false
+    await refreshVersion(id)
+  }, '版本已驳回')
 }
 
 async function rollbackVersion() {
-  if (!detail.value) return
-  loading.value = true
-  const v = await post<{ id: string }>(`/ontology-publish/versions/${detail.value.id}/rollback`)
-  await loadOntologies()
-  await selectVersion(v.id)
-  loading.value = false
+  const id = detail.value?.id
+  const ontologyId = selectedOntology.value?.ontology_id
+  if (!id) return
+  await performMutation(async () => {
+    const version = await post<{ id: string }>(`/ontology-publish/versions/${id}/rollback`)
+    await loadOntologies()
+    if (selectedOntology.value?.ontology_id === ontologyId) await selectVersion(version.id)
+  }, '回滚版本已创建')
+}
+
+function closeImpact() {
+  showImpact.value = false
+  ++impactRequest
+  impactLoading.value = false
 }
 
 async function previewImpact() {
-  if (!detail.value) return
+  const id = detail.value?.id
+  if (!id) return
+  const request = ++impactRequest
   showImpact.value = true
   impactLoading.value = true
+  impactData.value = null
+  impactError.value = ''
   try {
-    impactData.value = await ontologyPublishApi.previewImpact(detail.value.id)
-  } catch { impactData.value = null }
-  finally { impactLoading.value = false }
+    const result = await ontologyPublishApi.previewImpact(id)
+    if (request === impactRequest) impactData.value = result
+  } catch (error) {
+    if (request === impactRequest) impactError.value = errorText(error, '影响预览加载失败，请重试')
+  } finally {
+    if (request === impactRequest) impactLoading.value = false
+  }
 }
 
 function formatStatus(status: string) {
@@ -512,7 +623,7 @@ function formatTime(iso: string) {
 .page-banner__title { font-size: 24px; font-weight: 700; color: var(--neutral-900, #111); margin: 0; }
 .page-banner__desc { font-size: 13px; color: var(--neutral-600, #555); margin: 0; max-width: 600px; line-height: 1.5; }
 .btn-back { background: rgba(255,255,255,0.7); border: 1px solid var(--neutral-200, #e5e5e5); padding: 5px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--neutral-700, #333); transition: background 0.15s; }
-.btn-back:hover { background: #fff; }
+.btn-back:hover { background: var(--neutral-0); }
 .btn-back { background: none; border: 1px solid var(--neutral-200); padding: 4px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; color: var(--neutral-600); }
 .btn-back:hover { background: var(--neutral-50); }
 
@@ -521,7 +632,7 @@ function formatTime(iso: string) {
 @media (max-width: 1100px) { .card-grid { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 700px) { .card-grid { grid-template-columns: 1fr; } }
 
-.onto-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; gap: 12px; }
+.onto-card { background: var(--neutral-0); border: 1px solid var(--neutral-100); border-radius: 12px; padding: 20px; cursor: pointer; transition: all 0.15s; display: flex; flex-direction: column; gap: 12px; }
 .onto-card:hover { border-color: var(--semantic-400); box-shadow: 0 4px 12px rgba(59,130,246,0.08); }
 .onto-card__top { display: flex; align-items: center; gap: 12px; }
 .onto-card__icon { width: 40px; height: 40px; border-radius: 10px; background: var(--semantic-50); color: var(--semantic-600); display: flex; align-items: center; justify-content: center; }
@@ -535,7 +646,7 @@ function formatTime(iso: string) {
 .onto-card__status { color: #166534; font-weight: 600; }
 .onto-card__time { color: var(--neutral-400); }
 
-.empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--neutral-400); }
+.empty-state { grid-column: 1 / -1; text-align: center; padding: 60px 20px; color: var(--neutral-500); }
 .empty-state p { margin: 4px 0; }
 .empty-state__hint { font-size: 13px; }
 
@@ -555,16 +666,16 @@ function formatTime(iso: string) {
 .version-item__name { font-size: 13px; font-weight: 500; color: var(--neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .version-item__meta { font-size: 11px; color: var(--neutral-500); }
 .version-item__active { font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 3px; background: #dcfce7; color: #166534; }
-.version-empty { font-size: 13px; color: var(--neutral-400); text-align: center; padding: 20px; }
+.version-empty { font-size: 13px; color: var(--neutral-500); text-align: center; padding: 20px; }
 
-.version-main { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
-.version-empty-main { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--neutral-400); }
+.version-main { flex: 1; min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; }
+.version-empty-main { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--neutral-500); }
 
 .meta-card { background: var(--neutral-50); border-radius: 10px; padding: 16px; }
-.meta-card__header { display: flex; align-items: center; gap: 10px; }
-.meta-card__header h2 { font-size: 16px; font-weight: 600; margin: 0; color: var(--neutral-900); }
+.meta-card__header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.meta-card__header h2 { overflow-wrap: anywhere; min-width: 0; font-size: 16px; font-weight: 600; margin: 0; color: var(--neutral-900); }
 .meta-card__desc { font-size: 13px; color: var(--neutral-600); margin: 8px 0 0; }
-.meta-card__timeline { display: flex; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--neutral-500); }
+.meta-card__timeline { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: 11px; color: var(--neutral-500); }
 .meta-card__reject { margin-top: 8px; padding: 8px 10px; background: #fef2f2; border-radius: 6px; font-size: 12px; color: #dc2626; }
 
 .status-tag { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
@@ -586,19 +697,19 @@ function formatTime(iso: string) {
 .res-section__count { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 10px; background: var(--neutral-100); color: var(--neutral-600); }
 
 .res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-.res-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px; transition: all 0.15s; }
+.res-card { background: var(--neutral-0); border: 1px solid var(--neutral-100); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 6px; transition: all 0.15s; }
 .res-card:hover { border-color: var(--semantic-400); box-shadow: 0 4px 12px rgba(59,130,246,0.08); }
 .res-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.res-card__name { font-size: 14px; font-weight: 600; color: var(--neutral-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.res-card__name { min-width: 0; font-size: 14px; font-weight: 600; color: var(--neutral-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .res-card__en { font-size: 11px; color: var(--neutral-400); }
 .res-card__desc { font-size: 12px; color: var(--neutral-500); line-height: 1.4; margin: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .res-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--neutral-50); }
 .res-card__tag { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 4px; background: var(--semantic-50); color: var(--semantic-600); white-space: nowrap; }
 .res-card__tag--plain { background: var(--neutral-100); color: var(--neutral-600); }
 .res-card__rel { font-size: 12px; color: var(--neutral-600); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.res-empty { font-size: 13px; color: var(--neutral-400); text-align: center; padding: 24px; border: 1px dashed var(--neutral-200); border-radius: 10px; }
+.res-empty { font-size: 13px; color: var(--neutral-500); text-align: center; padding: 24px; border: 1px dashed var(--neutral-200); border-radius: 10px; }
 
-.check-card { background: #fff; border: 1px solid var(--neutral-100); border-radius: 10px; padding: 16px; }
+.check-card { background: var(--neutral-0); border: 1px solid var(--neutral-100); border-radius: 10px; padding: 16px; }
 .check-card h3 { font-size: 14px; font-weight: 600; margin: 0 0 10px; }
 .check-card__summary { font-size: 13px; font-weight: 600; padding: 8px 12px; border-radius: 6px; }
 .check-card__summary--pass { background: #dcfce7; color: #166534; }
@@ -610,7 +721,7 @@ function formatTime(iso: string) {
 .action-bar { display: flex; gap: 8px; align-items: center; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--neutral-100); flex-wrap: wrap; }
 
 /* 弱化的审批操作按钮 */
-.btn-quiet { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--neutral-200); background: #fff; color: var(--neutral-600); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.btn-quiet { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--neutral-200); background: var(--neutral-0); color: var(--neutral-600); font-size: 12px; cursor: pointer; transition: all 0.15s; }
 .btn-quiet:hover:not(:disabled) { border-color: var(--semantic-400); color: var(--semantic-600); }
 .btn-quiet:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-quiet--danger { color: #b91c1c; }
@@ -619,29 +730,29 @@ function formatTime(iso: string) {
 .btn-primary { padding: 8px 18px; border-radius: 6px; border: none; background: var(--semantic-600); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-primary:hover:not(:disabled) { background: var(--semantic-700); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-secondary { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--neutral-200); background: #fff; color: var(--neutral-700); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-secondary { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--neutral-200); background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-secondary:hover { background: var(--neutral-50); }
 .btn-danger { padding: 8px 18px; border-radius: 6px; border: none; background: #dc2626; color: #fff; font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-danger:hover:not(:disabled) { background: #b91c1c; }
 .btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn-danger-outline { padding: 8px 18px; border-radius: 6px; border: 1px solid #fca5a5; background: #fef2f2; color: #dc2626; font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-danger-outline:hover { background: #fee2e2; }
-.btn-outline { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--neutral-300); background: #fff; color: var(--neutral-700); font-size: 13px; font-weight: 500; cursor: pointer; }
+.btn-outline { padding: 8px 18px; border-radius: 6px; border: 1px solid var(--neutral-300); background: var(--neutral-0); color: var(--neutral-700); font-size: 13px; font-weight: 500; cursor: pointer; }
 .btn-outline:hover { background: var(--neutral-50); }
-.btn-sm { padding: 4px 12px; border-radius: 5px; border: 1px solid var(--neutral-200); background: #fff; font-size: 12px; cursor: pointer; }
+.btn-sm { padding: 4px 12px; border-radius: 5px; border: 1px solid var(--neutral-200); background: var(--neutral-0); font-size: 12px; cursor: pointer; }
 .btn-sm:hover { background: var(--neutral-50); }
 .btn-block { width: 100%; }
 .btn-link { background: none; border: none; font-size: 12px; cursor: pointer; color: var(--semantic-600); }
 .btn-link--danger { color: #dc2626; }
 
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 400px; max-height: 80vh; overflow-y: auto; }
+.modal-box { max-width: calc(100vw - 40px); background: var(--neutral-0); border-radius: 12px; padding: 24px; width: 400px; max-height: 80vh; overflow-y: auto; }
 .modal-box--wide { width: 520px; }
 .modal-box h3 { font-size: 16px; font-weight: 600; margin: 0 0 16px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .form-group { margin-bottom: 12px; }
 .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--neutral-600); margin-bottom: 4px; }
-.form-group input, .form-group textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--neutral-200); border-radius: 6px; font-size: 13px; resize: vertical; }
+.form-group input, .form-group textarea { background: var(--neutral-0); color: var(--neutral-800); width: 100%; padding: 8px 10px; border: 1px solid var(--neutral-200); border-radius: 6px; font-size: 13px; resize: vertical; }
 
 .selector-list { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .selector-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 13px; }
@@ -652,7 +763,7 @@ function formatTime(iso: string) {
 .selector-item__tier { margin-left: auto; font-size: 11px; color: var(--neutral-500); }
 
 .impact-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.impact-dialog { background: #fff; border-radius: 8px; width: 480px; max-height: 70vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.impact-dialog { max-width: calc(100vw - 40px); background: var(--neutral-0); border-radius: 8px; width: 480px; max-height: 70vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
 .impact-dialog__header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #e5e7eb; }
 .impact-dialog__header h3 { margin: 0; font-size: 16px; }
 .impact-dialog__close { background: none; border: none; font-size: 20px; cursor: pointer; color: #6b7280; }
@@ -664,6 +775,16 @@ function formatTime(iso: string) {
 .impact-dialog__empty { text-align: center; color: #059669; padding: 20px; }
 .impact-dialog__tag--del { color: #dc2626; }
 .impact-dialog__tag--ren { color: #d97706; }
+.load-state { padding: 28px 16px; text-align: center; color: var(--neutral-600); font-size: 13px; }
+.load-state p { margin: 0 0 12px; overflow-wrap: anywhere; }
+.onto-card:focus-visible, .version-item:focus-visible { outline: 2px solid var(--semantic-500); outline-offset: 3px; }
+.selector-item { flex-wrap: wrap; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  .version-sidebar { width: 230px; }
+  .publish-page__body { gap: 16px; }
+  .page-banner { padding: 24px; }
+  .page-banner__title { font-size: 22px; overflow-wrap: anywhere; }
+}
 </style>
 
 

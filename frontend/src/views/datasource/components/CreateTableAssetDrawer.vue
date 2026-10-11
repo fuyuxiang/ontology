@@ -1,17 +1,21 @@
 <template>
   <a-drawer :open="open" :title="`新建结构化资产`" width="640"
+            :closable="!saving" :mask-closable="!saving" :keyboard="!saving"
             @update:open="(v: boolean) => emit('update:open', v)" destroy-on-close>
+    <a-alert v-if="optionsError" type="error" show-icon :message="optionsError" style="margin-bottom:16px">
+      <template #action><a-button size="small" @click="loadOptions">重试</a-button></template>
+    </a-alert>
     <a-tabs v-model:active-key="kind">
-      <a-tab-pane key="table" tab="表 (table)">
+      <a-tab-pane key="table" tab="表 (table)" :disabled="saving">
         <a-form layout="vertical">
           <a-form-item label="连接 *">
             <a-select v-model:value="form.connection_id" :options="connOptions"
-                      :loading="!connStore.items.length" show-search option-filter-prop="label"
+                      :loading="loadingOptions" :disabled="saving" show-search option-filter-prop="label"
                       @change="onConnectionChange" />
           </a-form-item>
           <a-form-item label="表名 *">
             <a-select v-model:value="form.table" :options="tableOptions" allow-clear
-                      :loading="loadingTables" show-search option-filter-prop="label" />
+                      :loading="loadingTables" :disabled="!form.connection_id || loadingTables || saving" show-search option-filter-prop="label" />
           </a-form-item>
           <a-form-item label="资产名称 *">
             <a-input v-model:value="form.name" placeholder="如 用户主表" />
@@ -35,11 +39,11 @@
         </a-form>
       </a-tab-pane>
 
-      <a-tab-pane key="sql_view" tab="SQL 视图 (sql_view)">
+      <a-tab-pane key="sql_view" tab="SQL 视图 (sql_view)" :disabled="saving">
         <a-form layout="vertical">
           <a-form-item label="基于 table 资产 *">
             <a-select v-model:value="viewForm.base_asset_id" :options="baseTableOptions"
-                      show-search option-filter-prop="label" />
+                      :loading="loadingOptions" :disabled="saving" show-search option-filter-prop="label" />
           </a-form-item>
           <a-form-item label="资产名称 *">
             <a-input v-model:value="viewForm.name" placeholder="如 用户数量视图" />
@@ -71,13 +75,15 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import {
-  Button as AButton, Drawer as ADrawer, Form as AForm, FormItem as AFormItem,
+  Alert as AAlert, Button as AButton, Drawer as ADrawer, Form as AForm, FormItem as AFormItem,
   Input as AInput, InputNumber as AInputNumber, Select as ASelect,
   TabPane as ATabPane, Tabs as ATabs, Textarea as ATextarea, message,
 } from 'ant-design-vue'
 import { useAssetStore } from '../../../store/asset'
-import { useConnectionStore } from '../../../store/connection'
-import { listTablesOfConnection } from '../../../api/connection'
+import { listConnections, listTablesOfConnection } from '../../../api/connection'
+import { listAssets } from '../../../api/asset'
+import type { Asset } from '../../../types/asset'
+import type { Connection } from '../../../types/connection'
 import SqlEditor from '../../../components/sql/SqlEditor.vue'
 
 const props = defineProps<{ open: boolean }>()
@@ -87,10 +93,14 @@ const emit = defineEmits<{
 }>()
 
 const store = useAssetStore()
-const connStore = useConnectionStore()
 const kind = ref<'table' | 'sql_view'>('table')
 const saving = ref(false)
 const loadingTables = ref(false)
+const loadingOptions = ref(false)
+const optionsError = ref('')
+const connections = ref<Connection[]>([])
+const baseTables = ref<Asset[]>([])
+let tablesRequest = 0
 const tableOptions = ref<{ label: string; value: string }[]>([])
 
 const form = reactive({
@@ -103,17 +113,18 @@ const viewForm = reactive({
 })
 
 const connOptions = computed(() =>
-  connStore.items.map(c => ({ label: `${c.name} (${c.type})`, value: c.id })))
+  connections.value.filter(c => c.category === 'database' && c.enabled).map(c => ({ label: `${c.name} (${c.type})`, value: c.id })))
 
 const baseTableOptions = computed(() =>
-  store.items.filter(a => a.kind === 'table' && a.status === 'active')
+  baseTables.value
     .map(a => ({ label: a.name + (a.alias ? ` @${a.alias}` : ''), value: a.id })))
 
 watch(() => props.open, async (v) => {
   if (v) {
-    if (!connStore.items.length) await connStore.fetchList()
-    if (!store.items.length) await store.fetchList()
+    await loadOptions()
   } else {
+    ++tablesRequest
+    loadingTables.value = false
     Object.assign(form, { connection_id: '', table: '', name: '', alias: '',
       domain: '', tags: [], cache_ttl_seconds: 0, description: '' })
     Object.assign(viewForm, { base_asset_id: '', name: '', alias: '', sql: '',
@@ -123,28 +134,46 @@ watch(() => props.open, async (v) => {
   }
 })
 
+async function loadOptions() {
+  loadingOptions.value = true
+  optionsError.value = ''
+  try {
+    const [loadedConnections, loadedTables] = await Promise.all([listConnections(), listAssets({ kind: 'table' })])
+    connections.value = loadedConnections
+    baseTables.value = loadedTables
+  } catch (e: any) {
+    optionsError.value = e.response?.data?.detail || e.message || '资产选项加载失败，请重试'
+  } finally {
+    loadingOptions.value = false
+  }
+}
+
 async function onConnectionChange(value: unknown) {
+  const request = ++tablesRequest
+  form.table = ''
+  tableOptions.value = []
   const connId = value == null ? '' : String(value)
-  if (!connId) return
+  if (!connId) { loadingTables.value = false; return }
   loadingTables.value = true
   try {
     const tables = await listTablesOfConnection(connId)
-    tableOptions.value = tables.map(t => ({ label: t, value: t }))
+    if (request === tablesRequest && props.open) tableOptions.value = tables.map(t => ({ label: t, value: t }))
   } catch (e: any) {
-    message.error(e.message)
+    if (request === tablesRequest && props.open) message.error(e.message)
   } finally {
-    loadingTables.value = false
+    if (request === tablesRequest) loadingTables.value = false
   }
 }
 
 async function saveTable() {
-  if (!form.connection_id || !form.table || !form.name) {
+  if (saving.value) return
+  if (!form.connection_id || !form.table || !form.name.trim() || loadingTables.value) {
     message.error('请填写连接 / 表 / 名称'); return
   }
   saving.value = true
   try {
     await store.create({
-      name: form.name, alias: form.alias || null,
+      name: form.name.trim(), alias: form.alias || null,
       kind: 'table', connection_id: form.connection_id,
       locator: { table: form.table },
       domain: form.domain || null, tags: form.tags,
@@ -160,15 +189,16 @@ async function saveTable() {
 }
 
 async function saveView() {
-  if (!viewForm.base_asset_id || !viewForm.name || !viewForm.sql) {
+  if (saving.value) return
+  if (!viewForm.base_asset_id || !viewForm.name.trim() || !viewForm.sql.trim()) {
     message.error('请填写基表 / 名称 / SQL'); return
   }
   saving.value = true
   try {
-    const base = store.items.find(a => a.id === viewForm.base_asset_id)
+    const base = baseTables.value.find(a => a.id === viewForm.base_asset_id)
     if (!base) { message.error('基表资产不存在'); return }
     await store.create({
-      name: viewForm.name, alias: viewForm.alias || null,
+      name: viewForm.name.trim(), alias: viewForm.alias || null,
       kind: 'sql_view', connection_id: base.connection_id,
       locator: { base_asset_id: viewForm.base_asset_id, sql: viewForm.sql },
       cache_ttl_seconds: viewForm.cache_ttl_seconds,

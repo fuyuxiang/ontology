@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
 
 import pytest
 
@@ -103,3 +104,26 @@ class TestRegistryInMemory:
         meta2.description = "updated"
         registry.register(meta2)
         assert registry.get("calc").description == "updated"
+
+    def test_code_refresh_preserves_business_display_name(self):
+        db = MagicMock()
+        row = SimpleNamespace(name="设备风险评估")
+        db.query.return_value.filter.return_value.first.return_value = row
+        registry = FunctionRegistry(db)
+        meta = _make_meta("calculate_device_risk")
+        meta.description = "代码更新后的说明"
+        meta.checksum = "updated-checksum"
+
+        registry.register(meta)
+
+        assert row.name == "设备风险评估"
+        assert row.description == "代码更新后的说明"
+        assert row.checksum == "updated-checksum"
+        assert row.source_path == meta.source_path
+        assert row.func_name == "calculate_device_risk"
+        assert registry.get("calculate_device_risk") is meta
+
+        db.query.return_value.filter.return_value.first.return_value = None
+        registry.register(_make_meta("new_callable"))
+        new_row = db.add.call_args.args[0]
+        assert new_row.name == "new_callable"

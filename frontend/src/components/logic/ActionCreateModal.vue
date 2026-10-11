@@ -1,10 +1,15 @@
 <template>
-  <ModalDialog :visible="visible" title="创建动作" width="560px" @close="$emit('close')">
+  <ModalDialog :visible="visible" title="创建动作" width="560px" @close="close">
     <div class="create-form">
       <div class="form-section">
         <label class="form-label form-label--required">中文名称</label>
         <div class="input-wrap">
-          <input v-model="form.name" class="form-input" placeholder="请输入中文名称" maxlength="100" />
+          <input
+            v-model="form.name"
+            class="form-input"
+            placeholder="请输入中文名称"
+            maxlength="100"
+          />
           <span class="input-count">{{ form.name.length }}/100</span>
         </div>
       </div>
@@ -12,7 +17,12 @@
       <div class="form-section">
         <label class="form-label form-label--required">英文名称</label>
         <div class="input-wrap">
-          <input v-model="form.callable_name" class="form-input" placeholder="请输入英文名称" maxlength="100" />
+          <input
+            v-model="form.callable_name"
+            class="form-input"
+            placeholder="请输入英文名称"
+            maxlength="100"
+          />
           <span class="input-count">{{ form.callable_name.length }}/100</span>
         </div>
       </div>
@@ -20,7 +30,13 @@
       <div class="form-section">
         <label class="form-label">描述</label>
         <div class="input-wrap">
-          <textarea v-model="form.description" class="form-input form-textarea" placeholder="请输入描述" maxlength="2000" rows="3" />
+          <textarea
+            v-model="form.description"
+            class="form-input form-textarea"
+            placeholder="请输入描述"
+            maxlength="2000"
+            rows="3"
+          />
           <span class="input-count">{{ form.description.length }}/2000</span>
         </div>
       </div>
@@ -35,7 +51,7 @@
     </div>
 
     <template #footer>
-      <button class="btn-secondary" @click="$emit('close')">取消</button>
+      <button class="btn-secondary" :disabled="saving" @click="close">取消</button>
       <button class="btn-primary" :disabled="saving" @click="handleCreate">
         {{ saving ? '创建中…' : '创建' }}
       </button>
@@ -76,32 +92,60 @@ const form = ref({
 function resetForm() {
   form.value = { name: '', callable_name: '', description: '', entity_id: '' }
 }
-
-async function loadEntities() {
-  entities.value = await entityApi.list()
+function close() {
+  if (!saving.value) emit('close')
 }
 
-watch(() => props.visible, (v) => { if (v) { resetForm(); loadEntities() } })
-onMounted(() => { if (props.visible) loadEntities() })
+async function loadEntities() {
+  entities.value = []
+  try {
+    entities.value = await entityApi.list()
+  } catch {
+    toast.error('对象列表加载失败，请关闭后重新打开创建窗口')
+  }
+}
+
+watch(
+  () => props.visible,
+  (v) => {
+    if (v) {
+      resetForm()
+      loadEntities()
+    }
+  },
+)
+onMounted(() => {
+  if (props.visible) loadEntities()
+})
 
 async function handleCreate() {
-  if (!form.value.name.trim()) { toast.error('请填写中文名称'); return }
-  if (!form.value.callable_name.trim()) { toast.error('请填写英文名称'); return }
+  if (saving.value) return
+  if (!form.value.name.trim()) {
+    toast.error('请填写中文名称')
+    return
+  }
+  if (!form.value.callable_name.trim()) {
+    toast.error('请填写英文名称')
+    return
+  }
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(form.value.callable_name.trim())) {
     toast.error('英文名称必须是合法标识符（字母或下划线开头，仅含字母、数字、下划线）')
     return
   }
   saving.value = true
+  const origin = route.fullPath
   try {
     const result = await actionApi.create({
-      name: form.value.callable_name.trim(),
+      name: form.value.name.trim(),
       description: form.value.description,
       category: form.value.entity_id ? 'domain' : 'system',
-      action_type: 'python_script',
+      action_type: 'custom_script',
+      type_config: { callable_name: form.value.callable_name.trim() },
       entity_id: form.value.entity_id || undefined,
       ontology_id: ontologyStore.currentOntologyId || undefined,
     } as any)
     toast.success('动作创建成功')
+    if (route.fullPath !== origin) return
     emit('created', { id: result.id, name: result.name })
     const query: Record<string, string> = {}
     if (route.params.code) {
@@ -118,6 +162,8 @@ async function handleCreate() {
 </script>
 
 <style scoped>
+@import '../../views/logic/logic-shared.css';
+
 .create-form {
   display: flex;
   flex-direction: column;
@@ -126,6 +172,7 @@ async function handleCreate() {
 }
 
 .form-section {
+  margin-bottom: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -186,6 +233,10 @@ async function handleCreate() {
   color: var(--neutral-400, #aaa);
 }
 
+.input-wrap > input {
+  padding-right: 76px;
+}
+
 .form-textarea {
   resize: vertical;
   min-height: 72px;
@@ -213,5 +264,9 @@ async function handleCreate() {
 
 .btn-secondary:hover {
   background: var(--neutral-50, #fafafa);
+}
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 </style>

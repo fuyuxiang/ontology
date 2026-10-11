@@ -32,6 +32,7 @@ function migrateSession(s: any): BuilderSession {
     return 'manual'
   })()
   const objects: OntologyObjectDraft[] = (s.ontologyObjects || s.ontologyClasses || []).map((c: any) => ({
+    ...c,
     id: c.id,
     name: c.name,
     displayName: c.displayName,

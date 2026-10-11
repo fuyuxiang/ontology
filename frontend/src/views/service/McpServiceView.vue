@@ -8,8 +8,7 @@
       </div>
       <div class="page-banner__right">
         <div class="page-banner__status">
-          <span class="status-dot"></span>
-          <span>服务运行中</span>
+          <span>MCP 接入端点</span>
         </div>
         <div class="page-banner__endpoint">
           <code>{{ endpoint }}</code>
@@ -25,6 +24,7 @@
         :key="tab.key"
         class="tab-btn"
         :class="{ 'tab-btn--active': activeTab === tab.key }"
+        :aria-pressed="activeTab === tab.key"
         @click="activeTab = tab.key"
       >{{ tab.label }}</button>
     </div>
@@ -37,7 +37,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onBeforeUnmount } from 'vue'
+import { message } from 'ant-design-vue'
 import OverviewTab from './mcp/OverviewTab.vue'
 import DocsTab from './mcp/DocsTab.vue'
 import { copyText } from '../../utils/markdownExport'
@@ -50,13 +51,16 @@ const activeTab = ref('overview')
 
 const endpoint = `${window.location.origin}/api/v1/mcp`
 const copied = ref(false)
+let copyTimer: ReturnType<typeof setTimeout> | undefined
 
 async function copyEndpoint() {
   if (await copyText(endpoint)) {
     copied.value = true
-    setTimeout(() => { copied.value = false }, 1500)
-  }
+    clearTimeout(copyTimer)
+    copyTimer = setTimeout(() => { copied.value = false }, 1500)
+  } else message.error('复制失败，请手动选择并复制端点')
 }
+onBeforeUnmount(() => clearTimeout(copyTimer))
 </script>
 
 <style scoped>
@@ -69,6 +73,8 @@ async function copyEndpoint() {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
   padding: 32px 32px;
   background: linear-gradient(135deg, #e8f4fd 0%, #dbeafe 50%, #eff6ff 100%);
   border-radius: var(--radius-lg, 12px);
@@ -76,12 +82,10 @@ async function copyEndpoint() {
 }
 .page-banner__title { font-size: 24px; font-weight: 700; color: var(--neutral-900, #111); margin: 0 0 8px; }
 .page-banner__desc { font-size: 13px; color: var(--neutral-600, #555); margin: 0; max-width: 600px; line-height: 1.5; }
-.page-banner__right { text-align: right; flex-shrink: 0; }
-.page-banner__status { display: flex; align-items: center; gap: 6px; justify-content: flex-end; font-size: 13px; color: #16a34a; font-weight: 500; }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block; animation: pulse 2s infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.page-banner__right { text-align: right; min-width: 0; }
+.page-banner__status { display: flex; align-items: center; gap: 6px; justify-content: flex-end; font-size: 13px; color: var(--neutral-600, #555); font-weight: 500; }
 .page-banner__endpoint { margin-top: 10px; display: flex; align-items: center; justify-content: flex-end; }
-.page-banner__endpoint code { font-size: 12px; background: rgba(37,99,235,0.08); color: var(--primary, #2563eb); padding: 5px 10px; border-radius: 6px; }
+.page-banner__endpoint code { font-size: 12px; background: rgba(37,99,235,0.08); color: var(--primary, #2563eb); padding: 5px 10px; border-radius: 6px; overflow-wrap: anywhere; }
 .copy-btn { margin-left: 8px; font-size: 11px; background: var(--primary, #2563eb); border: none; color: #fff; padding: 5px 12px; border-radius: 6px; cursor: pointer; transition: opacity 0.15s; }
 .copy-btn:hover { opacity: 0.9; }
 
@@ -110,4 +114,6 @@ async function copyEndpoint() {
 }
 
 .mcp-service__content { padding-bottom: 24px; }
+.copy-btn { flex-shrink: 0; }
+.copy-btn:focus-visible, .tab-btn:focus-visible { outline: 2px solid var(--primary, #2563eb); outline-offset: 3px; }
 </style>

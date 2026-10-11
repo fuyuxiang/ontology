@@ -1,5 +1,6 @@
 <template>
   <a-drawer :open="open" :title="title" width="560"
+            :closable="!saving" :mask-closable="!saving" :keyboard="!saving"
             @update:open="(v: boolean) => emit('update:open', v)" destroy-on-close>
     <!-- file 上传（不依赖 Connection） -->
     <a-form v-if="sourceType === 'file'" layout="vertical">
@@ -10,7 +11,7 @@
             <UploadOutlined /> 选择文件
           </a-button>
         </a-upload>
-        <span v-if="form.file" style="margin-left:12px">{{ form.file.name }}（{{ (form.file.size/1024).toFixed(1) }} KB）</span>
+        <span v-if="form.file" class="selected-file">{{ form.file.name }}（{{ (form.file.size/1024).toFixed(1) }} KB）</span>
       </a-form-item>
       <a-form-item label="资产名称（可选，默认用文件名）"><a-input v-model:value="form.name" /></a-form-item>
       <a-form-item label="领域"><a-input v-model:value="form.domain" /></a-form-item>
@@ -31,6 +32,9 @@
     <!-- oss / api / mq 统一走"选 Connection + 填指针" -->
     <a-form v-else layout="vertical">
       <a-alert :message="connectionHint" type="info" show-icon style="margin-bottom:16px" />
+      <a-alert v-if="connError" :message="connError" type="error" show-icon style="margin-bottom:16px">
+        <template #action><a-button size="small" @click="loadConnections">重试</a-button></template>
+      </a-alert>
       <a-form-item label="选择数据源连接 *">
         <a-select v-model:value="conn.connection_id" :options="connectionOptions"
                   placeholder="先在「数据接入」页创建对应类型的数据源" :loading="connLoading"
@@ -54,8 +58,8 @@
         <a-form-item v-if="browseList.length > 0" label="可用对象">
           <a-list size="small" :data-source="browseList" :pagination="false" bordered style="max-height:200px;overflow:auto">
             <template #renderItem="{ item }">
-              <a-list-item @click="conn.key = item.key" style="cursor:pointer">
-                <span :style="conn.key === item.key ? 'color:#3b82f6;font-weight:600' : ''">{{ item.key }}</span>
+              <a-list-item>
+                <button type="button" class="browse-choice" :aria-pressed="conn.key === item.key" @click="conn.key = item.key">{{ item.key }}</button>
                 <span style="color:#9ca3af;font-size:11px">{{ formatSize(item.size) }}</span>
               </a-list-item>
             </template>
@@ -91,8 +95,8 @@
         <a-form-item v-if="browseTopics.length > 0" label="可用 Topic">
           <a-list size="small" :data-source="browseTopics" :pagination="false" bordered style="max-height:200px;overflow:auto">
             <template #renderItem="{ item }">
-              <a-list-item @click="conn.topic = item" style="cursor:pointer">
-                <span :style="conn.topic === item ? 'color:#3b82f6;font-weight:600' : ''">{{ item }}</span>
+              <a-list-item>
+                <button type="button" class="browse-choice" :aria-pressed="conn.topic === item" @click="conn.topic = item">{{ item }}</button>
               </a-list-item>
             </template>
           </a-list>
@@ -119,10 +123,9 @@ import {
 } from 'ant-design-vue'
 import { UploadOutlined } from '@ant-design/icons-vue'
 import { uploadDocumentAsset, createDirectoryDocAsset, createAsset } from '../../../api/asset'
-import { listObjects, listTopics } from '../../../api/connection'
-import { useConnectionStore } from '../../../store/connection'
+import { listConnections, listObjects, listTopics } from '../../../api/connection'
 import type { DocumentSourceType } from '../../../types/asset'
-import type { ConnectionCategory, ObjectEntry } from '../../../types/connection'
+import type { Connection, ConnectionCategory, ObjectEntry } from '../../../types/connection'
 
 const props = defineProps<{ open: boolean; sourceType: DocumentSourceType }>()
 const emit = defineEmits<{
@@ -130,10 +133,12 @@ const emit = defineEmits<{
   (e: 'success'): void
 }>()
 
-const connStore = useConnectionStore()
+const connections = ref<Connection[]>([])
 const saving = ref(false)
 const browsing = ref(false)
 const connLoading = ref(false)
+const connError = ref('')
+let browseRequest = 0
 const browseList = ref<ObjectEntry[]>([])
 const browseTopics = ref<string[]>([])
 
@@ -175,7 +180,7 @@ const requiredCategoryLabel = computed(() => {
 
 const connectionOptions = computed(() => {
   if (!requiredCategory.value) return []
-  return connStore.items
+  return connections.value
     .filter(c => c.category === requiredCategory.value && c.enabled)
     .map(c => ({ label: `${c.name} · ${c.type}`, value: c.id }))
 })
@@ -186,11 +191,10 @@ const connectionHint = computed(() => {
 
 watch(() => props.open, async (v) => {
   if (v) {
-    if (connStore.items.length === 0) {
-      connLoading.value = true
-      try { await connStore.fetchList() } finally { connLoading.value = false }
-    }
+    if (requiredCategory.value) await loadConnections()
   } else {
+    ++browseRequest
+    browsing.value = false
     form.file = null; form.name = ''; form.description = ''; form.domain = ''; form.tags = ''
     Object.assign(dir, { name: '', directory_path: '', file_extensions: '', description: '' })
     Object.assign(conn, {
@@ -202,12 +206,23 @@ watch(() => props.open, async (v) => {
   }
 })
 
+async function loadConnections() {
+  connLoading.value = true
+  connError.value = ''
+  try { connections.value = await listConnections() }
+  catch (e: any) { connError.value = e.response?.data?.detail || e.message || '数据源选项加载失败，请重试' }
+  finally { connLoading.value = false }
+}
+
 function handleFileSelect(file: File): boolean {
   form.file = file
   return false
 }
 
 function onConnChange() {
+  ++browseRequest
+  browsing.value = false
+  conn.key = ''; conn.path = ''; conn.topic = ''
   browseList.value = []
   browseTopics.value = []
 }
@@ -215,21 +230,25 @@ function onConnChange() {
 async function browse() {
   if (!conn.connection_id) { message.warning('请先选择连接'); return }
   browsing.value = true
+  const request = ++browseRequest
+  const connectionId = conn.connection_id
   try {
     if (props.sourceType === 'oss') {
-      browseList.value = await listObjects(conn.connection_id, conn.key || '', 50)
+      const objects = await listObjects(connectionId, conn.key || '', 50)
+      if (request === browseRequest && props.open) browseList.value = objects
     } else if (props.sourceType === 'mq') {
-      browseTopics.value = await listTopics(conn.connection_id)
+      const topics = await listTopics(connectionId)
+      if (request === browseRequest && props.open) browseTopics.value = topics
     }
   } catch (e: any) {
-    message.error(e.response?.data?.detail || e.message)
+    if (request === browseRequest && props.open) message.error(e.response?.data?.detail || e.message)
   } finally {
-    browsing.value = false
+    if (request === browseRequest) browsing.value = false
   }
 }
 
 async function saveFile() {
-  if (!form.file) return
+  if (saving.value || !form.file) return
   saving.value = true
   try {
     await uploadDocumentAsset(form.file, {
@@ -242,7 +261,8 @@ async function saveFile() {
 }
 
 async function saveDir() {
-  if (!dir.name || !dir.directory_path) { message.error('请填写必填项'); return }
+  if (saving.value) return
+  if (!dir.name.trim() || !dir.directory_path.trim()) { message.error('请填写必填项'); return }
   saving.value = true
   try {
     await createDirectoryDocAsset({
@@ -256,8 +276,9 @@ async function saveDir() {
 }
 
 async function saveConnAsset() {
+  if (saving.value) return
   if (!conn.connection_id) { message.error('请选择数据源连接'); return }
-  if (!conn.name) { message.error('请填写资产名称'); return }
+  if (!conn.name.trim()) { message.error('请填写资产名称'); return }
   let locator: Record<string, unknown> = {}
   if (props.sourceType === 'oss') {
     if (!conn.key) { message.error('请填写对象 Key'); return }
@@ -295,3 +316,10 @@ function formatSize(n: number) {
   return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`
 }
 </script>
+
+<style scoped>
+.selected-file { display: block; margin-top: 8px; overflow-wrap: anywhere; color: var(--neutral-700, #374151); }
+.browse-choice { min-width: 0; border: 0; padding: 0; background: none; font: inherit; text-align: left; color: var(--neutral-700, #374151); cursor: pointer; overflow-wrap: anywhere; }
+.browse-choice[aria-pressed="true"] { color: var(--primary, #2563eb); font-weight: 600; }
+.browse-choice:focus-visible { outline: 2px solid var(--primary, #2563eb); outline-offset: 3px; }
+</style>

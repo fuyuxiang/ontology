@@ -1,3 +1,4 @@
+import keyword
 import re
 from pathlib import Path
 
@@ -198,12 +199,14 @@ def _sanitize_dirname(name: str) -> str:
 
 def _generate_action_template(name: str, description: str) -> str:
     safe_name = re.sub(r'\W', '_', name)
+    if not safe_name.isidentifier() or keyword.iskeyword(safe_name):
+        safe_name = f"action_{safe_name}"
     return f'''from ontology_runtime import Function, call_function
 
 
 @Function(
-    name="{safe_name}",
-    description="{description}",
+    name={safe_name!r},
+    description={description!r},
     type="action",
     params=[],
     return_type="object",
@@ -230,13 +233,17 @@ def open_action_workspace(
     if not action:
         raise HTTPException(status_code=404, detail="动作不存在")
 
-    dir_name = _sanitize_dirname(action.name)
+    # Display names may be Chinese; new actions retain their callable identifier
+    # in type_config without changing the existing action contract.
+    configured_name = (action.type_config or {}).get("callable_name")
+    callable_name = configured_name if isinstance(configured_name, str) and configured_name else action.name
+    dir_name = _sanitize_dirname(callable_name)
     action_dir = (WORKSPACE_DIR / dir_name).resolve()
     action_dir.mkdir(parents=True, exist_ok=True)
 
     main_file = action_dir / "main.py"
     if not main_file.exists():
-        template = _generate_action_template(action.name, action.description or "")
+        template = _generate_action_template(callable_name, action.description or "")
         main_file.write_text(template, encoding="utf-8")
 
     # 同 functions.open_workspace：主机名交由浏览器推导，后端只提供路径与端口。

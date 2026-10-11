@@ -76,7 +76,7 @@ export const systemConfigApi = {
   },
 
   /** 测试指定模型连通性 */
-  testAiModel(data: { api_key: string; base_url: string; model_id: string }) {
+  testAiModel(data: { id?: string; api_key: string; base_url: string; model_id: string }) {
     return post<TestResult>('/system-config/ai/models/test', data)
   },
 

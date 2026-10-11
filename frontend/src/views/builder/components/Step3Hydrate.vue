@@ -3,12 +3,15 @@
     <header class="step3-topbar">
       <button class="step3-back-btn" @click="$emit('prev')">← 返回</button>
       <div class="step3-topbar-title">验证发布</div>
-      <div class="step3-topbar-progress" v-if="drillStarted && !drillResult">
+      <div class="step3-topbar-progress" v-if="drillRunning">
         <span class="step3-progress-label">演练进行中</span>
         <div class="step3-progress-track">
           <div class="step3-progress-bar" :style="{ width: drillProgress * 100 + '%' }"></div>
         </div>
         <span class="step3-progress-pct">{{ Math.round(drillProgress * 100) }}%</span>
+      </div>
+      <div class="step3-topbar-progress" v-else-if="drillStatus === 'error'">
+        <span class="step3-progress-label">演练失败，可重新演练</span>
       </div>
       <div class="step3-topbar-progress" v-else-if="drillResult">
         <span class="step3-progress-label step3-progress-label--done">演练完成</span>
@@ -79,12 +82,12 @@
           </div>
           <div v-else class="step3-ds-empty">
             <div class="step3-ds-empty__text">未找到可用数据资产</div>
-            <div class="step3-ds-empty__hint">本体对象未绑定数据资产，演练将仅验证结构完整性</div>
+            <div class="step3-ds-empty__hint">请先在资产目录注册数据资产，或返回走测为对象绑定数据源</div>
           </div>
 
           <button
             class="step3-drill-btn"
-            :disabled="assetLoading || selectedSourceIds.length === 0"
+            :disabled="assetLoading || drillRunning || selectedSourceIds.length === 0"
             @click="startDrill"
           >
             {{ assetLoading ? '加载资产中...' : '开始演练' }}
@@ -95,9 +98,9 @@
         <div v-if="drillStarted" class="step3-panel step3-panel--drill">
           <div class="step3-drill-header">
             <span class="step3-drill-dot" :class="{ done: !!drillResult }"></span>
-            <span>{{ !drillResult ? '演练进行中' : drillStatus === 'pass' ? '演练完成 · 全部通过' : drillStatus === 'warn' ? '演练完成 · 存在警告' : '演练失败' }}</span>
+            <span>{{ drillRunning ? '演练进行中' : drillStatus === 'error' ? '演练失败 · 请检查日志后重试' : drillStatus === 'pass' ? '演练完成 · 全部通过' : '演练完成 · 存在警告' }}</span>
             <span class="step3-drill-elapsed">{{ drillElapsed }}s</span>
-            <button v-if="drillResult" class="step3-retry-btn" @click="resetDrill">重新演练</button>
+            <button v-if="!drillRunning" class="step3-retry-btn" @click="resetDrill">重新演练</button>
           </div>
 
           <!-- 4 阶段指示 -->
@@ -248,7 +251,7 @@
 
         <button
           class="step3-publish-btn"
-          :disabled="!canPublish"
+          :disabled="!canPublish || publishing || drillRunning"
           @click="publishModalOpen = true"
         >
           发布至本体工作室
@@ -257,7 +260,7 @@
     </div>
 
     <!-- 发布弹窗 -->
-    <a-modal v-model:open="publishModalOpen" :footer="null" :width="480" class="step3-publish-modal">
+    <a-modal v-model:open="publishModalOpen" :closable="!publishing" :mask-closable="!publishing" :keyboard="!publishing" :footer="null" :width="480" class="step3-publish-modal">
       <div class="step3-modal-content">
         <div class="step3-modal-title">确认发布 · {{ versionLabel }}</div>
         <div class="step3-modal-text">
@@ -274,7 +277,7 @@
           场景归属：<strong>{{ selectedScenarioNames.join('、') }}</strong>
         </div>
         <div class="step3-modal-actions">
-          <a-button @click="publishModalOpen = false">取消</a-button>
+          <a-button :disabled="publishing" @click="publishModalOpen = false">取消</a-button>
           <a-button type="primary" :loading="publishing" @click="confirmPublish">确认发布</a-button>
         </div>
       </div>
@@ -304,6 +307,10 @@ const ontologyId = computed(() => {
 })
 
 // ── 状态 ──
+const drillRunning = ref(false)
+let drillController: AbortController | null = null
+let drillRequest = 0
+let assetRequest = 0
 const drillStarted = ref(!!props.session.drillResult)
 const drillProgress = ref(props.session.drillResult ? 1 : 0)
 const drillStatus = ref<'pass' | 'warn' | 'error' | undefined>(props.session.drillStatus)
@@ -423,9 +430,12 @@ async function resolveAssetIds(): Promise<string[]> {
 }
 
 async function loadAssetDetails() {
+  const request = ++assetRequest
+  const sessionId = props.session.sessionId
   assetLoading.value = true
   try {
     const ids = await resolveAssetIds()
+    if (request !== assetRequest || props.session.sessionId !== sessionId) return
     if (ids.length === 0) {
       assetList.value = []
       selectedSourceIds.value = []
@@ -458,14 +468,16 @@ async function loadAssetDetails() {
         })
       }
     }
+    if (request !== assetRequest || props.session.sessionId !== sessionId) return
     assetList.value = items
     selectedSourceIds.value = items.map(i => i.id)
   } catch (e) {
+    if (request !== assetRequest) return
     console.error('加载资产详情失败', e)
     assetList.value = []
     selectedSourceIds.value = []
   } finally {
-    assetLoading.value = false
+    if (request === assetRequest) assetLoading.value = false
   }
 }
 
@@ -545,48 +557,58 @@ function pushLog(level: 'OK' | 'RUN' | 'ERR', msg: string) {
   })
 }
 
+function stopDrill() {
+  ++drillRequest
+  drillController?.abort()
+  drillController = null
+  drillRunning.value = false
+  if (drillTimer) clearInterval(drillTimer)
+  drillTimer = null
+}
+
 function resetDrill() {
+  stopDrill()
   drillStarted.value = false
   drillResult.value = null
   drillStatus.value = undefined
   drillProgress.value = 0
   drillLogs.value = []
   drillElapsed.value = 0
+  store.updateSession(props.session.sessionId, { drillResult: undefined, drillStatus: undefined, status: 'reviewing' })
 }
 
 // PLACEHOLDER_DRILL_FN
 
 async function startDrill() {
-  // 发请求前最后兜底：选中为空时再尝试解析一次资产，避免发出空 asset_ids 请求
-  if (selectedSourceIds.value.length === 0) {
-    const ids = await resolveAssetIds()
-    if (ids.length > 0) {
-      selectedSourceIds.value = ids
-      if (assetList.value.length === 0) {
-        await loadAssetDetails()
-      }
-    }
-  }
-  if (selectedSourceIds.value.length === 0) {
-    message.warning('未找到可用数据资产，请先在「资产目录」注册数据表，或在对象上绑定 backing asset。')
-    return
-  }
+  if (drillRunning.value || publishing.value) return
+  const request = ++drillRequest
+  const session = props.session
+  const controller = new AbortController()
+  drillController = controller
+  drillRunning.value = true
   drillStarted.value = true
   drillProgress.value = 0
   drillLogs.value = []
   drillElapsed.value = 0
   drillStatus.value = undefined
   drillResult.value = null
-  store.setStatus('hydrating')
+  store.updateSession(session.sessionId, { status: 'hydrating', drillResult: undefined, drillStatus: undefined })
   if (drillTimer) clearInterval(drillTimer)
   drillTimer = window.setInterval(() => drillElapsed.value++, 1000)
-
   pushLog('RUN', '启动数据验证...')
 
   try {
+    if (selectedSourceIds.value.length === 0) {
+      const ids = await resolveAssetIds()
+      if (request !== drillRequest) return
+      selectedSourceIds.value = ids
+    }
+    if (selectedSourceIds.value.length === 0) {
+      throw new Error('未找到可用数据资产，请返回走测绑定数据源')
+    }
     const payload = {
-      session_id: props.session.sessionId || '',
-      objects: (props.session.ontologyObjects || []).map(o => ({
+      session_id: session.sessionId || '',
+      objects: (session.ontologyObjects || []).map(o => ({
         name: o.name,
         displayName: o.displayName,
         tier: o.tier,
@@ -603,9 +625,9 @@ async function startDrill() {
         })),
         backing_asset_ids: o.backing_asset_ids || [],
       })),
-      relations: (props.session.ontologyRelations || []).map(r => {
-        const srcObj = (props.session.ontologyObjects || []).find(o => o.id === r.source)
-        const tgtObj = (props.session.ontologyObjects || []).find(o => o.id === r.target)
+      relations: (session.ontologyRelations || []).map(r => {
+        const srcObj = (session.ontologyObjects || []).find(o => o.id === r.source)
+        const tgtObj = (session.ontologyObjects || []).find(o => o.id === r.target)
         return {
           name: r.name,
           displayName: r.displayName,
@@ -614,27 +636,26 @@ async function startDrill() {
           cardinality: r.cardinality || '1:N',
         }
       }),
-      asset_ids: selectedSourceIds.value,
+      asset_ids: [...selectedSourceIds.value],
     }
 
     const resp = await fetch('/api/v1/builder/hydrate', {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(payload),
+      signal: controller.signal,
     })
-    if (!resp.ok || !resp.body) {
-      throw new Error(`HTTP ${resp.status}`)
-    }
+    if (!resp.ok || !resp.body) throw new Error(`数据验证请求失败 (HTTP ${resp.status})`)
 
     const reader = resp.body.getReader()
     const decoder = new TextDecoder('utf-8')
     let buf = ''
     const phaseData: Record<string, DrillPhase> = {}
-
     while (true) {
       const { value, done } = await reader.read()
+      if (request !== drillRequest) return
       if (done) break
-      buf += decoder.decode(value, { stream: true })
+      buf += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
       let idx
       while ((idx = buf.indexOf('\n\n')) >= 0) {
         const chunk = buf.slice(0, idx).trim()
@@ -642,23 +663,33 @@ async function startDrill() {
         if (!chunk.startsWith('data:')) continue
         const raw = chunk.slice(5).trim()
         if (raw === '[DONE]') continue
-        try {
-          const ev = JSON.parse(raw)
-          handleHydrationEvent(ev, phaseData)
-        } catch { /* ignore parse errors */ }
+        let ev: any
+        try { ev = JSON.parse(raw) } catch { continue }
+        handleHydrationEvent(ev, phaseData, session.sessionId)
+        if (ev.type === 'error') throw new Error(ev.content || '数据验证失败')
       }
     }
+    if (!drillResult.value) throw new Error('验证连接已结束，但未收到完整结果，请重新演练')
   } catch (e: any) {
+    if (request !== drillRequest || controller.signal.aborted) return
+    controller.abort()
     pushLog('ERR', `演练异常: ${e.message || e}`)
     drillStatus.value = 'error'
+    store.updateSession(session.sessionId, { status: 'reviewing', drillResult: undefined, drillStatus: 'error' })
+    message.error('数据验证失败，请检查日志后重新演练')
   } finally {
-    if (drillTimer) clearInterval(drillTimer)
+    if (request === drillRequest) {
+      drillRunning.value = false
+      drillController = null
+      if (drillTimer) clearInterval(drillTimer)
+      drillTimer = null
+    }
   }
 }
 
 // PLACEHOLDER_EVENT_HANDLER
 
-function handleHydrationEvent(ev: any, phaseData: Record<string, DrillPhase>) {
+function handleHydrationEvent(ev: any, phaseData: Record<string, DrillPhase>, sessionId: string) {
   switch (ev.type) {
     case 'phase_log':
       pushLog(ev.level || 'OK', ev.msg || '')
@@ -701,13 +732,15 @@ function handleHydrationEvent(ev: any, phaseData: Record<string, DrillPhase>) {
       drillStatus.value = ev.status || 'pass'
       drillProgress.value = 1
       if (drillTimer) clearInterval(drillTimer)
-      store.patchActive({
+      store.updateSession(sessionId, {
         drillStatus: drillStatus.value,
         drillResult: drillResult.value,
         selectedSampleSourceIds: selectedSourceIds.value,
-        status: 'pending_publish',
+        status: drillStatus.value === 'error' ? 'reviewing' : 'pending_publish',
       })
-      message.success('验证完成')
+      if (drillStatus.value === 'error') message.error('验证完成，存在错误，请检查结果')
+      else if (drillStatus.value === 'warn') message.warning('验证完成，存在警告，请确认结果')
+      else message.success('验证完成')
       break
     }
     case 'error':
@@ -726,7 +759,9 @@ interface FinalizeResult {
 }
 
 async function confirmPublish() {
-  const objects = (props.session.ontologyObjects || []).map((o: any) => ({
+  if (publishing.value || drillRunning.value || !canPublish.value) return
+  const session = props.session
+  const objects = (session.ontologyObjects || []).map((o: any) => ({
     name: o.name,
     displayName: o.displayName,
     tier: o.tier,
@@ -751,9 +786,9 @@ async function confirmPublish() {
     return
   }
 
-  const relations = (props.session.ontologyRelations || []).map((r: any) => {
-    const srcObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.source)
-    const tgtObj = (props.session.ontologyObjects || []).find((o: any) => o.id === r.target)
+  const relations = (session.ontologyRelations || []).map((r: any) => {
+    const srcObj = (session.ontologyObjects || []).find((o: any) => o.id === r.source)
+    const tgtObj = (session.ontologyObjects || []).find((o: any) => o.id === r.target)
     return {
       name: r.name,
       displayName: r.displayName,
@@ -766,7 +801,7 @@ async function confirmPublish() {
   })
 
   publishing.value = true
-  store.setStatus('publishing')
+  store.updateSession(session.sessionId, { status: 'publishing' })
 
   let result: FinalizeResult
   try {
@@ -775,7 +810,7 @@ async function confirmPublish() {
   } catch (e: any) {
     // finalize 失败：不得标记为已发布，必须让用户看到真实错误
     console.error('finalize failed', e)
-    store.setStatus('drafting')
+    store.updateSession(session.sessionId, { status: 'pending_publish' })
     publishing.value = false
     const detail = e?.response?.data?.detail || e?.message || '未知错误'
     message.error({ content: `发布失败：${detail}`, duration: 6 })
@@ -783,15 +818,15 @@ async function confirmPublish() {
   }
 
   // 仅在 finalize 真正成功后，才标记为已发布并展示成功大屏
-  const version = props.session.publishedVersion || 'v0.1'
-  store.patchActive({
+  const version = session.publishedVersion || 'v0.1'
+  store.updateSession(session.sessionId, {
     status: 'published',
     publishedVersion: version,
     publishedAt: new Date().toISOString(),
   })
   publishing.value = false
   publishModalOpen.value = false
-  success.value = true
+  if (props.session.sessionId === session.sessionId) success.value = true
 
   const created = result.created_entities
   const skipped = result.skipped
@@ -814,7 +849,12 @@ onMounted(() => {
   scenarioStore.fetchScenarios()
 })
 
-watch(() => props.session.sessionId, () => {
+watch(() => props.session.sessionId, (_, previousSessionId) => {
+  if (drillRunning.value) store.updateSession(previousSessionId, { status: 'reviewing' })
+  stopDrill()
+  publishModalOpen.value = false
+  drillLogs.value = []
+  drillElapsed.value = 0
   drillStarted.value = !!props.session.drillResult
   drillResult.value = props.session.drillResult || null
   drillStatus.value = props.session.drillStatus
@@ -824,7 +864,9 @@ watch(() => props.session.sessionId, () => {
 })
 
 onUnmounted(() => {
-  if (drillTimer) clearInterval(drillTimer)
+  if (drillRunning.value) store.updateSession(props.session.sessionId, { status: 'reviewing' })
+  stopDrill()
+  ++assetRequest
 })
 </script>
 
@@ -940,7 +982,7 @@ onUnmounted(() => {
 .phase-label { color: #0f172a; font-weight: 500; }
 
 /* 日志终端 */
-.step3-log { background: #0f172a; border-radius: 8px; overflow: hidden; }
+.step3-log { display: block; flex: initial; min-height: 0; background: #0f172a; border-radius: 8px; overflow: hidden; }
 .step3-log__head {
   display: flex; align-items: center; gap: 6px;
   padding: 6px 12px; border-bottom: 1px solid #1e293b;
@@ -951,16 +993,17 @@ onUnmounted(() => {
 .step3-log__head .dot.green { background: #10b981; }
 .step3-log__title { color: #94a3b8; font-size: 11px; margin-left: 8px; font-family: 'JetBrains Mono', monospace; }
 .step3-log__body {
+  flex: initial; min-height: 80px;
   padding: 8px 12px; max-height: 240px; overflow-y: auto;
   font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #cbd5e1;
 }
 .step3-log__line { display: flex; gap: 8px; line-height: 1.7; white-space: nowrap; }
-.log-ts { color: #64748b; }
-.log-lvl { font-weight: 600; min-width: 28px; }
+.log-ts { color: #94a3b8; flex-shrink: 0; }
+.log-lvl { font-weight: 600; min-width: 28px; flex-shrink: 0; }
 .log-lvl--ok { color: #10b981; }
 .log-lvl--run { color: #6366f1; }
 .log-lvl--err { color: #ef4444; }
-.log-msg { color: #e2e8f0; white-space: pre-wrap; word-break: break-all; }
+.log-msg { min-width: 0; flex: 1; white-space: normal; overflow-wrap: anywhere; color: #e2e8f0; white-space: pre-wrap; word-break: break-all; }
 
 /* 结果 */
 .step3-result-banner {
@@ -1048,7 +1091,7 @@ onUnmounted(() => {
 .step3-publish-btn:hover:not(:disabled) { box-shadow: 0 4px 12px -2px rgba(16, 185, 129, 0.4); }
 
 /* 成功大屏 */
-.step3-success { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 40px; }
+.step3-success { width: 100%; max-width: none; gap: 0; border: 0; border-radius: 0; background: #f8fafc; display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 40px; }
 .step3-success__hero { font-size: 56px; margin-bottom: 12px; }
 .step3-success__title { font-size: 20px; font-weight: 700; color: #0f172a; }
 .step3-success__sub { font-size: 13px; color: #64748b; margin-top: 4px; }

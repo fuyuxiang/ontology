@@ -14,6 +14,7 @@ import sys
 import tempfile
 import threading
 import time
+from cryptography.fernet import Fernet
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,7 +29,7 @@ LLM_PORT = int(os.environ.get("ONTOLOGY_FIXTURE_LLM_PORT", "5056"))
 API_PORT = int(os.environ.get("ONTOLOGY_FIXTURE_API_PORT", "5055"))
 PASSWORD = "Fixture123!"
 secrets_path = STATE / "test-secrets.json"
-test_secrets = json.loads(secrets_path.read_text()) if secrets_path.exists() else {"SECRET_KEY": secrets.token_hex(32), "CREDENTIAL_ENCRYPTION_KEY": secrets.token_hex(32)}
+test_secrets = json.loads(secrets_path.read_text()) if secrets_path.exists() else {"SECRET_KEY": secrets.token_hex(32), "CREDENTIAL_ENCRYPTION_KEY": Fernet.generate_key().decode()}
 if not secrets_path.exists():
     secrets_path.write_text(json.dumps(test_secrets))
     secrets_path.chmod(0o600)
@@ -124,7 +125,7 @@ def build_app():
     from fastapi.middleware.cors import CORSMiddleware
     import app.models  # noqa: F401
     from app.database import Base, SessionLocal, engine
-    from app.main import app as production_app
+    from app.main import app as production_app, _seed_system_config
     from app.models.action import EntityAction
     from app.models.agent import Agent, ModelRegistry
     from app.models.asset import Asset
@@ -144,6 +145,7 @@ def build_app():
         if reuse_state:
             if not db.get(User, "fixture-editor"):
                 raise RuntimeError("The requested database is not the isolated browser fixture")
+            _seed_system_config(db)
             return production_routes_app(production_app, run_skill_case, FastAPI, CORSMiddleware)
         for role in ("admin", "editor", "viewer"):
             db.add(User(id=f"fixture-{role}", username=role, name=f"联调{role}", role=role, password_hash=hash_password(PASSWORD)))
@@ -170,6 +172,7 @@ def build_app():
         db.add(OntologyVersionAction(id="ticket-snap", version_id="ops-v1", source_action_id="ticket", version_entity_id="device-snap", **action))
         db.add(Asset(id="manual", name="设备检修手册", kind="document", locator={"source_type": "file", "path": str(STATE / "manual.txt")}, domain="ops", parsed_summary="温度超过80°C存在高风险，先检查冷却系统，再生成检修工单。", status="active"))
         db.commit()
+        _seed_system_config(db)
         owner = db.get(User, "fixture-editor")
         service = SkillService(db)
         skill = service.create({"name": "设备故障诊断", "description": "风险评估与检修工单", "prompt_template": "先加载本技能，再调用设备风险评估；如需要处置则创建检修工单。", "ontology_id": "ops", "ontology_version_id": "ops-v1", "entity_ids": ["device"], "tools": [{"type": "function", "id": "risk"}, {"type": "action", "id": "ticket"}], "asset_refs": ["manual"], "visibility": "workspace", "test_cases": [{"id": "risk-case", "name": "高温风险分析", "input": "分析设备告警", "expected_keywords": ["风险"], "expected_tools": ["risk"]}]}, owner)
@@ -190,6 +193,9 @@ def build_app():
 
 
 def production_routes_app(production_app, run_skill_case, fastapi_cls, cors_cls):
+    from app.services.data_plane import asset_service
+    asset_service._UPLOAD_DIR = STATE / "uploads"
+    asset_service._UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     application = fastapi_cls(title="Isolated production-route browser fixture")
     application.router.routes.extend(production_app.router.routes)
     application.state.skill_test_runner = run_skill_case

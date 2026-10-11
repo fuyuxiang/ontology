@@ -71,6 +71,7 @@ const memoryPercent = computed(() => clampPercent(props.data?.memory_percent ?? 
 const diskPercent = computed(() => clampPercent(props.data?.disk_percent ?? 0))
 
 function formatPercent(value: number): string {
+  if (!props.data) return '—'
   return `${Math.round(clampPercent(value))}%`
 }
 </script>
@@ -113,7 +114,7 @@ function formatPercent(value: number): string {
 }
 .gauge-detail {
   font-size: 12px;
-  color: var(--color-text-secondary, #888);
+  color: var(--neutral-600, #6b7280);
   white-space: nowrap;
 }
 

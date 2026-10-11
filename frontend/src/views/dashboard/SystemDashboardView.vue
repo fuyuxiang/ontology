@@ -4,7 +4,7 @@
     <div class="dashboard-header">
       <h2>系统看板</h2>
       <div class="header-right">
-        <span class="last-update">最后更新: {{ lastUpdate }}</span>
+        <span class="last-update">最近完整更新：{{ lastUpdate }}</span>
         <a-dropdown>
           <a-button size="small">
             <template #icon><ReloadOutlined /></template>
@@ -18,11 +18,14 @@
             </a-menu>
           </template>
         </a-dropdown>
-        <a-button size="small" @click="fetchAll" :loading="loading">
+        <a-button size="small" @click="fetchAll" :loading="loading" aria-label="刷新系统看板" title="刷新系统看板">
           <template #icon><ReloadOutlined /></template>
         </a-button>
       </div>
     </div>
+    <a-alert v-if="fetchError" type="warning" show-icon message="部分看板数据更新失败" :description="fetchError" style="margin-bottom:16px">
+      <template #action><a-button size="small" :loading="loading" @click="fetchAll">重试</a-button></template>
+    </a-alert>
 
     <!-- Service Health -->
     <ServiceHealthCards :services="services" />
@@ -39,16 +42,16 @@
 
     <!-- Stats Row - 6 cards -->
     <a-row :gutter="16" style="margin-top: 16px;">
-      <a-col :xs="12" :sm="8" :lg="4">
+      <a-col :xs="12" :sm="12" :lg="6">
         <OntologyStats :data="ontologyStats" />
       </a-col>
-      <a-col :xs="12" :sm="8" :lg="4">
+      <a-col :xs="12" :sm="12" :lg="6">
         <LLMCallStats :data="llmStats" />
       </a-col>
-      <a-col :xs="12" :sm="8" :lg="4">
+      <a-col :xs="12" :sm="12" :lg="6">
         <AgentActivity :data="agentActivity" />
       </a-col>
-      <a-col :xs="12" :sm="8" :lg="4">
+      <a-col :xs="12" :sm="12" :lg="6">
         <DataStats :data="platformStats" />
       </a-col>
     </a-row>
@@ -56,7 +59,7 @@
     <!-- Alerts + Events -->
     <a-row :gutter="16" style="margin-top: 16px;" class="bottom-row">
       <a-col :xs="24" :lg="12" class="bottom-col">
-        <AlertTable :alerts="mergedAlerts" @resolve="onResolveAlert" />
+        <AlertTable :alerts="mergedAlerts" :resolving-ids="resolvingIds" @resolve="onResolveAlert" />
       </a-col>
       <a-col :xs="24" :lg="12" class="bottom-col">
         <EventStream :events="wsEvents" />
@@ -68,6 +71,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
+import { Alert as AAlert, Button as AButton, message } from 'ant-design-vue'
 import { monitorApi } from '../../api/monitor'
 import type { ResourceMetrics, ServiceStatus, AlertItem, LLMStatsResponse, OntologyStatsResponse, AgentActivityResponse, PlatformStatsResponse } from '../../api/monitor'
 import { useMonitorWS } from '../../composables/useMonitorWS'
@@ -84,6 +88,8 @@ import AgentActivity from './components/AgentActivity.vue'
 import DataStats from './components/DataStats.vue'
 
 const loading = ref(false)
+const fetchError = ref('')
+const resolvingIds = ref<number[]>([])
 const resources = ref<ResourceMetrics | null>(null)
 const services = ref<ServiceStatus[]>([])
 const alerts = ref<AlertItem[]>([])
@@ -99,8 +105,8 @@ const { alerts: wsAlerts } = useMonitorWS()
 
 // Merge WS alerts into table
 const mergedAlerts = computed(() => {
-  const ws = wsAlerts.value.map(a => ({ ...a, resolved: false }))
   const existing = alerts.value
+  const ws = wsAlerts.value.map(a => existing.find(item => item.id === a.id && item.resolved) || { ...a, resolved: a.resolved ?? false })
   const ids = new Set(ws.map((a: any) => a.id))
   const merged = [...ws, ...existing.filter(a => !ids.has(a.id))]
   return merged.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 20)
@@ -115,6 +121,7 @@ const autoRefreshLabel = computed(() => {
 })
 
 async function fetchAll() {
+  if (loading.value) return
   loading.value = true
   try {
     const [res, svc, alt, llm, ont, agent, platform] = await Promise.allSettled([
@@ -155,12 +162,11 @@ async function fetchAll() {
     ontologyStats.value = next.ontologyStats
     agentActivity.value = next.agentActivity
     platformStats.value = next.platformStats
-    lastUpdate.value = new Date().toLocaleTimeString('zh-CN')
-
-    if (failedKeys.length) {
-      console.error('Dashboard partial fetch error:', failedKeys)
-    }
+    const labels: Record<string, string> = { resources: '资源用量', services: '服务健康', alerts: '告警', llmStats: '模型调用', ontologyStats: '本体统计', agentActivity: '智能体统计', platformStats: '数据统计' }
+    fetchError.value = failedKeys.length ? `${failedKeys.map(key => labels[key] || key).join('、')}更新失败，保留最近一次可用数据。请重试。` : ''
+    if (!failedKeys.length) lastUpdate.value = new Date().toLocaleTimeString('zh-CN')
   } catch (e) {
+    fetchError.value = '看板数据更新失败，请重试。'
     console.error('Dashboard fetch error:', e)
   } finally {
     loading.value = false
@@ -180,12 +186,19 @@ function onRefreshChange({ key }: { key: string }) {
 }
 
 async function onResolveAlert(id: number) {
+  if (resolvingIds.value.includes(id)) return
+  resolvingIds.value.push(id)
   try {
-    await monitorApi.resolveAlert(id)
+    const resolved = await monitorApi.resolveAlert(id)
     const idx = alerts.value.findIndex(a => a.id === id)
-    if (idx >= 0) alerts.value[idx].resolved = true
+    if (idx >= 0) alerts.value[idx] = resolved
+    else alerts.value.unshift(resolved)
+    message.success('告警已处理')
   } catch (e) {
+    message.error('告警处理失败，请重试')
     console.error('Resolve alert error:', e)
+  } finally {
+    resolvingIds.value = resolvingIds.value.filter(item => item !== id)
   }
 }
 
@@ -218,10 +231,11 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 .last-update {
   font-size: 13px;
-  color: var(--color-text-secondary, #888);
+  color: var(--neutral-600, #6b7280);
 }
 .middle-row,
 .bottom-row {
@@ -231,9 +245,13 @@ onUnmounted(() => {
 .middle-col,
 .bottom-col {
   display: flex;
+  min-width: 0;
 }
 .middle-col > *,
 .bottom-col > * {
   flex: 1;
+  min-width: 0;
 }
+.dashboard-header { flex-wrap: wrap; gap: 12px; }
+.middle-row, .bottom-row { row-gap: 16px; }
 </style>

@@ -34,11 +34,12 @@ export interface Conversation {
 }
 
 export const aiCodeApi = {
-  async generatePost(req: AiCodeGenerateRequest): Promise<Response> {
+  async generatePost(req: AiCodeGenerateRequest, signal?: AbortSignal): Promise<Response> {
     const resp = await fetch('/api/v1/ai-code/generate', {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(req),
+      signal,
     })
     return resp
   },

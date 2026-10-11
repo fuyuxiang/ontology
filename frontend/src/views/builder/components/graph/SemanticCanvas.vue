@@ -26,6 +26,7 @@
         <!-- edges -->
         <g>
           <g v-for="link in renderedLinks" :key="link.id">
+            <title>{{ link.label }}</title>
             <path
               :d="link.path"
               fill="none"
@@ -34,7 +35,7 @@
               stroke-opacity="0.7"
               marker-end="url(#graphArrow)"
             />
-            <text :x="link.midX" :y="link.midY - 5" class="graph-link-label" text-anchor="middle">{{ link.label }}</text>
+            <text :x="link.midX" :y="link.midY - 8" class="graph-link-label" text-anchor="middle">{{ link.label.length > 8 ? link.label.slice(0, 8) + '…' : link.label }}</text>
           </g>
         </g>
 
@@ -49,6 +50,7 @@
             @mousedown.stop="onNodeMouseDown($event, n.id)"
             @click.stop="onNodeClick(n.id)"
           >
+            <title>{{ n.label }}</title>
             <circle
               :r="n.r"
               :fill="n.color + '18'"
@@ -56,16 +58,17 @@
               stroke-width="2"
               filter="url(#graph-shadow)"
             />
-            <text x="0" :y="1" text-anchor="middle" class="graph-node-label" :fill="n.color">{{ n.icon }} {{ n.label }}</text>
-            <text v-if="n.count > 0" x="0" :y="n.r + 14" text-anchor="middle" class="graph-node-sub">{{ n.count }} 实例</text>
+            <text x="0" y="1" text-anchor="middle" dominant-baseline="middle" class="graph-node-icon" :fill="n.color">{{ n.icon }}</text>
+            <text x="0" :y="n.r + 18" text-anchor="middle" class="graph-node-label" :fill="n.color">{{ n.label.length > 8 ? n.label.slice(0, 8) + '…' : n.label }}</text>
+            <text v-if="n.count > 0" x="0" :y="n.r + 32" text-anchor="middle" class="graph-node-sub">{{ n.count }} 实例</text>
           </g>
         </g>
       </svg>
 
       <div class="graph-controls">
-        <button class="graph-ctrl" @click="zoomBy(1.2)">＋</button>
-        <button class="graph-ctrl" @click="zoomBy(1 / 1.2)">－</button>
-        <button class="graph-ctrl" @click="resetView">⤾</button>
+        <button class="graph-ctrl" aria-label="放大画布" title="放大画布" @click="zoomBy(1.2)">＋</button>
+        <button class="graph-ctrl" aria-label="缩小画布" title="缩小画布" @click="zoomBy(1 / 1.2)">－</button>
+        <button class="graph-ctrl" aria-label="重置画布视图" title="重置画布视图" @click="resetView">⤾</button>
         <button class="graph-ctrl" :disabled="!editable" @click="$emit('add')" title="新增对象">＋⊕</button>
       </div>
     </div>
@@ -258,11 +261,12 @@ function resetView() { vx.value = -400; vy.value = -300; vw.value = 800; vh.valu
 .graph-canvas-wrap { flex: 1; min-height: 0; padding: 4px 8px; position: relative; }
 .graph-canvas-svg { width: 100%; height: 100%; display: block; cursor: grab; }
 .graph-canvas-svg:active { cursor: grabbing; }
-.graph-link-label { font-size: 10px; fill: #64748b; font-family: monospace; pointer-events: none; }
+.graph-link-label { font-size: 12px; fill: #64748b; paint-order: stroke; stroke: #fafbfd; stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .graph-node { cursor: pointer; }
 .graph-node:hover circle { stroke-width: 3; }
 .graph-node--selected circle { stroke-width: 3.5; filter: drop-shadow(0 0 6px rgba(99,102,241,0.5)); }
-.graph-node-label { font-size: 12px; font-weight: 600; pointer-events: none; }
+.graph-node-icon { font-size: 22px; pointer-events: none; }
+.graph-node-label { font-size: 14px; font-weight: 600; pointer-events: none; }
 .graph-node-sub { font-size: 9px; fill: #94a3b8; pointer-events: none; }
 .graph-controls {
   position: absolute; bottom: 16px; right: 16px;

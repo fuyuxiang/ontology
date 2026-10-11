@@ -1,5 +1,5 @@
 <template>
-  <div class="skill-detail">
+  <div class="skill-detail" :class="{ 'skill-detail--readonly': saved && !canManage }">
     <a-spin v-if="loading" class="detail-loading" tip="正在加载技能…" />
     <a-result
       v-else-if="!route.params.id && !roleCanEdit"
@@ -59,6 +59,13 @@
           ></a-space
         >
       </header>
+      <a-alert
+        v-if="saved && !canManage"
+        type="info"
+        show-icon
+        message="当前技能为只读，可查看说明、依赖与历史记录。编辑、测试和发布需要创建者或管理员权限。"
+        class="detail-banner"
+      />
       <a-alert
         v-if="saved?.current_version && canEditContent"
         type="info"
@@ -750,7 +757,19 @@ function adopt(item: SkillItem) {
   inputValid.value = true
   outputValid.value = true
 }
+let loadRequest = 0
+let historyRequest = 0
+let versionRequest = 0
 async function load() {
+  const request = ++loadRequest
+  const id = String(route.params.id || '')
+  catalogRequest++
+  historyRequest++
+  versionRequest++
+  versionOpen.value = false
+  publishOpen.value = false
+  caseOpen.value = false
+  assetPreviewOpen.value = false
   loading.value = true
   loadError.value = ''
   formError.value = ''
@@ -760,18 +779,23 @@ async function load() {
   testRuns.value = []
   try {
     if (!authStore.user) await authStore.fetchUser()
-    if (route.params.id) adopt(await skillsApi.get(String(route.params.id)))
-    else {
+    if (id) {
+      const item = await skillsApi.get(id)
+      if (request !== loadRequest) return
+      adopt(item)
+    } else {
       saved.value = null
       form.value = emptySkill()
       baseline.value = JSON.stringify(form.value)
     }
+    if (request !== loadRequest) return
     await loadCatalog()
+    if (request !== loadRequest) return
     if (saved.value) await loadHistory()
   } catch (e) {
-    loadError.value = skillError(e, '技能加载失败')
+    if (request === loadRequest) loadError.value = skillError(e, '技能加载失败')
   } finally {
-    loading.value = false
+    if (request === loadRequest) loading.value = false
   }
 }
 async function loadCatalog() {
@@ -792,11 +816,14 @@ async function loadCatalog() {
 }
 async function loadHistory() {
   if (!saved.value) return
+  const request = ++historyRequest
+  const id = saved.value.id
   const result = await Promise.allSettled([
-    skillsApi.versions(saved.value.id),
-    skillsApi.references(saved.value.id),
-    skillsApi.testRuns(saved.value.id),
+    skillsApi.versions(id),
+    skillsApi.references(id),
+    skillsApi.testRuns(id),
   ])
+  if (request !== historyRequest || saved.value?.id !== id) return
   if (result[0].status === 'fulfilled') versions.value = result[0].value
   if (result[1].status === 'fulfilled') references.value = result[1].value
   if (result[2].status === 'fulfilled') testRuns.value = result[2].value
@@ -869,6 +896,8 @@ function formatDate(value?: string) {
   return Number.isNaN(d.getTime()) ? value : d.toLocaleString('zh-CN', { hour12: false })
 }
 async function save(): Promise<boolean> {
+  if (saving.value || testing.value || publishing.value || validating.value || archiving.value)
+    return false
   if (!canManage.value || form.value.status === 'archived') return false
   if (!inputValid.value || !outputValid.value) {
     formError.value = '输入或输出结构格式不正确，请在“本体与工具”中修正'
@@ -925,7 +954,10 @@ async function save(): Promise<boolean> {
     adopt(item)
     validation.value = null
     toast.success('技能草稿已保存')
-    if (!route.params.id) await router.replace(`/skills/${item.id}`)
+    if (!route.params.id) {
+      saving.value = false
+      await router.replace(`/skills/${item.id}`)
+    }
     return true
   } catch (e) {
     formError.value = skillError(e, '保存失败')
@@ -1112,19 +1144,26 @@ function previewAsset(id: string) {
 }
 async function showVersion(version: number) {
   if (!saved.value) return
+  const request = ++versionRequest
+  const id = saved.value.id
   versionOpen.value = true
   versionLoading.value = true
   selectedVersion.value = null
   try {
-    selectedVersion.value = await skillsApi.version(saved.value.id, version)
+    const result = await skillsApi.version(id, version)
+    if (request === versionRequest && saved.value?.id === id) selectedVersion.value = result
   } catch (e) {
-    toast.error(skillError(e, '版本定义加载失败'))
+    if (request === versionRequest) toast.error(skillError(e, '版本定义加载失败'))
   } finally {
-    versionLoading.value = false
+    if (request === versionRequest) versionLoading.value = false
   }
 }
 function confirmLeave() {
-  if (!dirty.value || saving.value) return true
+  if (saving.value || testing.value || publishing.value || validating.value || archiving.value) {
+    toast.info('操作正在进行，请等待完成后再离开')
+    return false
+  }
+  if (!dirty.value) return true
   return new Promise<boolean>((resolve) =>
     Modal.confirm({
       title: '离开未保存的技能？',
@@ -1148,7 +1187,13 @@ onMounted(() => {
   window.addEventListener('beforeunload', beforeUnload)
   load()
 })
-onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnload))
+onBeforeUnmount(() => {
+  loadRequest++
+  catalogRequest++
+  historyRequest++
+  versionRequest++
+  window.removeEventListener('beforeunload', beforeUnload)
+})
 watch(
   () => route.params.id,
   () => {
@@ -1161,6 +1206,11 @@ watch(
 .skill-detail {
   max-width: 1560px;
   margin: auto;
+}
+.skill-detail--readonly :deep(.ant-input[disabled]),
+.skill-detail--readonly :deep(.ant-select-disabled .ant-select-selector) {
+  color: var(--neutral-700);
+  cursor: default;
 }
 .detail-loading {
   display: block;

@@ -7,6 +7,7 @@ export const useAuthStore = defineStore('auth', () => {
   const user = ref<User | null>(null)
   const token = ref<string | null>(localStorage.getItem('token'))
   const refreshToken = ref<string | null>(localStorage.getItem('refresh_token'))
+  let userRequest: Promise<void> | null = null
 
   const isLoggedIn = computed(() => !!token.value)
 
@@ -23,13 +24,22 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('refresh_token', res.refresh_token)
   }
 
-  async function fetchUser() {
-    if (!token.value) return
-    try {
-      user.value = await authApi.me()
-    } catch {
-      logout()
-    }
+  function fetchUser(): Promise<void> {
+    if (!token.value) return Promise.resolve()
+    if (userRequest) return userRequest
+    const sessionToken = token.value
+    userRequest = authApi
+      .me()
+      .then((result) => {
+        if (token.value === sessionToken) user.value = result
+      })
+      .catch((error: any) => {
+        if (error?.response?.status === 401 && token.value === sessionToken) logout()
+      })
+      .finally(() => {
+        userRequest = null
+      })
+    return userRequest
   }
 
   function setTokens(newToken: string, newRefresh: string) {
@@ -47,5 +57,15 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('refresh_token')
   }
 
-  return { user, token, refreshToken, isLoggedIn, hasPermission, login, fetchUser, setTokens, logout }
+  return {
+    user,
+    token,
+    refreshToken,
+    isLoggedIn,
+    hasPermission,
+    login,
+    fetchUser,
+    setTokens,
+    logout,
+  }
 })

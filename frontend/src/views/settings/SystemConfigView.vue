@@ -10,6 +10,9 @@
         </a-button>
       </div>
     </div>
+    <a-alert v-if="configError" type="error" show-icon message="系统配置加载失败" :description="configError" style="margin-bottom:16px">
+      <template #action><a-button size="small" @click="fetchConfig">重试</a-button></template>
+    </a-alert>
 
     <div class="config-body">
       <!-- 左侧导航 -->
@@ -29,7 +32,7 @@
       </nav>
 
       <!-- 右侧配置区 -->
-      <div class="config-content">
+      <a-spin wrapper-class-name="config-content" :spinning="loadingConfig" tip="正在加载配置…">
         <template v-for="g in groupList" :key="g.key">
           <!-- AI 配置：特殊处理为模型卡片列表 -->
           <a-card v-if="g.key === 'ai'" :bordered="false" :id="`config-group-${g.key}`" style="margin-bottom: 16px;">
@@ -39,18 +42,21 @@
                   <span>{{ g.label }}</span>
                   <p class="config-card-desc">{{ g.desc }}</p>
                 </div>
-                <a-button type="primary" size="small" @click="openAddModel">＋ 添加模型</a-button>
+                <a-button type="primary" size="small" :disabled="loadingModels || !!modelsError || savingModels" @click="openAddModel">＋ 添加模型</a-button>
               </div>
             </template>
 
-            <div class="model-grid">
+            <a-alert v-if="modelsError" type="error" show-icon message="模型配置加载失败" :description="modelsError" style="margin-bottom:16px">
+              <template #action><a-button size="small" @click="fetchAiModels">重试</a-button></template>
+            </a-alert>
+            <a-spin :spinning="loadingModels" tip="正在加载模型…"><div class="model-grid">
               <div v-for="model in aiModels" :key="model.id" class="model-card" :class="{ 'model-card--default': model.is_default }">
                 <div class="model-card__header">
                   <div class="model-card__provider">{{ model.provider }}</div>
                   <div class="model-card__actions">
                     <span v-if="model.is_default" class="model-card__default-tag">默认</span>
-                    <a-button type="text" size="small" @click="openEditModel(model)">编辑</a-button>
-                    <a-button type="text" size="small" danger @click="handleDeleteModel(model.id)">删除</a-button>
+                    <a-button type="text" size="small" :disabled="savingModels" @click="openEditModel(model)">编辑</a-button>
+                    <a-button type="text" size="small" danger :disabled="savingModels" @click="handleDeleteModel(model.id)">删除</a-button>
                   </div>
                 </div>
                 <div class="model-card__name">{{ model.name }}</div>
@@ -63,10 +69,10 @@
                   <span v-for="s in model.scenes" :key="s" class="model-card__scene-tag">{{ sceneLabel(s) }}</span>
                 </div>
                 <div class="model-card__footer">
-                  <a-button size="small" @click="handleTestModel(model)" :loading="testingModelId === model.id">
+                  <a-button size="small" @click="handleTestModel(model)" :loading="testingModelId === model.id" :disabled="!!testingModelId && testingModelId !== model.id">
                     {{ testingModelId === model.id ? '测试中...' : '🔗 测试连通性' }}
                   </a-button>
-                  <a-button v-if="!model.is_default" size="small" type="link" @click="handleSetDefault(model.id)">设为默认</a-button>
+                  <a-button v-if="!model.is_default" size="small" type="link" :disabled="savingModels" @click="handleSetDefault(model.id)">设为默认</a-button>
                 </div>
                 <div v-if="testResults[model.id]" class="model-card__test-result" :class="testResults[model.id]?.success ? 'model-card__test-result--ok' : 'model-card__test-result--err'">
                   {{ testResults[model.id]?.success ? '✓' : '✗' }} {{ testResults[model.id]?.message }}
@@ -74,11 +80,11 @@
               </div>
             </div>
 
-            <div v-if="!aiModels.length" class="empty-state">
+            <div v-if="!loadingModels && !modelsError && !aiModels.length" class="empty-state">
               <div class="empty-state__icon">🤖</div>
               <p class="empty-state__title">暂无模型配置</p>
               <p class="empty-state__desc">点击「添加模型」配置第一个 AI 模型</p>
-            </div>
+            </div></a-spin>
           </a-card>
 
           <!-- 其他配置组 -->
@@ -120,7 +126,7 @@
                 <a-button v-if="g.key === 'notification'" @click="handleTestEmail" :loading="testing">📧 发送测试邮件</a-button>
               </div>
               <div class="config-card-footer__right">
-                <a-button @click="handleReset(g.key)">恢复默认</a-button>
+                <a-button @click="handleReset(g.key)" :disabled="saving || !hasChanges(g.key)">撤销更改</a-button>
                 <a-button type="primary" @click="handleSave(g.key)" :disabled="!hasChanges(g.key)" :loading="saving">保存</a-button>
               </div>
             </div>
@@ -131,11 +137,11 @@
             </div>
           </a-card>
         </template>
-      </div>
+      </a-spin>
     </div>
 
     <!-- 模型编辑弹窗 -->
-    <a-modal v-model:open="modelModalOpen" :title="modelModalIsEdit ? '编辑模型' : '添加模型'" :width="560" @ok="handleSaveModel" @cancel="modelModalOpen = false">
+    <a-modal v-model:open="modelModalOpen" :title="modelModalIsEdit ? '编辑模型' : '添加模型'" :width="560" :confirm-loading="savingModels" :closable="!savingModels" :mask-closable="!savingModels" :keyboard="!savingModels" :cancel-button-props="{ disabled: savingModels }" @ok="handleSaveModel" @cancel="modelModalOpen = false">
       <div class="modal-form">
         <div class="modal-form__row">
           <div class="modal-form__field">
@@ -200,12 +206,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick, computed, watch } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watch } from 'vue'
 import {
   Input as AInput, InputPassword as AInputPassword, InputNumber as AInputNumber,
   Select as ASelect, Drawer as ADrawer, Modal as AModal,
   Slider as ASlider, CheckboxGroup as ACheckboxGroup,
-  Card as ACard, Button as AButton,
+  Alert as AAlert, Card as ACard, Button as AButton, Spin as ASpin,
 } from 'ant-design-vue'
 import { HistoryOutlined } from '@ant-design/icons-vue'
 import { systemConfigApi, type ConfigItem, type TestResult, type AiModel, type ModelScene } from '../../api/systemConfig'
@@ -224,12 +230,18 @@ const groupList = computed(() => [
 ])
 
 const activeGroup = ref('basic')
+let scrollContainer: Element | null = null
 const showHistory = ref(false)
 const configData = ref<Record<string, ConfigItem[]>>({})
 const editingValues = reactive<Record<string, string | number>>({})
 const originalValues = reactive<Record<string, string | null>>({})
 const testing = ref(false)
 const saving = ref(false)
+const loadingConfig = ref(false)
+const configError = ref('')
+const loadingModels = ref(false)
+const modelsError = ref('')
+const savingModels = ref(false)
 const testResult = ref<TestResult | null>(null)
 const testGroup = ref<string | null>(null)
 
@@ -281,6 +293,8 @@ function hasChanges(group: string) {
 }
 
 async function fetchConfig() {
+  loadingConfig.value = true
+  configError.value = ''
   try {
     const res = await systemConfigApi.getAll()
     configData.value = res.groups
@@ -289,7 +303,8 @@ async function fetchConfig() {
     }
     const savedLang = editingValues['language']
     if (savedLang && (savedLang === 'zh-CN' || savedLang === 'en')) { switchLanguage(savedLang as string) }
-  } catch { /* ignore */ }
+  } catch (e: any) { configError.value = e?.response?.data?.detail || e.message || '无法读取配置，请重试' }
+  finally { loadingConfig.value = false }
 }
 
 watch(() => editingValues['language'], (newLang) => {
@@ -297,10 +312,15 @@ watch(() => editingValues['language'], (newLang) => {
 })
 
 async function fetchAiModels() {
-  try { const res = await systemConfigApi.getAiModels(); aiModels.value = res.models; modelScenes.value = res.scenes } catch { /* ignore */ }
+  loadingModels.value = true
+  modelsError.value = ''
+  try { const res = await systemConfigApi.getAiModels(); aiModels.value = res.models; modelScenes.value = res.scenes }
+  catch (e: any) { modelsError.value = e?.response?.data?.detail || e.message || '无法读取模型配置，请重试' }
+  finally { loadingModels.value = false }
 }
 
 async function handleSave(group: string) {
+  if (saving.value || !hasChanges(group)) return
   saving.value = true
   try {
     const items = (configData.value[group] || []).map(item => ({ key: item.key, value: editingValues[item.key] !== undefined ? String(editingValues[item.key]) : null }))
@@ -311,12 +331,13 @@ async function handleSave(group: string) {
 }
 
 function handleReset(group: string) {
-  if (!confirm('确定恢复该组配置为默认值？')) return
   const items = configData.value[group] || []
   for (const item of items) editingValues[item.key] = originalValues[item.key] ?? ''
 }
 
 async function handleTestEmail() {
+  if (testing.value) return
+  if (hasChanges('notification')) { error('请先保存邮件配置，再发送测试邮件'); return }
   const recipient = prompt('请输入测试收件人邮箱:')
   if (!recipient) return
   testing.value = true; testResult.value = null; testGroup.value = 'notification'
@@ -328,6 +349,20 @@ function scrollToGroup(key: string) {
   nextTick(() => { document.getElementById(`config-group-${key}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) })
 }
 
+function updateActiveGroup() {
+  if (!scrollContainer) return
+  const viewport = scrollContainer.getBoundingClientRect()
+  let visibleKey = activeGroup.value
+  let visibleHeight = 0
+  for (const group of groupList.value) {
+    const rect = document.getElementById(`config-group-${group.key}`)?.getBoundingClientRect()
+    if (!rect) continue
+    const height = Math.max(0, Math.min(rect.bottom, viewport.bottom) - Math.max(rect.top, viewport.top))
+    if (height > visibleHeight) { visibleHeight = height; visibleKey = group.key }
+  }
+  activeGroup.value = visibleKey
+}
+
 function openAddModel() {
   modelModalIsEdit.value = false; editingModelId.value = null
   Object.assign(modelForm, { id: '', name: '', provider: 'Anthropic', model_id: '', api_key: '', base_url: 'https://api.anthropic.com', temperature: 0.7, max_tokens: 4096, scenes: ['general'], is_default: false })
@@ -336,12 +371,14 @@ function openAddModel() {
 
 function openEditModel(model: AiModel) {
   modelModalIsEdit.value = true; editingModelId.value = model.id
-  Object.assign(modelForm, { ...model })
+  Object.assign(modelForm, { ...model, scenes: [...model.scenes] })
   modelModalOpen.value = true
 }
 
 async function handleSaveModel() {
-  if (!modelForm.name || !modelForm.model_id) { error('请填写模型名称和模型 ID'); return }
+  if (savingModels.value) return
+  if (!modelForm.name?.trim() || !modelForm.model_id?.trim()) { error('请填写模型名称和模型 ID'); return }
+  modelForm.name = modelForm.name.trim(); modelForm.model_id = modelForm.model_id.trim()
   let models = [...aiModels.value]
   if (modelModalIsEdit.value && editingModelId.value) {
     models = models.map(m => m.id === editingModelId.value ? { ...m, ...modelForm } as AiModel : m)
@@ -349,30 +386,46 @@ async function handleSaveModel() {
     const newModel: AiModel = { id: `model-${Date.now()}`, name: modelForm.name || '', provider: modelForm.provider || '其他', model_id: modelForm.model_id || '', api_key: modelForm.api_key || '', base_url: modelForm.base_url || '', temperature: modelForm.temperature ?? 0.7, max_tokens: modelForm.max_tokens ?? 4096, scenes: modelForm.scenes || ['general'], is_default: models.length === 0 }
     models.push(newModel)
   }
+  savingModels.value = true
   try {
     await systemConfigApi.saveAiModels(models)
     success(modelModalIsEdit.value ? '模型已更新' : '模型已添加')
-    modelModalOpen.value = false; fetchAiModels()
+    modelModalOpen.value = false; await fetchAiModels()
   } catch (e: any) { error(e?.response?.data?.detail || '保存失败') }
+  finally { savingModels.value = false }
 }
 
 async function handleDeleteModel(id: string) {
+  if (savingModels.value) return
   if (!confirm('确定删除该模型？')) return
   const models = aiModels.value.filter(m => m.id !== id)
-  try { await systemConfigApi.saveAiModels(models); success('模型已删除'); fetchAiModels() } catch { error('删除失败') }
+  savingModels.value = true
+  try { await systemConfigApi.saveAiModels(models); success('模型已删除'); await fetchAiModels() } catch { error('删除失败') }
+  finally { savingModels.value = false }
 }
 
 async function handleSetDefault(id: string) {
+  if (savingModels.value) return
   const models = aiModels.value.map(m => ({ ...m, is_default: m.id === id }))
-  try { await systemConfigApi.saveAiModels(models); success('已设为默认模型'); fetchAiModels() } catch { error('设置失败') }
+  savingModels.value = true
+  try { await systemConfigApi.saveAiModels(models); success('已设为默认模型'); await fetchAiModels() } catch { error('设置失败') }
+  finally { savingModels.value = false }
 }
 
 async function handleTestModel(model: AiModel) {
+  if (testingModelId.value) return
   testingModelId.value = model.id; testResults[model.id] = null
-  try { testResults[model.id] = await systemConfigApi.testAiModel({ api_key: model.api_key, base_url: model.base_url, model_id: model.model_id }) } catch { testResults[model.id] = { success: false, message: '测试请求失败' } } finally { testingModelId.value = null }
+  try { testResults[model.id] = await systemConfigApi.testAiModel({ id: model.id, api_key: model.api_key, base_url: model.base_url, model_id: model.model_id }) } catch { testResults[model.id] = { success: false, message: '测试请求失败' } } finally { testingModelId.value = null }
 }
 
-onMounted(() => { fetchConfig(); fetchAiModels() })
+onMounted(async () => {
+  await Promise.all([fetchConfig(), fetchAiModels()])
+  await nextTick()
+  scrollContainer = document.querySelector('.app-content')
+  scrollContainer?.addEventListener('scroll', updateActiveGroup, { passive: true })
+  updateActiveGroup()
+})
+onBeforeUnmount(() => scrollContainer?.removeEventListener('scroll', updateActiveGroup))
 </script>
 
 <style scoped>
@@ -389,13 +442,13 @@ onMounted(() => { fetchConfig(); fetchAiModels() })
 
 .config-card-title { display: flex; justify-content: space-between; align-items: flex-start; }
 .config-card-title span { font-size: 16px; font-weight: 600; }
-.config-card-desc { font-size: 12px; color: var(--color-text-secondary, #888); margin: 4px 0 0; font-weight: 400; }
+.config-card-desc { font-size: 12px; color: var(--neutral-600, #6b7280); margin: 4px 0 0; font-weight: 400; white-space: normal; line-height: 1.6; }
 
 .config-fields { display: flex; flex-direction: column; gap: 18px; }
 .config-field { display: flex; flex-direction: column; gap: 8px; }
 .config-field__label { font-size: 13px; font-weight: 500; }
 
-.config-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--color-bg-elevated, #f0f0f0); }
+.config-card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--neutral-200, #e5e7eb); }
 .config-card-footer__right { display: flex; gap: 8px; }
 
 .test-result { margin-top: 12px; padding: 10px 14px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
@@ -403,18 +456,18 @@ onMounted(() => { fetchConfig(); fetchAiModels() })
 .test-result--err { background: rgba(250, 82, 82, 0.08); color: #fa5252; }
 
 .model-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-.model-card { border: 1px solid var(--color-bg-elevated, #f0f0f0); border-radius: 8px; padding: 16px; transition: all 0.2s; }
+.model-card { border: 1px solid var(--neutral-200, #e5e7eb); border-radius: 8px; padding: 16px; transition: all 0.2s; }
 .model-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
 .model-card--default { border-color: #a5b4fc; background: rgba(99, 102, 241, 0.04); }
 .model-card__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.model-card__provider { font-size: 11px; color: var(--color-text-secondary, #888); text-transform: uppercase; letter-spacing: 0.5px; }
+.model-card__provider { font-size: 11px; color: var(--neutral-600, #6b7280); text-transform: uppercase; letter-spacing: 0.5px; }
 .model-card__actions { display: flex; align-items: center; gap: 4px; }
 .model-card__default-tag { font-size: 11px; padding: 2px 8px; background: #e0e7ff; color: #6366f1; border-radius: 4px; font-weight: 600; }
-.model-card__name { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
-.model-card__id { font-size: 12px; font-family: var(--font-mono, monospace); color: var(--color-text-secondary, #888); margin-bottom: 8px; }
-.model-card__config { display: flex; gap: 16px; font-size: 12px; color: var(--color-text-secondary, #888); margin-bottom: 8px; }
+.model-card__name { font-size: 15px; font-weight: 600; margin-bottom: 2px; overflow-wrap: anywhere; }
+.model-card__id { font-size: 12px; font-family: var(--font-mono, monospace); color: var(--neutral-600, #6b7280); margin-bottom: 8px; overflow-wrap: anywhere; }
+.model-card__config { display: flex; gap: 16px; font-size: 12px; color: var(--neutral-600, #6b7280); margin-bottom: 8px; }
 .model-card__scenes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.model-card__scene-tag { font-size: 11px; padding: 2px 8px; background: var(--color-bg-container, #fafafa); color: var(--color-text-secondary, #888); border-radius: 4px; }
+.model-card__scene-tag { font-size: 11px; padding: 2px 8px; background: var(--neutral-50, #fafafa); color: var(--neutral-600, #6b7280); border-radius: 4px; }
 .model-card__footer { display: flex; gap: 8px; align-items: center; }
 .model-card__test-result { margin-top: 8px; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
 .model-card__test-result--ok { background: rgba(16, 185, 129, 0.08); color: #10b981; }
@@ -423,7 +476,7 @@ onMounted(() => { fetchConfig(); fetchAiModels() })
 .empty-state { text-align: center; padding: 40px; }
 .empty-state__icon { font-size: 48px; margin-bottom: 12px; opacity: 0.8; }
 .empty-state__title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
-.empty-state__desc { font-size: 13px; color: var(--color-text-secondary, #888); }
+.empty-state__desc { font-size: 13px; color: var(--neutral-600, #6b7280); }
 
 .modal-form { display: flex; flex-direction: column; gap: 16px; }
 .modal-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -432,7 +485,7 @@ onMounted(() => { fetchConfig(); fetchAiModels() })
 .modal-form__required { color: #fa5252; }
 
 .history-list { display: flex; flex-direction: column; }
-.history-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--color-bg-elevated, #f0f0f0); }
+.history-item { display: flex; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--neutral-200, #e5e7eb); }
 .history-item:last-child { border-bottom: none; }
 .history-item__dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 4px; flex-shrink: 0; }
 .history-item__dot--update { background: #6366f1; }
@@ -441,9 +494,12 @@ onMounted(() => { fetchConfig(); fetchAiModels() })
 .history-item__content { flex: 1; }
 .history-item__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
 .history-item__user { font-size: 13px; font-weight: 600; }
-.history-item__time { font-size: 12px; color: var(--color-text-secondary, #888); font-family: var(--font-mono, monospace); }
-.history-item__desc { font-size: 13px; color: var(--color-text-secondary, #888); }
+.history-item__time { font-size: 12px; color: var(--neutral-600, #6b7280); font-family: var(--font-mono, monospace); }
+.history-item__desc { font-size: 13px; color: var(--neutral-600, #6b7280); }
 
 @media (max-width: 1440px) { .model-grid { grid-template-columns: 1fr; } }
-@media (max-width: 1280px) { .config-nav { display: none; } .config-body { flex-direction: column; } }
+.config-card-footer, .model-card__config, .model-card__footer { flex-wrap: wrap; gap: 12px; }
+.config-card-title { gap: 16px; }
+.model-card__test-result, .test-result { overflow-wrap: anywhere; }
+@media (max-width: 1280px) { .config-nav { position: static; flex-direction: row; flex-wrap: wrap; width: auto; } .config-nav__item { width: auto; } .config-body { flex-direction: column; } }
 </style>

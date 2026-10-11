@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -72,7 +72,7 @@ def get_tool_stats(db: Session = Depends(get_db)):
             McpCallLog.tool_name,
             func.count(McpCallLog.id).label("call_count"),
             func.avg(McpCallLog.duration_ms).label("avg_ms"),
-            func.sum(func.cast(McpCallLog.is_error, type_=None)).label("error_count"),
+            func.sum(case((McpCallLog.is_error.is_(True), 1), else_=0)).label("error_count"),
             func.max(McpCallLog.called_at).label("last_called"),
         )
         .filter(McpCallLog.called_at >= start)

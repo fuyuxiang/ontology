@@ -15,19 +15,24 @@
 
     <div v-if="loading" class="attr-panel__loading">加载中...</div>
 
+    <div v-else-if="error" class="attr-panel__empty" role="alert">
+      <p>{{ error }}</p>
+      <button class="attr-panel__back" @click="loadDetail">重新加载</button>
+    </div>
+
     <template v-else>
       <div class="attr-panel__count">属性 ({{ attrs.length }}个)</div>
 
       <div class="attr-panel__grid">
         <div v-for="attr in attrs" :key="attr.id" class="attr-card">
           <div class="attr-card__head">
-            <code class="attr-card__name">{{ attr.name }}</code>
+            <code class="attr-card__name" :title="attr.name">{{ attr.name }}</code>
             <span class="attr-card__type" :class="`attr-card__type--${attr.type}`">{{ attr.type }}</span>
           </div>
           <div v-if="attr.required" class="attr-card__required">
             <span class="attr-card__dot"></span>必填
           </div>
-          <div v-if="attr.description" class="attr-card__desc">{{ attr.description }}</div>
+          <div v-if="attr.description" class="attr-card__desc" :title="attr.description">{{ attr.description }}</div>
         </div>
       </div>
 
@@ -48,13 +53,19 @@ const props = defineProps<{
 const emit = defineEmits<{ back: [] }>()
 
 const loading = ref(false)
+const error = ref('')
+let detailRequest = 0
 const attrs = ref<{ id: string; name: string; type: string; required: boolean; description: string }[]>([])
 
 async function loadDetail() {
+  const request = ++detailRequest
+  const entityId = props.entity.id
   loading.value = true
+  error.value = ''
   attrs.value = []
   try {
-    const detail = await entityApi.detail(props.entity.id)
+    const detail = await entityApi.detail(entityId)
+    if (request !== detailRequest) return
     if (detail && detail.attributes) {
       attrs.value = detail.attributes.map(a => ({
         id: a.id,
@@ -65,9 +76,11 @@ async function loadDetail() {
       }))
     }
   } catch (e) {
+    if (request !== detailRequest) return
+    error.value = '对象属性加载失败，请重新加载'
     console.error('加载对象详情失败', e)
   } finally {
-    loading.value = false
+    if (request === detailRequest) loading.value = false
   }
 }
 
@@ -80,6 +93,7 @@ watch(() => props.entity.id, loadDetail)
 
 .attr-panel__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 16px;
   margin-bottom: 20px;
@@ -103,11 +117,14 @@ watch(() => props.entity.id, loadDetail)
 
 .attr-panel__info {
   display: flex;
+  flex-wrap: wrap;
+  min-width: 0;
   align-items: center;
   gap: 8px;
 }
 
 .attr-panel__name {
+  overflow-wrap: anywhere;
   font-size: 15px;
   font-weight: 600;
   color: var(--neutral-900, #111);
@@ -145,7 +162,7 @@ watch(() => props.entity.id, loadDetail)
 
 .attr-panel__grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 12px;
 }
 
@@ -163,16 +180,20 @@ watch(() => props.entity.id, loadDetail)
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 6px;
 }
 
 .attr-card__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 13px;
   font-weight: 600;
   color: var(--neutral-800, #222);
 }
 
 .attr-card__type {
+  flex-shrink: 0;
   font-size: 11px;
   font-weight: 500;
   padding: 1px 6px;
@@ -207,6 +228,7 @@ watch(() => props.entity.id, loadDetail)
 }
 
 .attr-card__desc {
+  overflow-wrap: anywhere;
   font-size: 12px;
   color: var(--neutral-500, #888);
   line-height: 1.4;
@@ -222,4 +244,5 @@ watch(() => props.entity.id, loadDetail)
   color: var(--neutral-400, #aaa);
   font-size: 13px;
 }
+.attr-panel__empty .attr-panel__back { margin: 12px auto 0; }
 </style>

@@ -4,51 +4,166 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/ontology/list' },
-    { path: '/login', name: 'login', component: () => import('../views/auth/LoginView.vue'), meta: { title: '登录', public: true } },
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/auth/LoginView.vue'),
+      meta: { title: '登录', public: true },
+    },
 
     // 工作台
-    { path: '/dashboard', name: 'dashboard', component: () => import('../views/dashboard/SystemDashboardView.vue'), meta: { title: '系统看版' } },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('../views/dashboard/SystemDashboardView.vue'),
+      meta: { title: '系统看版' },
+    },
 
     // 数据集成
-    { path: '/data/connections', name: 'data-connections', component: () => import('../views/datasource/ConnectionsPage.vue'), meta: { title: '数据接入' } },
-    { path: '/data/assets', name: 'data-assets', component: () => import('../views/datasource/AssetsPage.vue'), meta: { title: '资产目录' } },
+    {
+      path: '/data/connections',
+      name: 'data-connections',
+      component: () => import('../views/datasource/ConnectionsPage.vue'),
+      meta: { title: '数据接入' },
+    },
+    {
+      path: '/data/assets',
+      name: 'data-assets',
+      component: () => import('../views/datasource/AssetsPage.vue'),
+      meta: { title: '资产目录' },
+    },
 
     // 本体中心 — 本体构建
-    { path: '/ontology/list', name: 'ontology-list', component: () => import('../views/ontology/OntologyListView.vue'), meta: { title: '本体列表' } },
-    { path: '/ontology/list/:code', name: 'ontology-scenario-detail', component: () => import('../views/ontology/OntologyDetailView.vue'), meta: { title: '本体详情' } },
-    { path: '/builder', name: 'ontology-builder', component: () => import('../views/builder/OntologyBuilderView.vue'), meta: { title: '手动构建' } },
-    { path: '/builder/template', name: 'ontology-builder-template', component: () => import('../views/builder/TemplateBuilderView.vue'), meta: { title: '模板构建' } },
-    { path: '/builder/doc', name: 'ontology-builder-doc', component: () => import('../views/builder/DocBuilderView.vue'), meta: { title: '文档构建' } },
-    { path: '/builder/ai', name: 'ontology-builder-ai', component: () => import('../views/builder/AiBuilderView.vue'), meta: { title: '资产构建' } },
+    {
+      path: '/ontology/list',
+      name: 'ontology-list',
+      component: () => import('../views/ontology/OntologyListView.vue'),
+      meta: { title: '本体列表' },
+    },
+    {
+      path: '/ontology/list/:code',
+      name: 'ontology-scenario-detail',
+      component: () => import('../views/ontology/OntologyDetailView.vue'),
+      meta: { title: '本体详情' },
+    },
+    {
+      path: '/builder',
+      name: 'ontology-builder',
+      component: () => import('../views/builder/OntologyBuilderView.vue'),
+      meta: { title: '手动构建' },
+    },
+    {
+      path: '/builder/template',
+      name: 'ontology-builder-template',
+      component: () => import('../views/builder/TemplateBuilderView.vue'),
+      meta: { title: '模板构建' },
+    },
+    {
+      path: '/builder/doc',
+      name: 'ontology-builder-doc',
+      component: () => import('../views/builder/DocBuilderView.vue'),
+      meta: { title: '文档构建' },
+    },
+    {
+      path: '/builder/ai',
+      name: 'ontology-builder-ai',
+      component: () => import('../views/builder/AiBuilderView.vue'),
+      meta: { title: '资产构建' },
+    },
 
     // 逻辑建模
     { path: '/logic', redirect: '/logic/functions' },
-    { path: '/logic/functions', name: 'logic-functions', component: () => import('../views/logic/LogicModelingView.vue'), meta: { title: '逻辑建模' } },
-    { path: '/logic/functions/:id/code', name: 'logic-function-code', component: () => import('../views/logic/FunctionCodeView.vue'), meta: { title: '函数编辑' } },
-    { path: '/logic/actions', name: 'logic-actions', component: () => import('../views/logic/ActionsView.vue'), meta: { title: '行动建模' } },
-    { path: '/logic/actions/:id/code', name: 'logic-action-code', component: () => import('../views/logic/ActionCodeView.vue'), meta: { title: '动作编辑' } },
+    {
+      path: '/logic/functions',
+      name: 'logic-functions',
+      component: () => import('../views/logic/LogicModelingView.vue'),
+      meta: { title: '逻辑建模' },
+    },
+    {
+      path: '/logic/functions/:id/code',
+      name: 'logic-function-code',
+      component: () => import('../views/logic/FunctionCodeView.vue'),
+      meta: { title: '函数编辑' },
+    },
+    {
+      path: '/logic/actions',
+      name: 'logic-actions',
+      component: () => import('../views/logic/ActionsView.vue'),
+      meta: { title: '行动建模' },
+    },
+    {
+      path: '/logic/actions/:id/code',
+      name: 'logic-action-code',
+      component: () => import('../views/logic/ActionCodeView.vue'),
+      meta: { title: '动作编辑' },
+    },
 
     // 本体中心 — 本体发布
-    { path: '/ontology/publish', name: 'ontology-publish', component: () => import('../views/ontology/OntologyPublishView.vue'), meta: { title: '本体发布' } },
+    {
+      path: '/ontology/publish',
+      name: 'ontology-publish',
+      component: () => import('../views/ontology/OntologyPublishView.vue'),
+      meta: { title: '本体发布' },
+    },
     { path: '/ontology/version', redirect: '/ontology/publish' },
 
     // 本体中心 — 本体服务
-    { path: '/service/mcp', name: 'service-mcp', component: () => import('../views/service/McpServiceView.vue'), meta: { title: '本体服务' } },
+    {
+      path: '/service/mcp',
+      name: 'service-mcp',
+      component: () => import('../views/service/McpServiceView.vue'),
+      meta: { title: '本体服务' },
+    },
     { path: '/service/api', redirect: '/service/mcp' },
 
     // 智能体应用中心
-    { path: '/agent/manage', name: 'agent-manage', component: () => import('../views/service/AgentServiceView.vue'), meta: { title: '智能体管理' } },
-    { path: '/agent/manage/new', name: 'agent-new', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '新建智能体' } },
-    { path: '/agent/manage/:id', name: 'agent-detail', component: () => import('../views/agents/AgentDetailView.vue'), meta: { title: '智能体详情' } },
+    {
+      path: '/agent/manage',
+      name: 'agent-manage',
+      component: () => import('../views/service/AgentServiceView.vue'),
+      meta: { title: '智能体管理' },
+    },
+    {
+      path: '/agent/manage/new',
+      name: 'agent-new',
+      component: () => import('../views/agents/AgentDetailView.vue'),
+      meta: { title: '新建智能体' },
+    },
+    {
+      path: '/agent/manage/:id',
+      name: 'agent-detail',
+      component: () => import('../views/agents/AgentDetailView.vue'),
+      meta: { title: '智能体详情' },
+    },
 
-    { path: '/skills', name: 'skills-list', component: () => import('../views/skills/SkillsListView.vue'), meta: { title: '业务技能' } },
-    { path: '/skills/new', name: 'skill-new', component: () => import('../views/skills/SkillDetailView.vue'), meta: { title: '新建业务技能' } },
-    { path: '/skills/:id', name: 'skill-detail', component: () => import('../views/skills/SkillDetailView.vue'), meta: { title: '技能详情' } },
+    {
+      path: '/skills',
+      name: 'skills-list',
+      component: () => import('../views/skills/SkillsListView.vue'),
+      meta: { title: '业务技能' },
+    },
+    {
+      path: '/skills/new',
+      name: 'skill-new',
+      component: () => import('../views/skills/SkillDetailView.vue'),
+      meta: { title: '新建业务技能' },
+    },
+    {
+      path: '/skills/:id',
+      name: 'skill-detail',
+      component: () => import('../views/skills/SkillDetailView.vue'),
+      meta: { title: '技能详情' },
+    },
     { path: '/agent/skills', redirect: '/skills' },
-    { path: '/agent/skills/:id', redirect: to => `/skills/${to.params.id}` },
+    { path: '/agent/skills/:id', redirect: (to) => `/skills/${to.params.id}` },
 
     // 运维与安全中心
-    { path: '/ops/config', name: 'ops-config', component: () => import('../views/settings/SystemConfigView.vue'), meta: { title: '系统配置' } },
+    {
+      path: '/ops/config',
+      name: 'ops-config',
+      component: () => import('../views/settings/SystemConfigView.vue'),
+      meta: { title: '系统配置' },
+    },
 
     // 兼容旧路由
     { path: '/datasource', redirect: '/data/connections' },
@@ -58,13 +173,13 @@ const router = createRouter({
     { path: '/data/hydration', redirect: '/ontology/publish' },
     { path: '/service/agent', redirect: '/agent/manage' },
     { path: '/settings/general', redirect: '/ops/config' },
-  ]
+  ],
 })
 
 router.beforeEach((to) => {
   if (to.meta.public) return true
   const token = localStorage.getItem('token')
-  if (!token) return { name: 'login' }
+  if (!token) return { name: 'login', query: { redirect: to.fullPath } }
   return true
 })
 

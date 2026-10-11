@@ -50,11 +50,12 @@ def get_all_config(db: Session = Depends(get_db), _user: User = Depends(require_
     rows = db.query(SystemConfig).order_by(SystemConfig.group, SystemConfig.key).all()
     groups: dict[str, list[dict]] = {}
     for r in rows:
+        sensitive_key = r.key if "." in r.key else f"{r.group}.{r.key}"
         groups.setdefault(r.group, []).append({
             "key": r.key,
-            "value": _mask_value(r.key, r.value),
+            "value": _mask_value(sensitive_key, r.value),
             "description": r.description,
-            "is_sensitive": r.key in SENSITIVE_KEYS,
+            "is_sensitive": sensitive_key in SENSITIVE_KEYS,
         })
     return ConfigResponse(groups=groups)
 
@@ -81,7 +82,7 @@ def save_ai_models(data: dict, db: Session = Depends(get_db), user: User = Depen
     """保存 AI 模型列表"""
     import json
     models = data.get("models", [])
-    # 如果 API Key 是脱敏的（以 •••• 开头），保留原值
+    # 读取时返回的长、短密钥掩码都必须还原为已有值。
     row = db.query(SystemConfig).filter(SystemConfig.key == "ai.models").first()
     old_models = []
     if row and row.value:
@@ -93,8 +94,10 @@ def save_ai_models(data: dict, db: Session = Depends(get_db), user: User = Depen
     old_key_map = {m.get("id"): m.get("api_key", "") for m in old_models}
 
     for m in models:
-        if m.get("api_key", "").startswith("••••"):
-            m["api_key"] = old_key_map.get(m.get("id"), "")
+        old_key = old_key_map.get(m.get("id"), "")
+        submitted_key = m.get("api_key", "")
+        if old_key and submitted_key == _mask_model_api_key(old_key):
+            m["api_key"] = old_key
 
     value = json.dumps(models, ensure_ascii=False)
     if row:
@@ -108,11 +111,24 @@ def save_ai_models(data: dict, db: Session = Depends(get_db), user: User = Depen
 
 
 @router.post("/ai/models/test")
-def test_ai_model(data: dict, _user: User = Depends(require_admin)):
+def test_ai_model(data: dict, db: Session = Depends(get_db), _user: User = Depends(require_admin)):
     """测试指定模型的连通性"""
     api_key = data.get("api_key", "")
     base_url = data.get("base_url", "https://api.anthropic.com")
     model_id = data.get("model_id", "")
+
+    # 列表只包含脱敏密钥；测试已保存模型时按其 ID 在服务端取真实凭据。
+    if data.get("id"):
+        import json
+        row = db.query(SystemConfig).filter(SystemConfig.key == "ai.models").first()
+        try:
+            saved_models = json.loads(row.value) if row and row.value else []
+            saved = next((m for m in saved_models if m.get("id") == data["id"]), None)
+            saved_key = saved.get("api_key", "") if saved else ""
+            if saved_key and api_key == _mask_model_api_key(saved_key):
+                api_key = saved_key
+        except (ValueError, TypeError):
+            pass
 
     if not api_key or api_key.startswith("••••"):
         return TestResult(success=False, message="请先填写 API Key")
@@ -145,7 +161,8 @@ def save_config(data: ConfigSaveRequest, db: Session = Depends(get_db), user: Us
     for item in data.items:
         existing = db.query(SystemConfig).filter(SystemConfig.key == item.key).first()
         if existing:
-            if item.key in SENSITIVE_KEYS and item.value and item.value.startswith("••••"):
+            sensitive_key = existing.key if "." in existing.key else f"{existing.group}.{existing.key}"
+            if sensitive_key in SENSITIVE_KEYS and existing.value and item.value == _mask_value(sensitive_key, existing.value):
                 continue
             existing.value = item.value
             existing.updated_at = datetime.utcnow()
@@ -218,4 +235,7 @@ def test_email(data: dict, db: Session = Depends(get_db), _user: User = Depends(
 
 def _get_config_value(db: Session, key: str) -> str | None:
     row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+    if not row and "." in key:
+        group, bare_key = key.split(".", 1)
+        row = db.query(SystemConfig).filter(SystemConfig.group == group, SystemConfig.key == bare_key).first()
     return row.value if row else None

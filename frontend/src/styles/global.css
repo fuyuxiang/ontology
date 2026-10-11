@@ -69,7 +69,7 @@ body {
   font-weight: var(--text-caption-weight);
   line-height: var(--text-caption-leading);
   letter-spacing: var(--text-caption-tracking);
-  color: var(--neutral-600);
+  color: var(--neutral-700);
 }
 .text-caption-upper {
   font-size: var(--text-caption-upper-size);
@@ -88,7 +88,7 @@ body {
 
 /* ── 通用卡片 ── */
 .card {
-  background: #fff;
+  background: var(--neutral-0);
   border-radius: var(--radius-lg);
   border: 1px solid var(--neutral-200);
   box-shadow: var(--shadow-card);
@@ -104,6 +104,8 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .page-header__title {
   font-size: 20px;
@@ -113,7 +115,7 @@ body {
 }
 .page-header__desc {
   font-size: 13px;
-  color: var(--neutral-500);
+  color: var(--neutral-600);
   margin-top: 4px;
 }
 

@@ -708,6 +708,10 @@ const upgrade = ref<{
 } | null>(null)
 let loadGeneration = 0
 let catalogGeneration = 0
+let runsRequest = 0
+let versionsRequest = 0
+let apiRequest = 0
+let runRequest = 0
 let savingNew = false
 const activeModels = computed(() =>
   models.value.filter(
@@ -957,6 +961,7 @@ async function saveAgent() {
     error.value = skillError(e)
   } finally {
     saving.value = false
+    savingNew = false
   }
 }
 async function openSkillDrawer() {
@@ -1059,12 +1064,15 @@ function applyUpgrade() {
 }
 async function refreshActivity() {
   if (!current.value) return
+  const id = current.value.id
+  const generation = loadGeneration
   try {
-    const latest = await agentsApi.get(current.value.id)
+    const latest = await agentsApi.get(id)
+    if (generation !== loadGeneration || current.value?.id !== id) return
     current.value = latest
     if (workspaceTab.value === '运行记录') await loadRuns()
   } catch (e) {
-    error.value = skillError(e)
+    if (generation === loadGeneration) error.value = skillError(e)
   }
 }
 function markChatBusy(value: boolean) {
@@ -1073,37 +1081,50 @@ function markChatBusy(value: boolean) {
 }
 async function loadRuns() {
   if (!current.value) return
+  const id = current.value.id
+  const request = ++runsRequest
+  const generation = loadGeneration
   runsLoading.value = true
   try {
-    runs.value = await agentsApi.runs(current.value.id)
+    const result = await agentsApi.runs(id)
+    if (request === runsRequest && generation === loadGeneration) runs.value = result
   } catch (e) {
-    error.value = skillError(e)
+    if (request === runsRequest && generation === loadGeneration) error.value = skillError(e)
   } finally {
-    runsLoading.value = false
+    if (request === runsRequest && generation === loadGeneration) runsLoading.value = false
   }
 }
 async function loadVersions() {
   if (!current.value) return
+  const id = current.value.id
+  const request = ++versionsRequest
+  const generation = loadGeneration
   versionsLoading.value = true
   try {
-    versions.value = await agentsApi.versions(current.value.id)
+    const result = await agentsApi.versions(id)
+    if (request === versionsRequest && generation === loadGeneration) versions.value = result
   } catch (e) {
-    error.value = skillError(e)
+    if (request === versionsRequest && generation === loadGeneration) error.value = skillError(e)
   } finally {
-    versionsLoading.value = false
+    if (request === versionsRequest && generation === loadGeneration) versionsLoading.value = false
   }
 }
 async function loadApi() {
+  const request = ++apiRequest
+  const generation = loadGeneration
   apiInfo.value = null
+  apiLoading.value = false
   if (!canEdit.value) return
   if (!current.value?.current_version || current.value.status !== 'published') return
+  const id = current.value.id
   apiLoading.value = true
   try {
-    apiInfo.value = await agentsApi.apiInfo(current.value.id)
+    const result = await agentsApi.apiInfo(id)
+    if (request === apiRequest && generation === loadGeneration) apiInfo.value = result
   } catch (e) {
-    error.value = skillError(e)
+    if (request === apiRequest && generation === loadGeneration) error.value = skillError(e)
   } finally {
-    apiLoading.value = false
+    if (request === apiRequest && generation === loadGeneration) apiLoading.value = false
   }
 }
 async function selectWorkspaceTab(tab: (typeof workspaceTabs)[number]) {
@@ -1112,7 +1133,7 @@ async function selectWorkspaceTab(tab: (typeof workspaceTabs)[number]) {
   if (tab === '发布与接入') await Promise.all([loadVersions(), loadApi()])
 }
 async function publishAgent() {
-  if (!current.value || publishProblems.value.length) return
+  if (publishing.value || saving.value || !current.value || publishProblems.value.length) return
   publishing.value = true
   drawerError.value = ''
   try {
@@ -1128,7 +1149,13 @@ async function publishAgent() {
   }
 }
 async function unpublishAgent() {
-  if (!current.value || !window.confirm('下线后外部应用将无法调用此智能体，确认下线？')) return
+  if (
+    saving.value ||
+    publishing.value ||
+    !current.value ||
+    !window.confirm('下线后外部应用将无法调用此智能体，确认下线？')
+  )
+    return
   saving.value = true
   try {
     current.value = await agentsApi.update(current.value.id, { status: 'draft' })
@@ -1142,6 +1169,8 @@ async function unpublishAgent() {
 }
 async function rollback(version: AgentVersion) {
   if (
+    saving.value ||
+    publishing.value ||
     !current.value ||
     !window.confirm(
       `回滚到 v${version.version}？${isDirty.value ? '当前未保存修改将被替换。' : ''}`,
@@ -1164,25 +1193,34 @@ async function copyApi() {
     error.value = '复制失败，请手动复制调用示例。'
 }
 async function openRun(id: string) {
-  if (!current.value) return
+  if (deciding.value || !current.value) return
+  const request = ++runRequest
+  const generation = loadGeneration
+  const agentId = current.value.id
   drawer.value = 'run'
   drawerLoading.value = true
   drawerError.value = ''
   selectedRun.value = null
   try {
-    selectedRun.value = await agentsApi.run(current.value.id, id)
+    const result = await agentsApi.run(agentId, id)
+    if (request === runRequest && generation === loadGeneration) selectedRun.value = result
   } catch (e) {
-    drawerError.value = skillError(e)
+    if (request === runRequest && generation === loadGeneration) drawerError.value = skillError(e)
   } finally {
-    drawerLoading.value = false
+    if (request === runRequest && generation === loadGeneration) drawerLoading.value = false
   }
 }
 async function decideRunAction(pendingId: string, approve: boolean) {
-  if (!current.value || !selectedRun.value) return
+  if (deciding.value || !current.value || !selectedRun.value) return
+  const agentId = current.value.id
+  const runId = selectedRun.value.id
+  const generation = loadGeneration
   deciding.value = pendingId
   try {
-    await agentsApi.confirmAction(current.value.id, pendingId, approve)
-    selectedRun.value = await agentsApi.run(current.value.id, selectedRun.value.id)
+    await agentsApi.confirmAction(agentId, pendingId, approve)
+    const result = await agentsApi.run(agentId, runId)
+    if (generation !== loadGeneration) return
+    selectedRun.value = result
     await loadRuns()
   } catch (e) {
     drawerError.value = skillError(e)
@@ -1223,6 +1261,11 @@ watch(
   async () => {
     if (savingNew) return
     const generation = ++loadGeneration
+    catalogGeneration++
+    runsRequest++
+    versionsRequest++
+    apiRequest++
+    runRequest++
     loading.value = true
     error.value = ''
     notice.value = ''
@@ -1231,6 +1274,11 @@ watch(
     versions.value = []
     runs.value = []
     apiInfo.value = null
+    selectedRun.value = null
+    runsLoading.value = false
+    versionsLoading.value = false
+    apiLoading.value = false
+    drawerLoading.value = false
     chatBusy.value = false
     catalog.value = emptyCatalog()
     workspaceTab.value = '配置与调试'
@@ -1249,34 +1297,50 @@ watch(
       max_tool_rounds: 12,
     })
     savedSnapshot.value = JSON.stringify(payload())
-    if (!authStore.user) await authStore.fetchUser()
-    const results = await Promise.allSettled([
-      modelsApi.list(),
-      ontologyPublishApi.listPublishedOntologies(),
-      skillsApi.list(),
-      isNew.value ? Promise.resolve(null) : agentsApi.get(String(route.params.id)),
-    ])
-    if (generation !== loadGeneration) return
-    const [modelResult, ontologyResult, skillResult, agentResult] = results
-    if (modelResult.status === 'fulfilled') models.value = modelResult.value
-    else error.value = skillError(modelResult.reason)
-    if (ontologyResult.status === 'fulfilled') ontologies.value = ontologyResult.value
-    else error.value = skillError(ontologyResult.reason)
-    if (skillResult.status === 'fulfilled') skills.value = skillResult.value
-    else error.value = skillError(skillResult.reason)
-    if (agentResult.status === 'fulfilled' && agentResult.value) {
-      hydrate(agentResult.value)
-      await Promise.all([loadCatalog(), loadPins()])
-    } else if (agentResult.status === 'rejected') error.value = skillError(agentResult.reason)
-    if (generation === loadGeneration) loading.value = false
+    try {
+      if (!authStore.user) await authStore.fetchUser()
+      const results = await Promise.allSettled([
+        modelsApi.list(),
+        ontologyPublishApi.listPublishedOntologies(),
+        skillsApi.list(),
+        isNew.value ? Promise.resolve(null) : agentsApi.get(String(route.params.id)),
+      ])
+      if (generation !== loadGeneration) return
+      const [modelResult, ontologyResult, skillResult, agentResult] = results
+      if (modelResult.status === 'fulfilled') models.value = modelResult.value
+      else error.value = skillError(modelResult.reason)
+      if (ontologyResult.status === 'fulfilled') ontologies.value = ontologyResult.value
+      else error.value = skillError(ontologyResult.reason)
+      if (skillResult.status === 'fulfilled') skills.value = skillResult.value
+      else error.value = skillError(skillResult.reason)
+      if (agentResult.status === 'fulfilled' && agentResult.value) {
+        hydrate(agentResult.value)
+        await Promise.all([loadCatalog(), loadPins()])
+      } else if (agentResult.status === 'rejected') error.value = skillError(agentResult.reason)
+      if (generation === loadGeneration) loading.value = false
+    } catch (e) {
+      if (generation === loadGeneration) {
+        error.value = skillError(e, '智能体加载失败，请刷新重试')
+        loading.value = false
+      }
+    }
   },
   { immediate: true },
 )
 onBeforeRouteLeave(() => {
+  if (savingNew) return true
+  if (saving.value || publishing.value || deciding.value) {
+    error.value = '操作正在进行，请等待完成后再离开。'
+    return false
+  }
   if (chatBusy.value) return window.confirm('离开页面将中止调试响应，确认离开？')
   if (isDirty.value) return window.confirm('当前草稿尚未保存，确认离开？')
 })
 onBeforeRouteUpdate(() => {
+  if (!savingNew && (saving.value || publishing.value || deciding.value)) {
+    error.value = '操作正在进行，请等待完成后再切换智能体。'
+    return false
+  }
   if (!savingNew && (isDirty.value || chatBusy.value))
     return window.confirm('当前配置尚未保存或仍在调试，确认切换智能体？')
 })

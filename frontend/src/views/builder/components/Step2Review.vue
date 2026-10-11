@@ -13,7 +13,7 @@
       <button class="step2-approve-all-btn" @click="approveAll">✅ 一键全部通过</button>
       <button
         :class="['step2-complete-btn', { active: approvedCount === objects.length && objects.length > 0 }]"
-        :disabled="approvedCount < objects.length"
+        :disabled="!objects.length || approvedCount < objects.length || busy"
         @click="finishReview"
       >完成审批</button>
     </header>
@@ -33,6 +33,7 @@
             placeholder="选择要映射的数据资产"
             :options="assetOptions"
             :loading="assetLoading"
+            :disabled="autoMapping"
             style="flex:1"
             size="small"
             @dropdown-visible-change="onAssetDropdownOpen"
@@ -157,7 +158,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
 import { authHeaders } from '../../../utils/authHeaders'
@@ -169,6 +170,8 @@ import SemanticCanvas from './graph/SemanticCanvas.vue'
 const props = defineProps<{ session: BuilderSession }>()
 const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void }>()
 const store = useBuilderStore()
+let requestEpoch = 0
+let mounted = true
 
 const selectedId = ref<string | null>(props.session.ontologyObjects[0]?.id || null)
 const objects = ref([...props.session.ontologyObjects])
@@ -182,6 +185,7 @@ const selectedAssetIds = ref<string[]>([...(props.session.selectedAssetIds || []
 const assetOptions = ref<{ label: string; value: string }[]>([])
 const assetLoading = ref(false)
 const autoMapping = ref(false)
+const busy = computed(() => aiSuggesting.value || aiRelSuggesting.value || autoMapping.value)
 const mapCoverage = ref<{ high: number; medium: number; low: number; none: number } | null>(null)
 
 const tierOptions = [
@@ -207,7 +211,7 @@ function tierBg(t: 1 | 2 | 3) { return t === 1 ? 'rgba(46,91,255,0.12)' : t === 
 function tierColor(t: 1 | 2 | 3) { return t === 1 ? '#2E5BFF' : t === 2 ? '#00C7B1' : '#FF6B35' }
 
 function syncStore() {
-  store.patchActive({
+  store.updateSession(props.session.sessionId, {
     ontologyObjects: [...objects.value],
     ontologyRelations: [...relations.value],
     selectedAssetIds: [...selectedAssetIds.value],
@@ -246,17 +250,20 @@ function addProp() {
 
 async function suggestAttributes() {
   if (!selected.value || aiSuggesting.value) return
+  const objectId = selected.value.id
+  const request = requestEpoch
+  const source = selected.value
   aiSuggesting.value = true
   try {
     const resp = await fetch('/api/v1/builder/suggest-attributes', {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
-        object_name: selected.value.name,
-        display_name: selected.value.displayName,
-        tier: selected.value.tier,
-        description: selected.value.description,
-        existing_properties: selected.value.properties.map(p => ({
+        object_name: source.name,
+        display_name: source.displayName,
+        tier: source.tier,
+        description: source.description,
+        existing_properties: source.properties.map(p => ({
           name: p.name, displayName: p.displayName, type: p.type, required: p.required,
         })),
       }),
@@ -266,11 +273,14 @@ async function suggestAttributes() {
       throw new Error(err.detail || `HTTP ${resp.status}`)
     }
     const data = await resp.json()
-    const existingNames = new Set(selected.value.properties.map(p => p.name))
+    if (!mounted || request !== requestEpoch) return
+    const target = objects.value.find(o => o.id === objectId)
+    if (!target) return
+    const existingNames = new Set(target.properties.map(p => p.name))
     let added = 0
     for (const sp of data.suggested_properties || []) {
       if (!sp.name || existingNames.has(sp.name)) continue
-      selected.value.properties.push({
+      target.properties.push({
         id: 'p-' + Date.now() + '-' + added,
         name: sp.name,
         displayName: sp.displayName || sp.name,
@@ -285,15 +295,17 @@ async function suggestAttributes() {
     if (added > 0) message.success(`AI 补全了 ${added} 个属性`)
     else message.info('没有新属性可建议')
   } catch (e: any) {
+    if (!mounted || request !== requestEpoch) return
     message.error('AI 补全失败：' + (e.message || e))
   } finally {
-    aiSuggesting.value = false
+    if (request === requestEpoch) aiSuggesting.value = false
   }
 }
 
 async function suggestRelations() {
   if (aiRelSuggesting.value) return
   if (objects.value.length < 2) { message.warning('至少需要 2 个对象才能推断关系'); return }
+  const request = requestEpoch
   aiRelSuggesting.value = true
   try {
     const resp = await fetch('/api/v1/builder/suggest-relations', {
@@ -305,7 +317,8 @@ async function suggestRelations() {
           properties: o.properties.map(p => p.name),
         })),
         existing_relations: relations.value.map(r => ({
-          source: r.source, target: r.target, name: r.name,
+          source: objects.value.find(object => object.id === r.source)?.name || r.source,
+          target: objects.value.find(object => object.id === r.target)?.name || r.target, name: r.name,
         })),
       }),
     })
@@ -314,19 +327,22 @@ async function suggestRelations() {
       throw new Error(err.detail || `HTTP ${resp.status}`)
     }
     const data = await resp.json()
+    if (!mounted || request !== requestEpoch) return
     const existingPairs = new Set(relations.value.map(r => `${r.source}->${r.target}`))
     let added = 0
     for (const sr of data.suggested_relations || []) {
-      const key = `${sr.source}->${sr.target}`
-      const revKey = `${sr.target}->${sr.source}`
-      if (!sr.source || !sr.target) continue
+      const source = objects.value.find(object => object.name === sr.source || object.id === sr.source)?.id
+      const target = objects.value.find(object => object.name === sr.target || object.id === sr.target)?.id
+      if (!source || !target) continue
+      const key = `${source}->${target}`
+      const revKey = `${target}->${source}`
       if (existingPairs.has(key) || existingPairs.has(revKey)) continue
       relations.value.push({
         id: 'r-' + Date.now() + '-' + added,
         name: sr.name || 'relates_to',
         displayName: sr.displayName || sr.name || '关联',
-        source: sr.source,
-        target: sr.target,
+        source,
+        target,
         cardinality: sr.cardinality || '1:N',
         description: sr.description || '',
         relationType: sr.relationType || 'ObjectProperty',
@@ -339,9 +355,10 @@ async function suggestRelations() {
     if (added > 0) message.success(`AI 推断了 ${added} 条关系`)
     else message.info('没有新关系可推断')
   } catch (e: any) {
+    if (!mounted || request !== requestEpoch) return
     message.error('AI 推断失败：' + (e.message || e))
   } finally {
-    aiRelSuggesting.value = false
+    if (request === requestEpoch) aiRelSuggesting.value = false
   }
 }
 function removeProp(id: string) {
@@ -375,6 +392,7 @@ async function onAssetDropdownOpen(open: boolean) {
 
 async function runAutoMap() {
   if (!selectedAssetIds.value.length || autoMapping.value) return
+  const request = requestEpoch
   autoMapping.value = true
   mapCoverage.value = null
   try {
@@ -396,6 +414,7 @@ async function runAutoMap() {
       throw new Error(err.detail || `HTTP ${resp.status}`)
     }
     const data = await resp.json()
+    if (!mounted || request !== requestEpoch) return
     const mappings = data.mappings || {}
     let totalHigh = 0, totalMedium = 0, totalLow = 0, totalNone = 0
 
@@ -425,18 +444,20 @@ async function runAutoMap() {
     const mapped = totalHigh + totalMedium + totalLow
     message.success(`自动映射完成：${mapped} 个属性已匹配，${totalNone} 个未匹配`)
   } catch (e: any) {
+    if (!mounted || request !== requestEpoch) return
     message.error('自动映射失败：' + (e.message || e))
   } finally {
-    autoMapping.value = false
+    if (request === requestEpoch) autoMapping.value = false
   }
 }
 
 function finishReview() {
+  if (busy.value || !objects.value.length) return
   if (approvedCount.value < objects.value.length) {
     message.warning('请将所有对象审批通过后再完成走测')
     return
   }
-  store.patchActive({
+  store.updateSession(props.session.sessionId, {
     ontologyObjects: objects.value,
     ontologyRelations: relations.value,
     status: 'pending_hydration',
@@ -457,6 +478,12 @@ function finishReview() {
 }
 
 watch(() => props.session.sessionId, () => {
+  ++requestEpoch
+  aiSuggesting.value = false
+  aiRelSuggesting.value = false
+  autoMapping.value = false
+  selectedAssetIds.value = [...(props.session.selectedAssetIds || [])]
+  mapCoverage.value = null
   objects.value = [...props.session.ontologyObjects]
   relations.value = [...props.session.ontologyRelations]
   selectedId.value = objects.value[0]?.id || null
@@ -466,6 +493,7 @@ watch(() => props.session.sessionId, () => {
 watch(() => props.session.ontologyObjects, (v) => {
   objects.value = [...v]
 }, { deep: true })
+onUnmounted(() => { mounted = false; ++requestEpoch })
 </script>
 
 <style scoped>
