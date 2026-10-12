@@ -50,10 +50,6 @@ def _override_require_user():
     return _TEST_USER
 
 
-app.dependency_overrides[get_db] = _override_get_db
-app.dependency_overrides[require_user] = _override_require_user
-
-
 def _auth_headers() -> dict:
     token = create_access_token(_TEST_USER.id)
     return {"Authorization": f"Bearer {token}"}
@@ -71,13 +67,18 @@ def setup_db():
     db.merge(_TEST_USER)
     db.commit()
     db.close()
+    previous = dict(app.dependency_overrides)
+    app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[require_user] = _override_require_user
     yield
+    app.dependency_overrides.clear()
+    app.dependency_overrides.update(previous)
     Base.metadata.drop_all(bind=TEST_ENGINE)
 
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    return TestClient(app, headers=_auth_headers())
 
 
 @pytest.fixture

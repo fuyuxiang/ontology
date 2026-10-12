@@ -18,11 +18,11 @@ EXECUTOR_REGISTRY: dict[str, type[BaseActionExecutor]] = {
 }
 
 
-def get_executor(action_type: str) -> BaseActionExecutor:
+def get_executor(action_type: str, db=None) -> BaseActionExecutor:
     executor_cls = EXECUTOR_REGISTRY.get(action_type)
     if not executor_cls:
         raise ValueError(f"Unknown action type: {action_type}")
-    return executor_cls()
+    return executor_cls(db=db)
 
 
 def get_all_type_info() -> list[dict]:
@@ -37,17 +37,16 @@ def get_all_type_info() -> list[dict]:
     return result
 
 
-def run_executor_sync(action_type: str, type_config: dict, params: dict, dry_run: bool = False) -> ExecutionResult:
+def run_executor_sync(action_type: str, type_config: dict, params: dict, dry_run: bool = False, db=None) -> ExecutionResult:
     """Synchronous wrapper for executing an action in a sync context."""
-    executor = get_executor(action_type)
+    executor = get_executor(action_type, db=db)
     try:
         loop = asyncio.get_event_loop()
-        if loop.is_running():
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(asyncio.run, executor.execute(type_config, params, dry_run))
-                return future.result()
-        else:
-            return loop.run_until_complete(executor.execute(type_config, params, dry_run))
     except RuntimeError:
         return asyncio.run(executor.execute(type_config, params, dry_run))
+    if loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(asyncio.run, executor.execute(type_config, params, dry_run))
+            return future.result()
+    return loop.run_until_complete(executor.execute(type_config, params, dry_run))

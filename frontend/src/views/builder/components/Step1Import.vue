@@ -2,8 +2,8 @@
   <div class="step1-import">
     <div class="step1-import__inner">
       <div class="step1-import__header">
-        <div class="step1-import__title">文件导入</div>
-        <div class="step1-import__sub">导入 OWL / RDF / JSON 标准本体文件或 Excel 模板，系统会解析对象、属性与关系，进入审核流程</div>
+        <div class="step1-import__title">{{ text('文件导入') }}</div>
+        <div class="step1-import__sub">{{ text("导入 OWL / RDF / JSON 标准本体文件或 Excel 模板，系统会解析对象、属性与关系，进入数据映射与最终审核流程") }}</div>
       </div>
 
       <div
@@ -15,41 +15,41 @@
         @click="fileInput?.click()"
       >
         <div class="import-drop__icon">📤</div>
-        <div class="import-drop__title">点击或拖拽文件到此区域</div>
-        <div class="import-drop__sub">支持 .owl / .json / .ttl / .rdf / .xlsx — 最大 50MB</div>
+        <div class="import-drop__title">{{ parsing ? text('正在解析…') : text('点击或拖拽文件到此区域') }}</div>
+        <div class="import-drop__sub">{{ text("支持 .owl / .json / .ttl / .rdf / .xlsx — 最大 50MB") }}</div>
         <input ref="fileInput" type="file" class="hidden-file" accept=".owl,.json,.ttl,.rdf,.xlsx,.xls" @change="onFileChange" />
       </div>
 
       <div v-if="parsedSummary" class="import-summary">
         <div class="import-summary__head">
-          <div class="import-summary__title">解析结果</div>
-          <a-tag color="green">已解析</a-tag>
+          <div class="import-summary__title">{{ text('解析结果') }}</div>
+          <a-tag color="green">{{ text('已解析') }}</a-tag>
         </div>
         <div class="import-summary__grid">
           <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.classCount }}</div>
-            <div class="card-label">对象</div>
+            <div class="card-label">{{ text('对象') }}</div>
           </div>
           <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.relationCount }}</div>
-            <div class="card-label">关联关系</div>
+            <div class="card-label">{{ text('关联关系') }}</div>
           </div>
           <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.propertyCount }}</div>
-            <div class="card-label">属性总数</div>
+            <div class="card-label">{{ text('属性总数') }}</div>
           </div>
           <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.actionCount }}</div>
-            <div class="card-label">动作</div>
+            <div class="card-label">{{ text('动作') }}</div>
           </div>
           <div class="import-summary__card">
             <div class="card-num">{{ parsedSummary.fileSize }}</div>
-            <div class="card-label">文件大小</div>
+            <div class="card-label">{{ text('文件大小') }}</div>
           </div>
         </div>
 
         <div class="import-summary__list">
-          <div class="import-summary__list-title">本体对象（前 10 个）</div>
+          <div class="import-summary__list-title">{{ text('本体对象（前 10 个）') }}</div>
           <div class="import-class-list">
             <div v-for="c in parsedSummary.preview" :key="c.id" class="import-class-card">
               <div class="icc-icon" :class="`icc-icon--t${c.tier}`">{{ c.icon }}</div>
@@ -62,9 +62,9 @@
         </div>
 
         <div class="import-actions">
-          <a-button @click="parsedSummary = null">重新选择文件</a-button>
-          <a-button type="primary" size="large" @click="confirmImport">
-            确认导入 · 已有本体 →
+          <a-button @click="parsedSummary = null">{{ text('重新选择文件') }}</a-button>
+          <a-button type="primary" size="large" :disabled="parsing" @click="confirmImport">
+            {{ text('确认导入 · 已有本体 →') }}
           </a-button>
         </div>
       </div>
@@ -73,7 +73,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { useProductText } from '../../../composables/useProductText'
+const { text } = useProductText()
+import { ref, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
 import type { BuilderSession, OntologyObjectDraft, OntologyRelationDraft } from '../../../types/builder'
@@ -85,6 +87,9 @@ const emit = defineEmits<{ (e: 'next'): void }>()
 const store = useBuilderStore()
 
 const dragOver = ref(false)
+const parsing = ref(false)
+let parseRequest = 0, mounted = true
+onBeforeUnmount(() => { mounted = false; ++parseRequest })
 const fileInput = ref<HTMLInputElement | null>(null)
 const parsedSummary = ref<{
   classCount: number
@@ -106,13 +111,18 @@ function onFileChange(e: Event) {
 }
 
 async function parseFile(file: File) {
-  message.loading({ content: '正在解析本体文件...', key: 'parse', duration: 0 })
+  if (parsing.value) return
+  if (file.size > 50 * 1024 * 1024) { message.error(text('文件不能超过 50MB')); return }
+  const request = ++parseRequest, sessionId = props.session.sessionId
+  parsing.value = true; parsedSummary.value = null
+  message.loading({ content: text('正在解析本体文件...'), key: 'parse', duration: 0 })
 
   const ext = (file.name.split('.').pop() || '').toLowerCase()
   const supported = ['json', 'xlsx', 'xls', 'owl', 'rdf', 'xml', 'ttl']
   if (!supported.includes(ext)) {
     parsedSummary.value = null
     message.error({ content: `不支持的文件格式 .${ext}，请上传 .json / .xlsx / .owl / .ttl / .rdf 文件`, key: 'parse' })
+    parsing.value = false
     return
   }
 
@@ -120,6 +130,7 @@ async function parseFile(file: File) {
     // 统一走后端预览接口（只解析不落库），json / excel / owl / ttl 复用同一套草稿映射
     // namespace 留空，由后端推导（json 取 scenario.namespace，excel/owl 不需要）
     const preview: OntologyPreviewResult = await entityApi.previewFile(file, ext)
+    if (!mounted || request !== parseRequest || props.session.sessionId !== sessionId) return
 
     if (!preview.objects.length) {
       parsedSummary.value = null
@@ -167,9 +178,8 @@ async function parseFile(file: File) {
       }
     })
 
-    // 基数归一：后端已归一（1:N / N:1 / 1:1 / N:N），N:1 在草稿模型里折叠为 1:N
-    const toDraftCardinality = (c: string): '1:1' | '1:N' | 'N:N' =>
-      c === 'N:N' ? 'N:N' : c === '1:1' ? '1:1' : '1:N'
+    const toDraftCardinality = (c: string): OntologyRelationDraft['cardinality'] =>
+      c === 'N:N' || c === 'N:1' || c === '1:1' ? c : '1:N'
 
     const relations: OntologyRelationDraft[] = preview.relations.map((r, i) => ({
       id: `rel-${stamp}-${i}`,
@@ -179,21 +189,16 @@ async function parseFile(file: File) {
       target: nameToId.get(r.target)!,
       cardinality: toDraftCardinality(r.cardinality),
       description: r.description || '',
+      sourceField: r.source_field,
+      targetField: r.target_field,
       relationType: 'ObjectProperty' as const,
       semanticType: 'association' as const,
     }))
-
-    // actions 按 target_object 挂到对应对象（仅记录名称，发布链路再落库）
-    const objByName = new Map(classes.map(c => [c.name, c]))
-    preview.actions.forEach(a => {
-      if (a.target_object && objByName.has(a.target_object)) {
-        objByName.get(a.target_object)!.actions.push(a.display_name || a.name)
-      }
-    })
+    if (preview.warnings?.length) message.warning({content:preview.warnings.join('；'),duration:10})
 
     const skipped = preview.summary.relation_count < preview.relations.length
     if (skipped) {
-      message.warning('部分关系因实体缺失被跳过')
+      message.warning(text('部分关系因实体缺失被跳过'))
     }
 
     parsedSummary.value = {
@@ -204,15 +209,17 @@ async function parseFile(file: File) {
       fileSize: (file.size / 1024).toFixed(1) + ' KB',
       preview: classes.slice(0, 10),
     }
-    store.patchActive({
+    store.updateSession(sessionId, {
       ontologyObjects: classes,
       ontologyRelations: relations,
+      importedActions: preview.actions,
     })
   } catch (e: any) {
+    if (!mounted || request !== parseRequest) return
     parsedSummary.value = null
     message.error({ content: `本体文件解析失败: ${e?.response?.data?.detail || e?.message || '未知错误'}`, key: 'parse' })
     return
-  }
+  } finally { if (mounted && request === parseRequest) parsing.value = false }
 
   store.addUploadRecord({
     fileName: file.name,
@@ -227,12 +234,12 @@ async function parseFile(file: File) {
     extractedFields: parsedSummary.value!.propertyCount,
     mimeCategory: 'structured',
   })
-  message.success({ content: '本体文件解析完成', key: 'parse' })
+  message.success({ content: text('本体文件解析完成'), key: 'parse' })
 }
 
 function confirmImport() {
   if (!parsedSummary.value) return
-  store.patchActive({ status: 'pending_review' })
+  store.updateSession(props.session.sessionId, { status: 'pending_review' })
   emit('next')
 }
 </script>

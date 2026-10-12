@@ -719,8 +719,9 @@ Published
 ### Requirements
 
 - Python 3.11+
-- Node.js 18+
+- Node.js 20.19+ 或 22.12+（当前 Vite 8 的最低要求）
 - npm
+- code-server（工作区代码编辑器）；旧版 `.doc/.xls/.ppt` 导入另需 LibreOffice `soffice`
 
 ---
 
@@ -754,8 +755,15 @@ SECRET_KEY=replace-with-strong-random-string
 
 # Optional
 CREDENTIAL_ENCRYPTION_KEY=
-ADMIN_INITIAL_PASSWORD=
+# First initialization requires a password satisfying upper/lower/digit and length >= 8.
+ADMIN_INITIAL_PASSWORD=replace-with-your-own-strong-password
 CORS_ORIGINS=http://localhost:5177
+WORKSPACE_ROOT=/absolute/path/to/ontology/workspace
+LOCAL_DATA_ROOT=/absolute/path/to/ontology/local-data
+# Optional ports
+BACKEND_PORT=8001
+FRONTEND_PORT=5177
+CODE_SERVER_PORT=8443
 ```
 
 ---
@@ -784,7 +792,11 @@ Windows：
 | MCP Server  | `http://localhost:8001/api/v1/mcp` |
 | Code Server | `http://localhost:8443`            |
 
-首次启动会自动初始化数据库并创建管理员账户。
+首次启动会自动初始化数据库并创建管理员账户，必须提供符合密码策略的 `ADMIN_INITIAL_PASSWORD`；既有管理员密码不会被启动配置重置。
+
+启动脚本、直接运行的 `uvicorn` 和 `init_db.py` 均使用项目根目录 `.env`（模板为 `backend/.env.example`），进程环境变量优先。已有依赖可使用 `SKIP_DEPENDENCY_INSTALL=1`；编辑器密码来自 `CODE_SERVER_PASSWORD` 或首次启动生成的本地权限受限文件，启动日志不会输出密码。
+
+关键流程的复验命令见下方「回归验证」。单点登录目前支持 OIDC，需配置实际身份源；数据库、对象存储及模型连接需配置对应的真实服务凭据。
 
 > 生产环境请配置高强度 `SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和管理员密码，并限制 Code Server、CORS 与 MCP 的访问范围。
 
@@ -804,6 +816,7 @@ Windows：
 cd backend
 
 pip install -r requirements.txt
+# Configure ../.env from .env.example before directly starting the API.
 
 uvicorn app.main:app \
   --host 0.0.0.0 \
@@ -820,6 +833,28 @@ npm install
 
 npm run dev
 ```
+
+### 回归验证
+
+```bash
+# Backend: uses isolated databases and local protocol fixtures.
+cd backend
+pip install -r requirements-dev.txt
+python3 -m pytest -q
+
+# Frontend: state/interaction regressions, type checking and production build.
+cd ../frontend
+npm run test:ui-state
+npm run build
+```
+
+建模按「对象定义 → 数据映射 → 最终审核 → 验证发布」完成，编辑已审核内容会要求重新审核。文档映射选择保留时，最终发布沿用实际保留的映射。发布检查包含实例主键和字段映射；关系查询返回分页和遍历截断信息，调用方应沿 `pagination.next` 继续读取。
+
+实例标识使用已发布主键属性，端点和查询元数据通过 `id_property` 声明。SDK 保留原始业务属性 `id` 的值，并使用真实主键定位实例；关联查询支持 `limit`、`offset`、`relation_id` 和 `max_nodes` 分页参数。
+
+函数测试模拟业务写入，在首个写入处展示预览并停止。实际写入须通过行动执行或智能体确认；模拟模式不写业务数据。执行途中已有写入但后续失败时会保留回执并进入待核查状态，阻止直接重试造成重复执行。权限按持久化配置即时校验，并保留至少一个启用的系统管理账号。
+
+自定义 Python 的可导入模块只提供数据处理接口；禁止宿主模块访问、私有属性和反射式字符串格式化，使用 f-string 格式化文本。函数和生成技能共用校验与执行时限。平台保存的时区用于时间显示，业务名称、上传内容及原始服务回执保留其原始文本。
 
 ---
 

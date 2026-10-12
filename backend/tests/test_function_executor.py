@@ -127,7 +127,7 @@ class TestCallableNameLookup:
     def test_execute_by_callable_name_found(self):
         fn = _make_function("expression", "params['x'] + 1")
         db = MagicMock()
-        db.query.return_value.filter.return_value.first.return_value = fn
+        db.query.return_value.filter.return_value.all.return_value = [fn]
         executor = FunctionExecutor(db)
         result = executor.execute_by_callable_name("calc_score", {"x": 5})
         assert result.success is True

@@ -6,6 +6,7 @@ export interface McpOverview {
   avg_response_ms: number
   error_rate: number
   active_connections: number
+  active_requests: number
 }
 
 export interface McpTrendPoint { time: string; count: number }

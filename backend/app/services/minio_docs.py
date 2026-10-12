@@ -14,8 +14,14 @@ logger = logging.getLogger(__name__)
 _client = None
 
 
-def _get_client():
+def _get_client(db=None):
     global _client
+    if db is not None:
+        from app.services.data_plane.storage_policy import storage_policy
+        policy = storage_policy(db)
+        if not policy["endpoint"]:
+            raise ValueError("尚未配置 MinIO 文档源 endpoint")
+        return boto3.client("s3", endpoint_url=policy["endpoint"], aws_access_key_id=policy["access_key"], aws_secret_access_key=policy["secret_key"], config=Config(signature_version="s3v4", s3={"addressing_style": "path"}), region_name="us-east-1")
     if _client is None:
         _client = boto3.client(
             "s3",
@@ -28,13 +34,18 @@ def _get_client():
     return _client
 
 
-def list_documents(prefix: str = "", limit: int = 200) -> list[dict]:
-    client = _get_client()
-    resp = client.list_objects_v2(Bucket=settings.MINIO_BUCKET, Prefix=prefix, MaxKeys=limit)
+def list_documents(prefix: str = "", limit: int = 200, db=None) -> list[dict]:
+    client = _get_client(db)
+    if db is not None:
+        from app.services.data_plane.storage_policy import storage_policy
+        bucket = storage_policy(db)["bucket"]
+    else:
+        bucket = settings.MINIO_BUCKET
+    resp = client.list_objects_v2(Bucket=bucket, Prefix=prefix, MaxKeys=limit)
     items = []
     for obj in resp.get("Contents", []) or []:
         key = obj["Key"]
-        if not key.lower().endswith((".docx", ".doc", ".pdf", ".txt", ".xlsx")):
+        if not key.lower().endswith((".docx", ".doc", ".pdf", ".txt", ".md", ".csv", ".xlsx", ".xls", ".pptx", ".ppt")):
             continue
         items.append({
             "key": key,
@@ -45,19 +56,23 @@ def list_documents(prefix: str = "", limit: int = 200) -> list[dict]:
     return items
 
 
-def get_document_content(key: str) -> str:
-    client = _get_client()
-    resp = client.get_object(Bucket=settings.MINIO_BUCKET, Key=key)
-    body = resp["Body"].read()
-
-    if key.lower().endswith(".docx"):
-        return _parse_docx(body)
-    elif key.lower().endswith(".txt"):
-        return body.decode("utf-8", errors="replace")
-    elif key.lower().endswith(".pdf"):
-        return _parse_pdf(body)
+def get_document_content(key: str, db=None) -> str:
+    from app.services.doc_builder import parse_file_content
+    client = _get_client(db)
+    if db is not None:
+        from app.services.data_plane.storage_policy import storage_policy
+        policy = storage_policy(db)
+        bucket, maximum = policy["bucket"], policy["max_bytes"]
     else:
-        return f"[Unsupported format: {key}]"
+        bucket, maximum = settings.MINIO_BUCKET, 50 * 1024 * 1024
+    response = client.get_object(Bucket=bucket, Key=key)
+    try:
+        body = response["Body"].read(maximum + 1)
+    finally:
+        response["Body"].close()
+    if len(body) > maximum:
+        raise ValueError("文档超过配置的大小限制")
+    return parse_file_content(key, body)
 
 
 def _parse_docx(data: bytes) -> str:

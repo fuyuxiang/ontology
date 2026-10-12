@@ -39,7 +39,7 @@ def list_relations(
                 (EntityRelation.to_entity_id == entity_id)
             )
         q = q.filter(
-            (EntityRelation.from_entity_id.in_(visible_ids)) |
+            (EntityRelation.from_entity_id.in_(visible_ids)) &
             (EntityRelation.to_entity_id.in_(visible_ids))
         )
         rels = q.all()
@@ -66,6 +66,7 @@ def list_relations(
             rel_type=r.rel_type,
             cardinality=r.cardinality,
             description=r.description,
+            source_field=r.source_field, target_field=r.target_field,
         )
         for r in rels
     ]
@@ -77,6 +78,10 @@ def create_relation(
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
+    return _save_relation(db, data, user)
+
+
+def _save_relation(db, data, user, rel=None):
     repo = RelationRepository(db)
     f_name = repo.get_entity_name(data.from_entity_id)
     t_name = repo.get_entity_name(data.to_entity_id)
@@ -89,26 +94,49 @@ def create_relation(
     if from_entity and to_entity and from_entity.ontology_id != to_entity.ontology_id:
         # 检查是否通过共享引用建立跨本体关系
         shared = db.query(OntologySharedRef).filter(
-            OntologySharedRef.entity_id.in_([data.from_entity_id, data.to_entity_id])
+            ((OntologySharedRef.entity_id == from_entity.id) & (OntologySharedRef.target_ontology_id == to_entity.ontology_id)) |
+            ((OntologySharedRef.entity_id == to_entity.id) & (OntologySharedRef.target_ontology_id == from_entity.ontology_id))
         ).first()
         if not shared:
             raise HTTPException(status_code=400, detail="两端实体不属于同一本体，且未通过共享引用关联")
 
-    rel = EntityRelation(
-        id=gen_uuid(), from_entity_id=data.from_entity_id, to_entity_id=data.to_entity_id,
-        name=data.name, rel_type=data.rel_type, cardinality=data.cardinality, description=data.description,
-    )
-    repo.create(rel)
+    if bool(data.source_field) != bool(data.target_field):
+        raise HTTPException(422, "关系连接字段必须同时填写或清空")
+    if data.source_field:
+        if data.source_field not in {a.name for a in from_entity.attributes} or data.target_field not in {a.name for a in to_entity.attributes}:
+            raise HTTPException(422, "关系字段必须为对应对象的属性名称")
+    if not data.name.strip():
+        raise HTTPException(422, "关系名称不能为空")
+    if data.cardinality not in ("1:1", "1:N", "N:1", "N:N", "M:N"):
+        raise HTTPException(422, "不支持的关系基数")
+
+    operation = "update" if rel else "create"
+    if rel is None:
+        rel = EntityRelation(id=gen_uuid(), **data.model_dump())
+        repo.create(rel)
+    else:
+        for key, value in data.model_dump().items():
+            setattr(rel, key, value)
     write_audit(
         db, user_id=user.id, user_name=user.name,
-        action="create", target_type="relation", target_id=rel.id, target_name=f"{f_name} -> {t_name}",
+        action=operation, target_type="relation", target_id=rel.id, target_name=f"{f_name} -> {t_name}",
     )
     repo.commit()
     return RelationOut(
         id=rel.id, from_entity_id=rel.from_entity_id, from_entity_name=f_name,
         to_entity_id=rel.to_entity_id, to_entity_name=t_name,
         name=rel.name, rel_type=rel.rel_type, cardinality=rel.cardinality, description=rel.description,
+        source_field=rel.source_field, target_field=rel.target_field,
     )
+
+
+@router.put("/{relation_id}", response_model=RelationOut)
+def update_relation(relation_id: str, data: RelationCreate, db: Session = Depends(get_db),
+                    user: User = Depends(require_user)):
+    rel = db.get(EntityRelation, relation_id)
+    if not rel:
+        raise HTTPException(404, "关系不存在")
+    return _save_relation(db, data, user, rel)
 
 
 @router.delete("/{relation_id}", status_code=204)

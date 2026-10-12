@@ -6,19 +6,23 @@ import os
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
-from app.core.security import decode_token
+from app.core.security import decode_token_payload
 
 
-def verify_mcp_auth(request: Request) -> JSONResponse | None:
+def verify_mcp_auth(request: Request, db=None) -> JSONResponse | None:
     """验证 MCP 请求认证。返回 None = 通过，返回 JSONResponse = 拒绝"""
 
     # 1. JWT Bearer Token（复用项目 core.security.decode_token）
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header[7:]
-        user_id = decode_token(token)
-        if user_id:
-            request.state.mcp_user_id = user_id
+        payload = decode_token_payload(token, "access")
+        from app.models.user import User
+        user = db.get(User, payload["sub"]) if db is not None and payload else None
+        if user and user.is_active and payload.get("tv", 0) == user.token_version:
+            from app.core.permissions import role_permissions
+            request.state.mcp_user_id = user.id
+            request.state.mcp_permissions = set(role_permissions(db, user.role))
             return None
         return JSONResponse(
             status_code=401,
@@ -32,6 +36,7 @@ def verify_mcp_auth(request: Request) -> JSONResponse | None:
         valid_keys = {k.strip() for k in valid_keys_str.split(",") if k.strip()}
         if api_key in valid_keys:
             request.state.mcp_user_id = None
+            request.state.mcp_permissions = {"entity:read", "rule:read"}
             return None
         return JSONResponse(
             status_code=401,
@@ -39,11 +44,12 @@ def verify_mcp_auth(request: Request) -> JSONResponse | None:
         )
 
     # 3. 无认证 — 开发模式放行
-    if os.getenv("MCP_REQUIRE_AUTH", "false").lower() == "true":
+    if os.getenv("MCP_REQUIRE_AUTH", "true").lower() == "true":
         return JSONResponse(
             status_code=401,
             content={"jsonrpc": "2.0", "error": {"code": -32001, "message": "缺少认证凭据"}},
         )
 
     request.state.mcp_user_id = None
+    request.state.mcp_permissions = {"entity:read", "rule:read"}
     return None

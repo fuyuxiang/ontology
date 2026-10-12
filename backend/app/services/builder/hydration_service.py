@@ -33,8 +33,15 @@ class HydrateProperty(BaseModel):
     required: bool = False
     source_asset_id: str | None = None
     source_column: str | None = None
+    transform: str | None = None
     source_field: str | None = None
     source_table: str | None = None
+
+
+class HydrateEnrichment(BaseModel):
+    asset_id: str
+    primary_source_column: str | None = None
+    enrichment_source_column: str | None = None
 
 
 class HydrateObject(BaseModel):
@@ -44,6 +51,7 @@ class HydrateObject(BaseModel):
     primaryKey: str | None = None
     properties: list[HydrateProperty] = []
     backing_asset_ids: list[str] = []
+    enrichment_bindings: list[HydrateEnrichment] = []
 
 
 class HydrateRelation(BaseModel):
@@ -52,6 +60,8 @@ class HydrateRelation(BaseModel):
     source: str
     target: str
     cardinality: str = "1:N"
+    sourceField: str | None = None
+    targetField: str | None = None
 
 
 class HydrationRequest(BaseModel):
@@ -78,7 +88,11 @@ class HydrationService:
         total_cols = 0
         loaded_assets = 0
         asset_cache: dict[str, Asset] = {}  # asset_id -> Asset
+        asset_rows: dict[str, int] = {}
 
+        req.asset_ids = list(dict.fromkeys([
+            *req.asset_ids, *(aid for obj in req.objects for aid in obj.backing_asset_ids),
+        ]))
         # ── 前置校验：没有任何可用资产则直接快速失败 ──────────
         has_backing = any(obj.backing_asset_ids for obj in req.objects)
         if not req.asset_ids and not has_backing:
@@ -111,9 +125,13 @@ class HydrationService:
             if not asset:
                 msg = f"资产不存在: {aid}"
                 yield {"type": "phase_log", "phase": "ingest", "level": "ERR", "msg": msg}
-                ingest_status = "warn"
+                ingest_status = "error"
                 continue
 
+            if asset.status != "active":
+                ingest_status = "error"
+                yield {"type": "phase_log", "phase": "ingest", "level": "ERR", "msg": f"资产已失效: {asset.name}"}
+                continue
             asset_cache[aid] = asset
             conn_id = asset.connection_id
 
@@ -128,12 +146,12 @@ class HydrationService:
                     else:
                         yield {"type": "phase_log", "phase": "ingest", "level": "ERR",
                                "msg": f"连接 {asset.name} 失败: {result.get('message', '')}"}
-                        ingest_status = "warn"
+                        ingest_status = "error"
                         continue
                 except Exception as e:
                     yield {"type": "phase_log", "phase": "ingest", "level": "ERR",
                            "msg": f"连接 {asset.name} 异常: {e}"}
-                    ingest_status = "warn"
+                    ingest_status = "error"
                     continue
 
             # sync_schema
@@ -147,7 +165,7 @@ class HydrationService:
             except Exception as e:
                 yield {"type": "phase_log", "phase": "ingest", "level": "ERR",
                        "msg": f"sync_schema {asset.name} 失败: {e}"}
-                ingest_status = "warn"
+                ingest_status = "error"
 
             # preview
             try:
@@ -158,17 +176,20 @@ class HydrationService:
             except Exception as e:
                 yield {"type": "phase_log", "phase": "ingest", "level": "ERR",
                        "msg": f"preview {asset.name} 失败: {e}"}
+                ingest_status = "error"
 
             # profile
             try:
                 profile = self.asset_svc.profile(aid)
                 row_count = profile.get("row_count", 0)
+                asset_rows[aid] = row_count
                 total_rows += row_count
                 yield {"type": "phase_log", "phase": "ingest", "level": "OK",
                        "msg": f"profile: {asset.name} {row_count:,} 行, 列空值率已计算"}
             except Exception as e:
                 yield {"type": "phase_log", "phase": "ingest", "level": "ERR",
                        "msg": f"profile {asset.name} 失败: {e}"}
+                ingest_status = "error"
 
             loaded_assets += 1
 
@@ -195,7 +216,7 @@ class HydrationService:
         # ── Phase 2: 本体实例化 ───────────────────────────
         yield {"type": "phase_progress", "phase": "instantiate", "progress": 0.3}
         instantiate_start = time.time()
-        instantiate_status = "pass"
+        instantiate_status = "pass" if req.objects else "error"
         total_props = 0
         matched_props = 0
         high_confidence_props = 0
@@ -209,13 +230,6 @@ class HydrationService:
             instantiate_status = "error"
             total_props = sum(len(obj.properties) for obj in req.objects)
 
-        # 导入启发式打分函数
-        try:
-            from app.services.data_plane.mapping_suggest_service import _heuristic_score, _tier
-        except ImportError:
-            _heuristic_score = None
-            _tier = None
-
         _objs_to_check = [] if _skip_instantiate else req.objects
         for obj in _objs_to_check:
             obj_matched = 0
@@ -223,150 +237,48 @@ class HydrationService:
             obj_total = len(obj.properties)
             total_props += obj_total
 
-            # 收集 backing assets 的 schema；为空时 fallback 到全局 req.asset_ids
-            effective_asset_ids = obj.backing_asset_ids if obj.backing_asset_ids else req.asset_ids
-            all_columns: list[dict] = []
-            for aid in effective_asset_ids:
-                asset = asset_cache.get(aid) or self.asset_svc.get(aid)
-                if asset:
-                    if not asset_cache.get(aid):
-                        asset_cache[aid] = asset
-                    if asset.schema_snapshot:
-                        for col in asset.schema_snapshot:
-                            col_copy = dict(col)
-                            col_copy["_asset_id"] = aid
-                            col_copy["_asset_name"] = asset.name
-                            all_columns.append(col_copy)
-
-            # 构建 source_table → asset 列的索引，用于 source_field fallback
-            table_columns: dict[str, list[dict]] = {}
-            for aid in effective_asset_ids:
-                asset = asset_cache.get(aid)
-                if asset and asset.schema_snapshot:
-                    table_name = (asset.locator or {}).get("table", asset.name) if asset.locator else asset.name
-                    table_columns[table_name.lower()] = [
-                        {**dict(col), "_asset_id": aid} for col in asset.schema_snapshot
-                    ]
-
+            effective_asset_ids = obj.backing_asset_ids
+            if not effective_asset_ids or not obj_total:
+                instantiate_status = "error"
+                yield {"type":"phase_log", "phase":"instantiate", "level":"ERR", "msg":f"{obj.displayName or obj.name}: 必须明确绑定数据资产并定义属性"}
             for prop in obj.properties:
-                # 统一获取有效的列名：source_column 优先，fallback 到 source_field
-                effective_column = prop.source_column or prop.source_field
-                effective_asset_id = prop.source_asset_id
-
-                # 如果有 source_table 但没有 source_asset_id，尝试通过表名找到对应资产
-                if not effective_asset_id and prop.source_table:
-                    st_lower = prop.source_table.lower()
-                    for aid in effective_asset_ids:
-                        a = asset_cache.get(aid)
-                        if a:
-                            a_table = ((a.locator or {}).get("table", a.name) if a.locator else a.name).lower()
-                            if a_table == st_lower or a.name.lower() == st_lower:
-                                effective_asset_id = aid
-                                break
-
-                # 优先检查 effective_asset_id + effective_column 是否真实存在
-                if effective_asset_id and effective_column:
-                    # 先从已收集的列中查找
-                    found = any(
-                        c.get("name") == effective_column and c.get("_asset_id") == effective_asset_id
-                        for c in all_columns
-                    )
-                    # 如果不在 all_columns 中，尝试直接加载该资产验证
-                    if not found:
-                        src_asset = asset_cache.get(effective_asset_id) or self.asset_svc.get(effective_asset_id)
-                        if src_asset and src_asset.schema_snapshot:
-                            asset_cache[effective_asset_id] = src_asset
-                            found = any(
-                                c.get("name") == effective_column for c in src_asset.schema_snapshot
-                            )
-                            if found:
-                                for col in src_asset.schema_snapshot:
-                                    col_copy = dict(col)
-                                    col_copy["_asset_id"] = effective_asset_id
-                                    col_copy["_asset_name"] = src_asset.name
-                                    all_columns.append(col_copy)
-                    if found:
-                        obj_matched += 1
-                        obj_high_confidence += 1
-                        yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
-                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} ✓"}
-                        continue
-                    else:
-                        # 有明确指定但列不存在——可能是 schema 未同步，尝试在 table_columns 中查
-                        if prop.source_table:
-                            st_lower = prop.source_table.lower()
-                            t_cols = table_columns.get(st_lower, [])
-                            if any(c.get("name") == effective_column for c in t_cols):
-                                obj_matched += 1
-                                obj_high_confidence += 1
-                                yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
-                                       "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} (via {prop.source_table}) ✓"}
-                                continue
-                        yield {"type": "phase_log", "phase": "instantiate", "level": "ERR",
-                               "msg": f"{obj.displayName or obj.name}.{prop.name}: 指定列 {effective_column} 不存在"}
-                        unmatched_props.append(f"{obj.name}.{prop.name}")
-                        continue
-
-                # 如果有 effective_column 但无 effective_asset_id，在所有列中查找
-                if effective_column and not effective_asset_id:
-                    found_in_any = any(
-                        c.get("name") == effective_column for c in all_columns
-                    )
-                    # 也检查 table_columns
-                    if not found_in_any and prop.source_table:
-                        st_lower = prop.source_table.lower()
-                        t_cols = table_columns.get(st_lower, [])
-                        found_in_any = any(c.get("name") == effective_column for c in t_cols)
-                    if found_in_any:
-                        obj_matched += 1
-                        obj_high_confidence += 1
-                        yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
-                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} ✓"}
-                        continue
-                    # schema 为空时不能把声明式映射当作已验证结果
-                    if not all_columns and (prop.source_field or prop.source_column):
-                        unmatched_props.append(f"{obj.name}.{prop.name}")
-                        yield {"type": "phase_log", "phase": "instantiate", "level": "WARN",
-                               "msg": f"{obj.displayName or obj.name}.{prop.name}: → {effective_column} (schema 未同步，无法验证)"}
-                        continue
-
-                # 启发式打分找最佳匹配
-                best_score = 0.0
-                best_col = None
-                if _heuristic_score and all_columns:
-                    # 构造仅供评分使用的 EntityAttribute-like 对象
-                    class _ScoringAttr:
-                        def __init__(self, p):
-                            self.name = p.name
-                            self.type = p.type
-                            self.description = p.displayName or ""
-                            self.required = p.required
-
-                    scoring_attr = _ScoringAttr(prop)
-                    for col in all_columns:
-                        try:
-                            score, _ = _heuristic_score(scoring_attr, col)
-                            if score > best_score:
-                                best_score = score
-                                best_col = col
-                        except Exception:
-                            continue
-
-                if best_score >= 0.5 and best_col:
-                    obj_matched += 1
-                    if best_score >= 0.8:
-                        obj_high_confidence += 1
-                    tier_label = _tier(best_score) if _tier else ("high" if best_score >= 0.8 else "medium")
-                    yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
-                           "msg": f"{obj.displayName or obj.name}.{prop.name}: → {best_col['name']} ({tier_label}, {best_score:.2f})"}
-                else:
+                column = prop.source_column or prop.source_field
+                aid = prop.source_asset_id
+                if not aid or aid not in effective_asset_ids or not column:
                     unmatched_props.append(f"{obj.name}.{prop.name}")
-                    yield {"type": "phase_log", "phase": "instantiate", "level": "ERR",
-                           "msg": f"{obj.displayName or obj.name}.{prop.name}: 未找到匹配列"}
+                    yield {"type":"phase_log", "phase":"instantiate", "level":"ERR", "msg":f"{obj.displayName or obj.name}.{prop.name}: 必须明确选择已绑定资产及字段；推荐结果尚未构成有效映射"}
+                    continue
+                asset = asset_cache.get(aid)
+                if not asset or asset.status != "active" or not any(field.get("name") == column for field in asset.schema_snapshot or []):
+                    unmatched_props.append(f"{obj.name}.{prop.name}")
+                    yield {"type":"phase_log", "phase":"instantiate", "level":"ERR", "msg":f"{obj.displayName or obj.name}.{prop.name}: 指定列 {column} 不存在或资产不可用"}
+                    continue
+                if prop.transform:
+                    try:
+                        from app.services.data_plane.mapping_transform import validate_transform, apply_transform
+                        validate_transform(prop.transform)
+                        if prop.name == obj.primaryKey:
+                            raise ValueError("主键属性不能配置 transform")
+                        quote = self._quote(asset)
+                        sample = self.exec_svc.execute(ExecuteRequest(
+                            asset_id=aid, sql=f"SELECT {self._quoted(column, quote)} FROM <asset> LIMIT 100",
+                            params={}, purpose="hydrate.transform_sample", bypass_cache=True,
+                        ))
+                        converted = [apply_transform(row[0], prop.transform) for row in sample.rows]
+                        if prop.required and (not converted or any(value is None for value in converted)):
+                            raise ValueError("转换后的必填属性抽样为空")
+                        yield {"type":"phase_log", "phase":"instantiate", "level":"OK", "msg":f"{obj.name}.{prop.name}: transform 最多100行真实抽样通过 ({len(converted)}行)"}
+                    except Exception as exc:
+                        unmatched_props.append(f"{obj.name}.{prop.name}")
+                        yield {"type":"phase_log", "phase":"instantiate", "level":"ERR", "msg":f"{obj.name}.{prop.name}: transform 验证失败 - {exc}"}
+                        continue
+                obj_matched += 1
+                obj_high_confidence += 1
+                yield {"type":"phase_log", "phase":"instantiate", "level":"OK", "msg":f"{obj.displayName or obj.name}.{prop.name}: → {asset.name}.{column} ✓"}
 
             matched_props += obj_matched
             high_confidence_props += obj_high_confidence
-            obj_status = "pass" if obj_matched == obj_total else ("warn" if obj_matched > obj_total * 0.5 else "error")
+            obj_status = "pass" if obj_total and obj_matched == obj_total else "error"
             yield {"type": "phase_log", "phase": "instantiate", "level": "OK",
                    "msg": f"{obj.displayName or obj.name}: {obj_matched}/{obj_total} 属性映射命中"}
 
@@ -416,22 +328,25 @@ class HydrationService:
             if not src_obj or not tgt_obj:
                 yield {"type": "phase_log", "phase": "match", "level": "ERR",
                        "msg": f"关系 {rel.displayName or rel.name}: 源/目标对象不存在 ({rel.source} → {rel.target})"}
-                match_status = "warn"
+                match_status = "error"
                 continue
 
-            # 检查两端都有 backing assets（为空时 fallback 到全局资产）
-            src_assets = src_obj.backing_asset_ids if src_obj.backing_asset_ids else req.asset_ids
-            tgt_assets = tgt_obj.backing_asset_ids if tgt_obj.backing_asset_ids else req.asset_ids
+            # Both endpoint assets and relation fields must be explicitly mapped.
+            src_assets = src_obj.backing_asset_ids
+            tgt_assets = tgt_obj.backing_asset_ids
 
             if not src_assets or not tgt_assets:
                 yield {"type": "phase_log", "phase": "match", "level": "WARN",
                        "msg": f"关系 {rel.displayName or rel.name}: 无 backing 资产，跳过 JOIN 验证"}
-                match_status = "warn"
+                match_status = "error"
                 continue
 
-            # 检查主键列是否存在
-            src_pk = src_obj.primaryKey
-            tgt_pk = tgt_obj.primaryKey
+            if not rel.sourceField or not rel.targetField:
+                yield {"type": "phase_log", "phase": "match", "level": "ERR", "msg": f"关系 {rel.displayName or rel.name}: 未确认源/目标关联字段"}
+                match_status = "error"
+                continue
+            src_pk = self._mapped_column(src_obj, rel.sourceField)
+            tgt_pk = self._mapped_column(tgt_obj, rel.targetField)
 
             src_has_pk = False
             tgt_has_pk = False
@@ -463,12 +378,11 @@ class HydrationService:
                 try:
                     src_table = (src_asset_obj.locator or {}).get("table", "")
                     tgt_table = (tgt_asset_obj.locator or {}).get("table", "")
-                    quote = "`"
+                    quote = self._quote(src_asset_obj)
                     join_sql = (
-                        f"SELECT COUNT(*) AS cnt FROM {quote}{src_table}{quote} s "
-                        f"JOIN {quote}{tgt_table}{quote} t "
-                        f"ON s.{quote}{src_pk}{quote} = t.{quote}{tgt_pk}{quote} "
-                        f"LIMIT 1"
+                        f"SELECT COUNT(*) AS cnt FROM {self._table_quoted(src_table, quote)} s "
+                        f"JOIN {self._table_quoted(tgt_table, quote)} t "
+                        f"ON s.{self._quoted(src_pk, quote)} = t.{self._quoted(tgt_pk, quote)}"
                     )
                     r = self.exec_svc.execute(ExecuteRequest(
                         asset_id=src_assets[0], sql=join_sql, params={},
@@ -483,15 +397,26 @@ class HydrationService:
                 except Exception as e:
                     yield {"type": "phase_log", "phase": "match", "level": "WARN",
                            "msg": f"关系 {rel.displayName or rel.name}: JOIN 验证失败 - {e}"}
-                    match_status = "warn"
+                    match_status = "error"
             elif src_asset_obj and tgt_asset_obj and src_asset_obj.connection_id != tgt_asset_obj.connection_id:
-                yield {"type": "phase_log", "phase": "match", "level": "WARN",
-                       "msg": f"关系 {rel.displayName or rel.name}: 跨连接跳过 JOIN 验证"}
-                match_status = "warn"
+                try:
+                    if not src_has_pk or not tgt_has_pk:
+                        raise ValueError("关联字段不在实际源 schema 中")
+                    source_counts = self._key_counts(src_asset_obj, src_pk)
+                    target_counts = self._key_counts(tgt_asset_obj, tgt_pk)
+                    cnt = sum(count * target_counts.get(key, 0) for key, count in source_counts.items())
+                    yield {"type": "phase_log", "phase": "match", "level": "OK",
+                           "msg": f"关系 {rel.displayName or rel.name}: 跨连接真实关联验证通过, 匹配 {cnt:,} 行"}
+                    matched_relations += 1
+                    relation_count += cnt
+                except Exception as exc:
+                    yield {"type": "phase_log", "phase": "match", "level": "ERR",
+                           "msg": f"关系 {rel.displayName or rel.name}: 跨连接关联验证失败 - {exc}"}
+                    match_status = "error"
             else:
                 yield {"type": "phase_log", "phase": "match", "level": "WARN",
                        "msg": f"关系 {rel.displayName or rel.name}: 跳过 JOIN 验证 (资产信息不完整)"}
-                match_status = "warn"
+                match_status = "error"
 
         relation_accuracy = f"{matched_relations / total_relations * 100:.1f}%" if total_relations else "N/A"
         yield {"type": "phase_progress", "phase": "match", "progress": 0.75}
@@ -530,13 +455,33 @@ class HydrationService:
             if not asset:
                 continue
 
-            pk_col = obj.primaryKey
+            for extra_id in obj.backing_asset_ids[1:]:
+                try:
+                    rule = next((rule for rule in obj.enrichment_bindings if rule.asset_id == extra_id), None)
+                    enrichment_asset = asset_cache.get(extra_id) or self.asset_svc.get(extra_id)
+                    if not rule or not rule.primary_source_column or not rule.enrichment_source_column:
+                        raise ValueError("补充绑定待审核：请明确两侧物理关联列")
+                    if not enrichment_asset:
+                        raise ValueError("补充资产不可用")
+                    from app.services.data_plane.entity_data_service import EntityDataService
+                    from types import SimpleNamespace
+                    data = EntityDataService(self.db)
+                    binding = SimpleNamespace(filter_expr=None)
+                    data._assert_unique_join_key(asset, binding, rule.primary_source_column, purpose="hydrate.enrichment.primary")
+                    data._assert_unique_join_key(enrichment_asset, binding, rule.enrichment_source_column, purpose="hydrate.enrichment.secondary")
+                    yield {"type":"phase_log", "phase":"strategy", "level":"OK", "msg":f"{obj.name}: {rule.primary_source_column} ← {extra_id}.{rule.enrichment_source_column} 一对一左关联键验证通过"}
+                except Exception as exc:
+                    strategy_status = "error"
+                    yield {"type":"phase_log", "phase":"strategy", "level":"ERR", "msg":f"{obj.name} enrichment验证失败: {exc}"}
+            pk_col = self._mapped_column(obj, obj.primaryKey)
+            quote = self._quote(asset)
+            quoted_pk = self._quoted(pk_col, quote)
 
             # PK 唯一性检查
             try:
                 r = self.exec_svc.execute(ExecuteRequest(
                     asset_id=aid,
-                    sql=f"SELECT {pk_col}, COUNT(*) AS cnt FROM <asset> GROUP BY {pk_col} HAVING COUNT(*) > 1 LIMIT 10",
+                    sql=f"SELECT {quoted_pk}, COUNT(*) AS cnt FROM <asset> GROUP BY {quoted_pk} HAVING COUNT(*) > 1 LIMIT 10",
                     params={}, purpose="hydrate.pk_check", bypass_cache=True,
                 ))
                 pk_checks += 1
@@ -545,39 +490,54 @@ class HydrationService:
                     yield {"type": "phase_log", "phase": "strategy", "level": "OK",
                            "msg": f"{obj.displayName or obj.name}.{pk_col}: 主键唯一 (0 重复)"}
                 else:
-                    strategy_status = "warn"
+                    strategy_status = "error"
                     yield {"type": "phase_log", "phase": "strategy", "level": "WARN",
                            "msg": f"{obj.displayName or obj.name}.{pk_col}: 发现 {len(r.rows)} 个重复主键"}
             except Exception as e:
                 yield {"type": "phase_log", "phase": "strategy", "level": "ERR",
                        "msg": f"{obj.displayName or obj.name}.{pk_col}: PK 检查失败 - {e}"}
+                strategy_status = "error"
 
             # 必填字段空值率检查
             for prop in obj.properties:
-                if not prop.required:
+                if not prop.required and prop.name != obj.primaryKey:
                     continue
                 null_checks += 1
+                if prop.transform:
+                    # The shared transform check above evaluates real source values,
+                    # including None. Raw source nulls may intentionally be filled.
+                    if f"{obj.name}.{prop.name}" in unmatched_props:
+                        strategy_status = "error"
+                    else:
+                        null_passed += 1
+                    continue
+                column = prop.source_column or prop.source_field or prop.name
+                property_asset = asset_cache.get(prop.source_asset_id) if prop.source_asset_id else asset
+                quoted_column = self._quoted(column, self._quote(property_asset or asset))
                 try:
                     r = self.exec_svc.execute(ExecuteRequest(
-                        asset_id=aid,
-                        sql=f"SELECT SUM(CASE WHEN {prop.name} IS NULL THEN 1 ELSE 0 END) AS nn, COUNT(*) AS total FROM <asset>",
+                        asset_id=prop.source_asset_id or aid,
+                        sql=f"SELECT SUM(CASE WHEN {quoted_column} IS NULL THEN 1 ELSE 0 END) AS nn, COUNT(*) AS total FROM <asset>",
                         params={}, purpose="hydrate.null_check", bypass_cache=True,
                     ))
                     if r.rows:
                         nn = int(r.rows[0][0]) if r.rows[0][0] is not None else 0
                         total = int(r.rows[0][1]) if r.rows[0][1] is not None else 0
-                        ratio = nn / total if total else 0
-                        if ratio < 0.05:
+                        if total == 0:
+                            raise ValueError("源表为空，无法验证必填字段")
+                        ratio = nn / total
+                        if nn == 0:
                             null_passed += 1
                             yield {"type": "phase_log", "phase": "strategy", "level": "OK",
-                                   "msg": f"{obj.displayName or obj.name}.{prop.name}: 空值率 {ratio * 100:.1f}% (< 5%)"}
+                                   "msg": f"{obj.displayName or obj.name}.{prop.name}: 空值率 {ratio * 100:.1f}% (必填无空值)"}
                         else:
-                            strategy_status = "warn"
+                            strategy_status = "error"
                             yield {"type": "phase_log", "phase": "strategy", "level": "WARN",
-                                   "msg": f"{obj.displayName or obj.name}.{prop.name}: 空值率 {ratio * 100:.1f}% (> 5% 阈值)"}
+                                   "msg": f"{obj.displayName or obj.name}.{prop.name}: 空值率 {ratio * 100:.1f}% (必填字段存在空值)"}
                 except Exception as e:
                     yield {"type": "phase_log", "phase": "strategy", "level": "ERR",
                            "msg": f"{obj.displayName or obj.name}.{prop.name}: 空值检查失败 - {e}"}
+                    strategy_status = "error"
 
         strategy_elapsed = round(time.time() - strategy_start, 1)
         high_confidence = high_confidence_props
@@ -617,7 +577,7 @@ class HydrationService:
                 "selectedRows": total_rows,
                 "selectedColumns": total_cols,
                 "selectedSources": loaded_assets,
-                "entityCount": total_rows,
+                "entityCount": sum(asset_rows.get(obj.backing_asset_ids[0], 0) for obj in req.objects if obj.backing_asset_ids),
                 "relationCount": relation_count,
                 "attributionAccuracy": attribution_accuracy,
                 "highConfidenceAttribution": high_confidence,
@@ -625,3 +585,37 @@ class HydrationService:
             },
             "status": overall_status,
         }
+
+    @staticmethod
+    def _mapped_column(obj: HydrateObject, name: str | None) -> str | None:
+        prop = next((p for p in obj.properties if p.name == name), None)
+        return (prop.source_column or prop.source_field or name) if prop else name
+
+    def _quote(self, asset: Asset) -> str:
+        from app.models.connection import Connection
+        connection = self.db.get(Connection, asset.connection_id) if asset.connection_id else None
+        return "`" if connection and connection.type in ("mysql", "hive", "clickhouse") else '"'
+
+    @staticmethod
+    def _quoted(name: str, quote: str) -> str:
+        return quote + name.replace(quote, quote + quote) + quote
+
+    def _table_quoted(self, name: str, quote: str) -> str:
+        return ".".join(self._quoted(part, quote) for part in name.split("."))
+
+    def _key_counts(self, asset: Asset, column: str) -> dict:
+        # Keep the existing execution/audit/credential gate for both sources.
+        # Masked keys cannot establish real equality, and must never be read
+        # through an alternate unmasked channel to make the drill pass.
+        if (asset.sensitivity_tags or {}).get(column):
+            raise ValueError("敏感关联键不能用于跨连接水合，请使用受控的非敏感关联键")
+        quoted = self._quoted(column, self._quote(asset))
+        result = self.exec_svc.execute(ExecuteRequest(
+            asset_id=asset.id, sql=f"SELECT {quoted}, COUNT(*) FROM <asset> WHERE {quoted} IS NOT NULL GROUP BY {quoted}",
+            params={}, purpose="hydrate.cross_connection_keys", bypass_cache=True,
+        ))
+        # Grouped counts implement equality JOIN multiplicity without loading
+        # all source instances or introducing write-side effects.
+        if len(result.rows) > 100000:
+            raise ValueError("关联键数量超过100000，请缩小资产范围后重新水合")
+        return {row[0]: int(row[1]) for row in result.rows}

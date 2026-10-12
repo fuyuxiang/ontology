@@ -3,6 +3,7 @@ import { get, post, put, del } from './client'
 export interface FunctionItem {
   id: string
   entity_id: string | null
+  ontology_id?: string | null
   entity_ids: string[] | null
   entity_name: string
   name: string
@@ -33,12 +34,16 @@ export interface FunctionTestResult {
   result: any
   error: string | null
   execution_ms: number
+  outcome?: 'succeeded' | 'simulated' | 'failed'
+  simulated?: boolean
+  requested_write?: { entity_name?: string; entity_id?: string; record_id: string; updates: Record<string, unknown> }
 }
 
 export interface WorkspaceResult {
   folder: string
   port: number
   public_url?: string
+  registration_error?: string
 }
 
 export const functionApi = {

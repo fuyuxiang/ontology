@@ -248,8 +248,12 @@ def _get_entity_quality_data(db: Session, entity_id: str, svc: QualityRuleServic
     pass_rules = 0
     dim_status = {"null_ratio": "unknown", "pk_uniqueness": "unknown", "freshness": "unknown", "row_count": "unknown", "schema": "unknown"}
     dim_map = {"null_ratio_max": "null_ratio", "pk_uniqueness": "pk_uniqueness", "freshness": "freshness", "row_count_min": "row_count", "row_count_max": "row_count", "schema_stable": "schema"}
+    observed_dimensions, observed_assets, observed_statuses = set(), set(), []
 
     for b in bindings:
+        if b.asset_id in observed_assets:
+            continue
+        observed_assets.add(b.asset_id)
         rules = svc.list_rules(b.asset_id)
         for r in rules:
             if not r.enabled:
@@ -257,11 +261,13 @@ def _get_entity_quality_data(db: Session, entity_id: str, svc: QualityRuleServic
             total_rules += 1
             st = svc.latest_status(r.id)
             status = st.status if st else "unknown"
+            observed_statuses.append(status)
             if status == "healthy":
                 pass_rules += 1
             dim_key = dim_map.get(r.kind)
-            if dim_key and STATUS_RANK.get(status, 0) > STATUS_RANK.get(dim_status[dim_key], 0):
+            if dim_key and (dim_key not in observed_dimensions or STATUS_RANK.get(status, 0) > STATUS_RANK.get(dim_status[dim_key], 0)):
                 dim_status[dim_key] = status
+                observed_dimensions.add(dim_key)
 
     score = round(pass_rules / total_rules * 100) if total_rules > 0 else 0
     return {
@@ -271,6 +277,7 @@ def _get_entity_quality_data(db: Session, entity_id: str, svc: QualityRuleServic
         "dimensions": dim_status,
         "rule_count": total_rules,
         "pass_count": pass_rules,
+        "aggregate_status": max(observed_statuses, key=lambda s: STATUS_RANK[s]) if observed_statuses else "unknown",
     }
 
 
@@ -299,7 +306,7 @@ def quality_dashboard(db: Session = Depends(get_db)):
         entities.append(data)
         total_rules += data["rule_count"]
         total_pass += data["pass_count"]
-        worst = max(data["dimensions"].values(), key=lambda s: STATUS_RANK.get(s, 0))
+        worst = data["aggregate_status"]
         summary[worst] = summary.get(worst, 0) + 1
 
     overall_score = round(total_pass / total_rules * 100) if total_rules > 0 else 0

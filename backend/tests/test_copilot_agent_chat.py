@@ -7,6 +7,10 @@ from fastapi.testclient import TestClient
 from app.api.v1 import copilot as copilot_api
 from app.main import app
 from app.services import copilot as copilot_service
+from app.services import llm_resolver
+from app.core.security import create_access_token
+from app.database import SessionLocal
+from app.models.user import User
 
 
 class CopilotAgentChatTests(unittest.TestCase):
@@ -16,11 +20,19 @@ class CopilotAgentChatTests(unittest.TestCase):
                 raise RuntimeError("boom")
 
         with patch.object(copilot_api, "AgentService", BrokenAgentService):
-            with TestClient(app) as client:
-                response = client.post("/api/v1/copilot/agent-chat", json={"question": "test"})
+            with SessionLocal() as db:
+                user = User(username="copilot-init-test", password_hash="unused", name="Test", role="admin")
+                db.add(user)
+                db.commit()
+                headers = {"Authorization": f"Bearer {create_access_token(user.id)}"}
+                client = TestClient(app)
+                response = client.post("/api/v1/copilot/agent-chat", json={"question": "test"}, headers=headers)
+                db.delete(user)
+                db.commit()
 
         self.assertEqual(response.status_code, 200)
-        self.assertIn("服务异常: boom", response.text)
+        self.assertIn('"type": "error"', response.text)
+        self.assertIn("boom", response.text)
         self.assertIn("data: [DONE]", response.text)
 
     def test_get_llm_client_retries_without_proxy_env(self):
@@ -36,10 +48,10 @@ class CopilotAgentChatTests(unittest.TestCase):
             calls.append(kwargs)
             if "http_client" not in kwargs:
                 raise ImportError("Using SOCKS proxy, but the 'socksio' package is not installed.")
-            return SimpleNamespace(kwargs=kwargs)
+            return SimpleNamespace(kwargs=kwargs, chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_: None)))
 
-        with patch.object(copilot_service.httpx, "Client", side_effect=fake_httpx_client):
-            with patch.object(copilot_service, "OpenAI", side_effect=fake_openai):
+        with patch.object(llm_resolver.httpx, "Client", side_effect=fake_httpx_client):
+            with patch.object(llm_resolver, "OpenAI", side_effect=fake_openai):
                 client = copilot_service.get_llm_client()
 
         self.assertEqual(len(calls), 2)

@@ -3,11 +3,11 @@
     <BuilderReturnBanner kind-label="逻辑" />
     <div class="logic-page__header">
       <div v-if="!embedded">
-        <h1 class="text-display">逻辑管理</h1>
-        <p class="text-caption" style="margin-top: 4px">计算逻辑管理</p>
+        <h1 class="text-display">{{ text("逻辑管理") }}</h1>
+        <p class="text-caption" style="margin-top: 4px">{{ text("计算逻辑管理") }}</p>
       </div>
       <div class="logic-page__actions">
-        <button class="btn-primary" @click="showCreateModal = true">
+        <button class="btn-primary" @click="editingFuncId = undefined; showAdd = true" :disabled="!canEdit">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path
               d="M7 2v10M2 7h10"
@@ -16,14 +16,15 @@
               stroke-linecap="round"
             />
           </svg>
-          新建逻辑
+          {{ text("新建逻辑") }}
         </button>
+        <button class="btn-secondary" @click="showCreateModal = true" :disabled="!canEdit">{{ text("新建 Python 工作区") }}</button>
       </div>
     </div>
 
     <div v-if="error" class="logic-error" role="alert">
       <span>{{ error }}</span>
-      <button class="btn-secondary" :disabled="loading" @click="fetchFunctions">重试</button>
+      <button class="btn-secondary" :disabled="loading" @click="fetchFunctions">{{ text("重试") }}</button>
     </div>
     <div class="master-detail" :aria-busy="loading">
       <div class="master-detail__list">
@@ -31,8 +32,8 @@
           <input
             v-model="search"
             class="logic-search"
-            aria-label="搜索逻辑"
-            placeholder="搜索逻辑名称..."
+            :aria-label="text('搜索逻辑')"
+            :placeholder="text('搜索逻辑名称...')"
           />
           <div class="logic-filter-tags">
             <button
@@ -64,10 +65,10 @@
             <span class="list-item__badge priority--medium">{{ fn.logic_type }}</span>
             <span class="list-item__meta">{{ fn.entity_name || '—' }}</span>
           </button>
-          <div v-if="loading" class="logic-empty" role="status">正在加载逻辑…</div>
+          <div v-if="loading" class="logic-empty" role="status">{{ text("正在加载逻辑…") }}</div>
           <div v-else-if="!error && filteredFunctions.length === 0" class="logic-empty">
             <p class="text-caption">
-              {{ functions.length ? '无匹配逻辑，请调整搜索或筛选。' : '暂无逻辑，从新建开始。' }}
+              {{ functions.length ? text('无匹配逻辑，请调整搜索或筛选。') : text('暂无逻辑，从新建开始。') }}
             </p>
           </div>
         </div>
@@ -82,43 +83,43 @@
 
           <div class="detail-panel__meta">
             <div class="detail-meta-item">
-              <span class="detail-meta-label">状态</span>
+              <span class="detail-meta-label">{{ text("状态") }}</span>
               <span class="detail-meta-value">
                 <span
                   class="list-item__status"
                   :class="`list-item__status--${selectedFn.status}`"
                 ></span>
-                {{ selectedFn.status === 'active' ? '已激活' : '未激活' }}
+                {{ selectedFn.status === 'active' ? text('已激活') : text('未激活') }}
               </span>
             </div>
             <div class="detail-meta-item">
-              <span class="detail-meta-label">关联实体</span>
+              <span class="detail-meta-label">{{ text("关联实体") }}</span>
               <span class="detail-meta-value">{{ selectedFn.entity_name || '—' }}</span>
             </div>
             <div class="detail-meta-item">
-              <span class="detail-meta-label">返回类型</span>
+              <span class="detail-meta-label">{{ text("返回类型") }}</span>
               <span class="detail-meta-value"
                 ><code>{{ selectedFn.return_type }}</code></span
               >
             </div>
             <div class="detail-meta-item">
-              <span class="detail-meta-label">调用次数</span>
+              <span class="detail-meta-label">{{ text("调用次数") }}</span>
               <span class="detail-meta-value">{{ selectedFn.execution_count }} 次</span>
             </div>
           </div>
 
           <div v-if="selectedFn.description" class="detail-panel__section">
-            <h3 class="detail-section-title">描述</h3>
+            <h3 class="detail-section-title">{{ text("描述") }}</h3>
             <p class="detail-section-text">{{ selectedFn.description }}</p>
           </div>
 
           <div class="detail-panel__section">
-            <h3 class="detail-section-title">逻辑体</h3>
+            <h3 class="detail-section-title">{{ text("逻辑体") }}</h3>
             <code class="detail-code-block">{{ selectedFn.logic_body || '—' }}</code>
           </div>
 
           <div class="detail-panel__actions">
-            <button class="btn-sm-exec" @click="handleEdit(selectedFn)">
+            <button class="btn-sm-exec" @click="handleEdit(selectedFn)" :disabled="!canEdit">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path
                   d="M8.5 1.5l2 2L4 10l-2.5.5L2 8l6.5-6.5z"
@@ -128,9 +129,10 @@
                   stroke-linejoin="round"
                 />
               </svg>
-              编辑
+              {{ text("编辑配置") }}
             </button>
-            <button class="btn-sm-del" :disabled="!!deleting" @click="handleDelete(selectedFn)">
+            <button v-if="selectedFn.logic_type === 'python'" class="btn-sm-exec" @click="openCode(selectedFn)" :disabled="!canEdit">{{ text("Python 工作区") }}</button>
+            <button class="btn-sm-del" :disabled="!canEdit || (!!deleting)" @click="handleDelete(selectedFn)">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path
                   d="M2 3h8M4 3V2h4v1M3 3v7h6V3"
@@ -140,12 +142,12 @@
                   stroke-linejoin="round"
                 />
               </svg>
-              删除
+              {{ text("删除") }}
             </button>
           </div>
         </template>
         <div v-else class="detail-panel__empty">
-          <p class="text-caption">选择一个逻辑查看详情</p>
+          <p class="text-caption">{{ text("选择一个逻辑查看详情") }}</p>
         </div>
       </div>
     </div>
@@ -166,6 +168,11 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
+
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit } = useManagementPermission('rule:write')
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi, type FunctionItem } from '../../api/functions'
@@ -202,8 +209,8 @@ const selectedFn = computed(
 )
 
 const filters = [
-  { label: '全部', value: 'all' },
-  { label: '已激活', value: 'active' },
+  { label: text('全部'), value: 'all' },
+  { label: text('已激活'), value: 'active' },
 ]
 
 const filteredFunctions = computed(() => {
@@ -258,7 +265,7 @@ async function refreshAfterMutation() {
     try {
       await scenarioStore.refreshScenarios()
     } catch {
-      toast.warning('操作已完成，本体统计更新失败，请刷新本体列表')
+      toast.warning(text('操作已完成，本体统计更新失败，请刷新本体列表'))
     }
   }
 }
@@ -289,6 +296,10 @@ function onFuncSaved(fn: { id: string; name: string }) {
 }
 
 function handleEdit(fn: FunctionItem) {
+  editingFuncId.value = fn.id
+  showAdd.value = true
+}
+function openCode(fn: FunctionItem) {
   const query: Record<string, string> = {}
   if (route.params.code) {
     query.from = 'ontology'
@@ -303,7 +314,7 @@ async function handleDelete(fn: FunctionItem) {
   try {
     await functionApi.remove(fn.id)
     functions.value = functions.value.filter((item) => item.id !== fn.id)
-    toast.success('逻辑已删除')
+    toast.success(text('逻辑已删除'))
     await refreshAfterMutation()
   } catch (e) {
     error.value = skillError(e, '删除逻辑失败')

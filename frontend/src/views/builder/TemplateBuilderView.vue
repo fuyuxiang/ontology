@@ -1,45 +1,55 @@
 <template>
   <div class="ai-builder">
+    <BuilderTargetSelector />
     <div v-if="returnPath" class="ai-builder__back-bar">
       <button class="ai-builder__back-btn" @click="router.push(returnPath)">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        返回对象定义
+        {{ text('返回对象定义') }}
       </button>
     </div>
     <div class="ai-builder__steps">
-      <div v-for="(s, i) in steps" :key="i" class="ai-builder__step" :class="{ 'ai-builder__step--active': step === i, 'ai-builder__step--done': step > i }">
+      <div v-for="(s, i) in steps" :key="i" role="button" :tabindex="i <= step ? 0 : -1" @click="i <= step && (step = i)" @keydown.enter="i <= step && (step = i)" class="ai-builder__step" :class="{ 'ai-builder__step--active': step === i, 'ai-builder__step--done': step > i }">
         <div class="ai-builder__step-num">{{ step > i ? '✓' : i + 1 }}</div>
         <div class="ai-builder__step-label">{{ s }}</div>
       </div>
     </div>
 
-    <div class="ai-builder__content">
+    <div v-if="targetOntologyId" :key="targetOntologyId" class="ai-builder__content">
       <div v-if="!session" class="ai-builder__loading">正在初始化…</div>
       <Step1Import v-else-if="step === 0" :session="session" @next="onImportDone" />
-      <div v-else-if="step === 1" class="ai-builder__review">
-        <Step2Review :session="session!" @prev="step = 0" @next="step = 2" />
+      <Step3Mapping v-else-if="step === 1" :session="session!" @prev="step = 0" @next="step = 2" />
+      <div v-else-if="step === 2" class="ai-builder__review">
+        <Step2Review :session="session!" :mapping-complete="true" @prev="step = 1" @next="step = 3" />
       </div>
-      <div v-else-if="step === 2" class="ai-builder__hydrate">
-        <Step3Hydrate :session="session!" @prev="step = 1" @goto-studio="gotoStudio" />
+      <div v-else-if="step === 3" class="ai-builder__hydrate">
+        <Step3Hydrate :session="session!" @prev="step = 2" @goto-studio="gotoStudio" />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
+import { useAuthStore } from '../../store/auth'
+import { matchesBuilderSession } from '../../utils/builderSession'
+import BuilderTargetSelector from './components/BuilderTargetSelector.vue'
 import { useBuilderStore } from '../../store/builder'
 import Step1Import from './components/Step1Import.vue'
 import Step2Review from './components/Step2Review.vue'
 import Step3Hydrate from './components/Step3Hydrate.vue'
+import Step3Mapping from './components/Step3Mapping.vue'
 
 const router = useRouter()
 const route = useRoute()
 const store = useBuilderStore()
+const auth = useAuthStore()
+const targetOntologyId = computed(() => (route.query.ontology_id as string) || undefined)
 const { sessions, activeSession } = storeToRefs(store)
 
 const returnPath = computed(() => {
@@ -49,12 +59,14 @@ const returnPath = computed(() => {
   return ''
 })
 
-const steps = ['文件导入', '专家审核', '水合验证']
+const steps = computed(() => ['文件导入', '数据映射', '最终审核', '水合验证'].map(value => text(value)))
 const step = ref(0)
 
 const session = computed(() => {
-  if (activeSession.value && activeSession.value.buildMethod === 'import') return activeSession.value
-  return sessions.value.find(s => s.buildMethod === 'import' && s.status === 'drafting') || null
+  const matches = (draft: import('../../types/builder').BuilderSession) =>
+    matchesBuilderSession(draft, 'import', targetOntologyId.value, auth.user?.id)
+  if (activeSession.value && matches(activeSession.value)) return activeSession.value
+  return sessions.value.find(draft => matches(draft) && draft.status !== 'published') || null
 })
 
 function onImportDone() {
@@ -70,19 +82,29 @@ function gotoStudio() {
 }
 
 onMounted(() => {
+  const saved = session.value?.builderState
   if (!session.value) {
     store.createSession({
       ontologyName: `文件导入-${Date.now().toString(36).slice(-4)}`,
-      buildMethod: 'import',
+      buildMethod: 'import', ontologyId: targetOntologyId.value, builderKind: 'import',
     })
   } else {
-    // 复用旧的 drafting 会话时，清空上次残留的解析结果，避免串到本次导入
     store.setActiveSession(session.value.sessionId)
-    if (session.value.ontologyObjects.length || session.value.ontologyRelations.length) {
-      store.patchActive({ ontologyObjects: [], ontologyRelations: [] })
-    }
   }
+  if (saved?.step !== undefined) step.value = saved.workflowVersion === 2 ? saved.step : (saved.step === 1 || saved.step === 2 ? 1 : saved.step)
 })
+watch(targetOntologyId, () => {
+  if (!targetOntologyId.value) return
+  if (!session.value) store.createSession({ ontologyName: 'import构建', buildMethod: 'import', ontologyId: targetOntologyId.value, builderKind: 'import' })
+  else store.setActiveSession(session.value.sessionId)
+  const saved = session.value?.builderState
+  step.value = saved?.workflowVersion === 2 ? (saved.step || 0) : (saved?.step === 1 || saved?.step === 2 ? 1 : saved?.step || 0)
+
+})
+watch([step], () => {
+  if (!session.value) return
+  store.updateSession(session.value.sessionId, { builderState: { workflowVersion: 2, step: step.value } })
+}, { deep: true })
 </script>
 
 <style scoped>
@@ -100,4 +122,5 @@ onMounted(() => {
 .ai-builder__content { flex: 1; overflow-y: auto; }
 .ai-builder__loading { display: flex; align-items: center; justify-content: center; height: 100%; color: #999; }
 .ai-builder__review, .ai-builder__hydrate { height: 100%; }
+@media (max-width: 768px) { .ai-builder__steps { flex-wrap: wrap; padding: 12px 8px; justify-content: flex-start; gap: 8px; } .ai-builder__step { padding: 4px 6px; } .ai-builder__step-label { white-space: nowrap; } }
 </style>

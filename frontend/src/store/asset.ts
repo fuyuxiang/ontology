@@ -1,5 +1,6 @@
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
+import { useAuthStore } from './auth'
 import * as api from '../api/asset'
 import type { AssetFilters } from '../api/asset'
 import type {
@@ -12,6 +13,9 @@ export const useAssetStore = defineStore('asset', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   let listRequest = 0
+  const auth = useAuthStore()
+  let accountGeneration = 0
+  watch(() => auth.user?.id, () => { ++accountGeneration; ++listRequest; items.value = []; loading.value = false; error.value = null; usageCache.value = {}; }, {flush:'sync'})
   const usageCache = ref<Record<string, AssetWithUsage>>({})
 
   const stats = computed(() => {
@@ -33,6 +37,13 @@ export const useAssetStore = defineStore('asset', () => {
   })
 
   async function fetchList(params?: AssetFilters) {
+    if (!auth.user) {
+      const sessionToken = auth.token
+      if (!sessionToken) return
+      await auth.fetchUser()
+      // A caller waiting for account A must not start a request as account B.
+      if (!auth.user || !auth.token || auth.token !== sessionToken) return
+    }
     const request = ++listRequest
     loading.value = true
     error.value = null
@@ -48,7 +59,9 @@ export const useAssetStore = defineStore('asset', () => {
   }
 
   async function refreshOne(id: string) {
+    const account = accountGeneration
     const row = await api.getAsset(id)
+    if (account !== accountGeneration) return row
     const idx = items.value.findIndex(a => a.id === id)
     if (idx >= 0) items.value[idx] = row
     else items.value.unshift(row)
@@ -56,26 +69,34 @@ export const useAssetStore = defineStore('asset', () => {
   }
 
   async function create(body: AssetCreate) {
+    const account = accountGeneration
     const row = await api.createAsset(body)
+    if (account !== accountGeneration) return row
     items.value.unshift(row)
     return row
   }
 
   async function update(id: string, body: AssetUpdate) {
+    const account = accountGeneration
     const row = await api.updateAsset(id, body)
+    if (account !== accountGeneration) return row
     const idx = items.value.findIndex(a => a.id === id)
     if (idx >= 0) items.value[idx] = row
     return row
   }
 
   async function remove(id: string) {
+    const account = accountGeneration
     await api.deleteAsset(id)
+    if (account !== accountGeneration) return
     items.value = items.value.filter(a => a.id !== id)
     delete usageCache.value[id]
   }
 
   async function fetchUsage(id: string) {
+    const account = accountGeneration
     const u = await api.getAssetUsage(id)
+    if (account !== accountGeneration) return u
     usageCache.value[id] = u
     return u
   }

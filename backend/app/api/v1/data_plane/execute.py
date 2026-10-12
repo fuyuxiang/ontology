@@ -19,6 +19,8 @@ from app.services.data_plane.execute_service import (
     ExecuteBlocked,
     ExecuteRequest,
     ExecuteService,
+    ExecutePersistenceError,
+    ExecuteOutcomeUnknown,
 )
 
 router = APIRouter(prefix="/execute", tags=["data-plane:execute"])
@@ -44,6 +46,9 @@ def execute(
         raise HTTPException(400, detail={"blocked": True, "reason": e.reason, "detail": e.detail}) from e
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
+    except (ExecutePersistenceError, ExecuteOutcomeUnknown) as e:
+        raise HTTPException(503, detail={"outcome": e.outcome, "message": str(e),
+                                        "observed_result": getattr(e, "observed_result", None)}) from e
     except Exception as e:
         logger.exception("execute failed")
         raise HTTPException(500, f"execute failed: {e}") from e
@@ -51,6 +56,7 @@ def execute(
         columns=result.columns, rows=result.rows,
         rows_returned=result.rows_returned, duration_ms=result.duration_ms,
         cache_hit=result.cache_hit,
+        rows_affected=result.rows_affected,
     )
 
 

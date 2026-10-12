@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
@@ -53,7 +53,7 @@ class QualityRuleService:
     def create_rule(self, *, asset_id: str, name: str, kind: str,
                     column_name: str | None = None, params: dict | None = None,
                     severity: str = "warning", description: str | None = None,
-                    user_id: str | None = None) -> QualityRule:
+                    user_id: str | None = None, commit: bool = True) -> QualityRule:
         if kind not in RULE_KINDS:
             raise ValueError(f"未知规则类型: {kind}")
         if not self.assets.get_by_id(asset_id):
@@ -70,7 +70,10 @@ class QualityRuleService:
             created_by=user_id,
         )
         self.db.add(rule)
-        self.db.commit()
+        if commit:
+            self.db.commit()
+        else:
+            self.db.flush()
         self.db.refresh(rule)
         return rule
 
@@ -90,12 +93,16 @@ class QualityRuleService:
             rule.enabled = enabled
         if description is not None:
             rule.description = description
+        if any(v is not None for v in (params, severity, enabled)):
+            self.db.add(HealthStatus(rule_id=rule.id, asset_id=rule.asset_id, status="unknown",
+                                    message="规则已修改，请重新评估", ran_at=datetime.utcnow()))
         self.db.commit()
         self.db.refresh(rule)
         return rule
 
     def delete_rule(self, rule_id: str) -> None:
         rule = self._must_get(rule_id)
+        self.db.query(HealthStatus).filter_by(rule_id=rule.id).delete()
         self.db.delete(rule)
         self.db.commit()
 
@@ -197,8 +204,30 @@ class QualityRuleService:
                 return bad, v, f"行数 {int(v)} > 最大阈值 {int(threshold)}"
             return "healthy", v, f"行数 {int(v)} ≤ {int(threshold)}"
         if rule.kind == "null_ratio_max":
-            m = self.probe.run(rule.asset_id, "null_ratio", column=rule.column_name)
-            v = m.value_numeric
+            if params.get("binding_attribute_id") and params.get("binding_object_type_id"):
+                from app.models.entity import EntityAttribute
+                from app.services.data_plane.entity_data_service import EntityDataService
+                attribute = self.db.get(EntityAttribute, params["binding_attribute_id"])
+                if not attribute or attribute.entity_id != params["binding_object_type_id"]:
+                    raise ValueError("转换质量规则引用的属性已失效")
+                total, nulls, offset = 0, 0, 0
+                while True:
+                    result = EntityDataService(self.db).query_entity_data(attribute.entity_id,
+                        fields=[attribute.name],limit=200,offset=offset,purpose="quality.transformed_attribute")
+                    if result.get("error"):
+                        raise ValueError(result["error"])
+                    values = result["rows"]
+                    total += len(values)
+                    nulls += sum(row[0] is None for row in values)
+                    if len(values) < 200:
+                        break
+                    offset += 200
+                    if offset >= 10000:
+                        raise ValueError("转换质量评估超过10000行，请缩小资产绑定过滤范围")
+                v = nulls / total if total else None
+            else:
+                m = self.probe.run(rule.asset_id, "null_ratio", column=rule.column_name)
+                v = m.value_numeric
             threshold = float(params.get("max", 0.05))
             if v is None:
                 return "unknown", None, "无法取空值率"
@@ -222,16 +251,18 @@ class QualityRuleService:
                 return "failure", 1.0, "schema 出现破坏性变更"
             return "warning", 0.5, "schema 有新增列"
         if rule.kind == "freshness":
-            asset = self.assets.get_by_id(rule.asset_id)
-            if not asset:
-                return "unknown", None, "资产不存在"
             max_age = float(params.get("max_age_seconds", 86400))
-            mu = (asset.profile or {}).get("max_updated_at") if asset.profile else None
+            metric = self.probe.run(rule.asset_id, "freshness", column=rule.column_name)
+            mu = metric.value_text if metric.value_text is not None else metric.value_numeric
             if not mu:
-                return "unknown", None, "无 profile.max_updated_at（请先 profile）"
+                return "unknown", None, "源时间列为空，无法计算新鲜度"
             try:
-                ts = datetime.fromisoformat(mu) if isinstance(mu, str) else mu
-                age = (datetime.utcnow() - ts).total_seconds()
+                if isinstance(mu, (int, float)):
+                    ts = datetime.fromtimestamp(mu / 1000 if mu > 10**12 else mu, tz=timezone.utc)
+                else:
+                    ts = datetime.fromisoformat(mu.replace("Z", "+00:00")) if isinstance(mu, str) else mu
+                ts = ts.replace(tzinfo=timezone.utc) if ts.tzinfo is None else ts.astimezone(timezone.utc)
+                age = max(0.0, (datetime.now(timezone.utc) - ts).total_seconds())
             except Exception:
                 return "unknown", None, "max_updated_at 无法解析"
             if age > max_age:

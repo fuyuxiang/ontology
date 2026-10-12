@@ -1,13 +1,13 @@
 <template>
-  <button v-if="isMobile" ref="mobileToggle" class="sidebar-mobile-toggle" type="button" :aria-expanded="mobileOpen" aria-controls="platform-navigation" :aria-label="mobileOpen ? '关闭导航' : '打开导航'" @click="toggleMobileNavigation">
+  <button v-if="isMobile" ref="mobileToggle" class="sidebar-mobile-toggle" type="button" :aria-expanded="mobileOpen" aria-controls="platform-navigation" :aria-label="mobileOpen ? t('shell.closeNavigation') : t('shell.openNavigation')" @click="toggleMobileNavigation">
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path v-if="mobileOpen" d="M5 5l10 10M15 5L5 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path v-else d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
   </button>
-  <button v-if="isMobile && mobileOpen" class="sidebar-mobile-overlay" aria-label="关闭导航菜单" @click="closeMobileNavigation"></button>
+  <button v-if="isMobile && mobileOpen" class="sidebar-mobile-overlay" :aria-label="t('shell.closeNavigation')" @click="closeMobileNavigation"></button>
   <aside id="platform-navigation" ref="sidebarElement" class="sidebar" :class="{ 'sidebar--mobile-open': mobileOpen }" :inert="isMobile && !mobileOpen ? true : undefined" :aria-hidden="isMobile && !mobileOpen ? true : undefined">
     <div class="sidebar__logo">
-      <img src="/images/ontology/BONC.png" alt="BONC" class="sidebar__logo-img" />
+      <img src="/images/ontology/logo.png" :alt="platform.system_name" class="sidebar__logo-img" />
       <span class="sidebar__logo-divider"></span>
-      <span class="sidebar__logo-text">元枢 Ontology</span>
+      <span class="sidebar__logo-text" :title="platform.system_name">{{ platform.system_name }}</span>
     </div>
 
     <nav class="sidebar__nav">
@@ -59,8 +59,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { reactive, ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { usePlatformConfigStore } from '../../store/platformConfig'
+import { useAuthStore } from '../../store/auth'
+import { canAccessRoute } from '../../utils/access'
+const { t } = useI18n()
+const platform = usePlatformConfigStore()
+const auth = useAuthStore()
 
 const route = useRoute()
 const isMobile = ref(window.innerWidth <= 768)
@@ -128,21 +135,25 @@ const ico = {
   mcp: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2v4M8 10v4M2 8h4M10 8h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="2" r="1" fill="currentColor"/><circle cx="8" cy="14" r="1" fill="currentColor"/><circle cx="2" cy="8" r="1" fill="currentColor"/><circle cx="14" cy="8" r="1" fill="currentColor"/></svg>`,
 }
 
-const navGroups: NavGroup[] = [
-  { label: '数据集成', items: [
-    { path: '/data/connections', label: '数据接入', icon: ico.datasource },
-    { path: '/data/assets', label: '资产目录', icon: ico.catalog },
+const navGroups = computed<NavGroup[]>(() => [
+  { label: t('shell.dataIntegration'), items: [
+    { path: '/data/connections', label: t('shell.connections'), icon: ico.datasource },
+    { path: '/data/assets', label: t('shell.assets'), icon: ico.catalog },
   ]},
-  { label: '本体中心', items: [
-    { path: '/ontology/list', label: '本体列表', icon: ico.ontologyMgr },
-    { path: '/ontology/publish', label: '本体发布', icon: ico.version },
-    { path: '/service/mcp', label: '本体服务', icon: ico.mcp },
+  { label: t('shell.ontologyCenter'), items: [
+    { path: '/ontology/list', label: t('shell.ontologies'), icon: ico.ontologyMgr },
+    { path: '/ontology/publish', label: t('shell.publish'), icon: ico.version },
+    { path: '/service/mcp', label: t('shell.services'), icon: ico.mcp },
   ]},
-  { label: '本体应用', items: [
-    { path: '/agent/manage', label: '智能体应用', icon: ico.agent },
-    { path: '/skills', label: '业务技能', icon: ico.rule },
+  { label: t('shell.applications'), items: [
+    { path: '/agent/manage', label: t('shell.agents'), icon: ico.agent },
+    { path: '/skills', label: t('shell.skills'), icon: ico.rule },
   ]},
-]
+  { label: t('shell.operations'), items: [
+    { path: '/dashboard', label: t('shell.dashboard'), icon: ico.monitor },
+    { path: '/ops/config', label: t('shell.config'), icon: ico.config },
+  ]},
+].map(group => ({ ...group, items: group.items.filter(item => canAccessRoute(item.path, permission => auth.hasPermission(permission))) })).filter(group => group.items.length))
 </script>
 
 <style scoped>
@@ -181,6 +192,8 @@ const navGroups: NavGroup[] = [
   color: var(--sidebar-text-active);
   letter-spacing: 0.02em;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .sidebar__nav {
   flex: 1;

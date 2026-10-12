@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.api.v1 import system_config
 from app.models.system_config import SystemConfig
+from app.models.audit import AuditLog
 from app.schemas.system_config import ConfigSaveRequest
 
 
@@ -15,6 +16,7 @@ from app.schemas.system_config import ConfigSaveRequest
 def db():
     engine = create_engine("sqlite://")
     SystemConfig.__table__.create(engine)
+    AuditLog.__table__.create(engine)
     session = sessionmaker(bind=engine)()
     yield session
     session.close()
@@ -81,9 +83,11 @@ def test_saved_model_test_uses_real_key_without_exposing_it(db, monkeypatch):
         def __exit__(self, *args):
             pass
 
-        def get(self, url, headers):
+        def post(self, url, headers, json):
+            assert url == "http://example.test/v1/chat/completions"
+            assert json["model"] == "test-model"
             captured.update(headers)
-            return SimpleNamespace(status_code=200)
+            return SimpleNamespace(status_code=200, json=lambda: {"choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}]})
 
     monkeypatch.setattr("httpx.Client", FakeClient)
     result = system_config.test_ai_model({

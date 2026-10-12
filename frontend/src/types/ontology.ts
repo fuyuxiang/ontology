@@ -1,7 +1,7 @@
 // ── 本体核心类型定义 ──
 
 export type Tier = 1 | 2 | 3
-export type EntityStatus = 'active' | 'warning' | 'error'
+export type EntityStatus = 'draft' | 'active' | 'published' | 'warning' | 'error'
 export type Priority = 'high' | 'medium' | 'low'
 export type Cardinality = '1:1' | '1:N' | 'N:1' | 'N:N'
 export type RelationType = 'has_one' | 'has_many' | 'belongs_to' | 'many_to_many'
@@ -29,6 +29,7 @@ export interface EntityAttribute {
   source_table?: string | null
   source_field?: string | null
   data_status?: string
+  shared_attribute_id?: string | null
 }
 
 export interface EntityRelation {
@@ -41,6 +42,8 @@ export interface EntityRelation {
   toEntityName: string
   toEntityTier: Tier
   cardinality: Cardinality
+  source_field?: string | null
+  target_field?: string | null
   acyclic: boolean
   description?: string
 }
@@ -84,6 +87,7 @@ export interface EntityCreateAttribute {
   source_table?: string | null
   source_field?: string | null
   data_status?: string
+  shared_attribute_id?: string | null
 }
 
 export interface EntityCreatePayload {
@@ -111,6 +115,8 @@ export interface EntityRelationDetail {
   to_entity_name: string
   to_entity_tier: number
   cardinality: Cardinality
+  source_field?: string | null
+  target_field?: string | null
   acyclic: boolean
   description?: string
 }

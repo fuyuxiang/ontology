@@ -2,19 +2,22 @@ import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.deps import require_user
+from app.models.user import User
+from app.services.agent_management import require_edit
 from app.models.agent import Agent, ModelRegistry
 from app.models.eval import EvalCase, EvalResult, EvalRun, EvalSuite
 
-router = APIRouter(prefix="/evals", tags=["evals"])
+router = APIRouter(prefix="/evals", tags=["evals"], dependencies=[Depends(require_user)])
 
 
 class SuiteCreate(BaseModel):
     agent_id: str
-    name: str
+    name: str = Field(min_length=1, max_length=200)
 
 
 class SuiteUpdate(BaseModel):
@@ -22,7 +25,7 @@ class SuiteUpdate(BaseModel):
 
 
 class CaseCreate(BaseModel):
-    input_prompt: str
+    input_prompt: str = Field(min_length=1, max_length=20000)
     expected_keywords: list | None = None
 
 
@@ -56,7 +59,8 @@ def list_suites(agent_id: str | None = Query(None), db: Session = Depends(get_db
 
 
 @router.post("/suites", status_code=201)
-def create_suite(body: SuiteCreate, db: Session = Depends(get_db)):
+def create_suite(body: SuiteCreate, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    require_edit(user)
     a = db.get(Agent, body.agent_id)
     if not a:
         raise HTTPException(404, "Agent not found")
@@ -96,7 +100,8 @@ def get_suite(sid: str, db: Session = Depends(get_db)):
 
 
 @router.put("/suites/{sid}")
-def update_suite(sid: str, body: SuiteUpdate, db: Session = Depends(get_db)):
+def update_suite(sid: str, body: SuiteUpdate, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    require_edit(user)
     s = db.get(EvalSuite, sid)
     if not s:
         raise HTTPException(404, "Suite not found")
@@ -108,17 +113,24 @@ def update_suite(sid: str, body: SuiteUpdate, db: Session = Depends(get_db)):
 
 
 @router.delete("/suites/{sid}")
-def delete_suite(sid: str, db: Session = Depends(get_db)):
+def delete_suite(sid: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    require_edit(user)
     s = db.get(EvalSuite, sid)
     if not s:
         raise HTTPException(404, "Suite not found")
+    run_ids = [r.id for r in db.query(EvalRun).filter_by(suite_id=sid).all()]
+    case_ids = [c.id for c in db.query(EvalCase).filter_by(suite_id=sid).all()]
+    db.query(EvalResult).filter((EvalResult.run_id.in_(run_ids)) | (EvalResult.case_id.in_(case_ids))).delete(synchronize_session=False)
+    db.query(EvalRun).filter_by(suite_id=sid).delete()
+    db.query(EvalCase).filter_by(suite_id=sid).delete()
     db.delete(s)
     db.commit()
     return {"ok": True}
 
 
 @router.post("/suites/{sid}/cases", status_code=201)
-def create_case(sid: str, body: CaseCreate, db: Session = Depends(get_db)):
+def create_case(sid: str, body: CaseCreate, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    require_edit(user)
     s = db.get(EvalSuite, sid)
     if not s:
         raise HTTPException(404, "Suite not found")
@@ -130,7 +142,8 @@ def create_case(sid: str, body: CaseCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/cases/{cid}")
-def update_case(cid: str, body: CaseUpdate, db: Session = Depends(get_db)):
+def update_case(cid: str, body: CaseUpdate, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    require_edit(user)
     c = db.get(EvalCase, cid)
     if not c:
         raise HTTPException(404, "Case not found")
@@ -144,17 +157,20 @@ def update_case(cid: str, body: CaseUpdate, db: Session = Depends(get_db)):
 
 
 @router.delete("/cases/{cid}")
-def delete_case(cid: str, db: Session = Depends(get_db)):
+def delete_case(cid: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    require_edit(user)
     c = db.get(EvalCase, cid)
     if not c:
         raise HTTPException(404, "Case not found")
+    db.query(EvalResult).filter_by(case_id=cid).delete()
     db.delete(c)
     db.commit()
     return {"ok": True}
 
 
 @router.post("/suites/{sid}/run")
-def run_suite(sid: str, request: Request, db: Session = Depends(get_db)):
+def run_suite(sid: str, request: Request, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    require_edit(user)
     s = db.get(EvalSuite, sid)
     if not s:
         raise HTTPException(404, "Suite not found")
@@ -166,27 +182,14 @@ def run_suite(sid: str, request: Request, db: Session = Depends(get_db)):
     if not a:
         raise HTTPException(404, "Agent not found")
 
-    from app.services.agent.graph_engine import GraphEngine
+    from types import SimpleNamespace
+    from app.api.v1.agents import _collect_steps, _writeback_conversation
     from app.services.agent.orchestrator import AgentService
-
-    model_name = None
-    model_config: dict = {}
-    if a.model_id:
-        m = db.get(ModelRegistry, a.model_id)
-        if m:
-            model_name = m.model_name
-            if m.api_key:
-                model_config["api_key"] = m.api_key
-            if m.api_base:
-                model_config["api_base"] = m.api_base
-            if m.config_json:
-                model_config.update(m.config_json)
-    if a.tools_config:
-        for k in ("temperature", "max_tokens"):
-            if k in a.tools_config:
-                model_config.setdefault(k, a.tools_config[k])
-
-    has_canvas = bool(a.nodes_json and len(a.nodes_json) > 0)
+    from app.services.agent_chat import execute_chat
+    from app.services.agent_management import config_snapshot
+    snapshot = config_snapshot(a)
+    # Evaluation is an isolated preview; confirmation belongs to a user conversation.
+    snapshot["tools_config"] = {**(snapshot.get("tools_config") or {}), "action_mode": "simulation"}
 
     run = EvalRun(suite_id=sid, status="running")
     db.add(run)
@@ -196,36 +199,21 @@ def run_suite(sid: str, request: Request, db: Session = Depends(get_db)):
     results = []
     for case in cases:
         t0 = time.time()
-        output_chunks = []
-        status = "ok"
+        actual_output, status, error = "", "error", None
         try:
-            if has_canvas:
-                engine = GraphEngine(
-                    db, nodes_json=a.nodes_json, edges_json=a.edges_json or [],
-                    system_prompt=a.system_prompt or "", model_name=model_name,
-                    model_config=model_config or None,
-                    runtime_executor=getattr(request.app.state, "runtime_executor", None),
-                )
-                for event in engine.run(case.input_prompt):
-                    if event.get("type") == "answer" and event.get("content"):
-                        output_chunks.append(event["content"])
-            else:
-                entity_id = (a.entity_ids or [None])[0] if a.entity_ids else None
-                agent_svc = AgentService(
-                    db, system_prompt_prefix=a.system_prompt or None,
-                    model_name=model_name, model_config=model_config or None,
-                    runtime_executor=getattr(request.app.state, "runtime_executor", None),
-                )
-                for event in agent_svc.ask(case.input_prompt, entity_id):
-                    if event.get("type") == "answer" and event.get("content"):
-                        output_chunks.append(event["content"])
-        except Exception:
-            status = "error"
-
+            observed = execute_chat(db, a, snapshot,
+                SimpleNamespace(question=case.input_prompt, messages=None, conversation_id=None, stream=False),
+                request, user, AgentService, _collect_steps, _writeback_conversation)
+            actual_output = observed.get("answer") or ""
+            status, error = observed["status"], observed.get("error")
+        except Exception as exc:
+            error = str(getattr(exc, "detail", exc))
         latency_ms = int((time.time() - t0) * 1000)
-        actual_output = "".join(output_chunks)
         keywords = case.expected_keywords or []
-        passed = all(kw.lower() in actual_output.lower() for kw in keywords) if keywords else (status == "ok")
+        passed = status == "completed" and bool(actual_output.strip()) and all(
+            str(kw).lower() in actual_output.lower() for kw in keywords)
+        if status != "completed":
+            actual_output = f"[运行失败：{error or status}]\n{actual_output}"
 
         r = EvalResult(
             run_id=run.id, case_id=case.id, actual_output=actual_output,

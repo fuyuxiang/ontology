@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
 from app.database import get_db
-from app.models import OntologyEntity, ScenarioDict
+from app.models import OntologyEntity, ScenarioDict, OntologyVersion, OntologySharedRef, OntologyGroup, SharedAttribute
 from app.models.user import User
 from app.repositories.entity_repo import EntityRepository
 from app.schemas.scenario import ScenarioCreate, ScenarioOut, ScenarioUpdate
@@ -20,9 +20,13 @@ def list_scenarios(db: Session = Depends(get_db)):
         .all()
     )
     stats = EntityRepository(db).get_ontology_stats()
+    published = {row.ontology_id: row for row in db.query(OntologyVersion).filter(
+        OntologyVersion.is_active.is_(True), OntologyVersion.status == "published").all()}
     empty = {"entity_count": 0, "relation_count": 0, "logic_count": 0, "action_count": 0}
     return [
-        ScenarioOut.model_validate(sc).model_copy(update=stats.get(sc.id, empty))
+        ScenarioOut.model_validate(sc).model_copy(update={**stats.get(sc.id, empty),
+            "active_version_id": published[sc.id].id if sc.id in published else None,
+            "version_number": published[sc.id].version_number if sc.id in published else None})
         for sc in scenarios
     ]
 
@@ -61,6 +65,13 @@ def update_scenario(
     sc = db.get(ScenarioDict, scenario_id)
     if not sc:
         raise HTTPException(status_code=404, detail="场景不存在")
+    if data.code is not None and data.code != sc.code:
+        if db.query(ScenarioDict).filter(ScenarioDict.code == data.code, ScenarioDict.id != sc.id).first():
+            raise HTTPException(409, "场景代码已存在")
+        old_code = sc.code
+        for entity in db.query(OntologyEntity):
+            if old_code in (entity.scenario_codes or []):
+                entity.scenario_codes = [data.code if code == old_code else code for code in entity.scenario_codes]
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(sc, k, v)
     write_audit(
@@ -72,7 +83,6 @@ def update_scenario(
     return sc
 
 
-# PLACEHOLDER_DELETE
 @router.delete("/{scenario_id}", status_code=204)
 def delete_scenario(
     scenario_id: str,
@@ -82,6 +92,10 @@ def delete_scenario(
     sc = db.get(ScenarioDict, scenario_id)
     if not sc:
         raise HTTPException(status_code=404, detail="场景不存在")
+    owned = db.query(OntologyEntity).filter_by(ontology_id=sc.id).count()
+    versions = db.query(OntologyVersion).filter_by(ontology_id=sc.id).count()
+    if owned or versions:
+        raise HTTPException(409, detail={"message": "本体仍包含对象或历史版本，不能删除", "entities": owned, "versions": versions})
     # 引用检查：是否仍被本体对象引用
     referenced = [
         e.name_cn
@@ -99,5 +113,8 @@ def delete_scenario(
         db, user_id=user.id, user_name=user.name,
         action="delete", target_type="scenario", target_id=sc.id, target_name=sc.name,
     )
+    db.query(OntologySharedRef).filter((OntologySharedRef.source_ontology_id == sc.id) | (OntologySharedRef.target_ontology_id == sc.id)).delete(synchronize_session=False)
+    db.query(OntologyGroup).filter_by(ontology_id=sc.id).delete()
+    db.query(SharedAttribute).filter_by(ontology_id=sc.id).delete()
     db.delete(sc)
     db.commit()

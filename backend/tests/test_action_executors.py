@@ -21,7 +21,8 @@ async def test_sql_exec_dry_run():
     result = await executor.execute(config, {"status": "active", "id": "42"}, dry_run=True)
     assert result.success is True
     assert "conn_1" in result.message
-    assert "active" in result.output["sql"]
+    assert result.output["sql"] == "UPDATE users SET status=:status WHERE id=:id"
+    assert result.output["params"] == {"status": "active", "id": "42"}
 
 
 @pytest.mark.asyncio
@@ -32,6 +33,18 @@ async def test_modify_attribute_dry_run():
     assert result.success is True
     assert "price" in result.message
     assert result.output["value"] == "99.9"
+
+
+@pytest.mark.asyncio
+async def test_modify_attribute_explicit_expression_and_existing_literal_contract():
+    executor = get_executor("modify_attribute")
+    base = {"target_entity_id": "e1", "target_attribute": "price"}
+    calculated = await executor.execute({**base, "value_expression":"expr: round(params['price'] * 1.1, 2)"}, {"price":10}, dry_run=True)
+    assert calculated.success and calculated.output['value']==11
+    literal = await executor.execute({**base, "value_expression":"$status"}, {"status":"maintenance"}, dry_run=True)
+    assert literal.success and literal.output['value']=='$status'
+    invalid = await executor.execute({**base, "value_expression":"expr: params.__class__"}, {}, dry_run=True)
+    assert not invalid.success and invalid.output['outcome']=='failed'
 
 
 @pytest.mark.asyncio
@@ -83,3 +96,17 @@ def test_get_all_type_info():
 def test_get_executor_unknown_type():
     with pytest.raises(ValueError, match="Unknown action type"):
         get_executor("nonexistent")
+
+
+@pytest.mark.asyncio
+async def test_sync_wrapper_does_not_retry_runtime_error_after_dispatch(monkeypatch):
+    from app.services import action_executors
+    calls=[]
+    class FailingExecutor:
+        async def execute(self,*args):
+            calls.append('dispatched')
+            raise RuntimeError('receipt recording failed after dispatch')
+    monkeypatch.setattr(action_executors,'get_executor',lambda *args,**kwargs:FailingExecutor())
+    with pytest.raises(RuntimeError,match='receipt recording failed'):
+        action_executors.run_executor_sync('api_call',{}, {})
+    assert calls==['dispatched']

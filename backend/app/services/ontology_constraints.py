@@ -107,11 +107,7 @@ def validate_and_retry(
             return result, None
 
     logger.warning(f"Validation failed after {max_retries} retries: {errors}")
-    try:
-        fallback = json.loads(json_str)
-    except (json.JSONDecodeError, TypeError):
-        fallback = None
-    return fallback, errors
+    return None, errors
 
 
 def _extract_json_from_text(text: str) -> str:

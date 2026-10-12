@@ -61,8 +61,22 @@ export const authApi = {
     return post<LoginResponse>('/auth/login', data)
   },
 
+  ssoConfig() {
+    return get<{ enabled: boolean; provider: string }>('/auth/sso/config')
+  },
+
+  ssoExchange(code: string) {
+    return post<LoginResponse>('/auth/sso/exchange', { code })
+  },
+
   me() {
     return get<User>('/auth/me')
+  },
+
+  logout(token: string) {
+    return post<{ message: string }>('/auth/logout', undefined, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
   },
 
   refresh(refreshToken: string) {

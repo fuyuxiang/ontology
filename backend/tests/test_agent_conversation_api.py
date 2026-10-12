@@ -3,7 +3,15 @@ import unittest
 from fastapi.testclient import TestClient
 
 from app.core.security import create_access_token
-from app.database import SessionLocal
+from app.database import Base, get_db
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+import app.models
+
+_TEST_ENGINE = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+Base.metadata.create_all(_TEST_ENGINE)
+SessionLocal = sessionmaker(bind=_TEST_ENGINE, expire_on_commit=False)
 from app.main import app
 from app.models.agent import Agent
 from app.models.agent_test_conversation import AgentTestConversation
@@ -17,6 +25,11 @@ def _auth(user_id):
 class AgentConversationApiTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        Base.metadata.create_all(_TEST_ENGINE)
+        def isolated_db():
+            with SessionLocal() as session:
+                yield session
+        app.dependency_overrides[get_db] = isolated_db
         db = SessionLocal()
         cls.user_a = User(username="conv_user_a", password_hash="x", name="conv_user_a", role="admin")
         cls.user_b = User(username="conv_user_b", password_hash="x", name="conv_user_b", role="admin")
@@ -29,6 +42,7 @@ class AgentConversationApiTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        app.dependency_overrides.pop(get_db, None)
         db = SessionLocal()
         db.query(AgentTestConversation).filter_by(agent_id=cls.aid).delete()
         db.query(Agent).filter_by(id=cls.aid).delete()

@@ -53,6 +53,9 @@ class ExecuteRequest:
     timeout_ms: int = 5000
     bypass_cache: bool = False
     user_id: str | None = None
+    apply_sensitivity: bool = True
+        # Internal joins need original keys; their public projection is redacted after
+        # association. API schemas do not expose an option to disable redaction.
     additional_asset_ids: list[str] | None = None
         # 当 SQL 涉及跨 Asset JOIN 时声明额外允许的 Asset；用作白名单合并。
         # 主 asset_id 用于审计归因 + 缓存键 + connection 选择。
@@ -66,6 +69,50 @@ class ExecuteBlocked(RuntimeError):
         super().__init__(f"{reason}: {detail}" if detail else reason)
 
 
+class ExecuteOutcomeUnknown(ConnectionError):
+    outcome = "unknown"
+
+
+class ExecutePersistenceError(ConnectionError):
+    """A source result is known, but its execution record could not be persisted."""
+    def __init__(self, message, *, committed=False, observed_result=None):
+        self.outcome = "committed_unrecorded" if committed else "recording_failed"
+        self.observed_result = observed_result
+        super().__init__(message)
+
+
+def _execute_with_deadline(connector, raw, sql, params, timeout_ms, *, write=False):
+    """Only the worker runs source SQL; it never commits after a caller timeout."""
+    if not isinstance(timeout_ms, int) or isinstance(timeout_ms, bool) or timeout_ms < 1:
+        raise ValueError("timeout_ms 必须为正整数")
+    finished, outcome = threading.Event(), {}
+    def invoke():
+        try:
+            outcome["result"] = connector.execute_sql_with_params(raw, sql, params)
+        except BaseException as exc:
+            outcome["error"] = exc
+        finally:
+            finished.set()
+    threading.Thread(target=invoke, daemon=True).start()
+    if not finished.wait(timeout_ms / 1000):
+        # Drivers with a native cancellation API can stop server-side work too.
+        for name in ("cancel", "interrupt"):
+            cancel = getattr(raw, name, None)
+            if callable(cancel):
+                try:
+                    cancel()
+                except Exception:
+                    logger.exception("source SQL cancellation failed")
+                break
+        finished.wait(.2)
+        if write:
+            raise ExecuteOutcomeUnknown("源写入执行超时，未由平台提交；请回读业务数据核查，勿自动重试")
+        raise TimeoutError(f"源查询超过 {timeout_ms}ms，已取消并丢弃该连接")
+    if "error" in outcome:
+        raise outcome["error"]
+    return outcome["result"]
+
+
 @dataclass
 class ExecuteResult:
     columns: list[str]
@@ -73,6 +120,7 @@ class ExecuteResult:
     rows_returned: int
     duration_ms: int
     cache_hit: bool
+    rows_affected: int | None = None
 
 
 # ── 限流：进程内令牌桶（每 Connection 一个）─────────────────────
@@ -250,6 +298,7 @@ class ExecuteService:
 
     # ── 内部：执行流水线 ───────────────────────────────
     def _do_execute(self, req: ExecuteRequest, asset: Asset, connection: Connection) -> ExecuteResult:
+        committed = False
         log = ExecutionLog(
             asset_id=asset.id,
             connection_id=connection.id if connection else None,
@@ -282,18 +331,26 @@ class ExecuteService:
 
             # [5b] 缓存
             cache_key = log.sql_hash
-            if not req.bypass_cache and asset.cache_ttl_seconds and asset.cache_ttl_seconds > 0:
+            if intro.is_select and not req.bypass_cache and asset.cache_ttl_seconds and asset.cache_ttl_seconds > 0:
                 cached = _cache.get(cache_key)
                 if cached is not None:
                     log.cache_hit = True
                     columns, rows = cached
-                    rows = _apply_sensitivity(columns, rows, asset.sensitivity_tags)
+                    if req.apply_sensitivity:
+                        rows = _apply_sensitivity(columns, rows, asset.sensitivity_tags)
                     return self._finalize(log, columns, rows)
 
             # [6] 执行
             connector = ConnectorRegistry.get(connection.type)
             with self.conn_svc.with_conn(connection.id) as raw:
-                result = connector.execute_sql_with_params(raw, compiled_sql, req.params or {})
+                result = _execute_with_deadline(connector, raw, compiled_sql, req.params or {}, req.timeout_ms, write=intro.is_dml)
+                if intro.is_dml:
+                    try:
+                        raw.commit()
+                    except Exception as exc:
+                        raise ExecuteOutcomeUnknown("源数据库提交未获得可靠回执，请核查源数据；不要自动重试") from exc
+                    committed = True
+                    self.invalidate_cache_for_asset(asset.id)
             columns = result.get("columns") or []
             rows = result.get("rows") or []
 
@@ -302,9 +359,13 @@ class ExecuteService:
                 _cache.put(cache_key, (columns, rows), asset.cache_ttl_seconds)
 
             # 列级脱敏
-            rows = _apply_sensitivity(columns, rows, asset.sensitivity_tags)
-            return self._finalize(log, columns, rows)
+            if req.apply_sensitivity:
+                rows = _apply_sensitivity(columns, rows, asset.sensitivity_tags)
+            return self._finalize(log, columns, rows, rows_affected=result.get("rowsAffected") if intro.is_dml else None,
+                                  committed=committed)
 
+        except ExecutePersistenceError:
+            raise
         except ExecuteBlocked as e:
             log.blocked = True
             log.block_reason = e.reason
@@ -333,6 +394,8 @@ class ExecuteService:
             raise ExecuteBlocked(intro.reason or "ast_failed", "SQL 安全审查未通过")
         if intro.is_ddl:
             raise ExecuteBlocked("ddl_denied", "禁止 DDL 语句")
+        if not intro.is_select and not intro.is_dml:
+            raise ExecuteBlocked("statement_denied", "仅支持查询或显式授权的数据写入语句")
 
         # 3) 白名单：所有 FROM/JOIN 表必须命中 (主 asset.locator + dependencies +
         #    additional_asset_ids 同 connection 的 table)
@@ -341,6 +404,8 @@ class ExecuteService:
             extra = self.assets.get_by_id(extra_id)
             if not extra:
                 raise ExecuteBlocked("not_whitelisted", f"additional asset 不存在: {extra_id}")
+            if extra.status != "active":
+                raise ExecuteBlocked("asset_inactive", f"additional asset 已失效: {extra_id}")
             if extra.connection_id != asset.connection_id:
                 raise ExecuteBlocked("cross_connection_join", "跨 Connection JOIN 不允许")
             whitelist.update(self._whitelist_tables(extra))
@@ -363,7 +428,9 @@ class ExecuteService:
             if base and base.kind == "table":
                 table = (base.locator or {}).get("table", "")
                 qualified = f"{quote}{table}{quote}"
-                return sql.replace("{{base}}", qualified).replace("<asset>", qualified)
+                view_sql = (asset.locator or {}).get("sql", "").replace("{{base}}", qualified)
+                alias = "_asset" if connection and connection.type == "oracle" else "AS _asset"
+                return sql.replace("{{base}}", qualified).replace("<asset>", f"({view_sql}) {alias}")
             return sql
         if asset.kind == "document":
             raise ExecuteBlocked("document_not_executable", "document 资产不能通过 /execute 执行")
@@ -387,10 +454,15 @@ class ExecuteService:
         return names
 
     # ── 收尾 ───────────────────────────────────────────
-    def _finalize(self, log: ExecutionLog, columns: list[str], rows: list[list]) -> ExecuteResult:
+    def _finalize(self, log: ExecutionLog, columns: list[str], rows: list[list], *, rows_affected: int | None = None,
+                  committed: bool = False) -> ExecuteResult:
         log.rows_returned = len(rows)
         log.duration_ms = int((datetime.utcnow() - log.started_at).total_seconds() * 1000)
-        self._save_log(log)
+        try:
+            self._save_log(log)
+        except ExecutePersistenceError as exc:
+            raise ExecutePersistenceError("源执行已返回，但执行记录保存失败；请核查业务结果，勿重放写操作",
+                committed=committed, observed_result={"columns": columns, "rows": rows, "rows_affected": rows_affected}) from exc
         self.bus.emit("execution.completed", {
             "asset_id": log.asset_id, "purpose": log.purpose,
             "rows": log.rows_returned, "ms": log.duration_ms,
@@ -399,16 +471,17 @@ class ExecuteService:
         return ExecuteResult(
             columns=columns, rows=rows,
             rows_returned=log.rows_returned, duration_ms=log.duration_ms,
-            cache_hit=log.cache_hit,
+            cache_hit=log.cache_hit, rows_affected=rows_affected,
         )
 
     def _save_log(self, log: ExecutionLog) -> None:
         try:
             self.db.add(log)
             self.db.commit()
-        except Exception:
+        except Exception as exc:
             logger.exception("write execution_log failed")
             self.db.rollback()
+            raise ExecutePersistenceError("执行记录保存失败") from exc
 
     # ── 取依赖 ─────────────────────────────────────────
     def _must_asset(self, asset_id: str) -> Asset:
@@ -427,6 +500,8 @@ class ExecuteService:
         c = self.connections.get_by_id(asset.connection_id)
         if not c:
             raise LookupError(f"连接不存在: {asset.connection_id}")
+        if not c.enabled:
+            raise ExecuteBlocked("connection_disabled", "连接已禁用")
         return c
 
     # ── 缓存失效（供 asset.schema.changed handler 调用）──
@@ -463,6 +538,7 @@ class ExecuteService:
             params_redacted=_redact_params(params or {}),
             user_id=user_id, started_at=datetime.utcnow(),
         )
+        committed = False
         try:
             intro = sql_introspect.introspect(sql, dialect=connection.type)
             log.sql_hash = _hash_request(connection.id, sql, params or {})
@@ -471,6 +547,8 @@ class ExecuteService:
                 raise ExecuteBlocked(intro.reason or "ast_failed", "SQL 安全审查未通过")
             if intro.is_ddl:
                 raise ExecuteBlocked("ddl_denied", "禁止 DDL 语句")
+            if not intro.is_select and not intro.is_dml:
+                raise ExecuteBlocked("statement_denied", "仅支持查询或显式授权的数据写入语句")
             if intro.is_dml and not write:
                 raise ExecuteBlocked("dml_denied", "本通道默认只读，写入需显式声明 write=true")
             if write and not connection.writable:
@@ -488,15 +566,20 @@ class ExecuteService:
 
             connector = ConnectorRegistry.get(connection.type)
             with self.conn_svc.with_conn(connection.id) as raw:
-                result = connector.execute_sql_with_params(raw, sql, params or {})
+                result = _execute_with_deadline(connector, raw, sql, params or {}, timeout_ms, write=intro.is_dml)
                 if intro.is_dml:
                     try:
                         raw.commit()
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        raise ExecuteOutcomeUnknown("源数据库提交未获得可靠回执，请核查源数据；不要自动重试") from exc
+                    committed = True
+                    _cache.invalidate_prefix("")
             columns = result.get("columns") or []
             rows = result.get("rows") or []
-            return self._finalize(log, columns, rows)
+            return self._finalize(log, columns, rows, rows_affected=result.get("rowsAffected") if intro.is_dml else None,
+                                  committed=committed)
+        except ExecutePersistenceError:
+            raise
         except ExecuteBlocked as e:
             log.blocked = True
             log.block_reason = e.reason

@@ -19,6 +19,7 @@ def _build_client(params: dict, credential: dict | None) -> httpx.Client:
     headers: dict[str, str] = dict(params.get("default_headers") or {})
     cred = credential or {}
     auth = None
+    query = {}
     auth_type = (params.get("auth_type") or "none").lower()
     if auth_type == "bearer":
         token = cred.get("token") or ""
@@ -32,7 +33,13 @@ def _build_client(params: dict, credential: dict | None) -> httpx.Client:
         val = cred.get("value") or ""
         if loc == "header" and val:
             headers[key] = val
-    return httpx.Client(base_url=base_url, headers=headers, auth=auth, timeout=8.0)
+        elif loc == "query" and val:
+            query[key] = val
+        elif loc not in ("header", "query"):
+            raise ValueError("API Key in 必须为 header 或 query")
+    elif auth_type != "none":
+        raise ValueError(f"不支持的认证方式: {auth_type}")
+    return httpx.Client(base_url=base_url, headers=headers, params=query, auth=auth, timeout=8.0)
 
 
 class HTTPApiConnector:
@@ -47,7 +54,7 @@ class HTTPApiConnector:
         try:
             probe_path = params.get("probe_path") or "/"
             r = client.get(probe_path)
-            ok = r.status_code < 500
+            ok = r.is_success
             return ok, f"HTTP {r.status_code}"
         except httpx.HTTPError as e:
             return False, f"请求失败: {e}"

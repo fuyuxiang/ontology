@@ -1,3 +1,4 @@
+import { authenticatedFetch } from './authenticatedFetch'
 import { get, post } from './client'
 import { authHeaders } from '../utils/authHeaders'
 
@@ -6,6 +7,7 @@ export interface AiCodeGenerateRequest {
   target_id: string
   message: string
   extra_entity_ids?: string[]
+  execution_mode?: 'expression' | 'sql' | 'python' | 'custom_script'
 }
 
 export interface Violation {
@@ -19,6 +21,7 @@ export interface ValidateResponse {
 }
 
 export interface ConversationMessage {
+  execution_mode?: 'expression' | 'sql' | 'python' | 'custom_script'
   role: string
   content: string
   timestamp: string
@@ -35,7 +38,7 @@ export interface Conversation {
 
 export const aiCodeApi = {
   async generatePost(req: AiCodeGenerateRequest, signal?: AbortSignal): Promise<Response> {
-    const resp = await fetch('/api/v1/ai-code/generate', {
+    const resp = await authenticatedFetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/ai-code/generate`, {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(req),
@@ -48,7 +51,7 @@ export const aiCodeApi = {
     return get<Conversation | null>(`/ai-code/conversations/${targetType}/${targetId}`)
   },
 
-  validate(code: string) {
-    return post<ValidateResponse>('/ai-code/validate', { code })
+  validate(code: string, executionMode: 'expression' | 'sql' | 'python' | 'custom_script' = 'python') {
+    return post<ValidateResponse>('/ai-code/validate', { code, execution_mode:executionMode })
   },
 }

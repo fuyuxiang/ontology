@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import case, func
+from sqlalchemy import case, func, cast, String
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -15,6 +15,7 @@ router = APIRouter(prefix="/mcp", tags=["mcp-stats"])
 
 @router.get("/stats/overview")
 def get_overview(db: Session = Depends(get_db)):
+    from app.services.mcp_tools.activity import active_requests
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_start = today_start - timedelta(days=1)
@@ -29,13 +30,16 @@ def get_overview(db: Session = Depends(get_db)):
         McpCallLog.called_at >= today_start, McpCallLog.is_error.is_(True)
     ).scalar() or 0
     error_rate = round(error_count / total_today, 4) if total_today > 0 else 0
+    inflight = active_requests()
 
     return {
         "total_calls_today": total_today,
         "total_calls_yesterday": total_yesterday,
         "avg_response_ms": round(avg_ms, 1),
         "error_rate": error_rate,
-        "active_connections": 0,
+        "active_requests": inflight,
+        # Compatibility alias; it has never represented durable sessions.
+        "active_connections": inflight,
     }
 
 
@@ -44,13 +48,13 @@ def get_trend(range: str = Query("24h"), db: Session = Depends(get_db)):
     now = datetime.utcnow()
     if range == "7d":
         start = now - timedelta(days=7)
-        trunc = func.strftime("%Y-%m-%d", McpCallLog.called_at)
+        trunc = func.substr(cast(McpCallLog.called_at, String), 1, 10)
     elif range == "1h":
         start = now - timedelta(hours=1)
-        trunc = func.strftime("%Y-%m-%d %H:%M", McpCallLog.called_at)
+        trunc = func.substr(cast(McpCallLog.called_at, String), 1, 16)
     else:
         start = now - timedelta(hours=24)
-        trunc = func.strftime("%Y-%m-%d %H:00", McpCallLog.called_at)
+        trunc = func.substr(cast(McpCallLog.called_at, String), 1, 13) + ":00"
 
     rows = (
         db.query(trunc.label("bucket"), func.count(McpCallLog.id).label("count"))

@@ -6,6 +6,7 @@ from app.models.ai_code_conversation import AiCodeConversation  # noqa: F401
 from app.models.asset import Asset
 from app.models.asset_usage import AssetUsage
 from app.models.audit import AuditLog
+from app.models.auth_challenge import AuthChallenge
 from app.models.business_document import BusinessDocument
 
 # ── Data Plane（M1 新增 7 张表）──
@@ -19,6 +20,7 @@ from app.models.lineage_edge import LineageEdge
 from app.models.mcp_call_log import McpCallLog  # noqa: F401
 from app.models.monitor import Alert, LLMCallRecord, ServiceMetric
 from app.models.object_binding import ObjectBinding
+from app.models.ontology_group import OntologyGroup
 from app.models.prompt_template import PromptTemplate
 from app.models.quality_metric import QualityMetric
 from app.models.quality_rule import HealthStatus, QualityRule
@@ -30,6 +32,7 @@ from app.models.skill import Skill
 from app.models.skill_tool import SkillTool
 from app.models.skill_version import SkillTestRun, SkillVersion
 from app.models.trace import AgentTrace
+from app.models.system_config import SystemConfig
 from app.models.user import User
 from app.models.version import (
     OntologyVersion,
@@ -42,10 +45,15 @@ from app.models.version_components import (
     OntologyVersionFunction,
 )
 
+from app.models.action_execution import ActionExecution
+
 __all__ = [
+    "ActionExecution",
     "OntologyEntity", "EntityAttribute", "EntityRelation",
     "EntityAction", "OntologyFunction",
     "AuditLog", "User",
+    "SystemConfig",
+    "AuthChallenge",
     "DashboardConfig",
     "ModelRegistry", "Agent", "PromptTemplate", "AgentPendingAction", "AgentRun", "AgentVersion",
     "AgentTrace", "EvalSuite", "EvalCase", "EvalRun", "EvalResult",
@@ -68,5 +76,8 @@ __all__ = [
     "AgentTestConversation",
     # Shared / Data Isolation
     "OntologySharedRef",
+    "OntologyGroup",
     "SharedAttribute",
 ]
+
+from app.models.builder_document_session import BuilderDocumentSession  # noqa: F401

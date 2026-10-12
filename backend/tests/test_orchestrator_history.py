@@ -7,7 +7,7 @@ from app.services.agent import orchestrator as orch_mod
 
 def _fake_stream_no_tool(text):
     chunk = SimpleNamespace(
-        choices=[SimpleNamespace(delta=SimpleNamespace(content=text, tool_calls=None))]
+        choices=[SimpleNamespace(delta=SimpleNamespace(content=text, tool_calls=None), finish_reason="stop")]
     )
     return [chunk]
 
@@ -47,6 +47,20 @@ class OrchestratorHistoryTests(unittest.TestCase):
         list(svc.ask("Q1"))
         roles = [m["role"] for m in captured["messages"]]
         self.assertEqual(roles, ["system", "user"])
+
+    def test_truncated_stream_never_emits_done_or_executes_partial_tools(self):
+        svc = self._build_service({})
+        truncated = SimpleNamespace(choices=[SimpleNamespace(
+            delta=SimpleNamespace(content='{"answer":"partial', tool_calls=None), finish_reason=None)])
+        svc.client.chat.completions.create.side_effect = None
+        svc.client.chat.completions.create.return_value = [truncated]
+        events = list(svc.ask("Q"))
+        self.assertTrue(any(e["type"] == "error" for e in events))
+        self.assertFalse(any(e["type"] == "done" for e in events))
+        partial_tool = SimpleNamespace(index=0, id="t", function=SimpleNamespace(name="run_action", arguments="{}"))
+        truncated.choices[0].delta = SimpleNamespace(content=None, tool_calls=[partial_tool])
+        events = list(svc.ask("Q"))
+        self.assertFalse(any(e["type"] in ("tool_start", "done") for e in events))
 
 
 if __name__ == "__main__":

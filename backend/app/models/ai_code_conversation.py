@@ -11,6 +11,7 @@ class AiCodeConversation(Base):
     __tablename__ = "ai_code_conversations"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=gen_uuid)
+    owner_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     target_type: Mapped[str] = mapped_column(String(20), nullable=False)
     target_id: Mapped[str] = mapped_column(String(36), nullable=False)
     messages: Mapped[list] = mapped_column(JSON, default=list)

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.core.deps import require_user
 from app.database import get_db
@@ -12,7 +13,8 @@ from app.schemas.data_plane import (
     BindingDetail,
     BindingUpdate,
 )
-from app.services.data_plane.execute_service import ExecuteRequest, ExecuteService
+from app.models.asset import Asset
+from app.services.data_plane.entity_data_service import EntityDataService
 from app.services.data_plane.object_binding_service import ObjectBindingService
 
 router = APIRouter(prefix="/object-bindings", tags=["data-plane:bindings"])
@@ -54,6 +56,8 @@ def create_binding(
             field_mappings=[fm.model_dump() for fm in body.field_mappings],
             id_column=body.id_column,
             filter_expr=body.filter_expr,
+            primary_source_column=body.primary_source_column,
+            enrichment_source_column=body.enrichment_source_column,
             user_id=user.id,
         )
         db.commit()
@@ -62,6 +66,9 @@ def create_binding(
         raise HTTPException(409, str(e)) from e
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(409, "对象已存在活动主绑定，请刷新后重新确认") from e
 
 
 @router.put("/{binding_id}", response_model=BindingDetail)
@@ -76,6 +83,11 @@ def update_binding(binding_id: str, body: BindingUpdate, db: Session = Depends(g
         return binding
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(422, str(e)) from e
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(409, "对象已存在活动主绑定，请刷新后重新确认") from e
 
 
 @router.delete("/{binding_id}", status_code=204)
@@ -93,13 +105,16 @@ def test_resolve(binding_id: str, db: Session = Depends(get_db)):
     b = ObjectBindingService(db).get(binding_id)
     if not b:
         raise HTTPException(404, "binding 不存在")
-    sql = "SELECT * FROM <asset> LIMIT :lim"
     try:
-        r = ExecuteService(db).execute(ExecuteRequest(
-            asset_id=b.asset_id, sql=sql, params={"lim": 5},
-            purpose="binding.test_resolve",
-            bypass_cache=True,
-        ))
-        return {"columns": r.columns, "rows": r.rows, "field_mappings": b.field_mappings}
+        class BindingPreview(EntityDataService):
+            def resolve_entity_asset(self, entity_id):
+                asset = db.get(Asset, b.asset_id)
+                if b.status != "active" or not asset or asset.status != "active":
+                    return None
+                return asset, b
+        r = BindingPreview(db)._query_primary_data(b.object_type_id, limit=5, purpose="binding.test_resolve")
+        if r.get("error"):
+            raise ValueError(r["error"])
+        return {**r, "field_mappings": b.field_mappings}
     except Exception as e:
         raise HTTPException(400, f"取样失败: {e}") from e

@@ -1,4 +1,6 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { useAuthStore } from '../store/auth'
+import { captureAuthSession, refreshAccessToken } from '../api/client'
 
 export interface WSMessage {
   type: 'alert' | 'event' | 'ping'
@@ -6,6 +8,7 @@ export interface WSMessage {
 }
 
 export function useMonitorWS() {
+  const auth = useAuthStore()
   const connected = ref(false)
   const lastMessage = ref<WSMessage | null>(null)
   const alerts = ref<any[]>([])
@@ -16,17 +19,32 @@ export function useMonitorWS() {
   let stopped = false
 
   function getWsUrl(): string {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const host = window.location.host
-    return `${protocol}//${host}/api/v1/monitor/ws`
+    const url = new URL(`${import.meta.env.VITE_API_BASE_URL || '/api/v1'}/monitor/ws`, window.location.origin)
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+    return url.toString()
   }
 
-  function connect() {
+  async function connect() {
     if (stopped || ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return
 
-    ws = new WebSocket(getWsUrl())
+    if (!auth.token) return
+    if (auth.hasPermission && !auth.hasPermission('audit:read')) return
+    const session = captureAuthSession()
+    try {
+      const payload = JSON.parse(atob((auth.token.split('.')[1] || '').replace(/-/g, '+').replace(/_/g, '/')))
+      if (typeof payload.exp === 'number' && payload.exp * 1000 <= Date.now()) {
+        await refreshAccessToken(session)
+        if (!stopped && captureAuthSession().id === session.id) void connect()
+        return
+      }
+    } catch { /* A non-JWT fixture or rejected refresh cannot create a new socket. */
+      if (!auth.token || captureAuthSession().id !== session.id) return
+    }
+    ws = new WebSocket(getWsUrl(), ['ontology-monitor', `jwt.${auth.token}`])
 
+    const socket = ws
     ws.onopen = () => {
+      if (ws !== socket || stopped) return
       connected.value = true
       heartbeatTimer = setInterval(() => {
         if (ws?.readyState === WebSocket.OPEN) {
@@ -36,6 +54,7 @@ export function useMonitorWS() {
     }
 
     ws.onmessage = (event) => {
+      if (ws !== socket || stopped) return
       try {
         const msg: WSMessage = JSON.parse(event.data)
         lastMessage.value = msg
@@ -52,13 +71,14 @@ export function useMonitorWS() {
     }
 
     ws.onclose = () => {
+      if (ws !== socket) return
       connected.value = false
       if (heartbeatTimer) clearInterval(heartbeatTimer)
-      if (!stopped) reconnectTimer = setTimeout(connect, 5000)
+      if (!stopped && auth.token) reconnectTimer = setTimeout(connect, 5000)
     }
 
     ws.onerror = () => {
-      ws?.close()
+      if (ws === socket) socket.close()
     }
   }
 
@@ -71,6 +91,12 @@ export function useMonitorWS() {
     ws = null
   }
 
+  watch(() => auth.token, () => {
+    disconnect()
+    alerts.value = []
+    lastMessage.value = null
+    if (auth.token) { stopped = false; connect() }
+  })
   onMounted(connect)
   onUnmounted(disconnect)
 

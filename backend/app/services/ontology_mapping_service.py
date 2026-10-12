@@ -58,13 +58,13 @@ def _filter_tables_prompt(ontology_summary: str, tables_text: str) -> str:
 
 ## 要求
 - 选出与本体实体最相关的表，每个实体至少匹配1张候选表
-- 输出 JSON 格式：{{"candidates": [{{"entity": "实体名", "tables": ["表名1", "表名2"]}}]}}
+- 输出 JSON 格式：{{"candidates": [{{"entity": "实体名", "tables": ["asset_id1", "asset_id2"]}}]}}
 - 宁可多选不要漏选，后续会做精确匹配"""
 
 
 def get_all_tables_summary(db: Session | None = None) -> list[dict]:
     return [
-        {"table_name": item["table_name"], "table_desc": item["table_desc"] or ""}
+        {"table_name": item["asset_id"], "table_desc": item["table_name"] + " · " + (item["table_desc"] or "")}
         for item in asset_catalog.get_tables(db)
     ]
 
@@ -89,7 +89,7 @@ _MAPPING_PROMPT_TEMPLATE = """你是本体映射专家。将本体中的实体�
   "entities": [
     {{
       "name": "实体name",
-      "table": "对应表名",
+      "table": "候选表中的asset_id键",
       "confidence": 0.9,
       "properties": [
         {{"name": "属性name", "field": "字段名或null", "fieldType": "字段类型或null", "confidence": 0.9}}
@@ -128,9 +128,9 @@ def map_entities_and_relations(ontology: dict, candidate_table_names: list[str],
         candidate_schemas=candidate_schemas,
     )
 
-    client = _get_llm_client()
+    client = _get_llm_client(db)
     resp = client.chat.completions.create(
-        model=_get_model_name(),
+        model=_get_model_name(db),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
@@ -139,7 +139,7 @@ def map_entities_and_relations(ontology: dict, candidate_table_names: list[str],
         return json.loads(content)
     except json.JSONDecodeError:
         logger.warning("map_entities_and_relations 解析失败: %s", content[:200])
-        return {"entities": [], "relations": []}
+        raise ValueError("模型返回了无效映射 JSON，请重试")
 
 
 def _merge_mapping_into_ontology(ontology: dict, mapping: dict) -> dict:
@@ -188,6 +188,15 @@ def _merge_mapping_into_ontology(ontology: dict, mapping: dict) -> dict:
 
 
 def map_ontology_stream(ontology: dict, db: Session | None = None) -> Generator[str, None, None]:
+    try:
+        yield from _map_ontology_stream(ontology, db)
+    except Exception as exc:
+        logger.exception("ontology asset mapping failed")
+        yield f"data: {json.dumps({'event':'error','message':str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+
+def _map_ontology_stream(ontology: dict, db: Session | None = None) -> Generator[str, None, None]:
     ontology = copy.deepcopy(ontology)
 
     yield f"data: {json.dumps({'event': 'progress', 'stage': 'filtering', 'message': '正在筛选候选表...'})}\n\n"
@@ -196,10 +205,11 @@ def map_ontology_stream(ontology: dict, db: Session | None = None) -> Generator[
         all_tables = get_all_tables_summary(db)
     except Exception as e:
         yield f"data: {json.dumps({'event': 'error', 'message': f'数据资产服务不可用，请检查连接后重试: {e}'})}\n\n"
+        yield "data: [DONE]\n\n"
         return
 
     ontology_summary = _build_ontology_summary(ontology)
-    client = _get_llm_client()
+    client = _get_llm_client(db)
 
     all_candidates: dict[str, list[str]] = {}
     for i in range(0, len(all_tables), _BATCH_SIZE):
@@ -209,7 +219,7 @@ def map_ontology_stream(ontology: dict, db: Session | None = None) -> Generator[
 
         try:
             resp = client.chat.completions.create(
-                model=_get_model_name(),
+                model=_get_model_name(db),
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
             )
@@ -219,7 +229,7 @@ def map_ontology_stream(ontology: dict, db: Session | None = None) -> Generator[
                 entity = item["entity"]
                 all_candidates.setdefault(entity, []).extend(item.get("tables", []))
         except Exception as e:
-            logger.warning("filter batch %d failed: %s", i, e)
+            raise ValueError(f"第 {i // _BATCH_SIZE + 1} 批资产筛选失败: {e}") from e
 
     valid_names = {t["table_name"] for t in all_tables}
     candidate_table_names = list(set(
@@ -230,6 +240,7 @@ def map_ontology_stream(ontology: dict, db: Session | None = None) -> Generator[
 
     if not candidate_table_names:
         yield f"data: {json.dumps({'event': 'error', 'message': '未能匹配到任何候选表，请检查数据资产或重试'})}\n\n"
+        yield "data: [DONE]\n\n"
         return
 
     yield f"data: {json.dumps({'event': 'progress', 'stage': 'mapping', 'message': '正在精确映射实体和字段...'})}\n\n"

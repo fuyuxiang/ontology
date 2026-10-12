@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useAuthStore } from './auth'
 import { entityApi } from '../api/ontology'
 import type { EntityListItem, OntologyEntity, GraphData, Tier } from '../types'
 
@@ -10,7 +11,9 @@ export const useOntologyStore = defineStore('ontology', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const currentOntologyId = ref<string | null>(null)
-  let entitiesRequest = 0
+  let entitiesRequest = 0, detailRequest = 0, graphRequest = 0
+  const auth = useAuthStore()
+  watch(() => auth.user?.id, () => { ++entitiesRequest; ++detailRequest; ++graphRequest; entities.value = []; currentEntity.value = null; graphData.value = null; currentOntologyId.value = null; loading.value = false; error.value = null }, {flush:'sync'})
 
   const tier1 = computed(() => entities.value.filter(e => e.tier === 1))
   const tier2 = computed(() => entities.value.filter(e => e.tier === 2))
@@ -23,6 +26,13 @@ export const useOntologyStore = defineStore('ontology', () => {
   ])
 
   async function fetchEntities(query?: { tier?: Tier; search?: string; ontology_id?: string }) {
+    if (!auth.user) {
+      const sessionToken = auth.token
+      if (!sessionToken) return
+      await auth.fetchUser()
+      // A caller waiting for account A must not start a request as account B.
+      if (!auth.user || !auth.token || auth.token !== sessionToken) return
+    }
     const request = ++entitiesRequest
     loading.value = true
     error.value = null
@@ -41,33 +51,59 @@ export const useOntologyStore = defineStore('ontology', () => {
   }
 
   async function switchOntology(id: string) {
+    if (!auth.user) {
+      const sessionToken = auth.token
+      if (!sessionToken) return
+      await auth.fetchUser()
+      // A caller waiting for account A must not start a request as account B.
+      if (!auth.user || !auth.token || auth.token !== sessionToken) return
+    }
+    ++detailRequest; ++graphRequest
     currentOntologyId.value = id
-    entities.value = []
+    entities.value = []; currentEntity.value = null; graphData.value = null
     await fetchEntities({ ontology_id: id })
   }
 
   async function fetchEntity(id: string) {
+    if (!auth.user) {
+      const sessionToken = auth.token
+      if (!sessionToken) return
+      await auth.fetchUser()
+      // A caller waiting for account A must not start a request as account B.
+      if (!auth.user || !auth.token || auth.token !== sessionToken) return
+    }
+    const request = ++detailRequest
     loading.value = true
     error.value = null
     try {
-      currentEntity.value = await entityApi.detail(id)
+      const detail = await entityApi.detail(id)
+      if (request === detailRequest) currentEntity.value = detail
     } catch (e: unknown) {
-      error.value = (e as Error).message
+      if (request === detailRequest) error.value = (e as Error).message
     } finally {
-      loading.value = false
+      if (request === detailRequest) loading.value = false
     }
   }
 
   async function fetchGraph(entityId?: string) {
+    if (!auth.user) {
+      const sessionToken = auth.token
+      if (!sessionToken) return
+      await auth.fetchUser()
+      // A caller waiting for account A must not start a request as account B.
+      if (!auth.user || !auth.token || auth.token !== sessionToken) return
+    }
+    const request = ++graphRequest
     loading.value = true
     try {
-      graphData.value = entityId
+      const graph = entityId
         ? await entityApi.graph(entityId)
         : await entityApi.graphAll()
+      if (request === graphRequest) graphData.value = graph
     } catch (e: unknown) {
-      error.value = (e as Error).message
+      if (request === graphRequest) error.value = (e as Error).message
     } finally {
-      loading.value = false
+      if (request === graphRequest) loading.value = false
     }
   }
 

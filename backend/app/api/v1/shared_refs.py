@@ -7,6 +7,8 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.deps import require_user
+from app.models import ScenarioDict, User
 from app.models.shared_ref import OntologySharedRef
 from app.repositories.entity_repo import EntityRepository
 from app.repositories.shared_ref_repo import SharedRefRepository
@@ -31,7 +33,7 @@ class SharedRefOut(BaseModel):
 
 
 @router.post("/ontology/{ontology_id}/share", response_model=SharedRefOut)
-async def share_entity(ontology_id: str, body: ShareRequest, db: Session = Depends(get_db)):
+async def share_entity(ontology_id: str, body: ShareRequest, db: Session = Depends(get_db), user: User = Depends(require_user)):
     entity_repo = EntityRepository(db)
     entity = entity_repo.get_by_id(body.entity_id)
     if not entity:
@@ -40,6 +42,8 @@ async def share_entity(ontology_id: str, body: ShareRequest, db: Session = Depen
         raise HTTPException(status_code=403, detail="只能共享自己本体的实体")
     if body.target_ontology_id == ontology_id:
         raise HTTPException(status_code=400, detail="不能共享给自己的本体")
+    if not db.get(ScenarioDict, body.target_ontology_id):
+        raise HTTPException(404, "目标本体不存在")
 
     repo = SharedRefRepository(db)
     existing = repo.find_ref(body.target_ontology_id, body.entity_id)
@@ -50,6 +54,7 @@ async def share_entity(ontology_id: str, body: ShareRequest, db: Session = Depen
         source_ontology_id=ontology_id,
         target_ontology_id=body.target_ontology_id,
         entity_id=body.entity_id,
+        shared_by=user.id,
     )
     repo.create(ref)
     repo.commit()

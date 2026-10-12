@@ -1,104 +1,69 @@
-import ast
-import contextlib
-import io
-import signal
-
+from textwrap import indent
+from app.services.function_runtime.sandbox import UnifiedSandbox
 from .base import BaseActionExecutor, ExecutionResult
-
-SAFE_BUILTINS = {
-    "print": print, "len": len, "str": str, "int": int, "float": float,
-    "bool": bool, "list": list, "dict": dict, "tuple": tuple, "set": set,
-    "range": range, "enumerate": enumerate, "zip": zip, "map": map,
-    "filter": filter, "sorted": sorted, "min": min, "max": max,
-    "sum": sum, "abs": abs, "round": round, "isinstance": isinstance,
-    "type": type, "hasattr": hasattr, "getattr": getattr,
-    "True": True, "False": False, "None": None,
-}
-
-EXEC_TIMEOUT_SECONDS = 5
-
-
-def _check_imports(script: str) -> str | None:
-    try:
-        tree = ast.parse(script)
-    except SyntaxError as e:
-        return f"语法错误: {e}"
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            return f"禁止使用 import 语句 (line {node.lineno})"
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
-            if node.func.id == "__import__":
-                return f"禁止使用 __import__ (line {node.lineno})"
-    return None
-
-
-class _TimeoutError(Exception):
-    pass
-
-
-def _timeout_handler(signum, frame):
-    raise _TimeoutError("脚本执行超时")
-
+from app.services.function_runtime.models import ExecContext
 
 class CustomScriptExecutor(BaseActionExecutor):
-    async def execute(self, type_config: dict, params: dict, dry_run: bool = False) -> ExecutionResult:
+    async def execute(self, type_config, params, dry_run=False):
+        context = type_config.get("_exec_context") or ExecContext(ontology_id=type_config.get("ontology_id"))
         script = type_config.get("script", "")
-
+        source = type_config.get("source_code")
+        if source is None and type_config.get("source_path"):
+            from pathlib import Path
+            from app.config import settings
+            try:
+                path = Path(type_config["source_path"]).resolve()
+                path.relative_to(Path(settings.WORKSPACE_ROOT).resolve())
+                source = path.read_text(encoding="utf-8")
+            except (OSError, ValueError) as exc:
+                return ExecutionResult(False, f"行动工作区源码无法读取: {exc}")
+        if source is None and not script.strip():
+            return ExecutionResult(False, "脚本内容不能为空")
+        code = source if source is not None else "def execute_action(params):\n    result = {}\n" + indent(script, "    ") + "\n    return result\n"
+        validation = UnifiedSandbox().validate(code)
+        if not validation.valid:
+            return ExecutionResult(False, "脚本安全检查失败: " + "; ".join(validation.errors))
         if dry_run:
-            return ExecutionResult(
-                success=True,
-                message="[Dry Run] Would execute custom Python script",
-                output={"script_length": len(script), "params": params},
-            )
-
-        violation = _check_imports(script)
-        if violation:
-            return ExecutionResult(
-                success=False,
-                message=f"脚本安全检查失败: {violation}",
-                output={"error": violation},
-            )
-
-        stdout_capture = io.StringIO()
-        local_vars = {"params": params, "result": {}}
-        sandbox_globals = {"__builtins__": SAFE_BUILTINS}
-
-        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
-        signal.alarm(EXEC_TIMEOUT_SECONDS)
+            return ExecutionResult(True, "[Dry Run] Would execute custom Python script", {"script_length": len(script), "params": params})
         try:
-            with contextlib.redirect_stdout(stdout_capture):
-                exec(script, sandbox_globals, local_vars)
-            return ExecutionResult(
-                success=True,
-                message="Script executed successfully",
-                output=local_vars.get("result", {}),
-            )
-        except _TimeoutError:
-            return ExecutionResult(
-                success=False,
-                message=f"脚本执行超时 (>{EXEC_TIMEOUT_SECONDS}s)",
-                output={"error": "timeout"},
-            )
-        except Exception as e:
-            return ExecutionResult(
-                success=False,
-                message=f"Script error: {str(e)}",
-                output={"error": str(e), "stdout": stdout_capture.getvalue()},
-            )
-        finally:
-            signal.alarm(0)
-            signal.signal(signal.SIGALRM, old_handler)
-
+            from app.database import SessionLocal
+            from app.services.function_executor import FunctionExecutor
+            from app.services.function_runtime.executor import FunctionRuntimeExecutor
+            from app.services.function_runtime.registry import FunctionRegistry
+            from app.models.version import OntologyVersionEntity
+            from types import SimpleNamespace
+            db = self.db or SessionLocal()
+            try:
+                entity = db.get(OntologyVersionEntity, type_config["_version_entity_id"]) if type_config.get("_version_entity_id") else None
+                version_id = entity.version_id if entity else type_config.get("version_id")
+                if version_id:
+                    if context.version_id and context.version_id != version_id:
+                        raise PermissionError("行动不属于当前发布版本")
+                    context.version_id = version_id
+                runtime = FunctionRuntimeExecutor(FunctionRegistry(db), UnifiedSandbox(), db)
+                nested = FunctionExecutor(db)._nested_callable(SimpleNamespace(ontology_id=type_config.get("ontology_id"), version_id=version_id), context)
+                namespace = {"params": params, "call_function": nested,
+                    **runtime._build_ontology_helpers(context=context)}
+                result = UnifiedSandbox().execute(code, type_config.get("func_name", "execute_action") if source is not None else "execute_action", namespace, timeout=5)
+            finally:
+                if self.db is None:db.close()
+            if not isinstance(result, dict):
+                return ExecutionResult(False, "行动脚本 result 必须为对象",
+                    {"outcome": "partial_committed" if context.committed_writes else "failed",
+                     "committed_writes": list(context.committed_writes)})
+            if context.committed_writes:
+                result = {**result, "outcome": "committed", "committed_writes": list(context.committed_writes)}
+            return ExecutionResult(True, "Script executed successfully", result)
+        except Exception as exc:
+            return ExecutionResult(False, f"Script error: {exc}", {"error": str(exc),
+                "outcome": context.failure_outcome(exc) or "failed", "committed_writes": list(context.committed_writes),
+                "uncertain_write": context.active_write})
     @classmethod
-    def get_config_schema(cls) -> dict:
-        return {
-            "script": {"type": "string", "required": True, "description": "Python 脚本内容，通过 params 字典获取输入，结果写入 result 字典"},
-        }
-
+    def get_config_schema(cls):
+        return {"script": {"type": "string", "required": True, "description": "Python 脚本，通过 params 获取输入，结果写入 result 字典"}}
     @classmethod
-    def get_label(cls) -> str:
+    def get_label(cls):
         return "自定义脚本"
-
     @classmethod
-    def get_description(cls) -> str:
+    def get_description(cls):
         return "运行自定义 Python 脚本"

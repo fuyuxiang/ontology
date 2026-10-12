@@ -1,49 +1,49 @@
 <template>
   <div class="step3-root">
     <header class="step3-topbar">
-      <button class="step3-back-btn" @click="$emit('prev')">← 返回</button>
-      <div class="step3-topbar-title">验证发布</div>
+      <button class="step3-back-btn" @click="$emit('prev')">{{ text('← 返回') }}</button>
+      <div class="step3-topbar-title">{{ text('验证发布') }}</div>
       <div class="step3-topbar-progress" v-if="drillRunning">
-        <span class="step3-progress-label">演练进行中</span>
+        <span class="step3-progress-label">{{ text('演练进行中') }}</span>
         <div class="step3-progress-track">
           <div class="step3-progress-bar" :style="{ width: drillProgress * 100 + '%' }"></div>
         </div>
         <span class="step3-progress-pct">{{ Math.round(drillProgress * 100) }}%</span>
       </div>
       <div class="step3-topbar-progress" v-else-if="drillStatus === 'error'">
-        <span class="step3-progress-label">演练失败，可重新演练</span>
+        <span class="step3-progress-label">{{ text("演练失败，可重新演练") }}</span>
       </div>
       <div class="step3-topbar-progress" v-else-if="drillResult">
-        <span class="step3-progress-label step3-progress-label--done">演练完成</span>
+        <span class="step3-progress-label step3-progress-label--done">{{ text("演练完成") }}</span>
       </div>
     </header>
 
     <!-- 发布成功大屏 -->
     <div v-if="success" class="step3-success">
       <div class="step3-success__hero">🎉</div>
-      <div class="step3-success__title">发布成功</div>
-      <div class="step3-success__sub">{{ session.ontologyName }} 已发布至本体工作室</div>
+      <div class="step3-success__title">{{ text('发布成功') }}</div>
+      <div class="step3-success__sub">{{ session.ontologyName }} {{ text('已发布至本体工作室') }}</div>
       <div class="step3-success__stats">
         <div class="step3-success-stat">
           <div class="num">{{ session.ontologyObjects.length }}</div>
-          <div class="label">对象</div>
+          <div class="label">{{ text('对象') }}</div>
         </div>
         <div class="step3-success-stat">
           <div class="num">{{ session.ontologyRelations.length }}</div>
-          <div class="label">关系</div>
+          <div class="label">{{ text("关系") }}</div>
         </div>
         <div class="step3-success-stat">
           <div class="num">{{ drillResult?.entityCount?.toLocaleString() || 0 }}</div>
-          <div class="label">数据行数</div>
+          <div class="label">{{ text("数据行数") }}</div>
         </div>
         <div class="step3-success-stat">
           <div class="num">{{ drillResult?.attributionAccuracy || 'N/A' }}</div>
-          <div class="label">映射命中率</div>
+          <div class="label">{{ text("映射命中率") }}</div>
         </div>
       </div>
       <div class="step3-success__cta">
-        <a-button type="primary" size="large" @click="$emit('goto-studio')">前往本体工作室查看</a-button>
-        <a-button size="large" @click="success = false">留在构建器</a-button>
+        <a-button type="primary" size="large" @click="$emit('goto-studio')">{{ text("前往本体工作室查看") }}</a-button>
+        <a-button size="large" @click="success = false">{{ text("留在构建器") }}</a-button>
       </div>
     </div>
 
@@ -53,14 +53,14 @@
       <main class="step3-main">
         <!-- 演练前：数据源选择 -->
         <div v-if="!drillStarted" class="step3-panel">
-          <div class="step3-panel__title">数据源选择</div>
-          <div class="step3-panel__sub">选择参与验证的数据资产，验证本体属性与真实数据列的映射关系</div>
+          <div class="step3-panel__title">{{ text('数据源选择') }}</div>
+          <div class="step3-panel__sub">{{ text("选择参与验证的数据资产，验证本体属性与真实数据列的映射关系") }}</div>
 
-          <div v-if="assetLoading" class="step3-loading">加载资产信息中...</div>
+          <div v-if="assetLoading" class="step3-loading">{{ text("加载资产信息中...") }}</div>
           <div v-else-if="assetList.length > 0" class="step3-ds-list">
             <div class="step3-ds-actions">
-              <button class="step3-ds-action" @click="selectAll">全选</button>
-              <button class="step3-ds-action" @click="selectedSourceIds = []">清空</button>
+              <button class="step3-ds-action" @click="selectAll">{{ text('全选') }}</button>
+              <button class="step3-ds-action" @click="selectedSourceIds = []">{{ text('清空') }}</button>
               <span class="step3-ds-count">已选 {{ selectedSourceIds.length }} / {{ assetList.length }}</span>
             </div>
             <label
@@ -74,15 +74,15 @@
                 <div class="step3-ds-name">{{ ds.displayName }}</div>
                 <div class="step3-ds-meta">
                   <span class="step3-ds-kind">{{ ds.kind }}</span>
-                  <span v-if="ds.columnCount">{{ ds.columnCount }} 列</span>
-                  <span v-if="ds.objectName" class="step3-ds-obj">绑定: {{ ds.objectName }}</span>
+                  <span v-if="ds.columnCount">{{ ds.columnCount }} {{ text('列') }}</span>
+                  <span v-if="ds.objectName" class="step3-ds-obj">{{ text('绑定') }}: {{ ds.objectName }}</span>
                 </div>
               </div>
             </label>
           </div>
           <div v-else class="step3-ds-empty">
-            <div class="step3-ds-empty__text">未找到可用数据资产</div>
-            <div class="step3-ds-empty__hint">请先在资产目录注册数据资产，或返回走测为对象绑定数据源</div>
+            <div class="step3-ds-empty__text">{{ text("未找到可用数据资产") }}</div>
+            <div class="step3-ds-empty__hint">{{ text("请先在资产目录注册数据资产，或返回走测为对象绑定数据源") }}</div>
           </div>
 
           <button
@@ -90,7 +90,7 @@
             :disabled="assetLoading || drillRunning || selectedSourceIds.length === 0"
             @click="startDrill"
           >
-            {{ assetLoading ? '加载资产中...' : '开始演练' }}
+            {{ assetLoading ? text('加载资产中...') : text('开始演练') }}
           </button>
         </div>
 
@@ -98,9 +98,9 @@
         <div v-if="drillStarted" class="step3-panel step3-panel--drill">
           <div class="step3-drill-header">
             <span class="step3-drill-dot" :class="{ done: !!drillResult }"></span>
-            <span>{{ drillRunning ? '演练进行中' : drillStatus === 'error' ? '演练失败 · 请检查日志后重试' : drillStatus === 'pass' ? '演练完成 · 全部通过' : '演练完成 · 存在警告' }}</span>
+            <span>{{ drillRunning ? text('演练进行中') : drillStatus === 'error' ? text('演练失败 · 请检查日志后重试') : drillStatus === 'pass' ? text('演练完成 · 全部通过') : text('演练完成 · 存在警告') }}</span>
             <span class="step3-drill-elapsed">{{ drillElapsed }}s</span>
-            <button v-if="!drillRunning" class="step3-retry-btn" @click="resetDrill">重新演练</button>
+            <button v-if="!drillRunning" class="step3-retry-btn" @click="resetDrill">{{ text('重新演练') }}</button>
           </div>
 
           <!-- 4 阶段指示 -->
@@ -112,7 +112,7 @@
               :class="{ active: drillProgress >= (i + 1) / HYDRATION_PHASES.length }"
             >
               <span class="phase-idx" :style="{ background: drillProgress >= (i + 1) / HYDRATION_PHASES.length ? p.color : '#cbd5e1' }">{{ i + 1 }}</span>
-              <span class="phase-label">{{ p.label }}</span>
+              <span class="phase-label">{{ text(p.label) }}</span>
             </div>
           </div>
 
@@ -138,10 +138,10 @@
             <span class="step3-result-icon">{{ drillStatus === 'pass' ? '✅' : drillStatus === 'warn' ? '⚠️' : '❌' }}</span>
             <div>
               <div class="step3-result-title">
-                {{ drillStatus === 'pass' ? '全部阶段通过' : drillStatus === 'warn' ? '存在警告，建议确认后发布' : '演练失败，请修复后重试' }}
+                {{ drillStatus === 'pass' ? text('全部阶段通过') : drillStatus === 'warn' ? text('存在警告，建议确认后发布') : text('演练失败，请修复后重试') }}
               </div>
               <div class="step3-result-sub">
-                映射 {{ drillResult.attributionAccuracy || 'N/A' }} · 数据 {{ drillResult.entityCount?.toLocaleString() || 0 }} 行 · 用时 {{ drillElapsed }}s
+                {{ text('映射') }} {{ drillResult.attributionAccuracy || 'N/A' }} · {{ text('数据') }} {{ drillResult.entityCount?.toLocaleString() || 0 }} {{ text('行') }} · {{ text('用时') }} {{ drillElapsed }}s
               </div>
             </div>
           </div>
@@ -149,9 +149,9 @@
             <div v-for="p in drillResult.phases" :key="p.key" class="step3-phase-card">
               <div class="step3-phase-card__head">
                 <span class="phase-card-dot" :style="{ background: phaseColor(p.key) }"></span>
-                <span class="phase-card-name">{{ p.label }}</span>
+                <span class="phase-card-name">{{ text(p.label) }}</span>
                 <span class="phase-card-status" :class="`phase-card-status--${p.status}`">
-                  {{ p.status === 'pass' ? '通过' : p.status === 'warn' ? '警告' : '失败' }}
+                  {{ p.status === 'pass' ? text('通过') : p.status === 'warn' ? text('警告') : text('失败') }}
                 </span>
               </div>
               <div class="step3-phase-card__metrics">
@@ -168,29 +168,29 @@
       <!-- 右侧面板 -->
       <aside class="step3-aside">
         <div class="step3-panel">
-          <div class="step3-panel__title">本体概览</div>
+          <div class="step3-panel__title">{{ text('本体概览') }}</div>
           <div class="step3-summary-grid">
             <div class="step3-summary-item">
               <div class="step3-summary-val">{{ session.ontologyObjects.length }}</div>
-              <div class="step3-summary-label">对象</div>
+              <div class="step3-summary-label">{{ text('对象') }}</div>
             </div>
             <div class="step3-summary-item">
               <div class="step3-summary-val">{{ session.ontologyRelations.length }}</div>
-              <div class="step3-summary-label">关系</div>
+              <div class="step3-summary-label">{{ text("关系") }}</div>
             </div>
             <div class="step3-summary-item">
               <div class="step3-summary-val">{{ totalProps }}</div>
-              <div class="step3-summary-label">属性</div>
+              <div class="step3-summary-label">{{ text("属性") }}</div>
             </div>
             <div class="step3-summary-item">
               <div class="step3-summary-val">{{ mappingCoverage }}</div>
-              <div class="step3-summary-label">映射覆盖</div>
+              <div class="step3-summary-label">{{ text("映射覆盖") }}</div>
             </div>
           </div>
         </div>
 
         <div class="step3-panel">
-          <div class="step3-panel__title">发布门禁</div>
+          <div class="step3-panel__title">{{ text('发布门禁') }}</div>
           <div class="step3-gates">
             <div v-for="g in gates" :key="g.key" class="step3-gate">
               <span class="step3-gate__icon" :class="{ pass: g.pass }">{{ g.pass ? '✓' : '○' }}</span>
@@ -203,8 +203,8 @@
         </div>
 
         <div v-if="!ontologyId" class="step3-panel">
-          <div class="step3-panel__title">场景归属</div>
-          <div class="step3-panel__sub">为本次发布的对象选择业务场景，可在本体管理中按场景筛选</div>
+          <div class="step3-panel__title">{{ text("场景归属") }}</div>
+          <div class="step3-panel__sub">{{ text("为本次发布的对象选择业务场景，可在本体管理中按场景筛选") }}</div>
           <div class="step3-scenario-chips">
             <button
               v-for="s in scenarioStore.scenarios"
@@ -218,14 +218,14 @@
               {{ s.name }}
             </button>
             <span v-if="scenarioStore.scenarios.length === 0" class="step3-scenario-empty">
-              暂无场景，可在下方新建
+              {{ text("暂无场景，可在下方新建") }}
             </span>
           </div>
           <div class="step3-scenario-new">
             <input
               v-model="newScenarioName"
               class="step3-scenario-input"
-              placeholder="输入新场景名并回车"
+              :placeholder="text('输入新场景名并回车')"
               @keyup.enter="createScenario"
             />
             <button
@@ -234,18 +234,18 @@
               :disabled="!newScenarioName.trim() || creatingScenario"
               @click="createScenario"
             >
-              {{ creatingScenario ? '新建中' : '新建' }}
+              {{ creatingScenario ? text('新建中') : text('新建') }}
             </button>
           </div>
         </div>
 
         <div class="step3-panel">
-          <div class="step3-panel__title">版本信息</div>
+          <div class="step3-panel__title">{{ text('版本信息') }}</div>
           <div class="step3-version-info">
-            <div class="step3-version-row"><span>版本号</span><strong>{{ versionLabel }}</strong></div>
-            <div class="step3-version-row"><span>构建方式</span><strong>{{ buildPathLabel }}</strong></div>
-            <div class="step3-version-row"><span>对象数</span><strong>{{ session.ontologyObjects.length }}</strong></div>
-            <div class="step3-version-row"><span>关系数</span><strong>{{ session.ontologyRelations.length }}</strong></div>
+            <div class="step3-version-row"><span>{{ text("版本号") }}</span><strong>{{ versionLabel }}</strong></div>
+            <div class="step3-version-row"><span>{{ text("构建方式") }}</span><strong>{{ buildPathLabel }}</strong></div>
+            <div class="step3-version-row"><span>{{ text("对象数") }}</span><strong>{{ session.ontologyObjects.length }}</strong></div>
+            <div class="step3-version-row"><span>{{ text("关系数") }}</span><strong>{{ session.ontologyRelations.length }}</strong></div>
           </div>
         </div>
 
@@ -254,7 +254,7 @@
           :disabled="!canPublish || publishing || drillRunning"
           @click="publishModalOpen = true"
         >
-          发布至本体工作室
+          {{ text('发布至本体工作室') }}
         </button>
       </aside>
     </div>
@@ -262,23 +262,23 @@
     <!-- 发布弹窗 -->
     <a-modal v-model:open="publishModalOpen" :closable="!publishing" :mask-closable="!publishing" :keyboard="!publishing" :footer="null" :width="480" class="step3-publish-modal">
       <div class="step3-modal-content">
-        <div class="step3-modal-title">确认发布 · {{ versionLabel }}</div>
+        <div class="step3-modal-title">{{ text('确认发布 ·') }} {{ versionLabel }}</div>
         <div class="step3-modal-text">
-          将发布 <strong>{{ session.ontologyName }}</strong>，包含
-          <strong>{{ session.ontologyObjects.length }}</strong> 个对象、
-          <strong>{{ session.ontologyRelations.length }}</strong> 条关系
+          {{ text('将发布') }} <strong>{{ session.ontologyName }}</strong>{{ text('，包含') }}
+          <strong>{{ session.ontologyObjects.length }}</strong> {{ text('个对象、') }}
+          <strong>{{ session.ontologyRelations.length }}</strong> {{ text('条关系') }}
         </div>
         <div class="step3-modal-stats" v-if="drillResult">
-          <div><span>字段映射：</span><strong>{{ drillResult.attributionAccuracy || 'N/A' }}</strong></div>
-          <div><span>数据行数：</span><strong>{{ drillResult.entityCount?.toLocaleString() || 0 }}</strong></div>
-          <div><span>关系实例：</span><strong>{{ drillResult.relationCount?.toLocaleString() || 0 }}</strong></div>
+          <div><span>{{ text("字段映射：") }}</span><strong>{{ drillResult.attributionAccuracy || 'N/A' }}</strong></div>
+          <div><span>{{ text("数据行数：") }}</span><strong>{{ drillResult.entityCount?.toLocaleString() || 0 }}</strong></div>
+          <div><span>{{ text("关系实例：") }}</span><strong>{{ drillResult.relationCount?.toLocaleString() || 0 }}</strong></div>
         </div>
         <div class="step3-modal-text" v-if="selectedScenarioNames.length">
-          场景归属：<strong>{{ selectedScenarioNames.join('、') }}</strong>
+          {{ text("场景归属：") }}<strong>{{ selectedScenarioNames.join('、') }}</strong>
         </div>
         <div class="step3-modal-actions">
-          <a-button :disabled="publishing" @click="publishModalOpen = false">取消</a-button>
-          <a-button type="primary" :loading="publishing" @click="confirmPublish">确认发布</a-button>
+          <a-button :disabled="publishing" @click="publishModalOpen = false">{{ text("取消") }}</a-button>
+          <a-button type="primary" :loading="publishing" @click="confirmPublish">{{ text('确认发布') }}</a-button>
         </div>
       </div>
     </a-modal>
@@ -286,13 +286,21 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../../composables/useProductText'
+const { text } = useProductText()
+import { captureAuthSession, post } from '../../../api/client'
+import { formatPlatformTime } from '../../../utils/platformTime'
+import { useManagementPermission } from '../../../composables/useManagementPermission'
+const { canEdit } = useManagementPermission()
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
 import { useScenarioStore } from '../../../store/scenarios'
 import { scenarioApi } from '../../../api/scenarios'
-import { authHeaders } from '../../../utils/authHeaders'
+import { readJsonSse, postJsonSse } from '../../../api/sse'
+import { builderContentSignature } from '../../../utils/builderSession'
+import { ontologyPublishApi } from '../../../api/ontologyPublish'
 import { HYDRATION_PHASES, DEFAULT_PUBLISH_GATES } from '../../../data/builderPresets'
 import type { BuilderSession, DrillLogLine, DrillPhase, DrillResult, PublishGate } from '../../../types/builder'
 
@@ -303,7 +311,8 @@ const store = useBuilderStore()
 const scenarioStore = useScenarioStore()
 
 const ontologyId = computed(() => {
-  return (route.query.ontology_id as string) || null
+  return props.session.ontologyId || (route.query.ontology_id as string) ||
+    (selectedScenarioCodes.value.length === 1 ? scenarioStore.byCode(selectedScenarioCodes.value[0]!)?.id : null) || null
 })
 
 // ── 状态 ──
@@ -311,6 +320,9 @@ const drillRunning = ref(false)
 let drillController: AbortController | null = null
 let drillRequest = 0
 let assetRequest = 0
+let mounted = true
+let publishRequest = 0
+let publishController: AbortController | null = null
 const drillStarted = ref(!!props.session.drillResult)
 const drillProgress = ref(props.session.drillResult ? 1 : 0)
 const drillStatus = ref<'pass' | 'warn' | 'error' | undefined>(props.session.drillStatus)
@@ -344,10 +356,10 @@ interface AssetDisplayItem {
 const versionLabel = computed(() => props.session.publishedVersion || 'v0.1')
 const buildPathLabel = computed(() => {
   const m = props.session.buildMethod
-  if (m === 'chat') return '对话生成'
-  if (m === 'import') return '文件导入'
-  if (m === 'extract') return '文档抽取'
-  return '手工建模'
+  if (m === 'chat') return text('对话生成')
+  if (m === 'import') return text('文件导入')
+  if (m === 'extract') return text('文档抽取')
+  return text('手工建模')
 })
 
 const totalProps = computed(() =>
@@ -377,24 +389,26 @@ const gates = computed<PublishGate[]>(() => {
     desc: drillResult.value
       ? (drillStatus.value === 'error' ? '演练失败' : '演练通过')
       : '未演练',
-    pass: !!drillResult.value && drillStatus.value !== 'error',
+    pass: !!drillResult.value && drillStatus.value !== 'error' &&
+      props.session.drillFingerprint === builderContentSignature(props.session),
   }
   list[2] = { ...list[2], desc: versionLabel.value, pass: true }
   // 场景归属门禁：从本体详情进入时自动满足，否则需手动选择
   if (!ontologyId.value) {
     list.push({
       key: 'scenario',
-      label: '场景归属已设置',
+      label: text('场景归属已设置'),
       desc: selectedScenarioCodes.value.length
         ? selectedScenarioNames.value.join('、')
         : '未选择场景',
       pass: selectedScenarioCodes.value.length > 0,
     })
   }
-  return list
+  list.push({ key: 'review', label: text('当前内容已审核'), desc: props.session.ontologyObjects.every(object => object.approved) ? '对象审核通过' : '内容已修改，请返回专家审核', pass: objCount > 0 && props.session.ontologyObjects.every(object => object.approved === true) })
+  return list.map(gate => ({...gate,label:text(gate.label),desc:text(gate.desc)}))
 })
 
-const canPublish = computed(() => gates.value.every(g => g.pass))
+const canPublish = computed(() => canEdit.value && gates.value.every(g => g.pass))
 
 // ── 资产加载 ──
 // 解析本次演练应使用的资产 ID 集合：
@@ -414,18 +428,6 @@ async function resolveAssetIds(): Promise<string[]> {
     }
   }
 
-  // Fallback: query active table/sql_view assets from backend
-  if (allIds.size === 0) {
-    try {
-      const { get } = await import('../../../api/client')
-      const assets = await get('/assets?kinds=table%2Csql_view&status=active') as any[]
-      for (const a of (assets || [])) {
-        allIds.add(a.id)
-      }
-    } catch (e) {
-      console.error('兜底资产查询失败', e)
-    }
-  }
   return [...allIds]
 }
 
@@ -493,7 +495,7 @@ const selectedScenarioNames = computed(() =>
 function toggleScenario(code: string) {
   const i = selectedScenarioCodes.value.indexOf(code)
   if (i >= 0) selectedScenarioCodes.value.splice(i, 1)
-  else selectedScenarioCodes.value.push(code)
+  else selectedScenarioCodes.value = [code]
 }
 
 // 由场景名生成一个 slug 作为 code（英文/数字保留，其余转连字符）
@@ -546,8 +548,7 @@ function phaseColor(key: string) {
 }
 
 function nowStamp() {
-  const d = new Date()
-  return [d.getHours(), d.getMinutes(), d.getSeconds()].map(n => String(n).padStart(2, '0')).join(':')
+  return formatPlatformTime(new Date())
 }
 
 function pushLog(level: 'OK' | 'RUN' | 'ERR', msg: string) {
@@ -620,10 +621,12 @@ async function startDrill() {
           required: !!p.required,
           source_asset_id: p.source_asset_id ?? null,
           source_column: p.source_column ?? null,
+          transform:p.transform ?? null,
           source_field: (p as any).source_field ?? null,
           source_table: (p as any).source_table ?? null,
         })),
         backing_asset_ids: o.backing_asset_ids || [],
+        enrichment_bindings:o.enrichment_bindings || [],
       })),
       relations: (session.ontologyRelations || []).map(r => {
         const srcObj = (session.ontologyObjects || []).find(o => o.id === r.source)
@@ -634,41 +637,19 @@ async function startDrill() {
           source: srcObj?.name || r.source,
           target: tgtObj?.name || r.target,
           cardinality: r.cardinality || '1:N',
+          sourceField: (r as any).sourceField,
+          targetField: (r as any).targetField,
         }
       }),
       asset_ids: [...selectedSourceIds.value],
     }
 
-    const resp = await fetch('/api/v1/builder/hydrate', {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    })
-    if (!resp.ok || !resp.body) throw new Error(`数据验证请求失败 (HTTP ${resp.status})`)
-
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let buf = ''
+    const response = await postJsonSse('/builder/hydrate', payload, controller.signal)
     const phaseData: Record<string, DrillPhase> = {}
-    while (true) {
-      const { value, done } = await reader.read()
+    await readJsonSse(response, event => {
       if (request !== drillRequest) return
-      if (done) break
-      buf += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n')
-      let idx
-      while ((idx = buf.indexOf('\n\n')) >= 0) {
-        const chunk = buf.slice(0, idx).trim()
-        buf = buf.slice(idx + 2)
-        if (!chunk.startsWith('data:')) continue
-        const raw = chunk.slice(5).trim()
-        if (raw === '[DONE]') continue
-        let ev: any
-        try { ev = JSON.parse(raw) } catch { continue }
-        handleHydrationEvent(ev, phaseData, session.sessionId)
-        if (ev.type === 'error') throw new Error(ev.content || '数据验证失败')
-      }
-    }
+      handleHydrationEvent(event, phaseData, session.sessionId)
+    })
     if (!drillResult.value) throw new Error('验证连接已结束，但未收到完整结果，请重新演练')
   } catch (e: any) {
     if (request !== drillRequest || controller.signal.aborted) return
@@ -735,12 +716,13 @@ function handleHydrationEvent(ev: any, phaseData: Record<string, DrillPhase>, se
       store.updateSession(sessionId, {
         drillStatus: drillStatus.value,
         drillResult: drillResult.value,
+        drillFingerprint: builderContentSignature(props.session),
         selectedSampleSourceIds: selectedSourceIds.value,
         status: drillStatus.value === 'error' ? 'reviewing' : 'pending_publish',
       })
-      if (drillStatus.value === 'error') message.error('验证完成，存在错误，请检查结果')
+      if (drillStatus.value === 'error') message.error(text('验证完成，存在错误，请检查结果'))
       else if (drillStatus.value === 'warn') message.warning('验证完成，存在警告，请确认结果')
-      else message.success('验证完成')
+      else message.success(text('验证完成'))
       break
     }
     case 'error':
@@ -756,11 +738,19 @@ interface FinalizeResult {
   created_relations: number
   skipped: number
   total: number
+  ontology_id: string
 }
 
 async function confirmPublish() {
   if (publishing.value || drillRunning.value || !canPublish.value) return
   const session = props.session
+  const request = ++publishRequest
+  const authSession = captureAuthSession()
+  const targetOntology = ontologyId.value
+  const scenarioCodes = [...selectedScenarioCodes.value]
+  const controller = new AbortController()
+  publishController = controller
+  const current = () => mounted && request === publishRequest && props.session.sessionId === session.sessionId && ontologyId.value === targetOntology && captureAuthSession().id === authSession.id
   const objects = (session.ontologyObjects || []).map((o: any) => ({
     name: o.name,
     displayName: o.displayName,
@@ -776,8 +766,10 @@ async function confirmPublish() {
       description: p.description,
       source_asset_id: p.source_asset_id ?? null,
       source_column: p.source_column ?? null,
+          transform:p.transform ?? null,
     })),
     backing_asset_ids: o.backing_asset_ids || [],
+        enrichment_bindings:o.enrichment_bindings || [],
   }))
 
   // 无对象不允许发布，否则会产生「发布成功却空库」的假象
@@ -796,6 +788,8 @@ async function confirmPublish() {
       target: tgtObj?.name || r.target,
       cardinality: r.cardinality || '1:N',
       relationType: r.relationType || 'ObjectProperty',
+      sourceField: r.sourceField,
+      targetField: r.targetField,
       description: r.description || r.displayName || r.name,
     }
   })
@@ -805,20 +799,31 @@ async function confirmPublish() {
 
   let result: FinalizeResult
   try {
-    const { post } = await import('../../../api/client')
-    result = await post<FinalizeResult>('/builder/finalize', { objects, relations, scenario_codes: selectedScenarioCodes.value, ontology_id: ontologyId.value })
+    result = await post<FinalizeResult>('/builder/finalize', { objects, relations, actions:session.importedActions || [], scenario_codes: scenarioCodes, ontology_id: targetOntology, document_session_id: session.documentSessionId || (session.builderKind === 'document' ? session.builderState?.sessionId : undefined) }, {signal:controller.signal})
+    if (!current()) return
+    if (!result.ontology_id) throw new Error('草稿已保存，但缺少归属本体，请选择目标本体后重新发布')
+    const published = await ontologyPublishApi.quickPublish(result.ontology_id, session.ontologyName, undefined, controller.signal)
+    if (!current()) return
+    session.publishedVersion = `v${published.version_number || published.version?.version_number || ''}`
+
   } catch (e: any) {
     // finalize 失败：不得标记为已发布，必须让用户看到真实错误
+    if (!current()) return
     console.error('finalize failed', e)
     store.updateSession(session.sessionId, { status: 'pending_publish' })
     publishing.value = false
     const detail = e?.response?.data?.detail || e?.message || '未知错误'
     message.error({ content: `发布失败：${detail}`, duration: 6 })
     return
+  } finally {
+    if (request === publishRequest) {
+      publishController = null
+      if (!current()) { publishing.value = false; store.updateSession(session.sessionId, {status:'pending_publish'}) }
+    }
   }
 
   // 仅在 finalize 真正成功后，才标记为已发布并展示成功大屏
-  const version = session.publishedVersion || 'v0.1'
+  const version = session.publishedVersion || ''
   store.updateSession(session.sessionId, {
     status: 'published',
     publishedVersion: version,
@@ -833,13 +838,13 @@ async function confirmPublish() {
   if (created > 0) {
     message.success(
       skipped > 0
-        ? `发布成功：新建 ${created} 个对象，跳过 ${skipped} 个已存在对象`
-        : `发布成功：新建 ${created} 个对象`,
+        ? text('发布成功：新建 {created} 个对象，跳过 {skipped} 个已存在对象', {created,skipped})
+        : text('发布成功：新建 {created} 个对象', {created}),
     )
   } else if (skipped > 0) {
-    message.warning(`发布完成：${skipped} 个对象已存在，未新建对象`)
+    message.warning(text('发布完成：{skipped} 个对象已存在，未新建对象', {skipped}))
   } else {
-    message.success('发布成功')
+    message.success(text('发布成功'))
   }
 }
 
@@ -849,7 +854,19 @@ onMounted(() => {
   scenarioStore.fetchScenarios()
 })
 
+watch(() => props.session.contentFingerprint, () => {
+  if (props.session.drillResult) return
+  stopDrill()
+  drillStarted.value = false
+  drillResult.value = null
+  drillStatus.value = undefined
+  drillProgress.value = 0
+  success.value = false
+})
+
 watch(() => props.session.sessionId, (_, previousSessionId) => {
+  if (publishing.value) store.updateSession(previousSessionId, {status:'pending_publish'})
+  ++publishRequest; publishController?.abort(); publishController = null; publishing.value = false
   if (drillRunning.value) store.updateSession(previousSessionId, { status: 'reviewing' })
   stopDrill()
   publishModalOpen.value = false
@@ -864,6 +881,9 @@ watch(() => props.session.sessionId, (_, previousSessionId) => {
 })
 
 onUnmounted(() => {
+  mounted = false
+  if (publishing.value) store.updateSession(props.session.sessionId, {status:'pending_publish'})
+  ++publishRequest; publishController?.abort(); publishController = null
   if (drillRunning.value) store.updateSession(props.session.sessionId, { status: 'reviewing' })
   stopDrill()
   ++assetRequest
@@ -1108,4 +1128,13 @@ onUnmounted(() => {
 .step3-modal-stats { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: #475569; }
 .step3-modal-stats strong { color: #0f172a; }
 .step3-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+@media (max-width: 640px) {
+  .step3-topbar { flex-wrap: wrap; padding: 10px 12px; }
+  .step3-topbar-progress { margin-left: 0; }
+  .step3-body { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+  .step3-panel { min-width: 0; padding: 12px; }
+  .step3-phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .step3-ds-meta { flex-wrap: wrap; }
+  .step3-topbar button { min-height: 44px; }
+}
 </style>

@@ -45,6 +45,10 @@ backend/uploads/
 tmp/
 # User workspace (runtime generated function files)
 workspace/*/
+local-data/
+.code-server-password
+.code-server-data/
+.code-server-extensions/
 # IDE / editor
 .vscode/*
 !.vscode/extensions.json

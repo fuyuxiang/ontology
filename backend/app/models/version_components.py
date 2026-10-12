@@ -24,6 +24,13 @@ class OntologyVersionFunction(Base):
     logic_body: Mapped[str] = mapped_column(Text, default="")
     callable_name: Mapped[str] = mapped_column(String(100), default="")
     tags: Mapped[dict | None] = mapped_column(JSON)
+    # Immutable executable content. A published version must never reread a
+    # mutable workspace file; old snapshots deliberately remain NULL.
+    source_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    func_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    checksum: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    ontology_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    entity_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     version: Mapped["OntologyVersion"] = relationship(back_populates="functions")

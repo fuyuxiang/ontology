@@ -8,13 +8,14 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.core.deps import require_user
 from app.database import get_db
-from app.models import EntityAttribute, EntityRelation, OntologyEntity
+from app.models import EntityAttribute, EntityRelation, OntologyEntity, ScenarioDict, OntologyGroup, SharedAttribute
 from app.models.object_binding import ObjectBinding
 from app.models.quality_rule import QualityRule
 from app.models.user import User
 from app.repositories import EntityRepository
 from app.schemas.entity import (
     ActionOut,
+    AttributeBase,
     AttributeMappingUpdate,
     AttributeOut,
     EntityCreate,
@@ -31,6 +32,7 @@ from app.schemas.entity import (
     RelationOut,
 )
 from app.services.audit import write_audit
+from app.utils.identifiers import gen_uuid
 from app.services.copilot import get_llm_client
 
 router = APIRouter(prefix="/entities", tags=["entities"])
@@ -95,44 +97,24 @@ def list_entities(
 
 
 @router.get("/data-layer")
-def get_data_layer(db: Session = Depends(get_db)):
-
+def get_data_layer(ontology_id: str | None = None, db: Session = Depends(get_db)):
     from app.models.asset import Asset
-    rows = (
-        db.query(
-            EntityAttribute.entity_id,
-            EntityAttribute.source_table,
-        )
-        .filter(EntityAttribute.source_table.isnot(None), EntityAttribute.source_table != '')
-        .all()
-    )
-    # group by entity_id
-    entity_tables: dict[str, str] = {}
-    entity_field_counts: dict[str, int] = {}
-    for r in rows:
-        entity_tables[r.entity_id] = r.source_table
-        entity_field_counts[r.entity_id] = entity_field_counts.get(r.entity_id, 0) + 1
-
-    # build asset index by table_name
-    all_assets = db.query(Asset).filter(Asset.status == "active").all()
-    asset_by_table = {(a.locator or {}).get("table", ""): a for a in all_assets if (a.locator or {}).get("table")}
-
-    from app.models import OntologyEntity
+    query = db.query(ObjectBinding, OntologyEntity, Asset).join(
+        OntologyEntity, ObjectBinding.object_type_id == OntologyEntity.id).join(
+        Asset, ObjectBinding.asset_id == Asset.id).filter(ObjectBinding.status == "active")
+    if ontology_id:
+        query = query.filter(OntologyEntity.ontology_id == ontology_id)
     result = []
-    for entity_id, table_name in entity_tables.items():
-        e = db.get(OntologyEntity, entity_id)
-        if not e:
-            continue
-        asset = asset_by_table.get(table_name)
-        record_count = (asset.profile or {}).get("row_count", 0) if asset else 0
-        datasource_name = asset.name if asset else ''
+    for binding, e, asset in query.all():
         result.append({
-            'entity_id': entity_id,
+            'entity_id': e.id,
             'entity_name_cn': e.name_cn,
-            'table_name': table_name,
-            'field_count': entity_field_counts.get(entity_id, 0),
-            'record_count': record_count,
-            'datasource_name': datasource_name,
+            'asset_id': asset.id,
+            'binding_id': binding.id,
+            'table_name': (asset.locator or {}).get('table', ''),
+            'field_count': len(binding.field_mappings or []),
+            'record_count': (asset.profile or {}).get('row_count', 0),
+            'datasource_name': asset.name,
         })
     return result
 
@@ -256,70 +238,21 @@ def create_from_datasource(
     user: User = Depends(require_user),
 ):
     from app.models.asset import Asset
-    from app.services.data_plane.connection_service import ConnectionService
-
     asset = db.get(Asset, body.datasource_id)
     if not asset:
-        raise HTTPException(status_code=404, detail="数据源不存在")
-
-    if not asset.connection_id:
-        raise HTTPException(status_code=400, detail="资产未关联连接")
-    columns = ConnectionService(db).get_table_schema(asset.connection_id, body.table_name)
-    if not columns:
-        raise HTTPException(status_code=400, detail="表无列信息")
-
-    table_pascal = body.table_name.replace("_", " ").title().replace(" ", "")
-    eid = f"{body.namespace}_{table_pascal}" if body.namespace else table_pascal
-
-    repo = EntityRepository(db)
-    if repo.get_by_id(eid):
-        raise HTTPException(status_code=409, detail=f"实体 {eid} 已存在")
-
-    pk_cols = [c["name"] for c in columns if c.get("is_pk")]
-    primary_key = pk_cols[0] if pk_cols else None
-
-    entity = OntologyEntity(
-        id=eid,
-        name=table_pascal,
-        name_cn=body.name_cn,
-        tier=body.tier,
-        status="active",
-        description=f"从数据源 {asset.name} 的表 {body.table_name} 自动生成",
-        config_json={
-            "datasource_id": asset.id,
-            "datasource_name": asset.name,
-            "table_name": body.table_name,
-            "primary_key": primary_key,
-        },
-        created_by=user.id,
-    )
-    db.add(entity)
-
-    for col in columns:
-        attr = EntityAttribute(
-            entity_id=eid,
-            name=col["name"],
-            type=_map_db_type(col["type"]),
-            description=col.get("comment") or col["name"],
-            required=not col.get("nullable", True),
-        )
-        db.add(attr)
-
-    db.flush()
-    write_audit(
-        db, user_id=user.id,
-        user_name=user.name,
-        action="create", target_type="entity",
-        target_id=eid, target_name=table_pascal,
-        snapshot_after={"source": "datasource", "datasource": asset.name, "table": body.table_name},
-    )
-    db.commit()
-    return get_entity(eid, db)
+        raise HTTPException(404, "资产不存在")
+    if (asset.locator or {}).get("table") != body.table_name:
+        raise HTTPException(422, "table_name 必须与所选资产一致")
+    return create_from_asset(FromAssetRequest(
+        asset_id=asset.id, name_cn=body.name_cn, tier=body.tier,
+        namespace=body.namespace, ontology_id=body.ontology_id,
+    ), db, user)
 
 
 # ── M2: 从 Asset 创建本体（自动落 ObjectBinding）──────────────
 
 class FromAssetRequest(BaseModel):
+    ontology_id: str
     asset_id: str
     name_cn: str
     tier: int = 1
@@ -357,19 +290,22 @@ def create_from_asset(
     if not columns:
         raise HTTPException(status_code=400, detail="资产无列信息（请先同步 Schema）")
 
+    if not db.get(ScenarioDict, body.ontology_id):
+        raise HTTPException(404, "本体不存在")
     table_name = (asset.locator or {}).get("table") or asset.name
     table_pascal = table_name.replace("_", " ").title().replace(" ", "")
-    eid = f"{body.namespace}_{table_pascal}" if body.namespace else table_pascal
+    eid = gen_uuid()
 
     repo = EntityRepository(db)
-    if repo.get_by_id(eid):
-        raise HTTPException(status_code=409, detail=f"实体 {eid} 已存在")
+    if db.query(OntologyEntity).filter_by(ontology_id=body.ontology_id, name=table_pascal).first():
+        raise HTTPException(409, "当前本体内已存在同名实体")
 
     pk_cols = [c["name"] for c in columns if c.get("is_pk")]
     primary_key = pk_cols[0] if pk_cols else None
 
     entity = OntologyEntity(
         id=eid,
+        ontology_id=body.ontology_id,
         name=table_pascal,
         name_cn=body.name_cn,
         tier=body.tier,
@@ -441,19 +377,33 @@ async def create_from_file(
         raise HTTPException(status_code=400, detail="文件内容为空")
 
     _ontology_id = ontology_id or None
+    if _ontology_id and not db.get(ScenarioDict, _ontology_id):
+        raise HTTPException(404, "本体不存在")
 
     try:
         if file_type == "json":
             import json as _json
             data = _json.loads(content.decode("utf-8"))
+            from app.core.permissions import has_permission
+            from app.schemas.action import ACTION_TYPES
+            action_specs = data.get("action_types", data.get("actions", []))
+            if any((action.get("action_type") or action.get("type")) in ACTION_TYPES for action in action_specs) and not has_permission(user, "rule:write", db):
+                raise HTTPException(403, "导入可执行动作需要 rule:write 权限")
             result = parse_json_ontology(data, namespace, db, ontology_id=_ontology_id)
         elif file_type == "owl":
             result = parse_owl_ontology(content, "xml", db, ontology_id=_ontology_id)
         else:
             result = parse_owl_ontology(content, "turtle", db, ontology_id=_ontology_id)
+    except HTTPException:
+        db.rollback()
+        raise
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=400, detail=f"文件解析失败: {str(e)}") from e
+
+    if result.errors:
+        db.rollback()
+        raise HTTPException(422, detail={"message": "导入包含无法解析的引用，未保存任何内容", "errors": result.errors})
 
     write_audit(
         db, user_id=user.id,
@@ -502,7 +452,8 @@ async def preview_from_file(
     try:
         if ft in ("xlsx", "xls"):
             from app.services.excel_import import preview_excel_ontology
-            preview = preview_excel_ontology(content, namespace)
+            from starlette.concurrency import run_in_threadpool
+            preview = await run_in_threadpool(preview_excel_ontology, content, namespace)
         elif ft == "json":
             import json as _json
             data = _json.loads(content.decode("utf-8"))
@@ -543,10 +494,11 @@ def get_entity(entity_id: str, db: Session = Depends(get_db)):
             to_entity_id=r.to_entity_id, to_entity_name=to_e.name_cn if to_e else "",
             to_entity_tier=to_e.tier if to_e else 1,
             cardinality=r.cardinality, acyclic=r.acyclic, description=r.description,
+            source_field=r.source_field, target_field=r.target_field,
         ))
 
     return EntityDetail(
-        id=entity.id, name=entity.name, name_cn=entity.name_cn,
+        id=entity.id, ontology_id=entity.ontology_id, name=entity.name, name_cn=entity.name_cn,
         tier=entity.tier, status=entity.status, description=entity.description,
         config_json=entity.config_json,
         scenario_codes=entity.scenario_codes,
@@ -565,6 +517,22 @@ def create_entity(
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
+    if data.status == "published":
+        raise HTTPException(422, "请通过本体版本发布流程发布对象")
+    if not db.get(ScenarioDict, data.ontology_id):
+        raise HTTPException(404, "本体不存在")
+    if db.query(OntologyEntity).filter_by(ontology_id=data.ontology_id, name=data.name).first():
+        raise HTTPException(409, "当前本体内已存在同名对象")
+    names = [a.name for a in data.attributes]
+    if len(names) != len(set(names)):
+        raise HTTPException(422, "属性名称不能重复")
+    for attribute in data.attributes:
+        if attribute.shared_attribute_id:
+            shared = db.get(SharedAttribute, attribute.shared_attribute_id)
+            if not shared or shared.ontology_id != data.ontology_id:
+                raise HTTPException(422, "共享属性不属于当前本体")
+            attribute.type = shared.data_type
+            attribute.description = shared.description or attribute.description
     entity = OntologyEntity(
         name=data.name, name_cn=data.name_cn, tier=data.tier,
         status=data.status, description=data.description,
@@ -577,6 +545,10 @@ def create_entity(
         entity.attributes.append(EntityAttribute(**attr.model_dump()))
     db.add(entity)
     db.flush()
+    mappings = [AttributeMappingUpdate(attribute_id=a.id, source_table=a.source_table, source_field=a.source_field)
+                for a in entity.attributes if a.source_table or a.source_field]
+    if mappings:
+        _sync_attribute_mappings(db, entity, mappings, user.id)
 
     write_audit(
         db, user_id=user.id,
@@ -609,6 +581,10 @@ def update_entity(
         if entity.ontology_id and entity.ontology_id != ontology_id:
             raise HTTPException(status_code=403, detail="无权修改其他本体的实体")
 
+    if data.name and data.name != entity.name and db.query(OntologyEntity).filter_by(ontology_id=entity.ontology_id, name=data.name).first():
+        raise HTTPException(409, "当前本体内已存在同名对象")
+    if data.status == "published" and entity.status != "published":
+        raise HTTPException(422, "请通过本体版本发布流程发布对象")
     changes = []
     for field, value in data.model_dump(exclude_unset=True).items():
         col = field if field != "name_cn" else "name_cn"
@@ -634,6 +610,7 @@ def update_attribute_mappings(
     entity_id: str,
     items: list[AttributeMappingUpdate],
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ):
     repo = EntityRepository(db)
     entity = repo.get_by_id(entity_id)
@@ -644,13 +621,123 @@ def update_attribute_mappings(
     for item in items:
         attr = attr_map.get(item.attribute_id)
         if not attr:
-            continue
-        attr.source_table = item.source_table
-        attr.source_field = item.source_field
-        attr.data_status = item.data_status
+            raise HTTPException(422, "映射属性不属于当前对象")
+    _sync_attribute_mappings(db, entity, items, user.id)
+    write_audit(db, user_id=user.id, user_name=user.name, action="update",
+                target_type="entity_mapping", target_id=entity.id, target_name=entity.name)
 
     repo.commit()
     return get_entity(entity.id, db)
+
+
+def _sync_attribute_mappings(db, entity, items, user_id):
+    """Legacy mapping entry writes the authoritative binding in the same transaction."""
+    from app.models.asset import Asset
+    from app.services.data_plane.object_binding_service import ObjectBindingService
+    service = ObjectBindingService(db)
+    bindings = service.list(object_type_id=entity.id, status=None)
+    updates = {b.id: list(b.field_mappings or []) for b in bindings}
+    new_by_asset = {}
+    for item in items:
+        if bool(item.source_table) != bool(item.source_field):
+            raise HTTPException(422, "源表和源字段必须同时填写或清空")
+        for bid, mappings in updates.items():
+            updates[bid] = [m for m in mappings if m.get("attribute_id") != item.attribute_id]
+        if not item.source_table:
+            continue
+        if item.asset_id:
+            asset = db.get(Asset, item.asset_id)
+            if not asset or (asset.locator or {}).get("table") != item.source_table:
+                raise HTTPException(422, "所选资产与源表不一致")
+        else:
+            bound_assets = [db.get(Asset, b.asset_id) for b in bindings if b.status == "active"]
+            candidates = [a for a in bound_assets if a and (a.locator or {}).get("table") == item.source_table]
+            if not candidates:
+                candidates = [a for a in db.query(Asset).filter_by(status="active", kind="table")
+                              if (a.locator or {}).get("table") == item.source_table]
+            candidates = list({a.id: a for a in candidates}.values())
+            if len(candidates) != 1:
+                raise HTTPException(422, "源表无法唯一定位资产，请提供 asset_id")
+            asset = candidates[0]
+        mapping = {"attribute_id": item.attribute_id, "source_column": item.source_field, "transform": None}
+        binding = next((b for b in bindings if b.asset_id == asset.id and b.status == "active"), None)
+        if binding:
+            updates[binding.id].append(mapping)
+        else:
+            new_by_asset.setdefault(asset.id, []).append(mapping)
+    try:
+        for binding in bindings:
+            if updates[binding.id] != (binding.field_mappings or []):
+                service.update(binding.id, field_mappings=updates[binding.id])
+        for asset_id, mappings in new_by_asset.items():
+            # The first data asset is primary. Additional sources enrich the object.
+            role = "primary" if not service.repo.get_primary(entity.id) else "enrichment"
+            service.create(object_type_id=entity.id, asset_id=asset_id, role=role,
+                           field_mappings=mappings, user_id=user_id)
+    except (ValueError, LookupError) as exc:
+        raise HTTPException(422, str(exc)) from exc
+
+
+def _validate_attribute(db, entity, data, attribute_id=None):
+    data.name = data.name.strip()
+    if not data.name or len(data.name) > 100:
+        raise HTTPException(422, "属性名称不能为空且最多 100 个字符")
+    existing = db.query(EntityAttribute).filter_by(entity_id=entity.id, name=data.name).first()
+    if existing and existing.id != attribute_id:
+        raise HTTPException(409, "对象内已存在同名属性")
+    if data.shared_attribute_id:
+        shared = db.get(SharedAttribute, data.shared_attribute_id)
+        if not shared or shared.ontology_id != entity.ontology_id:
+            raise HTTPException(422, "共享属性不属于当前本体")
+        data.type = shared.data_type
+        data.description = shared.description or data.description
+
+
+@router.post("/{entity_id}/attributes", response_model=AttributeOut, status_code=201)
+def create_attribute(entity_id: str, data: AttributeBase, db: Session = Depends(get_db),
+                     user: User = Depends(require_user)):
+    entity = db.get(OntologyEntity, entity_id)
+    if not entity:
+        raise HTTPException(404, "对象不存在")
+    _validate_attribute(db, entity, data)
+    attr = EntityAttribute(entity_id=entity_id, **data.model_dump())
+    db.add(attr)
+    db.flush()
+    if data.source_table or data.source_field:
+        _sync_attribute_mappings(db, entity, [AttributeMappingUpdate(attribute_id=attr.id,
+                                  source_table=data.source_table, source_field=data.source_field)], user.id)
+    write_audit(db, user_id=user.id, user_name=user.name, action="create", target_type="attribute",
+                target_id=attr.id, target_name=attr.name)
+    db.commit()
+    return attr
+
+
+@router.put("/{entity_id}/attributes/{attribute_id}", response_model=AttributeOut)
+def update_attribute(entity_id: str, attribute_id: str, data: AttributeBase,
+                     db: Session = Depends(get_db), user: User = Depends(require_user)):
+    entity = db.get(OntologyEntity, entity_id)
+    attr = db.get(EntityAttribute, attribute_id)
+    if not entity or not attr or attr.entity_id != entity_id:
+        raise HTTPException(404, "对象或属性不存在")
+    _validate_attribute(db, entity, data, attribute_id)
+    previous_name = attr.name
+    mapping_changed = (attr.source_table, attr.source_field) != (data.source_table, data.source_field)
+    for key, value in data.model_dump().items():
+        setattr(attr, key, value)
+    if mapping_changed:
+        _sync_attribute_mappings(db, entity, [AttributeMappingUpdate(attribute_id=attr.id,
+                                  source_table=data.source_table, source_field=data.source_field)], user.id)
+    if previous_name != attr.name:
+        for relation in db.query(EntityRelation).filter(
+            (EntityRelation.from_entity_id == entity_id) | (EntityRelation.to_entity_id == entity_id)):
+            if relation.from_entity_id == entity_id and relation.source_field == previous_name:
+                relation.source_field = attr.name
+            if relation.to_entity_id == entity_id and relation.target_field == previous_name:
+                relation.target_field = attr.name
+    write_audit(db, user_id=user.id, user_name=user.name, action="update", target_type="attribute",
+                target_id=attr.id, target_name=attr.name)
+    db.commit()
+    return attr
 
 
 @router.delete("/{entity_id}", status_code=204)
@@ -701,6 +788,16 @@ def delete_entity(
         target_id=entity.id, target_name=entity.name,
         snapshot_before={"name": entity.name, "tier": entity.tier},
     )
+    for group in db.query(OntologyGroup).filter_by(ontology_id=entity.ontology_id):
+        if entity.id in (group.entity_ids or []):
+            group.entity_ids = [eid for eid in group.entity_ids if eid != entity.id]
+    from app.services.data_plane.object_binding_service import ObjectBindingService
+    from app.models.shared_ref import OntologySharedRef
+    for binding in bindings:
+        ObjectBindingService(db).delete(binding.id)
+    for relation in relations:
+        db.delete(relation)
+    db.query(OntologySharedRef).filter_by(entity_id=entity_id).delete(synchronize_session=False)
     repo.delete(entity)
     repo.commit()
 
@@ -755,9 +852,15 @@ def delete_attribute(
             original = binding.field_mappings or []
             updated = [m for m in original if m.get("attribute_id") != attribute_id]
             if len(updated) != len(original):
-                binding.field_mappings = updated
-                from sqlalchemy.orm.attributes import flag_modified
-                flag_modified(binding, "field_mappings")
+                from app.services.data_plane.object_binding_service import ObjectBindingService
+                ObjectBindingService(db).update(binding.id, field_mappings=updated)
+
+    for relation in db.query(EntityRelation).filter(
+        (EntityRelation.from_entity_id == entity_id) | (EntityRelation.to_entity_id == entity_id)):
+        if relation.from_entity_id == entity_id and relation.source_field == attr.name:
+            relation.source_field = None
+        if relation.to_entity_id == entity_id and relation.target_field == attr.name:
+            relation.target_field = None
 
     write_audit(
         db, user_id=user.id,
@@ -769,6 +872,9 @@ def delete_attribute(
 
     db.delete(attr)
     db.commit()
+    # Long-lived editor/test sessions may disable expire_on_commit. A later
+    # entity cascade must not revisit the already deleted attribute instance.
+    db.expire(entity, ["attributes"])
 
 
 # ── AI 智能提取本体 ──────────────────────────────────────────
@@ -818,24 +924,38 @@ _EXTRACT_PROMPT = """你是本体建模专家。请从以下文本中提取本�
 async def ai_extract_entities(
     text: str | None = Form(None),
     file: UploadFile | None = File(None),
+    db: Session = Depends(get_db),
 ):
     if not text and not file:
         raise HTTPException(400, "请提供文本或文件")
 
     content = text or ""
     if file:
-        raw = await file.read()
-        content = raw.decode("utf-8", errors="ignore")
+        from app.services.data_plane.storage_policy import storage_policy
+        from app.services.doc_builder import parse_file_content
+        policy = storage_policy(db)
+        if (file.filename or "").rsplit(".", 1)[-1].lower() not in policy["allowed"]:
+            raise HTTPException(422, "存储配置不允许该文档类型")
+        raw = await file.read(policy["max_bytes"] + 1)
+        if len(raw) > policy["max_bytes"]:
+            raise HTTPException(413, "文档超过配置的上传大小限制")
+        try:
+            content = parse_file_content(file.filename or "", raw)
+        except Exception as exc:
+            raise HTTPException(422, "无法解析文档内容") from exc
 
     if not content.strip():
         raise HTTPException(400, "内容为空")
+    if len(content) > 8000:
+        raise HTTPException(413, "提取内容超过 8000 字符，请拆分文档后重试")
 
-    client = get_llm_client()
+    from app.services.llm_resolver import get_model_name
+    client = get_llm_client(db=db, scene="ontology")
     resp = client.chat.completions.create(
-        model=settings.LLM_MODEL,
+        model=get_model_name(db, scene="ontology"),
         messages=[
             {"role": "system", "content": _EXTRACT_PROMPT},
-            {"role": "user", "content": content[:8000]},
+            {"role": "user", "content": content},
         ],
         temperature=0,
         max_tokens=4096,
@@ -851,4 +971,12 @@ async def ai_extract_entities(
     except _json.JSONDecodeError as e:
         raise HTTPException(500, "AI 返回格式异常，请重试") from e
 
-    return _ExtractResult(**data)
+    if not isinstance(data, dict) or not data.get("entities"):
+        raise HTTPException(502, "AI 未生成有效对象")
+    result = _ExtractResult(**data)
+    names = {entity.name for entity in result.entities}
+    if any(not entity.attributes for entity in result.entities) or any(
+        relation.from_entity not in names or relation.to_entity not in names for relation in result.relations
+    ):
+        raise HTTPException(502, "AI 对象属性或关系引用不完整")
+    return result

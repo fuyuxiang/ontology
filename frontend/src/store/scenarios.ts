@@ -1,20 +1,32 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
+import { useAuthStore } from './auth'
 import { scenarioApi, type Scenario } from '../api/scenarios'
 
 export const useScenarioStore = defineStore('scenarios', () => {
   const scenarios = ref<Scenario[]>([])
   const loaded = ref(false)
   const loading = ref(false)
+  const auth = useAuthStore()
+  let generation = 0
+  watch(() => auth.user?.id, () => { ++generation; scenarios.value = []; loaded.value = false; loading.value = false }, {flush:'sync'})
 
   async function fetchScenarios(force = false) {
+    if (!auth.user) {
+      const sessionToken = auth.token
+      if (!sessionToken) return
+      await auth.fetchUser()
+      // A caller waiting for account A must not start a request as account B.
+      if (!auth.user || !auth.token || auth.token !== sessionToken) return
+    }
     if (loaded.value && !force) return
+    const request = ++generation
     loading.value = true
     try {
-      scenarios.value = await scenarioApi.list()
-      loaded.value = true
+      const rows = await scenarioApi.list()
+      if (request === generation) { scenarios.value = rows; loaded.value = true }
     } finally {
-      loading.value = false
+      if (request === generation) loading.value = false
     }
   }
 

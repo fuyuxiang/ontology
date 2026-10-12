@@ -7,8 +7,8 @@ import { get, post } from './client'
 export const ontologyPublishApi = {
   previewImpact: (versionId: string) =>
     get<any>(`/ontology-publish/versions/${versionId}/impact`),
-  quickPublish: (ontologyId: string, name?: string, description?: string) =>
-    post<any>('/ontology-publish/quick-publish', { ontology_id: ontologyId, name, description }),
+  quickPublish: (ontologyId: string, name?: string, description?: string, signal?: AbortSignal) =>
+    post<any>('/ontology-publish/quick-publish', { ontology_id: ontologyId, name, description }, { signal }),
   listPublishedOntologies: () =>
     get<any>('/ontology-publish/ontologies'),
   listVersions: (status?: string) =>

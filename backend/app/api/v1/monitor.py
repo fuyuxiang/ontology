@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import platform
 import shutil
@@ -8,7 +9,9 @@ from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisco
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.database import get_db
+from app.database import get_db, SessionLocal
+from app.core.security import decode_token_payload
+from app.models.user import User
 from app.models import Agent, OntologyEntity
 from app.models.asset import Asset
 from app.models.quality_rule import QualityRule
@@ -188,12 +191,27 @@ def get_system_info():
 # -- WebSocket endpoint --
 
 @router.websocket("/ws")
-async def monitor_ws(ws: WebSocket):
+async def monitor_ws(ws: WebSocket, db: Session = Depends(get_db)):
+    offered = ws.headers.get("sec-websocket-protocol", "").split(",")
+    token = next((value.strip()[4:] for value in offered if value.strip().startswith("jwt.")), None)
+    header = ws.headers.get("Authorization", "")
+    token = token or (header[7:] if header.startswith("Bearer ") else ws.query_params.get("token"))
     await ws_manager.connect(ws)
     try:
         while True:
-            data = await ws.receive_text()
+            payload = decode_token_payload(token, "access") if token else None
+            db.rollback()
+            user = db.get(User, payload["sub"], populate_existing=True) if payload else None
+            if not user or not user.is_active or payload.get("tv", 0) != user.token_version:
+                await ws.close(code=1008, reason="登录会话已失效")
+                break
+            try:
+                data = await asyncio.wait_for(ws.receive_text(), timeout=30)
+            except asyncio.TimeoutError:
+                continue
             if data == "pong":
                 continue
     except WebSocketDisconnect:
+        pass
+    finally:
         ws_manager.disconnect(ws)

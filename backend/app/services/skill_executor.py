@@ -74,28 +74,48 @@ def execute_skill_stream(code_ref: str, params: dict, db: Session):
         yield {"step": "error", "status": "error", "message": str(e)}
 
 
-def execute_skill_tool_call(tool_type: str, tool_config: dict, params: dict, db: Session) -> dict:
+def execute_skill_tool_call(tool_type: str, tool_config: dict, params: dict, db: Session, *, context=None, user=None,
+                            version_id=None, action_mode="simulation") -> dict:
     """Execute a function tool referenced by a skill."""
     if tool_type == "function":
         from app.services.function_executor import FunctionExecutor
+        from app.services.function_runtime.models import ExecContext
+        context = context or ExecContext(ontology_id=tool_config.get("ontology_id"),
+            entity_ids=frozenset(tool_config["entity_ids"]) if tool_config.get("entity_ids") is not None else None,
+            user=user, version_id=version_id, action_mode=action_mode)
         callable_name = tool_config.get("callable_name")
         func_id = tool_config.get("function_id")
         executor = FunctionExecutor(db)
-        if callable_name:
-            result = executor.execute_by_callable_name(callable_name, params)
+        if context.version_id:
+            from app.models.version_components import OntologyVersionFunction
+            functions = db.query(OntologyVersionFunction).filter_by(version_id=context.version_id).all()
+            matches = [f for f in functions if (callable_name and f.callable_name == callable_name)
+                       or (func_id and f.source_function_id == func_id)]
+            if len(matches) != 1:
+                return {"success": False, "summary": "Function is not in the fixed release", "data": {}}
+            result = executor.execute_snapshot(matches[0], params, context=context)
+        elif callable_name:
+            result = executor.execute_by_callable_name(callable_name, params, context.ontology_id, context=context)
         elif func_id:
             from app.models.function import OntologyFunction
             func = db.get(OntologyFunction, func_id)
             if not func:
                 return {"success": False, "summary": f"Function {func_id} not found", "data": {}}
-            result = executor.execute(func, params)
+            result = executor.execute(func, params, context=context)
         else:
             return {"success": False, "summary": "Missing callable_name or function_id", "data": {}}
 
+        summary = f"Function returned: {result.value}" if result.success else f"Error: {result.error}"
+        if result.requested_write:
+            summary = "Write preview; execution stopped before the write" if result.outcome == "simulated" else "Write awaiting confirmation; execution stopped before the write"
         return {
             "success": result.success,
-            "summary": f"Function returned: {result.value}" if result.success else f"Error: {result.error}",
-            "data": {"value": result.value, "execution_ms": result.execution_ms},
+            "summary": summary,
+            "data": {"value": result.value, "execution_ms": result.execution_ms,
+                     "requested_write": result.requested_write, "committed_writes": result.committed_writes},
+            "outcome": result.outcome,
+            "simulated": result.outcome == "simulated",
+            "execution_complete": not bool(result.requested_write),
         }
 
     return {"success": False, "summary": f"Unknown tool type: {tool_type}", "data": {}}
@@ -107,6 +127,8 @@ def execute_generated_skill(skill, params: dict, db) -> dict:
     from app.services.skill_sandbox import execute_in_sandbox
 
     tools = db.query(SkillTool).filter(SkillTool.skill_id == skill.id).all()
+    if not tools:
+        return {"success": False, "summary": "Skill has no executable tools", "data": {}}
     results = {}
     for tool in tools:
         try:

@@ -2,37 +2,37 @@
   <div class="aw agent-list">
     <header class="aw-header">
       <div>
-        <h1>智能体应用</h1>
-        <p class="aw-muted">围绕业务任务配置本体、技能与执行范围。</p>
+        <h1>{{ text("智能体应用") }}</h1>
+        <p class="aw-muted">{{ text("围绕业务任务配置本体、技能与执行范围。") }}</p>
       </div>
       <button v-if="canEdit" class="aw-button aw-primary" @click="router.push('/agent/manage/new')">
-        + 新建智能体
+        {{ text("+ 新建智能体") }}
       </button>
     </header>
     <div v-if="error" class="aw-alert aw-error" role="alert">
-      {{ error }}<button class="aw-link" @click="loadAgents">重试</button>
+      {{ error }}<button class="aw-link" @click="loadAgents">{{ text("重试") }}</button>
     </div>
     <div class="agent-list-toolbar">
       <input
         v-model="searchText"
-        aria-label="搜索智能体"
-        placeholder="搜索名称或业务目标…"
-      /><select v-model="statusFilter" aria-label="按状态筛选">
-        <option value="all">全部状态</option>
-        <option value="draft">草稿</option>
-        <option value="published">已发布</option>
+        :aria-label="text('搜索智能体')"
+        :placeholder="text('搜索名称或业务目标…')"
+      /><select v-model="statusFilter" :aria-label="text('按状态筛选')">
+        <option value="all">{{ text("全部状态") }}</option>
+        <option value="draft">{{ text("草稿") }}</option>
+        <option value="published">{{ text("已发布") }}</option>
       </select>
     </div>
-    <p v-if="loading" class="aw-empty">正在加载智能体…</p>
+    <p v-if="loading" class="aw-empty">{{ text("正在加载智能体…") }}</p>
     <div v-else-if="filteredAgents.length" class="agent-list-cards">
       <article v-for="agent in filteredAgents" :key="agent.id" class="aw-card agent-list-card">
         <div class="aw-row aw-between">
           <h2>{{ agent.name }}</h2>
           <span class="aw-pill" :class="agent.status === 'published' ? 'aw-green' : 'aw-amber'">{{
-            agent.status === 'published' ? '已发布' : '草稿'
+            agent.status === 'published' ? text('已发布') : text('草稿')
           }}</span>
         </div>
-        <p class="aw-muted">{{ agent.description || '尚未填写业务目标' }}</p>
+        <p class="aw-muted">{{ agent.description || text('尚未填写业务目标') }}</p>
         <div class="aw-row">
           <span v-if="agent.current_version" class="aw-pill aw-blue"
             >v{{ agent.current_version }}</span
@@ -42,7 +42,7 @@
             }}
             项技能</span
           ><span v-for="tag in agent.tags || []" :key="tag" class="aw-pill">{{ tag }}</span
-          ><span v-if="agent.has_changes" class="aw-pill aw-amber">草稿有修改</span>
+          ><span v-if="agent.has_changes" class="aw-pill aw-amber">{{ text("草稿有修改") }}</span>
         </div>
         <footer class="aw-row aw-between">
           <small
@@ -56,7 +56,7 @@
               :disabled="deleting === agent.id || !canEdit"
               @click="removeAgent(agent)"
             >
-              {{ deleting === agent.id ? '删除中…' : '删除' }}</button
+              {{ deleting === agent.id ? '删除中…' : text('删除') }}</button
             ><button class="aw-link" @click="router.push(`/agent/manage/${agent.id}`)">
               配置与调试 →
             </button>
@@ -70,14 +70,18 @@
   </div>
 </template>
 <script setup lang="ts">
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
+
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { agentsApi, type AgentItem } from '../../api/agents'
 import { skillError } from '../../api/skills'
 import { useAuthStore } from '../../store/auth'
+import { useManagementPermission } from '../../composables/useManagementPermission'
 const router = useRouter()
 const authStore = useAuthStore()
-const canEdit = computed(() => ['admin', 'editor'].includes(authStore.user?.role || ''))
+const { canEdit } = useManagementPermission('rule:write')
 const searchText = ref('')
 const statusFilter = ref('all')
 const agents = ref<AgentItem[]>([])

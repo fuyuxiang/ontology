@@ -22,7 +22,8 @@
 import { ref } from 'vue'
 
 const emit = defineEmits<{ (e: 'next', payload: { businessDesc: string }): void }>()
-const desc = ref('')
+const props = defineProps<{ initialDesc?: string }>()
+const desc = ref(props.initialDesc || '')
 </script>
 
 <style scoped>

@@ -57,7 +57,8 @@ class SkillService:
 
     @staticmethod
     def can_edit(skill: Skill, user: User) -> bool:
-        return bool(user and user.is_active and user.role in {"admin", "editor"} and
+        from app.core.permissions import has_permission
+        return bool(has_permission(user, "rule:write") and
                     (user.role == "admin" or skill.created_by == user.id))
 
     @classmethod
@@ -83,7 +84,8 @@ class SkillService:
                 and (not search or search.lower() in f"{s.name} {s.description}".lower())]
 
     def create(self, data: dict, user: User) -> dict:
-        if not user.is_active or user.role not in {"admin", "editor"}:
+        from app.core.permissions import has_permission
+        if not has_permission(user, "rule:write", self.db):
             raise HTTPException(403, "需要管理员或编辑者权限")
         config = copy.deepcopy(META_DEFAULTS)
         config.update({k: copy.deepcopy(data[k]) for k in META_DEFAULTS if k in data})
@@ -259,12 +261,12 @@ class SkillService:
                 errors.append(f"能力 {tool.name} 未启用")
                 continue
             source = snap or tool
-            fields = ("name", "description", "input_schema", "return_type", "logic_type", "logic_body", "callable_name") if ref_type == "function" else (
+            fields = ("name", "description", "input_schema", "return_type", "logic_type", "logic_body", "callable_name", "source_code", "func_name", "checksum") if ref_type == "function" else (
                 "name", "description", "parameters_json", "output_schema", "action_type", "type_config", "category")
             payload = {key: copy.deepcopy(getattr(source, key, None)) for key in fields}
             payload.update({"id": ref_id, "type": ref_type, "ontology_id": ontology_id,
                             "entity_id": tool.entity_id, "entity_ids": sorted(tool_entities),
-                            "snapshot_id": snap.id if snap else None})
+                            "snapshot_id": snap.id if snap else None, "version_id": version_id})
             deps["functions" if ref_type == "function" else "actions"].append(payload)
         for asset_id in content["asset_refs"]:
             asset = self.db.get(Asset, asset_id)
@@ -370,6 +372,13 @@ class SkillService:
                         raise ValueError("测试执行器未返回有效结果")
                     answer = str(output.get("answer") or "")
                     tool_runs = _list(output.get("tool_runs"))
+                    for tool_run in tool_runs:
+                        result = tool_run.get("result") or {}
+                        if tool_run.get("success") is False or (isinstance(result, dict) and (
+                                result.get("success") is False or result.get("error"))):
+                            failure = (result.get("error") or result.get("message")) if isinstance(result, dict) else None
+                            case_errors.append(f"工具 {tool_run.get('tool', '')} 执行失败："
+                                f"{failure or tool_run.get('summary') or '业务失败'}")
                     if output.get("error"):
                         case_errors.append(str(output["error"]))
                     if not answer.strip():

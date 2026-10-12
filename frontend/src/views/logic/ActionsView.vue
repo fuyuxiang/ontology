@@ -3,11 +3,11 @@
     <BuilderReturnBanner kind-label="动作" />
     <div class="logic-page__header">
       <div v-if="!embedded">
-        <h1 class="text-display">行动建模</h1>
-        <p class="text-caption" style="margin-top: 4px">行动注册与执行管理</p>
+        <h1 class="text-display">{{ text("行动建模") }}</h1>
+        <p class="text-caption" style="margin-top: 4px">{{ text("行动注册与执行管理") }}</p>
       </div>
       <div class="logic-page__actions">
-        <button class="btn-primary" @click="openCreate">
+        <button class="btn-primary" @click="openCreate" :disabled="!canEdit">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path
               d="M7 2v10M2 7h10"
@@ -16,14 +16,15 @@
               stroke-linecap="round"
             />
           </svg>
-          新建行动
+          {{ text("新建行动") }}
         </button>
+        <button class="btn-secondary" @click="showCreateModal = true" :disabled="!canEdit">{{ text("新建 Python 脚本") }}</button>
       </div>
     </div>
 
     <div v-if="error" class="logic-error" role="alert">
       <span>{{ error }}</span>
-      <button class="btn-secondary" :disabled="loading" @click="fetchActions">重试</button>
+      <button class="btn-secondary" :disabled="loading" @click="fetchActions">{{ text("重试") }}</button>
     </div>
     <div class="master-detail" :aria-busy="loading">
       <div class="master-detail__list">
@@ -31,8 +32,8 @@
           <input
             v-model="search"
             class="logic-search"
-            aria-label="搜索行动"
-            placeholder="搜索行动名称..."
+            :aria-label="text('搜索行动')"
+            :placeholder="text('搜索行动名称...')"
           />
           <div class="logic-filter-tags">
             <button
@@ -62,14 +63,14 @@
             <span class="list-item__status" :class="`list-item__status--${action.status}`"></span>
             <span class="list-item__name">{{ action.name }}</span>
             <span class="list-item__badge" :class="`priority--${action.category}`">{{
-              action.category === 'domain' ? '领域' : '系统'
+              action.category === 'domain' ? text('领域') : text('系统')
             }}</span>
-            <span class="list-item__meta">{{ action.entity_name || '系统' }}</span>
+            <span class="list-item__meta">{{ action.entity_name || text('系统') }}</span>
           </button>
-          <div v-if="loading" class="logic-empty" role="status">正在加载行动…</div>
+          <div v-if="loading" class="logic-empty" role="status">{{ text("正在加载行动…") }}</div>
           <div v-else-if="!error && filteredActions.length === 0" class="logic-empty">
             <p class="text-caption">
-              {{ actions.length ? '无匹配行动，请调整搜索或筛选。' : '暂无行动，从新建开始。' }}
+              {{ actions.length ? text('无匹配行动，请调整搜索或筛选。') : text('暂无行动，从新建开始。') }}
             </p>
           </div>
         </div>
@@ -80,60 +81,61 @@
           <div class="detail-panel__header">
             <h2 class="detail-panel__title">{{ selectedAction.name }}</h2>
             <span class="list-item__badge" :class="`priority--${selectedAction.category}`">{{
-              selectedAction.category === 'domain' ? '领域行动' : '系统行动'
+              selectedAction.category === 'domain' ? text('领域行动') : text('系统行动')
             }}</span>
           </div>
 
           <div class="detail-panel__meta">
             <div class="detail-meta-item">
-              <span class="detail-meta-label">状态</span>
+              <span class="detail-meta-label">{{ text("状态") }}</span>
               <span class="detail-meta-value">
                 <span
                   class="list-item__status"
                   :class="`list-item__status--${selectedAction.status}`"
                 ></span>
-                {{ selectedAction.status === 'active' ? '已激活' : '未激活' }}
+                {{ selectedAction.status === 'active' ? text('已激活') : text('未激活') }}
               </span>
             </div>
             <div class="detail-meta-item">
-              <span class="detail-meta-label">关联实体</span>
-              <span class="detail-meta-value">{{ selectedAction.entity_name || '系统行动' }}</span>
+              <span class="detail-meta-label">{{ text("关联实体") }}</span>
+              <span class="detail-meta-value">{{ selectedAction.entity_name || text('系统行动') }}</span>
             </div>
             <div class="detail-meta-item">
-              <span class="detail-meta-label">行动类型</span>
+              <span class="detail-meta-label">{{ text("行动类型") }}</span>
               <span class="detail-meta-value">{{ getTypeLabel(selectedAction.action_type) }}</span>
             </div>
             <div class="detail-meta-item">
-              <span class="detail-meta-label">执行次数</span>
+              <span class="detail-meta-label">{{ text("执行次数") }}</span>
               <span class="detail-meta-value">{{ selectedAction.impact_count ?? 0 }} 次</span>
             </div>
           </div>
 
           <div v-if="selectedAction.description" class="detail-panel__section">
-            <h3 class="detail-section-title">描述</h3>
+            <h3 class="detail-section-title">{{ text("描述") }}</h3>
             <p class="detail-section-text">{{ selectedAction.description }}</p>
           </div>
 
           <div v-if="selectedAction.parameters_json?.length" class="detail-panel__section">
-            <h3 class="detail-section-title">参数</h3>
+            <h3 class="detail-section-title">{{ text("参数") }}</h3>
             <code class="detail-code-block">{{
               selectedAction.parameters_json.map((p: any) => p.name || p).join(', ')
             }}</code>
           </div>
 
           <div class="detail-panel__actions">
-            <button class="btn-sm-exec" @click="openEdit(selectedAction.id)">编辑</button>
+            <button class="btn-sm-exec" @click="openEdit(selectedAction.id)" :disabled="!canEdit">{{ text("编辑配置") }}</button>
+            <button v-if="selectedAction.action_type === 'custom_script'" class="btn-sm-exec" @click="openCode(selectedAction.id)" :disabled="!canEdit">{{ text("Python 工作区") }}</button>
             <button
               class="btn-sm-exec"
-              :disabled="executing || selectedAction.status !== 'active'"
+              :disabled="!canExecute || executing || selectedAction.status !== 'active'"
               @click="openExecution(selectedAction)"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path d="M3 1.5l7 4.5-7 4.5V1.5z" fill="currentColor" />
               </svg>
-              {{ selectedAction.status === 'active' ? '执行' : '未激活' }}
+              {{ selectedAction.status === 'active' ? text('执行') : text('未激活') }}
             </button>
-            <button class="btn-sm-del" :disabled="!!deleting" @click="handleDelete(selectedAction)">
+            <button class="btn-sm-del" :disabled="!canEdit || (!!deleting)" @click="handleDelete(selectedAction)">
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path
                   d="M2 3h8M4 3V2h4v1M3 3v7h6V3"
@@ -143,23 +145,24 @@
                   stroke-linejoin="round"
                 />
               </svg>
-              删除
+              {{ text("删除") }}
             </button>
           </div>
         </template>
         <div v-else class="detail-panel__empty">
-          <p class="text-caption">选择一个行动查看详情</p>
+          <p class="text-caption">{{ text("选择一个行动查看详情") }}</p>
         </div>
       </div>
     </div>
 
     <ModalDialog
       :visible="!!executionAction"
-      :title="`执行行动 · ${executionAction?.name || ''}`"
+      :title="`${text('执行行动')} · ${executionAction?.name || ''}`"
       width="640px"
       @close="closeExecution"
     >
-      <p class="execution-hint">请核对参数后执行。执行结果会显示在此窗口中。</p>
+      <p class="execution-hint">{{ text("请核对参数后执行。刷新、断线和重试使用同一执行关联键；结果未知时请先核对业务回执。") }}</p>
+      <p v-if="executionAttempt">{{ text('关联键：') }}<code>{{ executionAttempt.key }}</code></p>
       <ul v-if="executionAction?.parameters_json?.length" class="execution-parameters">
         <li v-for="parameter in executionAction.parameters_json" :key="parameter.name">
           <code>{{ parameter.name }}</code> · {{ parameter.type
@@ -167,7 +170,7 @@
           <span v-if="parameter.description"> — {{ parameter.description }}</span>
         </li>
       </ul>
-      <label class="form-label" for="action-execution-input">输入参数（JSON 对象）</label>
+      <label class="form-label" for="action-execution-input">{{ text("输入参数（JSON 对象）") }}</label>
       <textarea
         id="action-execution-input"
         v-model="executionInput"
@@ -183,20 +186,31 @@
         :class="{ 'execution-error': !executionResult.success }"
         role="status"
       >
-        <strong>{{ executionResult.success ? '执行成功' : '执行失败' }}</strong>
+        <strong>{{ executionStateLabel(executionResult) }}</strong>
+        <p v-if="executionResult.execution_id">{{ text('执行记录：') }}{{ executionResult.execution_id }} · {{ executionResult.state }}</p>
         <p>{{ executionResult.message }}</p>
         <pre v-if="executionResult.output">{{
           JSON.stringify(executionResult.output, null, 2)
         }}</pre>
       </div>
       <template #footer>
-        <button class="btn-secondary" :disabled="executing" @click="closeExecution">关闭</button>
+        <button class="btn-secondary" :disabled="executing" @click="closeExecution">{{ text("关闭") }}</button>
+        <section v-if="['unknown','committed_unrecorded'].includes(executionResult?.state || '') && executionResult?.execution_id" class="execution-reconciliation">
+          <h4>{{ text("人工核查执行回执") }}</h4><p>{{ text("仅记录人工已核对的声明，不会再次发送原行动。请先检查真实源数据或外部回执。") }}</p>
+          <label>{{ text("核查结果") }}<select v-model="reconciliationResolution" :disabled="executing"><option value="succeeded">{{ text("已确认业务成功") }}</option><option value="failed">{{ text("已确认未成功") }}</option></select></label>
+          <label>{{ text("回执编号（可选）") }}<input v-model="reconciliationReceipt" :disabled="executing" /></label>
+          <label>{{ text("核查依据") }}<textarea v-model="reconciliationEvidence" :disabled="executing" rows="3" :placeholder="text('记录源数据回读、外部回执及确认结果，至少10字')" /></label>
+          <label><input type="checkbox" v-model="reconciliationAcknowledged" :disabled="executing" /> {{ text("我已核对业务源或回执，确认上述人工声明") }}</label>
+          <button class="btn-secondary" :disabled="executing || !canExecute || !reconciliationAcknowledged || reconciliationEvidence.trim().length < 10" @click="reconcileExecution">{{ text("记录人工核查结果") }}</button>
+        </section>
+        <button v-if="executionAttempt" class="btn-secondary" :disabled="executing" @click="checkExecution">{{ text("核查已有执行结果") }}</button>
+        <button v-if="executionResult?.state === 'succeeded' || executionResult?.state === 'failed'" class="btn-secondary" :disabled="executing || !canExecute" @click="newExecution">{{ text("开始新执行") }}</button>
         <button
           class="btn-primary"
-          :disabled="executing || !!executionResult?.success"
+          :disabled="!canExecute || executing || !!executionResult?.success || ['unknown','committed_unrecorded','partial_committed','executing','pending'].includes(executionResult?.state || '')"
           @click="handleExecute"
         >
-          {{ executing ? '执行中…' : executionResult?.success ? '已执行' : '执行' }}
+          {{ executing ? text('执行中…') : executionResult?.success ? text('已执行') : text('执行') }}
         </button>
       </template>
     </ModalDialog>
@@ -217,6 +231,11 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
+
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit, canExecute } = useManagementPermission('rule:write')
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -233,8 +252,11 @@ import { useToast } from '../../composables/useToast'
 import BuilderReturnBanner from '../../components/common/BuilderReturnBanner.vue'
 import ActionBuilderDrawer from '../../components/logic/ActionBuilderDrawer.vue'
 import ActionCreateModal from '../../components/logic/ActionCreateModal.vue'
+import { useAuthStore } from '../../store/auth'
+import { readActionAttempt, ensureActionAttempt, saveActionAttempt, clearCompletedActionAttempt, type ActionAttempt } from '../../utils/actionAttempt'
 
 const props = defineProps<{ embedded?: boolean }>()
+const auth = useAuthStore()
 
 const route = useRoute()
 const router = useRouter()
@@ -259,10 +281,56 @@ const executionInput = ref('{}')
 const executionError = ref('')
 const executionResult = ref<ActionExecuteResult | null>(null)
 const executing = ref(false)
+const reconciliationResolution = ref<'succeeded'|'failed'>('succeeded')
+const reconciliationEvidence = ref(''), reconciliationReceipt = ref(''), reconciliationAcknowledged = ref(false)
+const executionAttempt = ref<ActionAttempt | null>(null)
+let executionEpoch = 0
+onBeforeUnmount(() => { ++executionEpoch })
+function executionStateLabel(result:ActionExecuteResult) {
+  if (result.state === 'partial_committed') return text('部分写入已提交 · 已完成的写入保留，请核查回执；原行动不可重试')
+  if (result.state === 'committed_unrecorded') return text('业务已提交 · 执行记录待核查，原行动不会重发')
+  if (result.state === 'unknown') return text('结果待核对 · 原执行不会重发')
+  if (result.state === 'executing' || result.state === 'pending') return text('执行正在进行')
+  return text(result.success ? '执行成功' : '执行失败')
+}
+function newExecution() {
+  const action = executionAction.value
+  if (!canExecute.value || !action || executing.value || !auth.user?.id) return
+  try { clearCompletedActionAttempt(auth.user.id, action.id); executionAttempt.value = null; executionResult.value = null; executionError.value = '' }
+  catch (exception) { executionError.value = skillError(exception, '无法开始新执行') }
+}
+async function reconcileExecution() {
+  const action=executionAction.value, result=executionResult.value, owner=auth.user?.id
+  if (!action || !owner || !result?.execution_id || !['unknown','committed_unrecorded'].includes(result.state || '') || !canExecute.value || executing.value) return
+  if (!reconciliationAcknowledged.value || reconciliationEvidence.value.trim().length < 10) { executionError.value=text('请确认已经人工核对，并填写至少10字的源数据或回执核查依据');return }
+  const epoch=executionEpoch
+  executing.value=true;executionError.value=''
+  try {
+    const resolved=await actionApi.reconcile(action.id,result.execution_id,{resolution:reconciliationResolution.value,evidence:reconciliationEvidence.value.trim(),receipt_id:reconciliationReceipt.value.trim() || undefined})
+    if (executionAttempt.value) saveActionAttempt(owner,action.id,{key:executionAttempt.value.key,state:resolved.state || 'unknown',execution_id:resolved.execution_id})
+    if (epoch !== executionEpoch) return
+    executionResult.value=resolved
+    await fetchActions()
+  } catch (error) { if (epoch === executionEpoch) executionError.value=skillError(error,'人工核查结果记录失败，请核查原执行回执') }
+  finally { if (epoch === executionEpoch) executing.value=false }
+}
+async function checkExecution() {
+  const action = executionAction.value, attempt = executionAttempt.value, owner = auth.user?.id
+  if (!action || !attempt || !owner || executing.value) return
+  const epoch = executionEpoch
+  executing.value = true; executionError.value = ''
+  try {
+    const record = await actionApi.executionByKey(action.id, attempt.key)
+    saveActionAttempt(owner, action.id, {key:attempt.key, state:record.state || 'unknown', execution_id:record.execution_id})
+    if (epoch !== executionEpoch || executionAction.value?.id !== action.id) return
+    executionAttempt.value = readActionAttempt(owner, action.id); executionResult.value = record; executionInput.value = JSON.stringify(record.params, null, 2)
+  } catch (exception:any) { if (epoch === executionEpoch) executionError.value = exception?.response?.status === 404 ? '服务端尚未登记该执行；使用原关联键重试，不会重复提交。' : skillError(exception, '核查执行结果失败') }
+  finally { if (epoch === executionEpoch) executing.value = false }
+}
 
 const filterOptions = [
-  { label: '全部', value: 'all' },
-  { label: '已激活', value: 'active' },
+  { label: text('全部'), value: 'all' },
+  { label: text('已激活'), value: 'active' },
 ]
 
 const selectedAction = computed(
@@ -291,10 +359,15 @@ function setFilter(value: string) {
 }
 
 function openCreate() {
-  showCreateModal.value = true
+  drawerEditId.value = undefined
+  drawerVisible.value = true
 }
 
 function openEdit(id: string) {
+  drawerEditId.value = id
+  drawerVisible.value = true
+}
+function openCode(id: string) {
   const query: Record<string, string> = {}
   if (route.params.code) {
     query.from = 'ontology'
@@ -352,7 +425,7 @@ async function refreshAfterMutation() {
     try {
       await scenarioStore.refreshScenarios()
     } catch {
-      toast.warning('操作已完成，本体统计更新失败，请刷新本体列表')
+      toast.warning(text('操作已完成，本体统计更新失败，请刷新本体列表'))
     }
   }
 }
@@ -366,7 +439,7 @@ async function fetchActionTypes() {
 }
 
 function openExecution(action: ActionItem) {
-  if (executing.value || action.status !== 'active') return
+  if (!canExecute.value || executing.value || action.status !== 'active') return
   executionAction.value = action
   const parameters: Record<string, unknown> = {}
   for (const parameter of action.parameters_json || []) {
@@ -381,6 +454,12 @@ function openExecution(action: ActionItem) {
   executionInput.value = JSON.stringify(parameters, null, 2)
   executionError.value = ''
   executionResult.value = null
+  reconciliationEvidence.value='';reconciliationReceipt.value='';reconciliationAcknowledged.value=false
+  ++executionEpoch
+  executionAttempt.value = null
+  try { if (auth.user?.id) executionAttempt.value = readActionAttempt(auth.user.id, action.id) }
+  catch (exception) { executionError.value = skillError(exception, '执行关联恢复失败') }
+  if (executionAttempt.value) void checkExecution()
 }
 
 function closeExecution() {
@@ -389,14 +468,14 @@ function closeExecution() {
 
 async function handleExecute() {
   const action = executionAction.value
-  if (!action || executing.value) return
+  if (!canExecute.value || !action || executing.value || ['unknown','committed_unrecorded','partial_committed','executing','pending'].includes(executionResult.value?.state || '')) return
   executionError.value = ''
   executionResult.value = null
   let params: Record<string, unknown>
   try {
     const parsed = JSON.parse(executionInput.value)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
-      throw new Error('请输入 JSON 对象，不能使用数组或空值')
+      throw new Error(text('请输入 JSON 对象，不能使用数组或空值'))
     params = parsed
     const missing = (action.parameters_json || []).filter(
       (parameter) => parameter.required && !(parameter.name in params),
@@ -409,13 +488,21 @@ async function handleExecute() {
     return
   }
   executing.value = true
+  const owner = auth.user?.id
+  if (!owner) { executing.value = false; executionError.value = text('请重新登录'); return }
+  const epoch = executionEpoch
   try {
-    executionResult.value = await actionApi.execute(action.id, params)
+    const attempt = ensureActionAttempt(owner, action.id)
+    executionAttempt.value = attempt
+    const result = await actionApi.execute(action.id, params, false, attempt.key)
+    saveActionAttempt(owner, action.id, {key:attempt.key, state:result.state || (result.success ? 'succeeded' : 'unknown'), execution_id:result.execution_id})
+    if (epoch !== executionEpoch) return
+    executionResult.value = result
     await fetchActions()
   } catch (e) {
-    executionError.value = skillError(e, '行动执行请求失败，请重试')
+    if (epoch === executionEpoch) executionError.value = skillError(e, '请求结果待核对，请核查已有执行结果；重试保留原关联键')
   } finally {
-    executing.value = false
+    if (epoch === executionEpoch) executing.value = false
   }
 }
 
@@ -425,7 +512,7 @@ async function handleDelete(action: ActionItem) {
   try {
     await actionApi.remove(action.id)
     actions.value = actions.value.filter((item) => item.id !== action.id)
-    toast.success('行动已删除')
+    toast.success(text('行动已删除'))
     await refreshAfterMutation()
   } catch (e) {
     error.value = skillError(e, '删除行动失败')
@@ -683,6 +770,7 @@ onMounted(() => {
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
+.execution-reconciliation{display:grid;gap:8px;flex-basis:100%;border:1px solid #f59e0b;border-radius:8px;padding:12px;}.execution-reconciliation label{display:grid;gap:4px;}.execution-reconciliation input,.execution-reconciliation textarea,.execution-reconciliation select{max-width:100%;}
 .execution-input {
   display: block;
   box-sizing: border-box;

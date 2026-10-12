@@ -37,6 +37,7 @@ class OntologyVersion(Base):
     reject_reason: Mapped[str | None] = mapped_column(Text)
     rollback_from: Mapped[int | None] = mapped_column(Integer)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
+    components_frozen: Mapped[bool] = mapped_column(Boolean, default=False)
 
     entities: Mapped[list["OntologyVersionEntity"]] = relationship(
         back_populates="version", cascade="all, delete-orphan"
@@ -66,6 +67,7 @@ class OntologyVersionEntity(Base):
     config_json: Mapped[dict | None] = mapped_column(JSON)
     publish_config: Mapped[dict | None] = mapped_column(JSON)
     scenario_codes: Mapped[list | None] = mapped_column(JSON)
+    binding_snapshot: Mapped[dict | None] = mapped_column(JSON)
 
     version: Mapped["OntologyVersion"] = relationship(back_populates="entities")
     attributes: Mapped[list["OntologyVersionAttribute"]] = relationship(
@@ -111,6 +113,8 @@ class OntologyVersionRelation(Base):
     cardinality: Mapped[str] = mapped_column(String(10), nullable=False)
     acyclic: Mapped[bool] = mapped_column(Boolean, default=False)
     description: Mapped[str | None] = mapped_column(Text)
+    source_field: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    target_field: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
     version: Mapped["OntologyVersion"] = relationship(
         back_populates="relations", foreign_keys=[version_id]

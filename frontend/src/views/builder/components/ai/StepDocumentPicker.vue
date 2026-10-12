@@ -2,6 +2,8 @@
   <div class="step-doc">
     <h2 class="step-doc__title">选择补充文档</h2>
     <p class="step-doc__sub">从文档库中选择与业务相关的非结构化文档，或直接上传本地文件</p>
+    <p v-if="loadError" role="alert">{{ loadError }} <button @click="loadDocuments">重试</button></p>
+    <p v-if="warning" role="status">{{ warning }}</p>
 
     <div class="step-doc__toolbar">
       <input class="step-doc__input" v-model="filter" placeholder="按文件名过滤..." />
@@ -26,7 +28,7 @@
         <span class="step-doc__uploaded-name">{{ f.title }}</span>
         <span class="step-doc__uploaded-size">{{ formatSize(f.size) }}</span>
         <span v-if="f.uploading" class="step-doc__uploaded-status">上传中...</span>
-        <span v-else-if="f.error" class="step-doc__uploaded-status step-doc__uploaded-status--err">失败</span>
+        <span v-else-if="f.error" class="step-doc__uploaded-status step-doc__uploaded-status--err">{{ f.errorMessage || '上传失败，请重新选择文件' }}</span>
         <span v-else class="step-doc__uploaded-status step-doc__uploaded-status--ok">已就绪</span>
         <button class="step-doc__uploaded-del" @click="removeUploaded(f.key)">×</button>
       </div>
@@ -54,7 +56,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getDocuments } from '../../../../api/aiBuilderV2'
 import { uploadDocuments } from '../../../../api/docBuilder'
 import type { DocInfo } from '../../../../api/aiBuilderV2'
@@ -68,15 +70,20 @@ interface UploadedDoc {
   size: number
   uploading: boolean
   error: boolean
+  errorMessage?: string
 }
 
-defineProps<{ businessDesc: string }>()
+const props = defineProps<{ businessDesc: string; initialSelected?: string[] }>()
 const emit = defineEmits<{ (e: 'next', keys: string[]): void }>()
 
 const docs = ref<DocInfo[]>([])
 const loading = ref(true)
+const loadError = ref(''), warning = ref('')
+let mounted = true
+const uploads = new Set<AbortController>()
+onUnmounted(() => { mounted = false; uploads.forEach(controller => controller.abort()) })
 const filter = ref('')
-const selectedKeys = ref<string[]>([])
+const selectedKeys = ref<string[]>([...(props.initialSelected || [])])
 const uploadedFiles = ref<UploadedDoc[]>([])
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -103,6 +110,7 @@ function removeUploaded(key: string) {
 }
 
 async function onFileSelect(e: Event) {
+  if (hasUploading.value) return
   const input = e.target as HTMLInputElement
   if (!input.files?.length) return
   const files = Array.from(input.files)
@@ -117,8 +125,10 @@ async function onFileSelect(e: Event) {
   }))
   uploadedFiles.value.push(...entries)
 
+  const controller = new AbortController(); uploads.add(controller)
   try {
-    const resp = await uploadDocuments(files)
+    const resp = await uploadDocuments(files, controller.signal)
+    if (!mounted) return
     const returnedFiles = resp.data.files
     entries.forEach((entry, i) => {
       if (returnedFiles[i]) {
@@ -126,25 +136,32 @@ async function onFileSelect(e: Event) {
       }
       entry.uploading = false
     })
-  } catch {
+  } catch (error:any) {
+    if (!mounted) return
     entries.forEach(entry => {
       entry.uploading = false
       entry.error = true
+      entry.errorMessage = error?.response?.data?.detail || error.message || '上传失败，请重新选择文件'
     })
-  }
+  } finally { uploads.delete(controller) }
 }
 
-onMounted(async () => {
+async function loadDocuments() {
+  loading.value = true; loadError.value = ''; warning.value = ''
   try {
     const resp = await getDocuments()
+    if (!mounted) return
     docs.value = resp.data.documents
+    warning.value = resp.data.warning || ''
   } catch (e: any) {
-    console.error(e)
-    toast.error(e?.response?.data?.detail || e?.message || '加载文档列表失败，请稍后重试')
+    if (!mounted) return
+    loadError.value = e?.response?.data?.detail || e?.message || '加载文档列表失败，请稍后重试'
+    toast.error(loadError.value)
   } finally {
-    loading.value = false
+    if (mounted) loading.value = false
   }
-})
+}
+onMounted(loadDocuments)
 </script>
 
 <style scoped>

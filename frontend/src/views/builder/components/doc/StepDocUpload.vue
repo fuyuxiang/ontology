@@ -45,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { uploadDocuments, downloadTemplate } from '../../../../api/docBuilder'
 
 const emit = defineEmits<{ (e: 'next', payload: { sessionId: string; businessDesc: string }): void }>()
@@ -55,6 +55,9 @@ const files = ref<File[]>([])
 const uploading = ref(false)
 const dragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+let mounted = true
+let controller: AbortController | null = null
+onBeforeUnmount(() => { mounted = false; controller?.abort() })
 
 const canProceed = computed(() => desc.value.trim() && files.value.length > 0)
 
@@ -88,18 +91,20 @@ function formatSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
-function handleDownloadTemplate() {
-  downloadTemplate()
+async function handleDownloadTemplate() {
+  try { await downloadTemplate() } catch { alert('模板下载失败，请重试') }
 }
 
 async function handleStart() {
-  if (!canProceed.value) return
+  if (uploading.value || !canProceed.value) return
   uploading.value = true
+  controller = new AbortController()
   try {
-    const resp = await uploadDocuments(files.value)
+    const resp = await uploadDocuments(files.value, controller.signal)
+    if (!mounted) return
     emit('next', { sessionId: resp.data.session_id, businessDesc: desc.value })
-  } catch {
-    alert('上传失败，请重试')
+  } catch (exception:any) {
+    if (mounted) alert(exception?.response?.data?.detail || '上传失败，请重试')
   } finally {
     uploading.value = false
   }

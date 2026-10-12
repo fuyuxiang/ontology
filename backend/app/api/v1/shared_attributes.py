@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models.shared_attribute import SharedAttribute
+from app.models.entity import EntityAttribute
+from app.models.scenario import ScenarioDict
 from app.repositories.shared_attribute_repo import SharedAttributeRepository
 
 router = APIRouter(tags=["shared-attributes"])
@@ -48,6 +50,8 @@ async def list_shared_attributes(ontology_id: str, db: Session = Depends(get_db)
 
 @router.post("/shared-attributes", response_model=SharedAttrOut)
 async def create_shared_attribute(body: SharedAttrCreate, db: Session = Depends(get_db)):
+    if not db.get(ScenarioDict, body.ontology_id):
+        raise HTTPException(404, "本体不存在")
     repo = SharedAttributeRepository(db)
     if repo.find_by_name(body.ontology_id, body.name):
         raise HTTPException(status_code=409, detail="该本体下已存在同名共享属性")
@@ -64,8 +68,17 @@ async def update_shared_attribute(attr_id: str, body: SharedAttrUpdate, db: Sess
     attr = repo.get_by_id(attr_id)
     if not attr:
         raise HTTPException(status_code=404, detail="共享属性不存在")
+    if body.name and body.name != attr.name and repo.find_by_name(attr.ontology_id, body.name):
+        raise HTTPException(409, "该本体下已存在同名共享属性")
     for key, val in body.model_dump(exclude_unset=True).items():
         setattr(attr, key, val)
+    # Linked definitions follow their shared type/description; instance data is
+    # never changed by editing a definition.
+    for linked in db.query(EntityAttribute).filter_by(shared_attribute_id=attr.id):
+        if body.data_type is not None:
+            linked.type = attr.data_type
+        if body.description is not None:
+            linked.description = attr.description or ""
     repo.commit()
     repo.refresh(attr)
     return attr
@@ -77,6 +90,8 @@ async def delete_shared_attribute(attr_id: str, db: Session = Depends(get_db)):
     attr = repo.get_by_id(attr_id)
     if not attr:
         raise HTTPException(status_code=404, detail="共享属性不存在")
+    for linked in db.query(EntityAttribute).filter_by(shared_attribute_id=attr_id):
+        linked.shared_attribute_id = None
     repo.delete(attr)
     repo.commit()
     return {"detail": "已删除"}

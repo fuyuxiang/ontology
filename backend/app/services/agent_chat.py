@@ -43,9 +43,12 @@ def execute_chat(db, agent, snapshot, body, request, user, service_factory,
                    "max_tool_rounds": 12, "config_hash": config_hash(snapshot)}
     context["user"] = user
     context["agent_id"] = agent.id
+    context["agent_snapshot"] = snapshot
     conv, history = None, None
     if body.conversation_id and user and not release:
         candidate = db.get(AgentTestConversation, body.conversation_id)
+        if not candidate or candidate.agent_id != agent.id or candidate.user_id != user.id:
+            raise HTTPException(404, "会话不存在或不属于当前智能体和用户")
         if candidate and candidate.agent_id == agent.id and candidate.user_id == user.id:
             conv = candidate
             history = [{"role": m["role"], "content": m["content"]}
@@ -77,10 +80,13 @@ def execute_chat(db, agent, snapshot, body, request, user, service_factory,
         tools, pending, errors = [], [], []
         suggestions, actions = [], []
         complete, cancelled = False, False
+        tokens_used = None
+        uncertain = False
         yield {"type": "run_started", "run_id": run.id, "version": run.version}
         try:
             from app.services.agent_models import model_credentials, model_snapshot
             pinned = snapshot.get("model_snapshot") or model_snapshot(db, snapshot.get("model_id"))
+            context["model_snapshot"] = pinned
             model_name = pinned.get("model_name")
             model_config = dict(pinned.get("config_json") or {})
             model_config["api_key"] = model_credentials(db, pinned)
@@ -103,7 +109,9 @@ def execute_chat(db, agent, snapshot, body, request, user, service_factory,
             for event in source:
                 event = json_safe(event)
                 kind = event.get("type")
-                if kind == "content":
+                if kind == "usage":
+                    tokens_used = (tokens_used or 0) + int(event.get("tokens_used") or 0)
+                elif kind == "content":
                     answer += event.get("content") or ""
                 elif kind == "answer":
                     answer = event.get("content") or answer
@@ -114,6 +122,10 @@ def execute_chat(db, agent, snapshot, body, request, user, service_factory,
                     tools.append({"tool": event.get("tool"), "arguments": event.get("arguments"), "success": None})
                 elif kind == "tool_result":
                     result = event.get("result")
+                    if isinstance(result, dict):
+                        nested = result.get("output") if isinstance(result.get("output"), dict) else {}
+                        outcome = result.get("outcome") or nested.get("outcome")
+                        uncertain = uncertain or outcome in {"unknown", "committed_unrecorded", "partial_committed"}
                     success = not (isinstance(result, dict) and (result.get("error") or result.get("success") is False))
                     target = next((t for t in reversed(tools) if t["tool"] == event.get("tool") and t["success"] is None), None)
                     if target is None:
@@ -140,14 +152,23 @@ def execute_chat(db, agent, snapshot, body, request, user, service_factory,
             errors.append(str(exc))
             yield {"type": "error", "message": str(exc)}
         finally:
-            run.status = "cancelled" if cancelled else "failed" if errors else "pending_confirmation" if pending else "completed"
+            run.status = "unknown" if uncertain else "cancelled" if cancelled else "failed" if errors else "pending_confirmation" if pending else "completed"
             run.answer, run.steps, run.tool_runs, run.pending_actions = answer, collector.result(), tools, pending
             run.error, run.finished_at = "\n".join(dict.fromkeys(errors)) or None, datetime.utcnow()
             db.add(run)
-            db.add(AgentTrace(agent_id=agent_id, input_text=question, output_text=answer,
-                latency_ms=int((time.monotonic() - t0) * 1000), status="ok" if not errors and not cancelled else "error"))
+            db.add(AgentTrace(id=run.id, agent_id=agent_id, input_text=question, output_text=answer,
+                latency_ms=int((time.monotonic() - t0) * 1000),
+                tokens_used=tokens_used,
+                status="pending" if run.status == "pending_confirmation" else "ok" if run.status == "completed" else "error"))
             db.commit()
-            writeback(db, conv, question, answer, collector.result(), pending)
+            if writeback(db, conv, question, answer, collector.result(), pending) is False:
+                run.status = "failed"
+                run.error = (run.error + "\n" if run.error else "") + "回答已生成，但会话保存失败，请刷新运行记录核查"
+                trace = db.get(AgentTrace, run.id)
+                if trace:
+                    trace.status = "error"
+                db.add(run)
+                db.commit()
             db.close()
         yield {"type": "run_finished", "run_id": run.id, "status": run.status,
                "error": run.error, "suggestions": suggestions, "actions": actions}

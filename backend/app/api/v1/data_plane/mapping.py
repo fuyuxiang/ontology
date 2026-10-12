@@ -6,6 +6,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from app.core.deps import require_user
 from app.database import get_db
@@ -42,6 +43,8 @@ class ApplyRequest(BaseModel):
     id_column: str | None = None
     filter_expr: str | None = None
     role: str = "primary"
+    primary_source_column: str | None = None
+    enrichment_source_column: str | None = None
 
 
 # ── Endpoints ───────────────────────────────────────
@@ -103,6 +106,9 @@ def apply(body: ApplyRequest, db: Session = Depends(get_db),
                 field_mappings=fm_payload,
                 id_column=body.id_column,
                 filter_expr=body.filter_expr,
+                status="active", review_reason=None,
+                primary_source_column=body.primary_source_column,
+                enrichment_source_column=body.enrichment_source_column,
             )
             action = "updated"
         else:
@@ -112,15 +118,25 @@ def apply(body: ApplyRequest, db: Session = Depends(get_db),
                 field_mappings=fm_payload,
                 id_column=body.id_column,
                 filter_expr=body.filter_expr,
+                primary_source_column=body.primary_source_column,
+                enrichment_source_column=body.enrichment_source_column,
                 user_id=user.id,
             )
             action = "created"
+        db.commit()
         return {
             "action": action,
             "binding_id": binding.id,
+            "status": binding.status,
+            "review_reason": binding.review_reason,
             "field_mappings_count": len(fm_payload),
         }
     except LookupError as e:
+        db.rollback()
         raise HTTPException(404, str(e)) from e
     except ValueError as e:
+        db.rollback()
         raise HTTPException(400, str(e)) from e
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(409, "对象已存在活动主绑定，请刷新后重新确认") from e

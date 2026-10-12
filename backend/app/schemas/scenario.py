@@ -16,6 +16,7 @@ class ScenarioCreate(ScenarioBase):
 
 
 class ScenarioUpdate(BaseModel):
+    code: str | None = None
     name: str | None = None
     color: str | None = None
     description: str | None = None
@@ -31,4 +32,6 @@ class ScenarioOut(ScenarioBase):
     relation_count: int = 0
     logic_count: int = 0
     action_count: int = 0
+    active_version_id: str | None = None
+    version_number: int | None = None
     model_config = {"from_attributes": True}

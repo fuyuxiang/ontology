@@ -44,12 +44,12 @@
       <button class="step-extract__btn" @click="emit('next', result)">确认，进入专家审核 →</button>
     </div>
 
-    <div v-if="error" class="step-extract__error">{{ error }}</div>
+    <div v-if="error" class="step-extract__error">{{ error }} <button @click="emit('retry')">返回重试</button></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { extractOntologySSE } from '../../../../api/aiBuilderV2'
 
 interface ExtractedProperty { name: string; displayName?: string; type: string; required?: boolean }
@@ -58,7 +58,7 @@ interface ExtractedRelation { name: string; displayName: string; source: string;
 interface ExtractionResult { entities: ExtractedEntity[]; relations: ExtractedRelation[] }
 
 const props = defineProps<{ tableNames: string[]; documentKeys: string[]; businessDesc: string }>()
-const emit = defineEmits<{ (e: 'next', result: ExtractionResult): void }>()
+const emit = defineEmits<{ (e: 'next', result: ExtractionResult): void; (e: 'retry'): void }>()
 
 const progressMessages = ref<string[]>([])
 const streaming = ref(true)
@@ -67,8 +67,10 @@ const error = ref('')
 
 const totalProps = computed(() => result.value?.entities.reduce((sum, e) => sum + e.properties.length, 0) || 0)
 
+let stream: ReturnType<typeof extractOntologySSE> | null = null
 onMounted(() => {
   const sse = extractOntologySSE(props.tableNames, props.documentKeys, props.businessDesc) as any
+  stream = sse
 
   sse.addEventListener('message', (ev: CustomEvent) => {
     const data = ev.detail
@@ -84,11 +86,13 @@ onMounted(() => {
     streaming.value = false
   })
 
-  sse.addEventListener('error', () => {
-    error.value = '请求失败，请重试'
+  sse.addEventListener('error', (ev: CustomEvent) => {
+    result.value = null
+    error.value = ev.detail || '请求失败，请重试'
     streaming.value = false
   })
 })
+onUnmounted(() => stream?.abort())
 </script>
 
 <style scoped>

@@ -234,9 +234,9 @@ function serializeIndividual(ind: OwlIndividual): string {
 
 export function serializeToOwlXml(ontology: OwlOntology): string {
   const allNs = [...BUILTIN_NAMESPACES, ...ontology.namespaces]
-  const nsAttrs = allNs.map(ns => `    xmlns:${ns.prefix}="${ns.iri}"`).join('\n')
+  const nsAttrs = allNs.filter(ns => ns.prefix).map(ns => `    xmlns:${esc(ns.prefix)}="${esc(ns.iri)}"`).join('\n')
 
-  const prefixes = allNs.map(ns => `    <Prefix name="${ns.prefix}" IRI="${ns.iri}"/>`).join('\n')
+  const prefixes = allNs.map(ns => `    <Prefix name="${esc(ns.prefix.replace(/:$/, ''))}:" IRI="${esc(ns.iri)}"/>`).join('\n')
 
   const body: string[] = []
   for (const c of ontology.classes) body.push(serializeClass(c, ontology))

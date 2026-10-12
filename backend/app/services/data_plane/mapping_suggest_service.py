@@ -390,9 +390,11 @@ class MappingSuggestService:
             })
 
         # 2. LLM 兜底
+        llm_status = {"requested": use_llm, "status": "not_needed" if not unmatched else "disabled"}
         if use_llm and unmatched:
             try:
                 llm_results = self._llm_suggest(unmatched, schema, top_k)
+                llm_status["status"] = "completed"
                 # 合并 LLM 候选
                 idx = {r["attribute_id"]: r for r in results}
                 for entry in llm_results:
@@ -403,7 +405,7 @@ class MappingSuggestService:
                     existing_cols = {c["column"] for c in cur["candidates"]}
                     for cand in entry.get("candidates", []):
                         col_name = cand.get("column")
-                        if not col_name or col_name in existing_cols:
+                        if not col_name or col_name in existing_cols or col_name not in {column.get("name") for column in schema}:
                             continue
                         col_meta = next((c for c in schema if c.get("name") == col_name), {})
                         cur["candidates"].append({
@@ -419,7 +421,8 @@ class MappingSuggestService:
                     cur["candidates"].sort(key=lambda x: x["score"], reverse=True)
                     cur["candidates"] = cur["candidates"][:top_k]
             except Exception as e:
-                logger.warning("LLM 兜底失败（继续用启发式结果）: %s", e)
+                logger.warning("LLM 兜底失败（继续用启发式结果）: %s", type(e).__name__)
+                llm_status = {"requested": True, "status": "failed", "error": type(e).__name__}
 
         # 3. 统计
         coverage = {"total": len(attrs), "high": 0, "medium": 0, "low": 0, "none": 0}
@@ -435,6 +438,7 @@ class MappingSuggestService:
                 "table": (asset.locator or {}).get("table") if asset.kind == "table" else None,
             },
             "coverage": coverage,
+            "llm": llm_status,
             "suggestions": results,
         }
 
@@ -442,8 +446,7 @@ class MappingSuggestService:
     def _llm_suggest(self, unmatched: list[EntityAttribute],
                      schema: list[dict], top_k: int) -> list[dict]:
         from app.services.copilot import get_llm_client
-        if not settings.LLM_API_KEY:
-            return []
+        from app.services.llm_resolver import get_model_name
 
         attrs_payload = [
             {
@@ -476,9 +479,9 @@ class MappingSuggestService:
 列：{json.dumps(cols_payload, ensure_ascii=False)}
 """
 
-        client = get_llm_client()
+        client = get_llm_client(db=self.db, scene="builder")
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=get_model_name(self.db, scene="builder"),
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
             timeout=60,

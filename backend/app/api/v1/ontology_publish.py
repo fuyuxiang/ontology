@@ -28,7 +28,7 @@ from app.services.ontology_impact import (
     find_affected_agents,
     mark_stale_dependents,
 )
-from app.services.version_component_snapshot import snapshot_components_for_version
+from app.services.version_component_snapshot import snapshot_components_for_version, clone_components_for_version, capture_binding
 
 router = APIRouter(prefix="/ontology-publish", tags=["ontology-publish"])
 
@@ -62,17 +62,25 @@ class QuickPublishRequest(BaseModel):
 # ─── 版本 CRUD ──────────────────────────────────────────────────────
 
 @router.get("/versions")
-def list_versions(status: str | None = None, db: Session = Depends(get_db)):
+def list_versions(status: str | None = None, ontology_id: str | None = None, db: Session = Depends(get_db)):
     q = db.query(OntologyVersion).order_by(OntologyVersion.version_number.desc())
     if status:
         q = q.filter(OntologyVersion.status == status)
+    if ontology_id:
+        q = q.filter(OntologyVersion.ontology_id == ontology_id)
     versions = q.all()
     return [_version_summary(v, db) for v in versions]
 
 
 @router.get("/versions/active")
-def get_active_version(db: Session = Depends(get_db)):
-    v = db.query(OntologyVersion).filter(OntologyVersion.is_active.is_(True)).first()
+def get_active_version(ontology_id: str | None = None, db: Session = Depends(get_db)):
+    query = db.query(OntologyVersion).filter(OntologyVersion.is_active.is_(True))
+    if ontology_id:
+        query = query.filter(OntologyVersion.ontology_id == ontology_id)
+    versions = query.all()
+    if len(versions) > 1:
+        raise HTTPException(400, "存在多个本体的活动版本，请指定 ontology_id")
+    v = versions[0] if versions else None
     if not v:
         return None
     return _version_detail(v, db)
@@ -171,6 +179,7 @@ def add_entities(version_id: str, req: AddEntitiesRequest, db: Session = Depends
             config_json=entity.config_json,
             publish_config=entity.publish_config,
             scenario_codes=entity.scenario_codes,
+            binding_snapshot=capture_binding(db, entity.id),
         )
         db.add(ve)
         db.flush()
@@ -194,6 +203,8 @@ def add_entities(version_id: str, req: AddEntitiesRequest, db: Session = Depends
         added.append(eid)
         existing_source_ids.add(eid)
 
+    db.flush()
+    db.expire(v, ["entities"])
     _sync_relations(v, db)
     db.commit()
     return {"added": len(added), "total": len(v.entities)}
@@ -213,6 +224,8 @@ def remove_entity(version_id: str, entity_id: str, db: Session = Depends(get_db)
         raise HTTPException(404, "该实体不在此版本中")
 
     db.delete(ve)
+    db.flush()
+    db.expire(v, ["entities"])
     _sync_relations(v, db)
     db.commit()
     return {"message": "实体已移除"}
@@ -283,7 +296,8 @@ def preview_impact(version_id: str, db: Session = Depends(get_db)):
     v = _get_version(version_id, db)
 
     old_active = db.query(OntologyVersion).filter(
-        OntologyVersion.is_active.is_(True), OntologyVersion.id != v.id
+        OntologyVersion.is_active.is_(True), OntologyVersion.id != v.id,
+        OntologyVersion.ontology_id == v.ontology_id,
     ).first()
 
     old_entities = []
@@ -332,6 +346,11 @@ def submit_for_approval(version_id: str, db: Session = Depends(get_db)):
 
     v.status = "pending_approval"
     v.submitted_at = datetime.utcnow()
+    try:
+        snapshot_components_for_version(db, v, replace=True)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
     db.commit()
     return {"message": "已提交审批", "status": "pending_approval"}
 
@@ -341,6 +360,9 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User =
     v = _get_version(version_id, db)
     if v.status != "pending_approval":
         raise HTTPException(400, "只有待审批状态可以通过")
+    check = consistency_check(version_id, db)
+    if not check["passed"]:
+        raise HTTPException(400, f"一致性检查未通过: {check['summary']}")
 
     # 只失活同一本体下的活动版本
     old_active = db.query(OntologyVersion).filter(
@@ -359,7 +381,7 @@ def approve_version(version_id: str, db: Session = Depends(get_db), user: User =
     published_entity_ids = [ve.source_entity_id for ve in v.entities]
     if published_entity_ids:
         db.query(OntologyEntity).filter(
-            OntologyEntity.status == "published"
+            OntologyEntity.status == "published", OntologyEntity.ontology_id == v.ontology_id
         ).update({"status": "active"})
         db.query(OntologyEntity).filter(
             OntologyEntity.id.in_(published_entity_ids)
@@ -436,6 +458,7 @@ def quick_publish(req: QuickPublishRequest, db: Session = Depends(get_db), user:
             config_json=entity.config_json,
             publish_config=entity.publish_config,
             scenario_codes=entity.scenario_codes,
+            binding_snapshot=capture_binding(db, entity.id),
         )
         db.add(ve)
         db.flush()
@@ -456,6 +479,13 @@ def quick_publish(req: QuickPublishRequest, db: Session = Depends(get_db), user:
             db.add(va)
 
     _sync_relations(version, db)
+    db.flush()
+    db.expire(version, ["entities"])
+    check = consistency_check(version.id, db)
+    if not check["passed"]:
+        db.rollback()
+        details = "；".join(f"{row['entity_name']}: {', '.join(row['issues'])}" for row in check["entity_issues"])
+        raise HTTPException(400, f"一致性检查未通过: {check['summary']}" + (f"；{details}" if details else ""))
 
     old_active = db.query(OntologyVersion).filter(
         OntologyVersion.is_active.is_(True),
@@ -474,7 +504,11 @@ def quick_publish(req: QuickPublishRequest, db: Session = Depends(get_db), user:
     ).update({"status": "published"})
 
     impact = mark_stale_dependents(old_active, version, db)
-    snapshot_components_for_version(db, version)
+    try:
+        snapshot_components_for_version(db, version)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(400, str(exc)) from exc
     db.commit()
 
     return {
@@ -600,6 +634,7 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
     db.flush()
 
     entity_id_map = {}
+    attribute_id_map = {}
     for ve in target.entities:
         new_ve = OntologyVersionEntity(
             version_id=new_version.id,
@@ -611,6 +646,7 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
             config_json=ve.config_json,
             publish_config=ve.publish_config,
             scenario_codes=ve.scenario_codes,
+            binding_snapshot=ve.binding_snapshot,
         )
         db.add(new_ve)
         db.flush()
@@ -631,6 +667,8 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
                 data_status=attr.data_status,
             )
             db.add(new_attr)
+            db.flush()
+            attribute_id_map[attr.id] = new_attr.id
 
     for rel in target.relations:
         new_from = entity_id_map.get(rel.from_version_entity_id)
@@ -646,9 +684,11 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
                 cardinality=rel.cardinality,
                 acyclic=rel.acyclic,
                 description=rel.description,
+                source_field=rel.source_field, target_field=rel.target_field,
             )
             db.add(new_rel)
 
+    clone_components_for_version(db, target, new_version, entity_id_map, attribute_id_map)
     db.commit()
     db.refresh(new_version)
     return _version_summary(new_version, db)
@@ -658,24 +698,17 @@ def rollback_to_version(version_id: str, db: Session = Depends(get_db), user: Us
 
 @router.get("/status")
 def list_publish_status(db: Session = Depends(get_db)):
+    from types import SimpleNamespace
     entities = db.query(OntologyEntity).all()
     result = []
     for entity in entities:
         attrs = entity.attributes or []
-        total_attrs = len(attrs)
-        mapped_attrs = sum(1 for a in attrs if a.source_table and a.source_field)
-        has_datasource = mapped_attrs > 0
-        mapping_ratio = mapped_attrs / total_attrs if total_attrs > 0 else 0.0
+        readiness = _check_readiness_for_version_entity(SimpleNamespace(
+            attributes=[SimpleNamespace(source_attribute_id=a.id) for a in attrs],
+            binding_snapshot=capture_binding(db, entity.id)))
         rels = db.query(EntityRelation).filter(
             (EntityRelation.from_entity_id == entity.id) | (EntityRelation.to_entity_id == entity.id)
         ).count()
-        issues = []
-        if not has_datasource:
-            issues.append("未绑定数据源")
-        if total_attrs == 0:
-            issues.append("未定义任何属性")
-        elif mapping_ratio < 0.5:
-            issues.append(f"属性映射不完整（{mapped_attrs}/{total_attrs}）")
         result.append({
             "id": entity.id,
             "name": entity.name,
@@ -683,15 +716,7 @@ def list_publish_status(db: Session = Depends(get_db)):
             "tier": entity.tier,
             "status": entity.status,
             "publish_config": entity.publish_config,
-            "readiness": {
-                "has_datasource": has_datasource,
-                "mapped_attrs": mapped_attrs,
-                "total_attrs": total_attrs,
-                "mapping_ratio": round(mapping_ratio, 2),
-                "has_relations": rels > 0,
-                "issues": issues,
-                "ready": len(issues) == 0,
-            },
+            "readiness": {**readiness, "has_relations": rels > 0},
         })
     return result
 
@@ -714,6 +739,7 @@ def _version_summary(v: OntologyVersion, db: Session) -> dict:
     ).count()
     return {
         "id": v.id,
+        "ontology_id": v.ontology_id,
         "version_number": v.version_number,
         "name": v.name,
         "description": v.description,
@@ -777,11 +803,40 @@ def _version_detail(v: OntologyVersion, db: Session) -> dict:
 def _check_readiness_for_version_entity(ve: OntologyVersionEntity) -> dict:
     attrs = ve.attributes or []
     total_attrs = len(attrs)
-    mapped_attrs = sum(1 for a in attrs if a.source_table and a.source_field)
+    snapshot = ve.binding_snapshot or {}
+    attribute_ids = {getattr(a, "source_attribute_id", None) for a in attrs} - {None}
+    sources = [snapshot] + (snapshot.get("enrichments") or [])
+    mapped_ids = {m.get("attribute_id") for source in sources
+                  if source.get("asset_id") and source.get("status", "active") == "active"
+                  for m in source.get("field_mappings") or [] if m.get("source_column")}
+    mapped_attrs = len(mapped_ids & attribute_ids)
     has_datasource = mapped_attrs > 0
     mapping_ratio = mapped_attrs / total_attrs if total_attrs > 0 else 0.0
 
     issues = []
+    id_column = snapshot.get("id_column")
+    identity_mappings = [m for m in snapshot.get("field_mappings") or []
+                         if id_column and m.get("source_column") == id_column
+                         and m.get("attribute_id") in attribute_ids and not m.get("transform")]
+    if not snapshot.get("asset_id") or not id_column or len(identity_mappings) != 1:
+        issues.append("发布对象必须绑定并映射唯一实例 ID 列")
+    from app.services.data_plane.mapping_transform import validate_transform
+    for source in [snapshot] + (snapshot.get("enrichments") or []):
+        identity_columns = set(source.get("asset_primary_keys") or []) | {source.get("id_column")}
+        for mapping in source.get("field_mappings") or []:
+            if not mapping.get("transform"):
+                continue
+            try:
+                validate_transform(mapping["transform"])
+                if mapping.get("source_column") in identity_columns:
+                    raise ValueError("主键字段禁止 transform")
+            except ValueError as exc:
+                issues.append(f"映射 transform 无效: {exc}")
+    for enrichment in (ve.binding_snapshot or {}).get("enrichments") or []:
+        if enrichment.get("status") != "active":
+            issues.append("enrichment 绑定尚未审核")
+        if not enrichment.get("primary_source_column") or not enrichment.get("enrichment_source_column"):
+            issues.append("enrichment 绑定缺少明确的一对一关联字段")
     if not has_datasource:
         issues.append("未绑定数据源")
     if total_attrs == 0:
@@ -828,5 +883,6 @@ def _sync_relations(v: OntologyVersion, db: Session):
             cardinality=rel.cardinality,
             acyclic=rel.acyclic if hasattr(rel, 'acyclic') else False,
             description=rel.description,
+            source_field=rel.source_field, target_field=rel.target_field,
         )
         db.add(vr)

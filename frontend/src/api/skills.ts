@@ -1,3 +1,4 @@
+import { productText } from '../composables/useProductText'
 import { get, post, put, del } from './client'
 
 export interface SkillToolRef {
@@ -134,9 +135,10 @@ export const skillsApi = {
 }
 
 export function skillError(error: unknown, fallback = '操作失败，请稍后重试'): string {
-  const err = error as { response?: { data?: { detail?: unknown } }; message?: string }
+  const err = error as { response?: { status?: number; data?: { detail?: unknown } }; message?: string }
+  if (err.response?.status === 403) return productText('当前账号没有执行此操作的权限，请联系管理员配置相应权限。')
   const detail = err.response?.data?.detail
-  if (typeof detail === 'string') return detail
+  if (typeof detail === 'string') return productText(detail)
   if (Array.isArray(detail))
     return detail.map((item) => item.msg || item.message || String(item)).join('；')
   if (detail && typeof detail === 'object' && 'message' in detail) {
@@ -144,5 +146,5 @@ export function skillError(error: unknown, fallback = '操作失败，请稍后�
       'errors' in detail && Array.isArray(detail.errors) ? detail.errors.map(String).join('；') : ''
     return `${String(detail.message)}${errors ? `：${errors}` : ''}`
   }
-  return err.message || fallback
+  return productText(err.message || fallback)
 }

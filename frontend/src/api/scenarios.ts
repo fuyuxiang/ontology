@@ -10,6 +10,8 @@ export interface Scenario {
   created_at: string
   updated_at: string
   // 本体下各类组件数量，由后端列表接口聚合返回
+  active_version_id?: string | null
+  version_number?: string | null
   entity_count: number
   relation_count: number
   logic_count: number

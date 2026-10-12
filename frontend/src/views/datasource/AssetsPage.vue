@@ -2,20 +2,20 @@
   <div class="ap-page">
     <div class="ap-page__header">
       <div>
-      <h1 class="ap-page__title">资产目录</h1>
-      <p class="ap-page__subtitle">统一管理可用数据资产</p>
+      <h1 class="ap-page__title">{{ text("资产目录") }}</h1>
+      <p class="ap-page__subtitle">{{ text("统一管理可用数据资产") }}</p>
       </div>
       <a-dropdown>
-        <a-button type="primary">新建资产 <DownOutlined /></a-button>
+        <a-button type="primary" :disabled="!canEdit">{{ text("新建资产") }} <DownOutlined /></a-button>
         <template #overlay>
           <a-menu @click="onCreateAsset">
-            <a-menu-item key="table">表 / SQL 视图</a-menu-item>
+            <a-menu-item key="table">{{ text("表 / SQL 视图") }}</a-menu-item>
             <a-menu-divider />
-            <a-menu-item key="file">上传文件</a-menu-item>
-            <a-menu-item key="oss">对象存储</a-menu-item>
-            <a-menu-item key="directory">本地目录</a-menu-item>
+            <a-menu-item key="file">{{ text("上传文件") }}</a-menu-item>
+            <a-menu-item key="oss">{{ text("对象存储") }}</a-menu-item>
+            <a-menu-item key="directory">{{ text("本地目录") }}</a-menu-item>
             <a-menu-item key="api">HTTP API</a-menu-item>
-            <a-menu-item key="mq">消息队列</a-menu-item>
+            <a-menu-item key="mq">{{ text("消息队列") }}</a-menu-item>
           </a-menu>
         </template>
       </a-dropdown>
@@ -23,16 +23,16 @@
 
     <!-- KPI -->
     <div class="ap-stats">
-      <a-statistic title="资产总数" :value="store.stats.total" />
-      <a-statistic title="结构化" :value="store.stats.structured" :value-style="{ color: '#3b82f6' }" />
-      <a-statistic title="非结构化" :value="store.stats.unstructured" :value-style="{ color: '#f59e0b' }" />
+      <a-statistic :title="text('资产总数')" :value="store.stats.total" />
+      <a-statistic :title="text('结构化')" :value="store.stats.structured" :value-style="{ color: '#3b82f6' }" />
+      <a-statistic :title="text('非结构化')" :value="store.stats.unstructured" :value-style="{ color: '#f59e0b' }" />
     </div>
 
     <!-- 二级 tab：结构化 / 非结构化 -->
     <a-tabs v-model:active-key="activeCategory" class="ap-tabs" @change="onCategoryChange">
-      <a-tab-pane key="all" tab="全部" />
-      <a-tab-pane key="structured" tab="结构化" />
-      <a-tab-pane key="unstructured" tab="非结构化" />
+      <a-tab-pane key="all" :tab="text('全部')" />
+      <a-tab-pane key="structured" :tab="text('结构化')" />
+      <a-tab-pane key="unstructured" :tab="text('非结构化')" />
     </a-tabs>
 
     <!-- 非结构化 source_type 子过滤 -->
@@ -41,22 +41,22 @@
 
     <!-- 工具栏 -->
     <div class="ap-toolbar">
-      <a-input-search v-model:value="search" placeholder="搜索资产名称 / 别名 / 描述..." style="width:340px"
+      <a-input-search v-model:value="search" :placeholder="text('搜索资产名称 / 别名 / 描述...')" style="width:340px"
                       allow-clear @search="reload" @change="reload" />
-      <a-select v-model:value="domainFilter" placeholder="按 domain 过滤" allow-clear style="width:200px"
+      <a-select v-model:value="domainFilter" :placeholder="text('按 domain 过滤')" allow-clear style="width:200px"
                 :options="domainOptions" @change="reload" />
       <span style="flex:1" />
       <a-segmented v-model:value="viewMode" :options="viewModeOptions" />
     </div>
-    <a-alert v-if="store.error" type="error" show-icon message="资产加载失败"
+    <a-alert v-if="store.error" type="error" show-icon :message="text('资产加载失败')"
              :description="store.error" class="ap-load-error">
-      <template #action><a-button size="small" @click="reload">重试</a-button></template>
+      <template #action><a-button size="small" @click="reload">{{ text("重试") }}</a-button></template>
     </a-alert>
 
     <!-- 卡片网格视图 -->
-    <a-spin v-if="viewMode === 'grid'" :spinning="store.loading" tip="正在加载资产…">
+    <a-spin v-if="viewMode === 'grid'" :spinning="store.loading" :tip="text('正在加载资产…')">
       <a-empty v-if="!store.loading && !store.error && store.items.length === 0"
-               :description="hasFilters ? '没有匹配的资产，请调整搜索或筛选条件' : '暂无资产，点击「新建资产」开始登记'" style="padding:64px 0" />
+               :description="hasFilters ? text('没有匹配的资产，请调整搜索或筛选条件') : text('暂无资产，点击「新建资产」开始登记')" style="padding:64px 0" />
       <a-row v-else :gutter="[16, 16]">
         <a-col v-for="record in store.items" :key="record.id" :xs="24" :sm="12" :lg="8" :xl="6">
           <a-card hoverable class="ap-card" :body-style="{ padding: '16px' }" @click="openDetail(record)">
@@ -87,31 +87,29 @@
             <!-- 底部：行数 / 刷新策略 / owner -->
             <div class="ap-card__meta">
               <span>
-                <span class="ap-muted">记录:</span>
+                <span class="ap-muted">{{ text("记录:") }}</span>
                 <span class="ap-card__num">{{ record.profile?.row_count?.toLocaleString() || '—' }}</span>
               </span>
               <span>
-                <span class="ap-muted">刷新:</span>
+                <span class="ap-muted">{{ text("刷新:") }}</span>
                 <span>{{ refreshPolicyLabel(record.refresh_policy) }}</span>
               </span>
             </div>
             <div class="ap-card__owner">
-              <span class="ap-muted">连接:</span> {{ connectionName(record.connection_id) }}
+              <span class="ap-muted">{{ text("连接:") }}</span> {{ connectionName(record.connection_id) }}
               <span v-if="record.owner" style="margin-left:12px">· {{ record.owner }}</span>
             </div>
 
             <!-- 卡片悬停操作（点击不冒泡）-->
             <div class="ap-card__actions" @click.stop>
               <a-button type="link" size="small"
-                        :disabled="record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'sync'" @click="syncOne(record)">
-                同步 Schema
-              </a-button>
+                        :disabled="!canEdit || record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'sync'" @click="syncOne(record)"> {{ text("同步 Schema") }} </a-button>
               <a-button type="link" size="small"
-                        :disabled="record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'profile'" @click="profileOne(record)">
+                        :disabled="!canEdit || record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'profile'" @click="profileOne(record)">
                 Profile
               </a-button>
-              <a-popconfirm :title="`确认删除「${record.name}」？`" ok-text="删除" cancel-text="取消" :ok-button-props="{ danger: true }" :overlay-style="{ maxWidth: 'min(480px, calc(100vw - 32px))' }" @confirm="del(record)">
-                <a-button type="link" size="small" danger :disabled="!!pendingActions[record.id]" :loading="pendingActions[record.id] === 'delete'">删除</a-button>
+              <a-popconfirm :title="text('确认删除「{name}」？', { name: record.name })" :ok-text="text('删除')" :cancel-text="text('取消')" :ok-button-props="{ danger: true }" :overlay-style="{ maxWidth: 'min(480px, calc(100vw - 32px))' }" @confirm="del(record)">
+                <a-button type="link" size="small" danger :disabled="!canDelete || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'delete'">{{ text("删除") }}</a-button>
               </a-popconfirm>
             </div>
           </a-card>
@@ -137,7 +135,7 @@
           {{ connectionName(record.connection_id) }}
         </template>
         <template v-else-if="column.key === 'profile'">
-          <span v-if="record.profile?.row_count != null">{{ record.profile.row_count }} 行</span>
+          <span v-if="record.profile?.row_count != null">{{ record.profile.row_count }} {{ text("行") }}</span>
           <span v-else class="ap-muted">—</span>
         </template>
         <template v-else-if="column.key === 'status'">
@@ -145,23 +143,21 @@
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4" wrap>
-            <a-button type="link" size="small" @click="openDetail(record as Asset)">详情</a-button>
+            <a-button type="link" size="small" @click="openDetail(record as Asset)">{{ text("详情") }}</a-button>
             <a-button type="link" size="small"
-                      :disabled="record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'sync'" @click="syncOne(record as Asset)">
-              同步 Schema
-            </a-button>
+                      :disabled="!canEdit || record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'sync'" @click="syncOne(record as Asset)"> {{ text("同步 Schema") }} </a-button>
             <a-button type="link" size="small"
-                      :disabled="record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'profile'" @click="profileOne(record as Asset)">
+                      :disabled="!canEdit || record.kind === 'document' || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'profile'" @click="profileOne(record as Asset)">
               Profile
             </a-button>
-            <a-popconfirm :title="`确认删除「${record.name}」？被引用时会被拒绝。`" ok-text="删除" cancel-text="取消" :ok-button-props="{ danger: true }" :overlay-style="{ maxWidth: 'min(480px, calc(100vw - 32px))' }" @confirm="del(record as Asset)">
-              <a-button type="link" size="small" danger :disabled="!!pendingActions[record.id]" :loading="pendingActions[record.id] === 'delete'">删除</a-button>
+            <a-popconfirm :title="text('确认删除「{name}」？被引用时会被拒绝。', { name: record.name })" :ok-text="text('删除')" :cancel-text="text('取消')" :ok-button-props="{ danger: true }" :overlay-style="{ maxWidth: 'min(480px, calc(100vw - 32px))' }" @confirm="del(record as Asset)">
+              <a-button type="link" size="small" danger :disabled="!canDelete || !!pendingActions[record.id]" :loading="pendingActions[record.id] === 'delete'">{{ text("删除") }}</a-button>
             </a-popconfirm>
           </a-space>
         </template>
       </template>
       <template #emptyText>
-        <a-empty v-if="!store.error" :description="hasFilters ? '没有匹配的资产，请调整搜索或筛选条件' : '暂无资产，点击「新建资产」开始登记'" />
+        <a-empty v-if="!store.error" :description="hasFilters ? text('没有匹配的资产，请调整搜索或筛选条件') : text('暂无资产，点击「新建资产」开始登记')" />
       </template>
     </a-table>
 
@@ -187,6 +183,11 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from "../../composables/useProductText"
+const { text } = useProductText()
+
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit, canDelete } = useManagementPermission('entity:write')
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   Alert as AAlert, Button as AButton, Card as ACard, Col as ACol, Dropdown as ADropdown,
@@ -219,33 +220,33 @@ const pendingActions = reactive<Record<string, 'sync' | 'profile' | 'delete'>>({
 const knownDomains = ref<string[]>([])
 const hasFilters = computed(() => !!search.value || !!domainFilter.value || activeCategory.value !== 'all')
 
-const viewModeOptions = [
-  { label: '卡片', value: 'grid' },
-  { label: '列表', value: 'list' },
-]
+const viewModeOptions = computed(() => [
+  { label: text("卡片"), value: 'grid' },
+  { label: text("列表"), value: 'list' },
+])
 
-const docFilterOptions = [
-  { label: '全部', value: 'all' },
-  { label: '文件', value: 'file' },
-  { label: '对象存储', value: 'oss' },
-  { label: '目录', value: 'directory' },
+const docFilterOptions = computed(() => [
+  { label: text("全部"), value: 'all' },
+  { label: text("文件"), value: 'file' },
+  { label: text("对象存储"), value: 'oss' },
+  { label: text("目录"), value: 'directory' },
   { label: 'API', value: 'api' },
   { label: 'MQ', value: 'mq' },
-]
+])
 
 const detail = reactive({ visible: false, assetId: null as string | null })
 const createTable = reactive({ open: false })
 const createDoc = reactive({ open: false, kind: 'file' as DocumentSourceType })
 
-const columns = [
-  { title: '名称', key: 'name', width: 210, ellipsis: true },
-  { title: '类型', key: 'kind', width: 130 },
-  { title: '位置', key: 'locator', width: 210, ellipsis: true },
-  { title: '连接', key: 'connection', width: 160, ellipsis: true },
-  { title: '统计', key: 'profile', width: 100 },
-  { title: '状态', key: 'status', width: 100 },
-  { title: '操作', key: 'actions', width: 280, fixed: 'right' as const },
-]
+const columns = computed(() => [
+  { title: text("名称"), key: 'name', width: 210, ellipsis: true },
+  { title: text("类型"), key: 'kind', width: 130 },
+  { title: text("位置"), key: 'locator', width: 210, ellipsis: true },
+  { title: text("连接"), key: 'connection', width: 160, ellipsis: true },
+  { title: text("统计"), key: 'profile', width: 100 },
+  { title: text("状态"), key: 'status', width: 100 },
+  { title: text("操作"), key: 'actions', width: 280, fixed: 'right' as const },
+])
 
 const domainOptions = computed(() => {
   const s = new Set(knownDomains.value)
@@ -300,7 +301,7 @@ async function syncOne(record: Asset) {
   try {
     const r = await store.syncSchema(record.id)
     const { added, removed, type_changed } = r.diff
-    const msg = `Schema 同步完成，新增 ${added.length} / 删除 ${removed.length} / 类型变更 ${type_changed.length}`
+    const msg = text('Schema 同步完成，新增 {added} / 删除 {removed} / 类型变更 {changed}', { added: added.length, removed: removed.length, changed: type_changed.length })
     if (added.length || removed.length || type_changed.length) message.warning(msg)
     else message.success(msg)
   } catch (e: any) {
@@ -315,7 +316,7 @@ async function profileOne(record: Asset) {
   pendingActions[record.id] = 'profile'
   try {
     const r = await store.profile(record.id)
-    message.success(`Profile 完成：${r.row_count} 行`)
+    message.success(text('Profile 完成：{count} 行', { count: r.row_count }))
   } catch (e: any) {
     message.error(e.response?.data?.detail || e.message)
   } finally {
@@ -328,19 +329,19 @@ async function del(record: Asset) {
   pendingActions[record.id] = 'delete'
   try {
     await store.remove(record.id)
-    message.success('已删除')
+    message.success(text("已删除"))
   } catch (e: any) {
-    message.error(e.response?.data?.detail || '删除失败（可能被引用）')
+    message.error(e.response?.data?.detail || text("删除失败（可能被引用）"))
   } finally {
     delete pendingActions[record.id]
   }
 }
 
 function kindLabel(a: Asset) {
-  if (a.kind === 'table') return '表'
-  if (a.kind === 'sql_view') return 'SQL 视图'
-  const labels: Record<string, string> = { file: '文件', oss: '对象存储', s3: '对象存储', directory: '目录', api: 'API', mq: '消息队列' }
-  return a.document_source_type ? `文档 · ${labels[a.document_source_type] || a.document_source_type}` : '文档'
+  if (a.kind === 'table') return text("表")
+  if (a.kind === 'sql_view') return text("SQL 视图")
+  const labels: Record<string, string> = { file: text("文件"), oss: text("对象存储"), s3: text("对象存储"), directory: text("目录"), api: 'API', mq: text("消息队列") }
+  return a.document_source_type ? text('文档 · {type}', { type: labels[a.document_source_type] || a.document_source_type }) : text("文档")
 }
 function kindColor(k: AssetKind) {
   return ({ table: 'blue', sql_view: 'cyan', document: 'gold' } as Record<AssetKind, string>)[k]
@@ -349,10 +350,10 @@ function statusColor(s: string) {
   return ({ active: 'green', deprecated: 'orange', broken: 'red' } as any)[s] || 'default'
 }
 function statusLabel(status: string) {
-  return ({ active: '可用', deprecated: '已弃用', broken: '异常' } as Record<string, string>)[status] || status
+  return ({ active: text("可用"), deprecated: text("已弃用"), broken: text("异常") } as Record<string, string>)[status] || status
 }
 function refreshPolicyLabel(policy: string) {
-  return ({ on_demand: '按需', hourly: '每小时', daily: '每日' } as Record<string, string>)[policy] || policy
+  return ({ on_demand: text("按需"), hourly: text("每小时"), daily: text("每日") } as Record<string, string>)[policy] || policy
 }
 function locatorBrief(a: Asset) {
   const loc: any = a.locator || {}

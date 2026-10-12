@@ -27,6 +27,7 @@ class S3Connector:
         cfg = Config(
             signature_version="s3v4",
             s3={"addressing_style": "path" if params.get("path_style") else "auto"},
+            connect_timeout=5, read_timeout=10, retries={"max_attempts": 1},
         )
         kwargs = dict(
             aws_access_key_id=cred.get("access_key") or None,

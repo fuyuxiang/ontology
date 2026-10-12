@@ -3,7 +3,8 @@ OSDK 生成服务 — 根据本体 Schema 生成 TypeScript/Python SDK 代码
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from typing import Literal
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/osdk", tags=["osdk"])
 
 
 class GenerateRequest(BaseModel):
-    language: str = "typescript"
+    language: Literal["typescript", "python"] = "typescript"
     entity_ids: list[str] | None = None
 
 

@@ -23,8 +23,9 @@
       <button class="btn-primary" @click="loadWorkspace">重试</button>
       <button class="btn-back" @click="goBack">返回列表</button>
     </div>
+    <div v-if="!loading && !error && registrationError" class="code-server-page__warning" role="alert">源码尚未通过注册：{{ registrationError }}。请在工作区修复并保存；执行与发布仍需重新校验。</div>
     <iframe
-      v-else
+      v-if="!loading && !error"
       :src="codeServerUrl"
       class="code-server-page__iframe"
       :title="`${funcName || '逻辑'}代码工作区`"
@@ -48,6 +49,7 @@ const codeServerUrl = ref('')
 const funcName = ref('')
 const loading = ref(true)
 const error = ref('')
+const registrationError = ref('')
 let requestGeneration = 0
 
 function goBack() {
@@ -63,6 +65,7 @@ async function loadWorkspace() {
   const id = String(route.params.id || '')
   loading.value = true
   error.value = ''
+  registrationError.value = ''
   codeServerUrl.value = ''
   funcName.value = ''
   if (!id) {
@@ -75,7 +78,10 @@ async function loadWorkspace() {
     if (generation !== requestGeneration) return
     funcName.value = item.name
     const workspace = await functionApi.openWorkspace(id)
-    if (generation === requestGeneration) codeServerUrl.value = buildCodeServerUrl(workspace)
+    if (generation === requestGeneration) {
+      codeServerUrl.value = buildCodeServerUrl(workspace)
+      registrationError.value = workspace.registration_error || ''
+    }
   } catch (e) {
     if (generation === requestGeneration) error.value = skillError(e, '打开工作区失败')
   } finally {
@@ -89,6 +95,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.code-server-page__warning {padding:12px 20px;background:#fff7ed;color:#9a3412;overflow-wrap:anywhere;}
 .code-server-page {
   display: flex;
   flex-direction: column;

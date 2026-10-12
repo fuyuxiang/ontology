@@ -4,7 +4,7 @@
       <OntologyBreadcrumb :items="breadcrumbs" />
     </div>
     <div class="topbar__right">
-      <button class="topbar__icon-btn" title="我的待办（即将上线）" disabled>
+      <button class="topbar__icon-btn" :title="t('shell.pendingFuture')" disabled>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path
             d="M8 2a4 4 0 00-4 4v3l-1 1.5h10L12 9V6a4 4 0 00-4-4z"
@@ -20,7 +20,7 @@
       <button
         type="button"
         class="topbar__user"
-        aria-label="打开用户设置"
+        :aria-label="t('shell.openSettings')"
         aria-haspopup="dialog"
         @click="showSettings = true"
       >
@@ -36,6 +36,9 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { platformRouteTitle } from '../../utils/platformPresentation'
+const { t } = useI18n()
 import { useAuthStore } from '../../store/auth'
 import OntologyBreadcrumb from './OntologyBreadcrumb.vue'
 import SettingsDialog from './SettingsDialog.vue'
@@ -44,29 +47,29 @@ const route = useRoute()
 const authStore = useAuthStore()
 const showSettings = ref(false)
 
-const userName = computed(() => authStore.user?.name || '用户')
+const userName = computed(() => authStore.user?.name || t('shell.user'))
 const initial = computed(() => userName.value.charAt(0).toUpperCase())
 
 const breadcrumbs = computed(() => {
-  const title = route.meta.title as string | undefined
+  const title = platformRouteTitle(route.meta.title as string | undefined)
   if (route.path.startsWith('/skills'))
     return route.name === 'skills-list'
-      ? [{ label: '本体应用' }, { label: '业务技能' }]
+      ? [{ label: t('shell.applications') }, { label: t('shell.skills') }]
       : [
-          { label: '本体应用' },
-          { label: '业务技能', path: '/skills' },
-          { label: title || '技能详情' },
+          { label: t('shell.applications') },
+          { label: t('shell.skills'), path: '/skills' },
+          { label: title || t('shell.skillDetail') },
         ]
   if (route.path.startsWith('/agent/manage'))
     return route.name === 'agent-manage'
-      ? [{ label: '本体应用' }, { label: '智能体应用' }]
+      ? [{ label: t('shell.applications') }, { label: t('shell.agents') }]
       : [
-          { label: '本体应用' },
-          { label: '智能体应用', path: '/agent/manage' },
-          { label: title || '智能体详情' },
+          { label: t('shell.applications') },
+          { label: t('shell.agents'), path: '/agent/manage' },
+          { label: title || t('shell.agentDetail') },
         ]
   if (title) return [{ label: title }]
-  return [{ label: '首页' }]
+  return [{ label: t('shell.home') }]
 })
 </script>
 

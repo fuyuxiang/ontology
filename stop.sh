@@ -1,40 +1,23 @@
 #!/bin/bash
-
-set -u
-
+set -euo pipefail
 cd "$(dirname "$0")"
-
-BACKEND_PORT="${BACKEND_PORT:-8001}"
-FRONTEND_PORT="${FRONTEND_PORT:-5177}"
-CODE_SERVER_PORT="${CODE_SERVER_PORT:-8443}"
-
-stop_port() {
-    local port="$1"
-    local name="$2"
-    local pids
-    local remaining
-
-    pids="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
-    if [ -n "$pids" ]; then
-        echo "  Stopping $name on port $port (PID(s): $(echo "$pids" | tr '\n' ' '))..."
-        echo "$pids" | xargs kill 2>/dev/null || true
-        sleep 1
-        remaining="$(lsof -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null || true)"
-        if [ -n "$remaining" ]; then
-            echo "  Force stopping $name on port $port (PID(s): $(echo "$remaining" | tr '\n' ' '))..."
-            echo "$remaining" | xargs kill -9 2>/dev/null || true
-        fi
-    else
-        echo "  $name not running on port $port."
-    fi
-}
-
-echo "Stopping services..."
-
-stop_port "$BACKEND_PORT" "backend"
-stop_port "$FRONTEND_PORT" "frontend"
-stop_port "$CODE_SERVER_PORT" "code-server"
-
-rm -f .backend.pid .frontend.pid .code-server.pid
-
-echo "Done."
+ROOT_DIR="$(pwd)"
+if [ -f "$ROOT_DIR/.env" ]; then
+    set -a
+    source "$ROOT_DIR/.env"
+    set +a
+fi
+PYTHON="${BACKEND_PYTHON:-}"
+if [ -z "$PYTHON" ]; then
+    for candidate in "$ROOT_DIR/backend/venv/bin/python" "$ROOT_DIR/backend/.venv/bin/python" "$(command -v python3 || true)"; do
+        if [ -x "$candidate" ]; then PYTHON="$candidate"; break; fi
+    done
+fi
+if [ -z "$PYTHON" ]; then
+    echo "Python is required to validate managed PID records; no process was stopped."
+    exit 1
+fi
+for service in code-server frontend backend; do
+    "$PYTHON" "$ROOT_DIR/scripts/process_manager.py" stop "$ROOT_DIR/.$service.pid" "$ROOT_DIR"
+done
+echo "Managed services stopped. Unrelated port listeners were preserved."

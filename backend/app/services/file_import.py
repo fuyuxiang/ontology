@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.models.action import EntityAction
 from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.relation import EntityRelation
+from app.utils.identifiers import gen_uuid
 
 
 @dataclass
@@ -26,8 +27,64 @@ class ImportResult:
 _JSON_TYPE_MAP = {
     "string": "string", "number": "number", "boolean": "boolean",
     "datetime": "date", "enum": "string", "reference": "ref",
-    "array": "json", "object": "json",
+    "array": "json", "object": "json", "integer": "integer", "date": "date", "json": "json", "ref": "ref",
 }
+
+
+def _normalize_json_contract(data: dict) -> dict:
+    """Accept the studio's exported structure as well as V1.1 import names."""
+    data = dict(data)
+    if "object_types" not in data and "objects" in data:
+        data["object_types"] = data.pop("objects")
+    if "link_types" not in data and "relations" in data:
+        data["link_types"] = [{**relation, "source_type": relation.get("source_type", relation.get("source")),
+                               "target_type": relation.get("target_type", relation.get("target"))} for relation in data.pop("relations")]
+    if "action_types" not in data and "actions" in data:
+        data["action_types"] = data.pop("actions")
+    return data
+
+
+def persist_import_actions(actions: list[dict], entity_ids: dict[str, str], ontology_id: str | None, db: Session) -> tuple[int, list[str]]:
+    """Persist explicit executable definitions, retaining legacy business hints."""
+    from app.schemas.action import ActionCreate, ACTION_TYPES
+    from app.api.v1.actions import _validate_action_scope
+    from app.services.action_executors import get_executor
+    created, warnings = 0, []
+    for specification in actions:
+        kind = specification.get("action_type") or specification.get("type")
+        target = specification.get("target_object") or specification.get("entity_name")
+        category = specification.get("category", "domain")
+        if kind not in ACTION_TYPES:
+            # effects/automatic is an incomplete business suggestion, not an
+            # executor. Preserve it on the target definition for later editing.
+            entity = db.get(OntologyEntity, entity_ids.get(target)) if target else None
+            if entity:
+                hints = list((entity.config_json or {}).get("pending_action_specs", []))
+                if specification not in hints:
+                    entity.config_json = {**(entity.config_json or {}), "pending_action_specs": [*hints, specification]}
+            warnings.append(f"动作 {specification.get('name', '')} 尚未指定六类执行器及配置，保留为待配置建议，未注册可执行动作")
+            continue
+        if category == "domain" and target not in entity_ids:
+            raise ValueError(f"动作 {specification.get('name')} 必须指定当前本体的 target_object")
+        configuration = specification.get("type_config") or {}
+        missing = [name for name, field in get_executor(kind).get_config_schema().items()
+                   if field.get("required") and configuration.get(name) in (None, "")]
+        if missing:
+            raise ValueError(f"动作 {specification.get('name')} 配置缺少必填字段: {', '.join(missing)}")
+        validated = ActionCreate(
+            name=specification.get("display_name") or specification["name"], description=specification.get("description"),
+            category=category, entity_id=entity_ids.get(target) if category == "domain" else None,
+            ontology_id=ontology_id, action_type=kind, type_config=specification.get("type_config") or {},
+            parameters_json=specification.get("parameters_json", specification.get("parameters")),
+            output_schema=specification.get("output_schema"), status="active",
+        )
+        existing = db.query(EntityAction).filter_by(ontology_id=ontology_id, entity_id=validated.entity_id, name=validated.name).first()
+        values = _validate_action_scope(db, validated.model_dump(), existing)
+        if existing:
+            for key, value in values.items(): setattr(existing, key, value)
+        else:
+            db.add(EntityAction(**values)); created += 1
+    return created, warnings
 
 # ── 解析器实际消费的顶层字段；其余字段一律不会被导入 ──
 _SUPPORTED_TOP_LEVEL_KEYS = {
@@ -49,6 +106,7 @@ def _ignored_warning(data: dict) -> list[str]:
 
 def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id: str | None = None) -> ImportResult:
     """按 V1.1 本体 JSON Schema 规范解析，复用 import_schema.py 的逻辑。"""
+    data = _normalize_json_contract(data)
     result = ImportResult()
     result.warnings.extend(_ignored_warning(data))
 
@@ -78,8 +136,9 @@ def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id:
         raw_ds_ref = obj.get("datasource_ref", "")
         resolved_ds_ref = _resolve_ds_ref(raw_ds_ref)
 
-        existing = db.query(OntologyEntity).filter(OntologyEntity.id == eid).first()
+        existing = db.query(OntologyEntity).filter_by(ontology_id=ontology_id, name=obj["name"]).first()
         if existing:
+            eid = existing.id
             entity_map[obj["name"]] = eid
             # 更新已有实体的 datasource_ref（可能之前是逻辑名）
             schema = existing.config_json or {}
@@ -92,6 +151,8 @@ def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id:
             result.entities_skipped += 1
             continue
 
+        if ontology_id:
+            eid = gen_uuid()
         entity = OntologyEntity(
             id=eid,
             name=obj["name"],
@@ -154,6 +215,25 @@ def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id:
 
     db.flush()
 
+    # Imported source fields use the same authoritative ObjectBinding write
+    # path as the studio editor; compatibility columns alone are not grounding.
+    from app.api.v1.entities import _sync_attribute_mappings
+    from app.schemas.entity import AttributeMappingUpdate
+    for obj in data.get("object_types", []):
+        entity_id = entity_map.get(obj["name"])
+        if not entity_id:
+            continue
+        attributes = {attr.name: attr for attr in db.query(EntityAttribute).filter_by(entity_id=entity_id).all()}
+        mapped = []
+        for property_definition in obj.get("properties", []):
+            table = property_definition.get("source_table") or _resolve_ds_ref(obj.get("datasource_ref", ""))
+            field = property_definition.get("source_field")
+            if table and field:
+                mapped.append(AttributeMappingUpdate(attribute_id=attributes[property_definition["name"]].id,
+                              source_table=table, source_field=field, asset_id=property_definition.get("source_asset_id")))
+        if mapped:
+            _sync_attribute_mappings(db, db.get(OntologyEntity, entity_id), mapped, None)
+
     # ── link_types → EntityRelation ──
     cardinality_map = {
         "one_to_many": "1:N", "many_to_one": "N:1",
@@ -164,26 +244,14 @@ def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id:
         target = link.get("target_type", "")
         source_ns = link.get("source_namespace", namespace)
         target_ns = link.get("target_namespace", namespace)
-        from_id = f"{source_ns}_{source}" if source_ns else source
-        to_id = f"{target_ns}_{target}" if target_ns else target
-
-        # namespace 感知的实体查找（限定在当前本体内）
-        if not db.get(OntologyEntity, from_id):
-            if db.get(OntologyEntity, source):
-                from_id = source
-            elif ontology_id:
-                found = db.query(OntologyEntity).filter(
-                    OntologyEntity.name == source, OntologyEntity.ontology_id == ontology_id
-                ).first()
-                from_id = found.id if found else from_id
-        if not db.get(OntologyEntity, to_id):
-            if db.get(OntologyEntity, target):
-                to_id = target
-            elif ontology_id:
-                found = db.query(OntologyEntity).filter(
-                    OntologyEntity.name == target, OntologyEntity.ontology_id == ontology_id
-                ).first()
-                to_id = found.id if found else to_id
+        from_id = entity_map.get(source)
+        to_id = entity_map.get(target)
+        if not from_id:
+            found = db.query(OntologyEntity).filter_by(name=source, ontology_id=ontology_id).first()
+            from_id = found.id if found else None
+        if not to_id:
+            found = db.query(OntologyEntity).filter_by(name=target, ontology_id=ontology_id).first()
+            to_id = found.id if found else None
 
         if not db.get(OntologyEntity, from_id) or not db.get(OntologyEntity, to_id):
             result.errors.append(f"关系 {source} -> {target} 跳过（实体未找到）")
@@ -203,45 +271,15 @@ def parse_json_ontology(data: dict, namespace: str, db: Session, *, ontology_id:
             from_entity_id=from_id, to_entity_id=to_id,
             name=link["name"], rel_type=link.get("directionality", "directed"),
             cardinality=card, description=link.get("description"),
+            source_field=link.get("source_field", link.get("sourceField")),
+            target_field=link.get("target_field", link.get("targetField")),
         )
         db.add(rel)
         result.relations_created += 1
 
-    # ── action_types → EntityAction ──
-    for act in data.get("action_types", []):
-        entity_id = None
-        # 优先从 effects 的 target 解析关联实体
-        for eff in act.get("effects", []):
-            target = eff.get("target", "")
-            if target in entity_map:
-                entity_id = entity_map[target]
-                break
-        if not entity_id:
-            for obj_name, eid in entity_map.items():
-                if obj_name.lower() in act.get("description", "").lower() or obj_name.lower() in act["name"].lower():
-                    entity_id = eid
-                    break
-        if not entity_id:
-            entity_id = list(entity_map.values())[0] if entity_map else None
-        if entity_id:
-            action = EntityAction(
-                entity_id=entity_id,
-                ontology_id=ontology_id,
-                name=act.get("display_name", act["name"]),
-                action_type=act.get("trigger", "automatic"),
-                status="active",
-                parameters_json=act.get("parameters"),
-                type_config={
-                    "action_name": act["name"],
-                    "reasoning_mode": act.get("reasoning_mode"),
-                    "permissions": act.get("permissions"),
-                    "audit": act.get("audit"),
-                    "preconditions": act.get("preconditions"),
-                    "effects": act.get("effects"),
-                },
-            )
-            db.add(action)
-            result.actions_created += 1
+    action_specs = preview_json_ontology(data, namespace)["actions"]
+    result.actions_created, action_warnings = persist_import_actions(action_specs, entity_map, ontology_id, db)
+    result.warnings.extend(action_warnings)
 
     return result
 
@@ -281,6 +319,7 @@ def preview_json_ontology(data: dict, namespace: str) -> dict:
     供模版构建预览使用。解析口径与 parse_json_ontology 保持一致（类型映射、
     基数归一、数据源逻辑名→物理表映射、动作关联实体推断）。
     """
+    data = _normalize_json_contract(data)
     if not namespace:
         namespace = data.get("scenario", {}).get("namespace", "")
 
@@ -339,13 +378,15 @@ def preview_json_ontology(data: dict, namespace: str) -> dict:
             "target": target,
             "cardinality": _normalize_cardinality(link.get("cardinality", "")),
             "description": link.get("description", ""),
+            "source_field": link.get("source_field") or link.get("sourceField"),
+            "target_field": link.get("target_field") or link.get("targetField"),
         })
 
     # ── action_types → actions（关联实体推断：effects.target > 名称/描述匹配 > 首个对象）──
     actions: list[dict] = []
     obj_name_list = list(object_names)
     for act in data.get("action_types", []):
-        target_object = None
+        target_object = act.get("target_object") or act.get("entity_name")
         for eff in act.get("effects", []):
             t = eff.get("target", "")
             if t in object_names:
@@ -365,6 +406,11 @@ def preview_json_ontology(data: dict, namespace: str) -> dict:
             "trigger": act.get("trigger", "automatic"),
             "target_object": target_object,
             "description": act.get("description", ""),
+            "action_type": act.get("action_type") or act.get("type"),
+            "category": act.get("category", "domain"),
+            "type_config": act.get("type_config"),
+            "parameters_json": act.get("parameters_json", act.get("parameters")),
+            "output_schema": act.get("output_schema"),
         })
 
     # ── data_sources（逻辑名 → 物理表）──
@@ -427,13 +473,86 @@ def _local_name(uri: str) -> str:
     return uri.rsplit("/", 1)[-1]
 
 
+def _load_owl_graph(content: bytes, fmt: str):
+    """Read both RDF/XML and the OWL/XML exported by the local editor.
+
+    OWL/XML is an axiom syntax, not RDF/XML. Translate the named vocabulary
+    axioms consumed by this importer explicitly; never infer data bindings from
+    OWL object properties. Unsupported reasoning/individual axioms are reported.
+    """
+    from urllib.parse import urljoin
+    from xml.etree import ElementTree as ET
+    from rdflib import Graph, Literal, OWL, RDF, RDFS, URIRef
+
+    graph = Graph()
+    warnings: list[str] = []
+    root = None
+    if fmt in {"xml", "application/rdf+xml", "owl", "owlxml"}:
+        root = ET.fromstring(content)
+    if root is None or root.tag != f"{{{_OWL}}}Ontology":
+        graph.parse(data=content, format=fmt)
+        return graph, warnings
+
+    def tag(element):
+        return element.tag.rsplit("}", 1)[-1]
+
+    base = root.get("{http://www.w3.org/XML/1998/namespace}base") or root.get("ontologyIRI", "")
+    prefixes = {"owl": _OWL, "rdf": _RDF, "rdfs": _RDFS, "xsd": _XSD}
+    for element in root:
+        if tag(element) == "Prefix":
+            prefixes[element.get("name", "").rstrip(":")] = element.get("IRI", "")
+
+    def iri(element):
+        value = element.get("IRI") or element.get("abbreviatedIRI") or (element.text or "").strip()
+        if not value:
+            raise ValueError(f"OWL/XML 的 {tag(element)} 缺少 IRI")
+        # Also accept the editor's annotation subjects (IRI text uses its prefix).
+        if ":" in value and value.split(":", 1)[0] in prefixes:
+            prefix, local = value.split(":", 1)
+            return URIRef(prefixes[prefix] + local)
+        return URIRef(urljoin(base, value))
+
+    declaration_types = {"Class": OWL.Class, "DataProperty": OWL.DatatypeProperty, "ObjectProperty": OWL.ObjectProperty, "AnnotationProperty": OWL.AnnotationProperty}
+    pairs = {
+        "SubClassOf": ("Class", "Class", RDFS.subClassOf),
+        "DataPropertyDomain": ("DataProperty", "Class", RDFS.domain),
+        "DataPropertyRange": ("DataProperty", "Datatype", RDFS.range),
+        "ObjectPropertyDomain": ("ObjectProperty", "Class", RDFS.domain),
+        "ObjectPropertyRange": ("ObjectProperty", "Class", RDFS.range),
+    }
+    unsupported: set[str] = set()
+    for axiom in root:
+        name = tag(axiom)
+        children = [child for child in axiom if tag(child) != "Annotation"]
+        if name == "Prefix":
+            continue
+        if name == "Declaration" and len(children) == 1 and tag(children[0]) in declaration_types:
+            graph.add((iri(children[0]), RDF.type, declaration_types[tag(children[0])]))
+        elif name in pairs and len(children) == 2 and (tag(children[0]), tag(children[1])) == pairs[name][:2]:
+            graph.add((iri(children[0]), pairs[name][2], iri(children[1])))
+            for child in children:
+                if tag(child) in declaration_types:
+                    graph.add((iri(child), RDF.type, declaration_types[tag(child)]))
+        elif name == "AnnotationAssertion" and len(children) == 3 and tag(children[0]) == "AnnotationProperty" and tag(children[2]) == "Literal":
+            literal = children[2]
+            language = literal.get("{http://www.w3.org/XML/1998/namespace}lang")
+            datatype = literal.get("datatypeIRI")
+            value = Literal(literal.text or "", lang=language, datatype=URIRef(datatype) if datatype and not language else None)
+            graph.add((iri(children[1]), iri(children[0]), value))
+        else:
+            unsupported.add(name)
+    if unsupported:
+        warnings.append("以下 OWL/XML 公理保留在 OWL 文件中，未转成业务本体定义：" + "、".join(sorted(unsupported)))
+    return graph, warnings
+
+
 def parse_owl_ontology(content: bytes, fmt: str, db: Session, *, ontology_id: str | None = None) -> ImportResult:
     """解析 OWL/XML 或 TTL 文件。"""
     from rdflib import OWL, RDF, RDFS, Graph
 
     result = ImportResult()
-    g = Graph()
-    g.parse(data=content, format=fmt)
+    g, warnings = _load_owl_graph(content, fmt)
+    result.warnings.extend(warnings)
 
     entity_map: dict[str, str] = {}  # URI -> entity_id
 
@@ -452,10 +571,10 @@ def parse_owl_ontology(content: bytes, fmt: str, db: Session, *, ontology_id: st
         comments = list(g.objects(cls, RDFS.comment))
         description = str(comments[0]) if comments else ""
 
-        eid = f"{ontology_id}_{name}" if ontology_id else name
-        existing = db.query(OntologyEntity).filter(OntologyEntity.id == eid).first()
+        eid = gen_uuid() if ontology_id else name
+        existing = db.query(OntologyEntity).filter_by(ontology_id=ontology_id, name=name).first()
         if existing:
-            entity_map[uri] = eid
+            entity_map[uri] = existing.id
             result.entities_skipped += 1
             continue
 
@@ -514,6 +633,8 @@ def parse_owl_ontology(content: bytes, fmt: str, db: Session, *, ontology_id: st
         labels = list(g.objects(prop, RDFS.label))
         description = str(labels[0]) if labels else prop_name
 
+        if db.query(EntityAttribute).filter_by(entity_id=entity_id, name=prop_name).first():
+            continue
         attr = EntityAttribute(
             entity_id=entity_id,
             name=prop_name,
@@ -570,8 +691,7 @@ def preview_owl_ontology(content: bytes, fmt: str, namespace: str = "") -> dict:
     """
     from rdflib import OWL, RDF, RDFS, Graph
 
-    g = Graph()
-    g.parse(data=content, format=fmt)
+    g, warnings = _load_owl_graph(content, fmt)
 
     # ── owl:Class → objects ──
     objects: list[dict] = []
@@ -669,6 +789,7 @@ def preview_owl_ontology(content: bytes, fmt: str, namespace: str = "") -> dict:
         "relations": relations,
         "actions": [],
         "data_sources": [],
+        "warnings": warnings,
         "summary": {
             "object_count": len(objects),
             "relation_count": len(relations),

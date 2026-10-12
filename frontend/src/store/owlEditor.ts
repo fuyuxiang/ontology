@@ -22,6 +22,7 @@ function createEmptyOntology(): OwlOntology {
 
 export const useOwlEditorStore = defineStore('owlEditor', () => {
   const ontology = ref<OwlOntology>(createEmptyOntology())
+  const storageScope = ref<string | null>(null)
   const selectedTab = ref<string>('classes')
   const selectedClassId = ref<string | null>(null)
   const selectedObjectPropertyId = ref<string | null>(null)
@@ -233,20 +234,23 @@ export const useOwlEditorStore = defineStore('owlEditor', () => {
 
   // Persistence
   function saveDraft() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(ontology.value)) } catch { /* noop */ }
+    if (!storageScope.value) throw new Error("请先选择目标本体")
+    try { localStorage.setItem(`${STORAGE_KEY}:${storageScope.value}`, JSON.stringify(ontology.value)) } catch { /* noop */ }
     isDirty.value = false
   }
 
   function loadDraft(): boolean {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY)
+      const raw = storageScope.value ? localStorage.getItem(`${STORAGE_KEY}:${storageScope.value}`) : null
       if (raw) { ontology.value = JSON.parse(raw); return true }
     } catch { /* noop */ }
     return false
   }
 
+  function setScope(scope: string | null) { if (storageScope.value === scope) return; if (storageScope.value && isDirty.value) saveDraft(); storageScope.value = scope; ontology.value = createEmptyOntology(); selectedClassId.value = null; selectedObjectPropertyId.value = null; selectedDataPropertyId.value = null; selectedIndividualId.value = null; undoStack.value = []; redoStack.value = []; isDirty.value = false; if (scope) loadDraft() }
+
   return {
-    ontology, selectedTab, selectedClassId, selectedObjectPropertyId, selectedDataPropertyId, selectedIndividualId, isDirty,
+    setScope, ontology, selectedTab, selectedClassId, selectedObjectPropertyId, selectedDataPropertyId, selectedIndividualId, isDirty,
     selectedClass, selectedObjectProperty, selectedDataProperty, selectedIndividual, metrics,
     snapshot, undo, redo,
     addClass, deleteClass, updateClass,

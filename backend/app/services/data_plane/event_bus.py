@@ -24,6 +24,9 @@ import uuid
 from collections import defaultdict
 from collections.abc import Callable
 
+from sqlalchemy import event as sqlalchemy_event
+from sqlalchemy.orm import Session
+
 logger = logging.getLogger(__name__)
 
 EventHandler = Callable[[dict], None]
@@ -107,3 +110,19 @@ def get_event_bus() -> EventBus:
     if _bus_singleton is None:
         _bus_singleton = EventBus()
     return _bus_singleton
+
+
+def emit_after_commit(db: Session, event: str, payload: dict) -> None:
+    """Observers must never see bindings that are later rolled back."""
+    db.info.setdefault("data_plane_events", []).append((event, dict(payload)))
+
+
+@sqlalchemy_event.listens_for(Session, "after_commit")
+def _publish_committed_events(db):
+    for event, payload in db.info.pop("data_plane_events", []):
+        get_event_bus().emit(event, payload)
+
+
+@sqlalchemy_event.listens_for(Session, "after_rollback")
+def _discard_rolled_back_events(db):
+    db.info.pop("data_plane_events", None)

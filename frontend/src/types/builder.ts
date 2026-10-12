@@ -54,6 +54,7 @@ export interface OntologyProperty {
   // M2.2：AI 召回回写 backing —— 让发布链路可自动落 ObjectBinding
   source_asset_id?: string | null
   source_column?: string | null
+  transform?: string | null
   source_field?: string | null
   source_table?: string | null
 }
@@ -76,6 +77,7 @@ export interface OntologyObjectDraft {
   approved?: boolean
   // M2.2：AI 召回回写 backing
   backing_asset_ids?: string[]
+  enrichment_bindings?: {asset_id:string;primary_source_column?:string|null;enrichment_source_column?:string|null}[]
   evidence_asset_ids?: string[]
 }
 
@@ -102,7 +104,9 @@ export interface OntologyRelationDraft {
   inverseDisplayName?: string
   source: string
   target: string
-  cardinality: '1:1' | '1:N' | 'N:N'
+  cardinality: '1:1' | '1:N' | 'N:1' | 'N:N'
+  sourceField?: string | null
+  targetField?: string | null
   description: string
   relationType: 'ObjectProperty' | 'SymmetricProperty' | 'TransitiveProperty' | 'FunctionalProperty'
   semanticType: 'composition' | 'event' | 'inheritance' | 'dependency' | 'association'
@@ -166,6 +170,13 @@ export interface DrillResult {
 export interface BuilderSession {
   sessionId: string
   ontologyName: string
+  ontologyId?: string
+  builderKind?: string
+  documentSessionId?: string
+  builderState?: Record<string, any>
+  ownerId?: string
+  contentFingerprint?: string
+  drillFingerprint?: string
   scenarioId?: string
   scenarioName?: string
   buildMethod: BuildMethod
@@ -175,6 +186,7 @@ export interface BuilderSession {
   updatedAt: string
   ontologyObjects: OntologyObjectDraft[]
   ontologyRelations: OntologyRelationDraft[]
+  importedActions?: Array<{ name: string; display_name?: string; target_object: string | null; action_type?: string | null; category?: string; description: string; type_config?: Record<string, unknown> | null; parameters_json?: Array<Record<string, unknown>> | null; output_schema?: Array<Record<string, unknown>> | null }>
   hints: OntologyHints
   selectedAssetIds: string[]
   selectedSampleSourceIds: string[]

@@ -260,6 +260,7 @@ class TestValidateAndRetry:
         bad_json = json.dumps({"entities": [], "relations": []})
         mock_caller = MagicMock(return_value=bad_json)
         result, warnings = validate_and_retry(mock_caller, bad_json, max_retries=2)
+        assert result is None
         assert warnings is not None
         assert mock_caller.call_count == 2
 

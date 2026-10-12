@@ -56,6 +56,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatPlatformDateTime } from '../../../utils/platformTime'
 import { ref, computed } from 'vue'
 import type { AlertItem } from '../../../api/monitor'
 
@@ -87,18 +88,9 @@ function levelColor(level: string) {
 function levelLabel(level: string) {
   return { critical: '严重', warning: '警告', info: '提示' }[level] || level
 }
-function formatTime(iso: string) {
-  if (!iso) return ''
-  // 后端返回的是 UTC 时间（无 Z 后缀），需要加 Z 表示 UTC
-  const d = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso) ? iso : iso + 'Z')
-  return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
-}
+function formatTime(iso: string) { return formatPlatformDateTime(iso) }
+function formatTimeFull(iso: string) { return formatPlatformDateTime(iso) }
 
-function formatTimeFull(iso: string) {
-  if (!iso) return ''
-  const d = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(iso) ? iso : iso + 'Z')
-  return d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Shanghai' })
-}
 </script>
 
 <style scoped>

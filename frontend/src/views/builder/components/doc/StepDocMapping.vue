@@ -36,9 +36,9 @@
             >
               <td>{{ e.displayName || e.name }}</td>
               <td>
-                <select v-model="e.table" class="step-mapping__select">
+                <select v-model="e.table" class="step-mapping__select" @change="changeTable(e)">
                   <option :value="null">未匹配</option>
-                  <option v-for="t in candidateTables" :key="t" :value="t">{{ t }}</option>
+                  <option v-for="t in candidateTables" :key="t" :value="t">{{ tables.find(table => table.asset_id === t)?.table_name || t }}</option>
                 </select>
               </td>
               <td>
@@ -63,7 +63,7 @@
                       <tr v-for="p in e.properties" :key="p.name">
                         <td>{{ p.displayName || p.name }}</td>
                         <td>
-                          <select v-model="p.field" class="step-mapping__select step-mapping__select--sm">
+                          <select v-model="p.field" class="step-mapping__select step-mapping__select--sm" @change="changeField(e, p)">
                             <option :value="null">未匹配</option>
                             <option v-for="f in getFieldsForTable(e.table)" :key="f.field_name" :value="f.field_name">
                               {{ f.field_name }} ({{ f.field_desc || '' }})
@@ -117,8 +117,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive } from 'vue'
-import { authHeaders } from '../../../../utils/authHeaders'
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue'
+import { getTableSchema, listTables } from '../../../../api/aiBuilderV2'
+import { postJsonSse, readJsonSse } from '../../../../api/sse'
 
 const props = defineProps<{
   sessionId: string
@@ -139,7 +140,7 @@ const expanded = reactive<Record<string, boolean>>({})
 
 const allEntitiesMapped = computed(() => {
   if (!mappedOntology.value) return false
-  return mappedOntology.value.entities.every((e: any) => e.table != null)
+  return mappedOntology.value.entities.length > 0 && mappedOntology.value.entities.every((e: any) => e.table != null && e.properties.every((p: any) => !p.field || getFieldsForTable(e.table).some(f => f.field_name === p.field)))
 })
 
 function confidenceClass(c: number | undefined) {
@@ -157,76 +158,74 @@ function getFieldsForTable(tableName: string | null): any[] {
   return tableFields[tableName] || []
 }
 
+function changeField(entity: any, property: any) {
+  property.fieldType = getFieldsForTable(entity.table).find(field => field.field_name === property.field)?.field_type || null
+  property.confidence = property.field ? 1 : 0
+}
+
+function changeTable(entity: any) {
+  const fields = getFieldsForTable(entity.table)
+  entity.confidence = entity.table ? 1 : 0
+  for (const property of entity.properties) {
+    if (!fields.some(field => field.field_name === property.field)) property.field = null
+    changeField(entity, property)
+  }
+  for (const relation of mappedOntology.value.relations) {
+    if (relation.source === entity.name) { relation.sourceTable = entity.table; relation.sourceField = null; relation.confidence = 0 }
+    if (relation.target === entity.name) { relation.targetTable = entity.table; relation.targetField = null; relation.confidence = 0 }
+  }
+}
+
+let controller: AbortController | null = null
+let request = 0
+const tables = ref<import('../../../../api/aiBuilderV2').TableInfo[]>([])
 async function fetchTableFields(tableNames: string[]) {
   for (const tn of tableNames) {
     if (tableFields[tn]) continue
-    try {
-      const resp = await fetch(`/api/v1/ai-builder/tables/${tn}/schema`, { headers: authHeaders() })
-      if (resp.ok) {
-        tableFields[tn] = await resp.json()
-      }
-    } catch { /* skip */ }
+    const response = await getTableSchema(tn)
+    tableFields[tn] = response.data.fields
   }
 }
 
 async function startMapping() {
+  const current = ++request
+  controller?.abort()
+  controller = new AbortController()
   loading.value = true
   errorMessage.value = ''
+  mappedOntology.value = null
   progressMessage.value = '正在筛选候选表...'
-
   try {
-    const resp = await fetch('/api/v1/doc-builder/mapping', {
-      method: 'POST',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ session_id: props.sessionId, ontology: props.ontology }),
-    })
-
-    const reader = resp.body!.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const raw = line.slice(6)
-        if (raw === '[DONE]') break
-        try {
-          const evt = JSON.parse(raw)
-          if (evt.event === 'progress') {
-            progressMessage.value = evt.message
-          } else if (evt.event === 'error') {
-            errorMessage.value = evt.message
-            loading.value = false
-            return
-          } else if (evt.event === 'result') {
-            mappedOntology.value = evt.data
-            candidateTables.value = evt.candidate_tables || []
-            await fetchTableFields(candidateTables.value)
-          }
-        } catch { /* skip non-json */ }
+    tables.value = (await listTables()).data.tables
+    const response = await postJsonSse('/doc-builder/mapping', {
+      session_id: props.sessionId, ontology: props.ontology,
+    }, controller.signal)
+    await readJsonSse(response, event => {
+      if (current !== request) return
+      if (event.event === 'progress') progressMessage.value = event.message
+      if (event.event === 'result') {
+        mappedOntology.value = event.data
+        candidateTables.value = event.candidate_tables || []
       }
-    }
-  } catch (e: any) {
-    errorMessage.value = `请求失败: ${e.message}`
-  }
-
-  loading.value = false
+    }, true)
+    await fetchTableFields(candidateTables.value)
+  } catch (error: any) {
+    if (current === request) { errorMessage.value = `请求失败: ${error.message}`; mappedOntology.value = null }
+  } finally { if (current === request) loading.value = false }
 }
 
 function onConfirm() {
+  for (const entity of mappedOntology.value.entities) {
+    const matching = tables.value.filter(table => table.asset_id === entity.table || table.table_name === entity.table)
+    if (matching.length !== 1) { errorMessage.value = '表名对应多个资产，请在资产目录使用唯一名称后重试'; return }
+    entity.asset_id = matching[0]!.asset_id
+    entity.table = matching[0]!.table_name
+  }
   emit('next', mappedOntology.value)
 }
 
-onMounted(() => {
-  startMapping()
-})
+onMounted(startMapping)
+onUnmounted(() => { ++request; controller?.abort() })
 </script>
 
 <style scoped>

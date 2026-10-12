@@ -52,7 +52,7 @@
     <!-- 第二级：版本历史详情 -->
     <div v-if="selectedOntology" class="publish-page__body">
       <div class="version-sidebar">
-        <button class="btn-primary btn-block" :disabled="loading" @click="showCreateDialog = true">创建新版本</button>
+        <button class="btn-primary btn-block" :disabled="!canEdit || (loading)" @click="showCreateDialog = true">创建新版本</button>
         <div class="version-list">
           <div
             v-for="v in filteredVersions"
@@ -103,7 +103,7 @@
           <section class="res-section">
             <div class="res-section__header">
               <h3>对象<span class="res-section__count">{{ detail.entities.length }}</span></h3>
-              <button v-if="detail.status === 'draft'" class="btn-link" @click="showEntitySelector = true" :disabled="loading">+ 添加实体</button>
+              <button v-if="detail.status === 'draft'" class="btn-link" @click="showEntitySelector = true" :disabled="!canEdit || (loading)">+ 添加实体</button>
             </div>
             <div v-if="detail.entities.length" class="res-grid">
               <div v-for="e in detail.entities" :key="e.id" class="res-card">
@@ -114,7 +114,7 @@
                 <p v-if="e.description" class="res-card__desc">{{ e.description }}</p>
                 <div class="res-card__foot">
                   <span class="res-card__tag">属性 {{ e.attribute_count }}</span>
-                  <button v-if="detail.status === 'draft'" class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)" :disabled="loading">移除</button>
+                  <button v-if="detail.status === 'draft'" class="btn-link btn-link--danger" @click="removeEntity(e.source_entity_id)" :disabled="!canEdit || (loading)">移除</button>
                 </div>
               </div>
             </div>
@@ -183,17 +183,17 @@
           <div class="action-bar">
             <template v-if="detail.status === 'draft'">
               <button class="btn-quiet" @click="runCheck" :disabled="loading">一致性检查</button>
-              <button class="btn-quiet" @click="submitForApproval" :disabled="loading || !detail.entities.length">提交审批</button>
+              <button class="btn-quiet" @click="submitForApproval" :disabled="!canEdit || (loading || !detail.entities.length)">提交审批</button>
               <button class="btn-quiet" @click="previewImpact" :disabled="loading">预览影响</button>
-              <button class="btn-quiet btn-quiet--danger" @click="deleteVersion" :disabled="loading">删除草稿</button>
+              <button class="btn-quiet btn-quiet--danger" @click="deleteVersion" :disabled="!canEdit || (loading)">删除草稿</button>
             </template>
             <template v-else-if="detail.status === 'pending_approval'">
-              <button class="btn-quiet" @click="approveVersion" :disabled="loading">审批通过</button>
-              <button class="btn-quiet btn-quiet--danger" @click="showRejectDialog = true" :disabled="loading">驳回</button>
+              <button class="btn-quiet" @click="approveVersion" :disabled="!canEdit || (loading)">审批通过</button>
+              <button class="btn-quiet btn-quiet--danger" @click="showRejectDialog = true" :disabled="!canEdit || (loading)">驳回</button>
               <button class="btn-quiet" @click="previewImpact" :disabled="loading">预览影响</button>
             </template>
             <template v-else-if="detail.status === 'published'">
-              <button class="btn-quiet" @click="rollbackVersion" :disabled="loading">回滚到此版本</button>
+              <button class="btn-quiet" @click="rollbackVersion" :disabled="!canEdit || (loading)">回滚到此版本</button>
             </template>
           </div>
         </template>
@@ -205,7 +205,7 @@
       <div class="form-group"><label for="version-description">描述</label><textarea id="version-description" v-model="newVersion.description" rows="3" placeholder="可选"></textarea></div>
       <template #footer>
         <button class="btn-secondary" :disabled="saving" @click="showCreateDialog = false">取消</button>
-        <button class="btn-primary" :disabled="loading || !newVersion.name.trim()" @click="createVersion">{{ saving ? '创建中…' : '创建' }}</button>
+        <button class="btn-primary" :disabled="!canEdit || (loading || !newVersion.name.trim())" @click="createVersion">{{ saving ? '创建中…' : '创建' }}</button>
       </template>
     </ModalDialog>
 
@@ -221,7 +221,7 @@
       </div>
       <template #footer>
         <button class="btn-secondary" :disabled="saving" @click="showEntitySelector = false">取消</button>
-        <button class="btn-primary" :disabled="loading || !selectedEntityIds.length" @click="addEntities">{{ saving ? '添加中…' : `添加 (${selectedEntityIds.length})` }}</button>
+        <button class="btn-primary" :disabled="!canEdit || (loading || !selectedEntityIds.length)" @click="addEntities">{{ saving ? '添加中…' : `添加 (${selectedEntityIds.length})` }}</button>
       </template>
     </ModalDialog>
 
@@ -229,7 +229,7 @@
       <div class="form-group"><label for="version-reject-reason">驳回原因</label><textarea id="version-reject-reason" v-model="rejectReason" rows="3" placeholder="请说明驳回原因"></textarea></div>
       <template #footer>
         <button class="btn-secondary" :disabled="saving" @click="showRejectDialog = false">取消</button>
-        <button class="btn-danger" :disabled="loading || !rejectReason.trim()" @click="rejectVersion">{{ saving ? '提交中…' : '驳回' }}</button>
+        <button class="btn-danger" :disabled="!canEdit || (loading || !rejectReason.trim())" @click="rejectVersion">{{ saving ? '提交中…' : '驳回' }}</button>
       </template>
     </ModalDialog>
 
@@ -252,7 +252,11 @@
   </div>
 </template>
 <script setup lang="ts">
+import { formatPlatformDateTime } from '../../utils/platformTime'
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit } = useManagementPermission('entity:write')
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { get, post, del } from '../../api/client'
 import { ontologyPublishApi } from '../../api/ontologyPublish'
 import { message } from 'ant-design-vue'
@@ -282,6 +286,7 @@ interface VersionDetail extends VersionSummary { rejected_at: string | null; rej
 interface CheckResult { passed: boolean; entity_issues: any[]; relation_issues: any[]; summary: string }
 interface EntityItem { id: string; name: string; name_cn: string; tier: number }
 
+const route = useRoute()
 const ontologies = ref<OntologyCard[]>([])
 const selectedOntology = ref<OntologyCard | null>(null)
 const versions = ref<VersionSummary[]>([])
@@ -330,6 +335,11 @@ const availableEntities = computed(() => {
 
 onMounted(async () => {
   await loadOntologies()
+  const ontology = ontologies.value.find(item => item.ontology_id === route.query.ontology_id)
+  if (ontology) {
+    selectOntology(ontology)
+    if (route.query.version_id) await selectVersion(route.query.version_id as string)
+  }
 })
 
 function errorText(error: any, fallback: string): string {
@@ -603,7 +613,7 @@ function formatStatus(status: string) {
 }
 
 function formatTime(iso: string) {
-  return new Date(iso).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  return formatPlatformDateTime(iso)
 }
 </script>
 <style scoped>

@@ -62,19 +62,21 @@
         <AlertTable :alerts="mergedAlerts" :resolving-ids="resolvingIds" @resolve="onResolveAlert" />
       </a-col>
       <a-col :xs="24" :lg="12" class="bottom-col">
-        <EventStream :events="wsEvents" />
+        <EventStream :events="systemEvents" :error="eventError" :connected="eventsConnected" @retry="retryEvents" />
       </a-col>
     </a-row>
   </div>
 </template>
 
 <script setup lang="ts">
+import { formatPlatformTime } from '../../utils/platformTime'
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ReloadOutlined } from '@ant-design/icons-vue'
 import { Alert as AAlert, Button as AButton, message } from 'ant-design-vue'
 import { monitorApi } from '../../api/monitor'
 import type { ResourceMetrics, ServiceStatus, AlertItem, LLMStatsResponse, OntologyStatsResponse, AgentActivityResponse, PlatformStatsResponse } from '../../api/monitor'
 import { useMonitorWS } from '../../composables/useMonitorWS'
+import { useSystemEvents } from '../../composables/useSystemEvents'
 import { mergeDashboardFetchState } from './dashboardFetchState'
 
 import ServiceHealthCards from './components/ServiceHealthCards.vue'
@@ -112,8 +114,7 @@ const mergedAlerts = computed(() => {
   return merged.sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 20)
 })
 
-// Events from WS messages
-const wsEvents = ref<Array<{ time: string; type: string; description: string }>>([])
+const { events:systemEvents, error:eventError, connected:eventsConnected, retry:retryEvents } = useSystemEvents()
 
 const autoRefreshLabel = computed(() => {
   if (autoRefreshSec.value === 0) return '关闭'
@@ -164,7 +165,7 @@ async function fetchAll() {
     platformStats.value = next.platformStats
     const labels: Record<string, string> = { resources: '资源用量', services: '服务健康', alerts: '告警', llmStats: '模型调用', ontologyStats: '本体统计', agentActivity: '智能体统计', platformStats: '数据统计' }
     fetchError.value = failedKeys.length ? `${failedKeys.map(key => labels[key] || key).join('、')}更新失败，保留最近一次可用数据。请重试。` : ''
-    if (!failedKeys.length) lastUpdate.value = new Date().toLocaleTimeString('zh-CN')
+    if (!failedKeys.length) lastUpdate.value = formatPlatformTime(new Date())
   } catch (e) {
     fetchError.value = '看板数据更新失败，请重试。'
     console.error('Dashboard fetch error:', e)

@@ -6,11 +6,16 @@
         <a-select-option value="deploy">部署</a-select-option>
         <a-select-option value="config">配置</a-select-option>
         <a-select-option value="user">用户</a-select-option>
+        <a-select-option value="asset">资产</a-select-option>
+        <a-select-option value="binding">绑定</a-select-option>
+        <a-select-option value="execution">执行</a-select-option>
       </a-select>
     </template>
+    <p v-if="error" role="alert">{{ error }} <button @click="$emit('retry')">重试</button></p>
+    <p v-else>{{ connected ? '实时事件已连接' : '正在连接实时事件…' }}</p>
     <div class="event-list">
       <div v-for="(ev, i) in filteredEvents" :key="i" class="event-item">
-        <span class="event-time">{{ ev.time }}</span>
+        <span class="event-time">{{ formatPlatformDateTime(ev.time) }}</span>
         <a-tag :color="tagColor(ev.type)" size="small">{{ ev.type }}</a-tag>
         <span class="event-desc">{{ ev.description }}</span>
       </div>
@@ -20,6 +25,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatPlatformDateTime } from '../../../utils/platformTime'
 import { ref, computed } from 'vue'
 
 interface SystemEvent {
@@ -28,7 +34,8 @@ interface SystemEvent {
   description: string
 }
 
-const props = defineProps<{ events: SystemEvent[] }>()
+const props = defineProps<{ events: SystemEvent[]; error?:string; connected?:boolean }>()
+defineEmits<{ (event:'retry'):void }>()
 const filter = ref('all')
 
 const filteredEvents = computed(() => {

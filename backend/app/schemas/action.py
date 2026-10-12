@@ -1,6 +1,7 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 ACTION_TYPES = ["api_call", "sql_exec", "modify_attribute", "notification", "call_function", "custom_script"]
 CATEGORIES = ["domain", "system"]
@@ -31,7 +32,7 @@ class ActionCreate(BaseModel):
     type_config: dict | None = None
     parameters_json: list[ParameterDef] | None = None
     output_schema: list[OutputFieldDef] | None = None
-    status: str = "active"
+    status: Literal["active", "inactive", "draft"] = "active"
 
     @field_validator("category")
     @classmethod
@@ -51,14 +52,23 @@ class ActionCreate(BaseModel):
 class ActionUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    category: str | None = None
+    category: Literal["domain", "system"] | None = None
     entity_id: str | None = None
     ontology_id: str | None = None
-    action_type: str | None = None
+    action_type: Literal["api_call", "sql_exec", "modify_attribute", "notification", "call_function", "custom_script"] | None = None
     type_config: dict | None = None
     parameters_json: list[ParameterDef] | None = None
     output_schema: list[OutputFieldDef] | None = None
-    status: str | None = None
+    status: Literal["active", "inactive", "draft"] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_null_required_fields(cls, values):
+        if isinstance(values, dict):
+            for key in {"name", "category", "action_type", "status"}:
+                if key in values and values[key] is None:
+                    raise ValueError(f"{key} 不能为空")
+        return values
 
 
 class ActionOut(BaseModel):
@@ -84,12 +94,22 @@ class ActionOut(BaseModel):
 class ActionExecuteRequest(BaseModel):
     params: dict = {}
     dry_run: bool = False
+    idempotency_key: str | None = None
+    version_id: str | None = None
 
 
 class ActionExecuteResult(BaseModel):
     success: bool
     message: str
     output: dict | None = None
+    execution_id: str | None = None
+    state: str | None = None
+
+
+class ActionReconciliation(BaseModel):
+    resolution: Literal["succeeded", "failed"]
+    evidence: str = Field(min_length=10, max_length=5000)
+    receipt_id: str | None = Field(default=None, max_length=200)
 
 
 class ActionTypeInfo(BaseModel):

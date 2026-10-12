@@ -133,6 +133,10 @@ def create_asset(
         )
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
+    except LookupError as e:
+        raise HTTPException(404, str(e)) from e
+    except Exception as e:
+        raise HTTPException(502, f"资产源验证失败：{type(e).__name__}") from e
 
 
 @router.put("/{asset_id}", response_model=AssetDetail)
@@ -141,6 +145,8 @@ def update_asset(asset_id: str, body: AssetUpdate, db: Session = Depends(get_db)
         return _svc(db).update(asset_id, **body.model_dump(exclude_unset=True))
     except LookupError as e:
         raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 @router.delete("/{asset_id}", status_code=204)
@@ -212,7 +218,11 @@ async def upload_document(
     db: Session = Depends(get_db),
     user: User = Depends(require_user),
 ):
-    raw = await file.read()
+    from app.services.data_plane.storage_policy import storage_policy
+    maximum = storage_policy(db)["max_bytes"]
+    raw = await file.read(maximum + 1)
+    if len(raw) > maximum:
+        raise HTTPException(413, "文件超过 storage.max_upload_mb 限制")
     tag_list = _parse_tags(tags)
     try:
         return _svc(db).register_document_file(
@@ -247,15 +257,21 @@ def create_dir_doc(body: DirectoryDocCreate, db: Session = Depends(get_db),
 @router.post("/document/api", response_model=AssetDetail, status_code=201)
 def create_api_doc(body: ApiDocCreate, db: Session = Depends(get_db),
                    user: User = Depends(require_user)):
-    return _svc(db).register_document_api(user_id=user.id,
-                                           **body.model_dump())
+    try:
+        return _svc(db).register_document_api(user_id=user.id, **body.model_dump())
+    except (RuntimeError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @router.post("/document/mq", response_model=AssetDetail, status_code=201)
 def create_mq_doc(body: MqDocCreate, db: Session = Depends(get_db),
                   user: User = Depends(require_user)):
-    return _svc(db).register_document_mq(user_id=user.id,
-                                          **body.model_dump())
+    try:
+        return _svc(db).register_document_mq(user_id=user.id, **body.model_dump())
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"消息源验证失败：{type(exc).__name__}") from exc
 
 
 # ── 工具 ─────────────────────────────────────────────

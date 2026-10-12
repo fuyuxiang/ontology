@@ -6,10 +6,12 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_admin, require_user
+from app.core.permissions import role_permissions
 from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_refresh_token,
+    decode_token_payload,
     hash_password,
     verify_password,
 )
@@ -33,6 +35,24 @@ from app.schemas.auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
+@router.get("/platform-config")
+def platform_config(db: Session = Depends(get_db)):
+    """Public presentation settings for login and the shell; never return secrets."""
+    from app.api.v1.system_config import _get_config_value
+    defaults = {"system_name": "本体管理平台", "language": "zh-CN", "timezone": "Asia/Shanghai"}
+    return {key: _get_config_value(db, f"basic.{key}") or fallback for key, fallback in defaults.items()}
+
+
+def validate_password(db: Session, password: str) -> None:
+    from app.api.v1.system_config import _get_config_value
+    minimum = int(_get_config_value(db, "auth.password_min_length") or "8")
+    rules = set((_get_config_value(db, "auth.password_complexity") or "upper,lower,digit").split(","))
+    checks = {"upper": any(c.isupper() for c in password), "lower": any(c.islower() for c in password),
+              "digit": any(c.isdigit() for c in password), "special": any(not c.isalnum() for c in password)}
+    if len(password) < minimum or len(password.encode("utf-8")) > 72 or any(not checks.get(rule.strip(), True) for rule in rules):
+        raise HTTPException(422, f"密码必须满足配置的长度（至少{minimum}位，UTF-8不超过72字节）和复杂度要求")
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(data: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.username == data.username).first()
@@ -44,14 +64,16 @@ def login(data: LoginRequest, db: Session = Depends(get_db)):
     # 记录登录时间
     user.last_login_at = datetime.utcnow()
     db.commit()
-    token = create_access_token(user.id)
-    refresh_token = create_refresh_token(user.id)
+    from app.api.v1.system_config import _get_config_value
+    timeout = _get_config_value(db, "auth.session_timeout")
+    token = create_access_token(user.id, user.token_version, int(timeout) if timeout else None)
+    refresh_token = create_refresh_token(user.id, user.token_version)
     return TokenResponse(
         token=token,
         refresh_token=refresh_token,
         user=UserOut(
             id=user.id, username=user.username, name=user.name,
-            role=user.role, permissions=ROLE_PERMISSIONS.get(user.role, []),
+            role=user.role, permissions=role_permissions(db, user.role),
         ),
     )
 
@@ -71,22 +93,42 @@ def refresh(data: RefreshRequest, db: Session = Depends(get_db)):
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token 无效或已过期")
     user = db.get(User, user_id)
-    if not user:
+    payload = decode_token_payload(data.refresh_token, "refresh")
+    if not user or not user.is_active or not payload or payload.get("tv", 0) != user.token_version:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在")
-    new_token = create_access_token(user.id)
-    new_refresh = create_refresh_token(user.id)
+    from app.api.v1.system_config import _get_config_value
+    timeout = _get_config_value(db, "auth.session_timeout")
+    new_token = create_access_token(user.id, user.token_version, int(timeout) if timeout else None)
+    new_refresh = create_refresh_token(user.id, user.token_version)
     return RefreshResponse(token=new_token, refresh_token=new_refresh)
 
 
 @router.get("/me", response_model=UserOut)
-def get_me(user: User = Depends(require_user)):
+def get_me(user: User = Depends(require_user), db: Session = Depends(get_db)):
     return UserOut(
         id=user.id, username=user.username, name=user.name,
-        role=user.role, permissions=ROLE_PERMISSIONS.get(user.role, []),
+        role=user.role, permissions=role_permissions(db, user.role),
     )
 
 
+@router.post("/logout")
+def logout(user: User = Depends(require_user), db: Session = Depends(get_db)):
+    user.token_version += 1
+    db.commit()
+    return {"message": "所有会话已退出"}
+
+
 # ── 用户管理（需 admin 权限）──
+
+def _ensure_management_account(db, *, user_id=None, role=None, active=None, permission_role=None, permissions=None):
+    """Do not let user or role editing remove the last management account."""
+    for account in db.query(User).all():
+        account_role = role if account.id == user_id and role is not None else account.role
+        account_active = active if account.id == user_id and active is not None else account.is_active
+        effective = permissions if account_role == permission_role else role_permissions(db, account_role)
+        if account_active and "admin:users" in effective:
+            return
+    raise HTTPException(409, "必须保留至少一个启用且拥有系统管理权限的账号")
 
 @router.get("/users", response_model=UserListResponse)
 def list_users(
@@ -114,6 +156,7 @@ def list_users(
 
 @router.post("/users", response_model=UserListItem)
 def create_user(data: UserCreate, db: Session = Depends(get_db), _admin: User = Depends(require_admin)):
+    validate_password(db, data.password)
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(status_code=400, detail="用户名已存在")
     if data.role not in ROLE_PERMISSIONS:
@@ -136,15 +179,20 @@ def update_user(user_id: str, data: UserUpdate, db: Session = Depends(get_db), _
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
+    if data.role is not None and data.role not in ROLE_PERMISSIONS:
+        raise HTTPException(status_code=400, detail=f"无效角色: {data.role}")
+    _ensure_management_account(db, user_id=user.id, role=data.role, active=data.is_active)
     if data.name is not None:
         user.name = data.name
     if data.email is not None:
         user.email = data.email
     if data.role is not None:
-        if data.role not in ROLE_PERMISSIONS:
-            raise HTTPException(status_code=400, detail=f"无效角色: {data.role}")
+        if user.role != data.role:
+            user.token_version += 1
         user.role = data.role
     if data.is_active is not None:
+        if user.is_active != data.is_active:
+            user.token_version += 1
         user.is_active = data.is_active
     user.updated_at = datetime.utcnow()
     db.commit()
@@ -157,7 +205,9 @@ def toggle_user_status(user_id: str, db: Session = Depends(get_db), _admin: User
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
+    _ensure_management_account(db, user_id=user.id, active=not user.is_active)
     user.is_active = not user.is_active
+    user.token_version += 1
     user.updated_at = datetime.utcnow()
     db.commit()
     return {"id": user.id, "is_active": user.is_active}
@@ -168,7 +218,9 @@ def reset_password(user_id: str, data: ResetPasswordRequest, db: Session = Depen
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
+    validate_password(db, data.new_password)
     user.password_hash = hash_password(data.new_password)
+    user.token_version += 1
     user.updated_at = datetime.utcnow()
     db.commit()
     return {"message": "密码已重置"}
@@ -187,7 +239,7 @@ def list_roles(db: Session = Depends(get_db), _admin: User = Depends(require_adm
             key=role_key,
             label=meta["label"],
             description=meta["description"],
-            permissions=ROLE_PERMISSIONS.get(role_key, []),
+            permissions=role_permissions(db, role_key),
             user_count=counts.get(role_key, 0),
             is_system=meta["is_system"],
         )
@@ -205,8 +257,8 @@ class RolePermUpdate(BaseModel):
 
 
 @router.put("/roles/{role_key}/permissions")
-def update_role_permissions(role_key: str, data: RolePermUpdate, _admin: User = Depends(require_admin)):
-    """更新角色权限（运行时生效，重启后恢复默认；后续可持久化到数据库）"""
+def update_role_permissions(role_key: str, data: RolePermUpdate, _admin: User = Depends(require_admin), db: Session = Depends(get_db)):
+    """更新角色权限并持久化；后续请求立即读取当前配置。"""
     if role_key not in ROLE_PERMISSIONS:
         raise HTTPException(status_code=404, detail="角色不存在")
     # 校验权限值合法性
@@ -216,8 +268,17 @@ def update_role_permissions(role_key: str, data: RolePermUpdate, _admin: User = 
     invalid = [p for p in data.permissions if p not in all_valid]
     if invalid:
         raise HTTPException(status_code=400, detail=f"无效权限: {', '.join(invalid)}")
-    ROLE_PERMISSIONS[role_key] = data.permissions
-    ROLE_META[role_key]["description"] = ROLE_META[role_key].get("description", "")
+    _ensure_management_account(db, permission_role=role_key, permissions=data.permissions)
+    import json
+    from app.models.system_config import SystemConfig
+    key = f"auth.role_permissions.{role_key}"
+    row = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+    if row:
+        row.value = json.dumps(data.permissions)
+        row.updated_by = _admin.username
+    else:
+        db.add(SystemConfig(group="auth", key=key, value=json.dumps(data.permissions), updated_by=_admin.username))
+    db.commit()
     return {"message": "权限已更新", "permissions": data.permissions}
 
 
@@ -229,7 +290,11 @@ def seed_admin(db: Session):
         return
     initial_pw = settings.ADMIN_INITIAL_PASSWORD
     if not initial_pw:
-        initial_pw = "admin"
+        raise RuntimeError("首次初始化必须配置 ADMIN_INITIAL_PASSWORD；不会创建使用默认密码的管理员")
+    try:
+        validate_password(db, initial_pw)
+    except HTTPException as exc:
+        raise RuntimeError(f"ADMIN_INITIAL_PASSWORD 不符合密码策略：{exc.detail}") from exc
     admin = User(
         username="admin",
         password_hash=hash_password(initial_pw),

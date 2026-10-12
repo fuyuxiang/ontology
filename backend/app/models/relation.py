@@ -18,4 +18,6 @@ class EntityRelation(Base):
     cardinality: Mapped[str] = mapped_column(String(10), nullable=False)
     acyclic: Mapped[bool] = mapped_column(Boolean, default=False)
     description: Mapped[str | None] = mapped_column(Text)
+    source_field: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    target_field: Mapped[str | None] = mapped_column(String(100), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -121,7 +121,7 @@ def _prepare_messages(messages: list[dict], db: Session, entity_id: str | None =
 
 def chat_stream(messages: list[dict], db: Session, entity_id: str | None = None):
     """流式对话，返回 SSE 事件生成器"""
-    client = get_llm_client()
+    client = get_llm_client(db=db)
     api_messages = _prepare_messages(messages, db, entity_id)
 
     stream = client.chat.completions.create(
@@ -139,7 +139,7 @@ def chat_stream(messages: list[dict], db: Session, entity_id: str | None = None)
 
 def chat_sync(messages: list[dict], db: Session, entity_id: str | None = None) -> str:
     """非流式对话，返回完整响应"""
-    client = get_llm_client()
+    client = get_llm_client(db=db)
     api_messages = _prepare_messages(messages, db, entity_id)
 
     response = client.chat.completions.create(

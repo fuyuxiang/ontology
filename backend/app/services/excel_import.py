@@ -205,6 +205,8 @@ def _parse_relation_sheet(ws, valid_names: set[str]) -> list[dict]:
             "target": target,
             "cardinality": _map_cardinality(_cell(ws, r, col_idx, "cardinality")),
             "description": label_cn or _cell(ws, r, col_idx, "rel_type_cn"),
+            "source_field": _cell(ws, r, col_idx, "source_attr") or None,
+            "target_field": _cell(ws, r, col_idx, "target_attr") or None,
         })
     return relations
 
@@ -224,6 +226,9 @@ def _classify_sheet(ws) -> str:
 
 def preview_excel_ontology(content: bytes, namespace: str = "") -> dict:
     """解析 Excel 本体模板为草稿结构（结构与 preview_json_ontology 一致，不落库）。"""
+    from app.services.office_conversion import OLE_MAGIC, convert_legacy_office
+    if content.startswith(OLE_MAGIC):
+        content = convert_legacy_office(content, "xls")
     wb = openpyxl.load_workbook(BytesIO(content), data_only=True, read_only=True)
 
     objects: list[dict] = []
@@ -246,6 +251,7 @@ def preview_excel_ontology(content: bytes, namespace: str = "") -> dict:
     if namespace:
         for o in objects:
             o["namespace"] = namespace
+    wb.close()
 
     return {
         "objects": objects,

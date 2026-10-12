@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import hashlib
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
@@ -37,8 +38,7 @@ class PlainTextVault:
         try:
             return json.loads(base64.urlsafe_b64decode(data).decode("utf-8"))
         except Exception:
-            logger.error("vault decode failed for ref=%s", ref[:40])
-            return {}
+            raise ValueError("旧版凭据无法读取，请重新保存连接凭据") from None
 
 
 class FernetVault:
@@ -47,8 +47,7 @@ class FernetVault:
     def __init__(self, key: str):
         from cryptography.fernet import Fernet
         if not key:
-            key = Fernet.generate_key().decode()
-            logger.warning("CREDENTIAL_ENCRYPTION_KEY 未配置，使用临时密钥（重启后无法解密已有凭据）")
+            raise ValueError("凭据加密需要稳定的 CREDENTIAL_ENCRYPTION_KEY")
         self._fernet = Fernet(key.encode() if isinstance(key, str) else key)
         self._plain_vault = PlainTextVault()
 
@@ -64,15 +63,13 @@ class FernetVault:
             return self._plain_vault.fetch(ref)
         prefix = f"{self.SCHEME}://"
         if not ref.startswith(prefix):
-            logger.error("vault ref scheme mismatch: %s", ref[:40])
-            return {}
+            raise ValueError("不支持的凭据格式，请重新保存连接凭据")
         data = ref[len(prefix):]
         try:
             decrypted = self._fernet.decrypt(data.encode("ascii"))
             return json.loads(decrypted.decode("utf-8"))
         except Exception:
-            logger.error("vault decrypt failed for ref=%s", ref[:40])
-            return {}
+            raise ValueError("凭据解密失败：密钥已变化或记录损坏，请恢复原密钥或重新保存凭据") from None
 
     def rotate(self, ref: str, payload: dict) -> str:
         return self.store(payload)
@@ -90,5 +87,7 @@ def get_vault() -> CredentialVault:
     global _vault_singleton
     if _vault_singleton is None:
         from app.config import settings
-        _vault_singleton = FernetVault(settings.CREDENTIAL_ENCRYPTION_KEY)
+        key = settings.CREDENTIAL_ENCRYPTION_KEY or base64.urlsafe_b64encode(
+            hashlib.sha256(("ontology:credentials:v1:" + settings.SECRET_KEY).encode()).digest()).decode()
+        _vault_singleton = FernetVault(key)
     return _vault_singleton

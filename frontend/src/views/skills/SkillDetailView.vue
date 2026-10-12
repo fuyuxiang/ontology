@@ -593,6 +593,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatPlatformDateTime } from '../../utils/platformTime'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import { Modal } from 'ant-design-vue'
@@ -616,7 +617,7 @@ const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const authStore = useAuthStore()
-const roleCanEdit = computed(() => ['admin', 'editor'].includes(authStore.user?.role || ''))
+const roleCanEdit = computed(() => authStore.hasPermission('rule:write'))
 const emptySkill = (): SkillItem => ({
   id: '',
   name: '',
@@ -891,9 +892,7 @@ function toolName(id: string) {
   )
 }
 function formatDate(value?: string) {
-  if (!value) return '—'
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString('zh-CN', { hour12: false })
+  return formatPlatformDateTime(value)
 }
 async function save(): Promise<boolean> {
   if (saving.value || testing.value || publishing.value || validating.value || archiving.value)
@@ -970,6 +969,7 @@ async function ensureSaved() {
   return saved.value && !dirty.value ? true : await save()
 }
 async function validate() {
+  if (validating.value || !canManage.value) return
   if (!(await ensureSaved()) || !saved.value) return
   validating.value = true
   try {
@@ -981,6 +981,7 @@ async function validate() {
   }
 }
 async function runTests(caseId?: string) {
+  if (testing.value || !canManage.value) return
   if (!(await ensureSaved()) || !saved.value) return
   testing.value = true
   formError.value = ''
@@ -1000,6 +1001,7 @@ async function runTests(caseId?: string) {
   }
 }
 async function preparePublish() {
+  if (validating.value || !canManage.value) return
   if (!(await ensureSaved()) || !saved.value) return
   tab.value = 'tests'
   validating.value = true
@@ -1037,6 +1039,7 @@ async function preparePublish() {
 const publishOpen = ref(false)
 const publishDescription = ref('')
 async function publish() {
+  if (publishing.value || !canManage.value) return
   if (!publishDescription.value.trim()) {
     toast.warning('请填写版本说明')
     return

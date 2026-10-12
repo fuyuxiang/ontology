@@ -15,10 +15,12 @@ def _table_name(asset: Asset) -> str:
 def _find_asset(db: Session | None, table_name: str) -> Asset | None:
     if db is None:
         return None
-    for asset in AssetRepository(db).list_active_structured():
-        if table_name in {_table_name(asset), asset.name, asset.alias}:
-            return asset
-    return None
+    assets = AssetRepository(db).list_active_structured()
+    exact = [asset for asset in assets if asset.id == table_name]
+    matches = exact or [asset for asset in assets if table_name in {_table_name(asset), asset.name, asset.alias}]
+    if len(matches) > 1:
+        raise ValueError(f"数据表 {table_name} 对应多个资产，请指定 asset_id")
+    return matches[0] if matches else None
 
 
 def get_tables(db: Session | None) -> list[dict]:
@@ -28,6 +30,7 @@ def get_tables(db: Session | None) -> list[dict]:
     return [
         {
             "asset_id": asset.id,
+            "selector": asset.id,
             "table_name": _table_name(asset),
             "table_desc": asset.description or asset.alias or asset.name,
             "kind": asset.kind,

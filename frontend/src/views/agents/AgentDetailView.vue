@@ -1,48 +1,48 @@
 <template>
   <div class="aw" @keydown.esc="drawer = null">
-    <div v-if="loading" class="aw-empty">正在加载智能体配置…</div>
+    <div v-if="loading" class="aw-empty">{{ text("正在加载智能体配置…") }}</div>
     <template v-else>
       <header class="aw-header">
         <div class="aw-row">
-          <button class="aw-icon" aria-label="返回智能体列表" @click="router.push('/agent/manage')">
+          <button class="aw-icon" :aria-label="text('返回智能体列表')" @click="router.push('/agent/manage')">
             ←
           </button>
-          <h1>{{ form.name || '未命名智能体' }}</h1>
-          <span class="aw-pill aw-amber">编辑草稿</span
+          <h1>{{ form.name || text('未命名智能体') }}</h1>
+          <span class="aw-pill aw-amber">{{ text("编辑草稿") }}</span
           ><span v-if="current?.current_version" class="aw-pill aw-green"
-            >{{ current.status === 'published' ? '在线' : '最近发布' }} v{{
+            >{{ current.status === 'published' ? text('在线') : text('最近发布') }} v{{
               current.current_version
             }}</span
-          ><small class="aw-muted">{{ isDirty ? '未保存 · 待验证' : '已保存' }}</small>
+          ><small class="aw-muted">{{ isDirty ? text('未保存 · 待验证') : text('已保存') }}</small>
         </div>
         <div class="aw-row">
           <button class="aw-button" :disabled="saving || chatBusy || !canEdit" @click="saveAgent">
-            {{ saving ? '保存中…' : '保存草稿' }}</button
+            {{ saving ? text('保存中…') : text('保存草稿') }}</button
           ><button
             class="aw-button aw-primary"
             :disabled="!current || chatBusy || !canEdit"
             @click="drawer = 'publish'"
           >
-            发布
+            {{ text("发布") }}
           </button>
         </div>
       </header>
       <div v-if="error" class="aw-alert aw-error" role="alert">
-        {{ error }}<button class="aw-link" @click="error = ''">关闭</button>
+        {{ error }}<button class="aw-link" @click="error = ''">{{ text("关闭") }}</button>
       </div>
       <div v-if="notice" class="aw-alert aw-success" role="status">{{ notice }}</div>
       <div v-if="!canEdit" class="aw-alert">
-        当前账号可查看与调试，修改配置、发布和行动授权需要编辑者或管理员权限。
+        {{ text("当前账号可查看；修改配置和发布需要写入权限，调试和行动授权分别需要对应的执行权限。") }}
       </div>
       <div v-if="current?.ontology_stale" class="aw-alert">
-        依赖本体已经变化，请核对版本与技能依赖并重新测试。<button
+        {{ text("依赖本体已经变化，请核对版本与技能依赖并重新测试。") }}<button
           class="aw-link"
           @click="configTab = '本体与能力'"
         >
-          检查依赖
+          {{ text("检查依赖") }}
         </button>
       </div>
-      <nav class="aw-tabs" aria-label="智能体工作台">
+      <nav class="aw-tabs" :aria-label="text('智能体工作台')">
         <button
           v-for="tab in workspaceTabs"
           :key="tab"
@@ -51,12 +51,12 @@
           :disabled="chatBusy && workspaceTab !== tab"
           @click="selectWorkspaceTab(tab)"
         >
-          {{ tab }}
+          {{ text(tab) }}
         </button>
       </nav>
       <div v-show="workspaceTab === '配置与调试'" class="aw-workbody">
-        <section class="aw-config" aria-label="智能体配置">
-          <nav class="aw-subtabs" aria-label="配置分区">
+        <section class="aw-config" :aria-label="text('智能体配置')">
+          <nav class="aw-subtabs" :aria-label="text('配置分区')">
             <button
               v-for="tab in configTabs"
               :key="tab"
@@ -64,25 +64,25 @@
               :aria-selected="configTab === tab"
               @click="configTab = tab"
             >
-              {{ tab }}
+              {{ text(tab) }}
             </button>
           </nav>
           <fieldset :disabled="chatBusy || saving || !canEdit">
             <template v-if="configTab === '基本设置'">
               <label class="aw-field"
-                ><span>智能体名称 <b>*</b></span
-                ><input v-model="form.name" maxlength="100" placeholder="输入智能体名称" /></label
+                ><span>{{ text("智能体名称") }} <b>*</b></span
+                ><input v-model="form.name" maxlength="100" :placeholder="text('输入智能体名称')" /></label
               ><label class="aw-field"
-                ><span>业务目标</span
+                ><span>{{ text("业务目标") }}</span
                 ><textarea
                   v-model="form.description"
                   rows="4"
-                  placeholder="希望智能体帮助完成什么业务任务？"
+                  :placeholder="text('希望智能体帮助完成什么业务任务？')"
                 ></textarea></label
               ><label class="aw-field"
-                ><span>模型</span
+                ><span>{{ text("模型") }}</span
                 ><select v-model="form.model_id">
-                  <option value="">平台默认模型</option>
+                  <option value="">{{ text("平台默认模型") }}</option>
                   <option v-for="model in activeModels" :key="model.id" :value="model.id">
                     {{ model.name }} · {{ model.model_name }}
                   </option>
@@ -91,20 +91,20 @@
                     :value="form.model_id"
                     disabled
                   >
-                    原模型已停用或不可访问
+                    {{ text("原模型已停用或不可访问") }}
                   </option></select
-                ><small>使用平台已配置且可用的模型。</small></label
+                ><small>{{ text("使用平台已配置且可用的模型。") }}</small></label
               ><label class="aw-field"
-                ><span>标签</span
-                ><input v-model="form.tagsStr" placeholder="用逗号分隔，例如：设备运维,分析"
+                ><span>{{ text("标签") }}</span
+                ><input v-model="form.tagsStr" :placeholder="text('用逗号分隔，例如：设备运维,分析')"
               /></label>
             </template>
             <template v-else-if="configTab === '本体与能力'">
-              <h2>业务上下文</h2>
+              <h2>{{ text("业务上下文") }}</h2>
               <label class="aw-field"
-                ><span>关联已发布本体 <b>*</b></span
+                ><span>{{ text("关联已发布本体") }} <b>*</b></span
                 ><select v-model="form.ontology_id" @change="changeOntology">
-                  <option value="">请选择本体</option>
+                  <option value="">{{ text("请选择本体") }}</option>
                   <option
                     v-for="ontology in ontologies"
                     :key="ontology.ontology_id"
@@ -114,16 +114,16 @@
                   </option>
                 </select></label
               ><label class="aw-field"
-                ><span>固定本体版本 <b>*</b></span
+                ><span>{{ text("固定本体版本") }} <b>*</b></span
                 ><select
                   v-model="form.ontology_version_id"
                   :disabled="!form.ontology_id"
                   @change="changeOntologyVersion"
                 >
-                  <option value="">请选择已发布版本</option>
+                  <option value="">{{ text("请选择已发布版本") }}</option>
                   <option v-for="version in ontologyVersions" :key="version.id" :value="version.id">
                     v{{ version.version_number }} · {{ version.name
-                    }}{{ version.is_active ? '（当前）' : '' }}
+                    }}{{ version.is_active ? text('（当前）') : '' }}
                   </option>
                   <option
                     v-if="
@@ -133,19 +133,19 @@
                     :value="form.ontology_version_id"
                     disabled
                   >
-                    原本体版本不可用
+                    {{ text("原本体版本不可用") }}
                   </option>
                 </select></label
               >
-              <div v-if="catalogLoading" class="aw-muted">正在读取版本对象与能力…</div>
+              <div v-if="catalogLoading" class="aw-muted">{{ text("正在读取版本对象与能力…") }}</div>
               <div v-else-if="form.ontology_version_id" class="aw-card">
                 <div class="aw-row aw-between">
-                  <h3>可访问的对象范围</h3>
+                  <h3>{{ text("可访问的对象范围") }}</h3>
                   <button
                     class="aw-link"
                     @click="form.entity_ids = catalog.entities.map(entitySourceId)"
                   >
-                    选择全部
+                    {{ text("选择全部") }}
                   </button>
                 </div>
                 <label v-for="entity in catalog.entities" :key="entity.id" class="aw-checkbox"
@@ -155,21 +155,21 @@
                     :value="entitySourceId(entity)"
                   /><span>{{ entity.name_cn || entity.display_name || entity.name }}</span></label
                 >
-                <p v-if="!catalog.entities.length" class="aw-muted">该发布版本没有可用对象。</p>
-                <small class="aw-muted">技能依赖对象必须在所选范围内。</small>
+                <p v-if="!catalog.entities.length" class="aw-muted">{{ text("该发布版本没有可用对象。") }}</p>
+                <small class="aw-muted">{{ text("技能依赖对象必须在所选范围内。") }}</small>
               </div>
               <div class="aw-row aw-between aw-section-title">
-                <h2>挂载的业务技能</h2>
+                <h2>{{ text("挂载的业务技能") }}</h2>
                 <button
                   class="aw-link"
                   :disabled="!form.ontology_version_id || catalogLoading"
                   @click="openSkillDrawer"
                 >
-                  + 添加技能
+                  {{ text("+ 添加技能") }}
                 </button>
               </div>
               <p v-if="!form.skill_bindings.length" class="aw-empty aw-empty-compact">
-                尚未挂载技能，从已发布技能中选择业务能力。
+                {{ text("尚未挂载技能，从已发布技能中选择业务能力。") }}
               </p>
               <article
                 v-for="binding in form.skill_bindings"
@@ -181,7 +181,7 @@
                   <span class="aw-pill aw-blue">v{{ binding.version }}</span>
                 </div>
                 <p class="aw-muted">
-                  {{ boundSkill(binding)?.description || '正在读取固定版本…' }}
+                  {{ boundSkill(binding)?.description || text('正在读取固定版本…') }}
                 </p>
                 <div class="aw-row">
                   <span class="aw-pill"
@@ -194,7 +194,7 @@
                   {{ problem }}
                 </p>
                 <footer class="aw-row aw-between">
-                  <small>固定使用已发布版本</small>
+                  <small>{{ text("固定使用已发布版本") }}</small>
                   <div class="aw-row">
                     <button class="aw-link" @click="router.push(`/skills/${binding.skill_id}`)">
                       查看</button
@@ -204,7 +204,7 @@
                       @click="reviewUpgrade(binding)"
                     >
                       升级到 v{{ latestSkillVersion(binding.skill_id) }}</button
-                    ><button class="aw-link aw-danger" @click="unmountSkill(binding)">卸载</button>
+                    ><button class="aw-link aw-danger" @click="unmountSkill(binding)">{{ text("卸载") }}</button>
                   </div>
                 </footer>
               </article>
@@ -212,8 +212,8 @@
                 v-if="availableFunctions.length || availableActions.length"
                 class="aw-section-title"
               >
-                <h2>本体基础能力</h2>
-                <p class="aw-muted aw-small">逻辑和动作在本体中维护，挂载技能不会扩大访问权限。</p>
+                <h2>{{ text("本体基础能力") }}</h2>
+                <p class="aw-muted aw-small">{{ text("逻辑和动作在本体中维护，挂载技能不会扩大访问权限。") }}</p>
                 <div class="aw-row">
                   <span v-for="item in availableFunctions" :key="item.id" class="aw-pill aw-blue"
                     >逻辑 · {{ item.name }}</span
@@ -225,28 +225,37 @@
             </template>
             <template v-else
               ><label class="aw-field"
-                ><span>行为指引</span
+                ><span>{{ text("行为指引") }}</span
                 ><textarea
                   v-model="form.system_prompt"
                   rows="13"
-                  placeholder="定义智能体目标、如何使用证据、信息不足时的处理与输出要求。"
+                  :placeholder="text('定义智能体目标、如何使用证据、信息不足时的处理与输出要求。')"
                 ></textarea>
               </label>
-              <h2>业务动作策略</h2>
+              <h2>{{ text("运行方式") }}</h2>
+              <label class="aw-field"><span>{{ text("执行路径") }}</span><select v-model="form.execution_mode"><option value="react">{{ text("ReAct 对话与工具") }}</option><option value="graph">{{ text("图执行") }}</option></select></label>
+              <template v-if="form.execution_mode === 'graph'">
+                <label class="aw-field"><span>{{ text("图定义（nodes / edges JSON）") }}</span><textarea v-model="form.graph_json" rows="14" spellcheck="false"></textarea></label>
+                <p v-if="graphProblem" class="aw-text-error">{{ graphProblem }}</p>
+                <label class="aw-field"><span>已发布业务动作</span><select v-model="graphActionId"><option value="">选择动作</option><option v-for="action in availableActions" :key="action.id" :value="action.id">{{ action.name }}</option></select></label>
+                <button type="button" :disabled="!graphActionId" @click="setApprovalGraph">{{ text("生成输入 → 授权确认 → 输出图") }}</button>
+                <p class="aw-muted">{{ text("在节点 data.params 中填写动作参数。函数和动作必须来自已绑定版本；确认模式会产生可授权的待执行记录。") }}</p>
+              </template>
+              <h2>{{ text("业务动作策略") }}</h2>
               <label class="aw-checkbox"
                 ><input v-model="form.action_mode" type="radio" value="simulation" /><span
-                  ><strong>模拟执行</strong
-                  ><small>首次默认使用模拟模式，业务写操作只返回预览。</small></span
+                  ><strong>{{ text("模拟执行") }}</strong
+                  ><small>{{ text("首次默认使用模拟模式，业务写操作只返回预览。") }}</small></span
                 ></label
               ><label class="aw-checkbox"
                 ><input v-model="form.action_mode" type="radio" value="confirm" /><span
-                  ><strong>执行前授权确认</strong
+                  ><strong>{{ text("执行前授权确认") }}</strong
                   ><small
-                    >展示待执行动作和参数，由当前用户授权或拒绝；后端检查执行权限。</small
+                    >{{ text("展示待执行动作和参数，由当前用户授权或拒绝；后端检查执行权限。") }}</small
                   ></span
                 ></label
               ><label class="aw-field"
-                ><span>最多工具调用轮次</span
+                ><span>{{ text("最多工具调用轮次") }}</span
                 ><input
                   v-model.number="form.max_tool_rounds"
                   type="number"
@@ -261,7 +270,8 @@
           :agent-name="form.name"
           :dirty="isDirty"
           :action-mode="form.action_mode"
-          :can-authorize="canEdit"
+          :can-authorize="canAuthorize"
+          :can-confirm-actions="canConfirmActions"
           @busy="markChatBusy"
           @activity="refreshActivity"
           @inspect="openRun"
@@ -269,22 +279,22 @@
       </div>
       <section v-if="workspaceTab === '运行记录'" class="aw-page">
         <div class="aw-row aw-between">
-          <h2>运行记录</h2>
+          <h2>{{ text("运行记录") }}</h2>
           <button class="aw-link" @click="loadRuns">刷新</button>
         </div>
-        <p v-if="!current" class="aw-empty">保存智能体后查看运行记录。</p>
-        <p v-else-if="runsLoading" class="aw-empty">正在加载运行记录…</p>
+        <p v-if="!current" class="aw-empty">{{ text("保存智能体后查看运行记录。") }}</p>
+        <p v-else-if="runsLoading" class="aw-empty">{{ text("正在加载运行记录…") }}</p>
         <p v-else-if="!runs.length" class="aw-empty">
-          暂无运行记录，完成对话调试后可查看执行过程。
+          {{ text("暂无运行记录，完成对话调试后可查看执行过程。") }}
         </p>
         <div v-else class="aw-table-wrap">
           <table class="aw-table">
             <thead>
               <tr>
-                <th>业务问题</th>
-                <th>运行时间</th>
-                <th>状态</th>
-                <th>操作</th>
+                <th>{{ text("业务问题") }}</th>
+                <th>{{ text("运行时间") }}</th>
+                <th>{{ text("状态") }}</th>
+                <th>{{ text("操作") }}</th>
               </tr>
             </thead>
             <tbody>
@@ -302,7 +312,7 @@
                     >{{ runStatus(run.status) }}</span
                   >
                 </td>
-                <td><button class="aw-link" @click="openRun(run.id)">查看过程</button></td>
+                <td><button class="aw-link" @click="openRun(run.id)">{{ text("查看过程") }}</button></td>
               </tr>
             </tbody>
           </table>
@@ -311,29 +321,29 @@
       <section v-if="workspaceTab === '发布与接入'" class="aw-page">
         <div class="aw-two">
           <section>
-            <h2>已发布版本</h2>
+            <h2>{{ text("已发布版本") }}</h2>
             <div class="aw-card">
               <strong>{{
-                current?.current_version ? `v${current.current_version}` : '尚未发布'
+                current?.current_version ? `v${current.current_version}` : text('尚未发布')
               }}</strong>
-              <p class="aw-muted">发布时固定模型、行为指引、本体版本、技能版本与动作策略。</p>
+              <p class="aw-muted">{{ text("发布时固定模型、行为指引、本体版本、技能版本与动作策略。") }}</p>
             </div>
-            <h2 v-if="publishedSnapshot" class="aw-section-title">在线依赖快照</h2>
+            <h2 v-if="publishedSnapshot" class="aw-section-title">{{ text("在线依赖快照") }}</h2>
             <dl v-if="publishedSnapshot" class="aw-info">
-              <dt>本体版本</dt>
+              <dt>{{ text("本体版本") }}</dt>
               <dd>{{ snapshotOntologyName }} · {{ snapshotVersionLabel }}</dd>
-              <dt>业务技能</dt>
+              <dt>{{ text("业务技能") }}</dt>
               <dd>
                 <div v-for="binding in publishedBindings" :key="binding.skill_id">
                   {{ skillName(binding.skill_id) }} v{{ binding.version }}
                 </div>
               </dd>
-              <dt>动作策略</dt>
+              <dt>{{ text("动作策略") }}</dt>
               <dd>
                 {{
                   publishedSnapshot.tools_config?.action_mode === 'confirm'
-                    ? '执行前授权确认'
-                    : '模拟执行'
+                    ? text('执行前授权确认')
+                    : text('模拟执行')
                 }}
               </dd>
             </dl>
@@ -341,20 +351,20 @@
           <section>
             <h2>接入方式</h2>
             <div v-if="!current?.current_version || current.status !== 'published'" class="aw-card">
-              <strong>{{ current?.current_version ? '应用已下线' : '发布后可接入' }}</strong>
-              <p class="aw-muted">完成配置与调试，发布业务应用后查看调用信息。</p>
+              <strong>{{ current?.current_version ? '应用已下线' : text('发布后可接入') }}</strong>
+              <p class="aw-muted">{{ text("完成配置与调试，发布业务应用后查看调用信息。") }}</p>
             </div>
             <p v-else-if="!canEdit" class="aw-muted">
-              查看应用密钥与接入示例需要编辑者或管理员权限。
+              {{ text("查看应用密钥与接入示例需要配置写入权限。") }}
             </p>
             <template v-else
-              ><div v-if="apiLoading" class="aw-muted">正在读取接入信息…</div>
+              ><div v-if="apiLoading" class="aw-muted">{{ text("正在读取接入信息…") }}</div>
               <div v-else-if="apiInfo" class="aw-card">
                 <h3>应用 API</h3>
                 <code class="aw-code">POST {{ apiInfo.endpoint }}</code
-                ><button class="aw-link" @click="copyApi">复制调用示例</button>
+                ><button class="aw-link" @click="copyApi">{{ text("复制调用示例") }}</button>
                 <details>
-                  <summary>查看调用示例（包含应用密钥）</summary>
+                  <summary>{{ text("查看调用示例（包含应用密钥）") }}</summary>
                   <pre>{{ apiInfo.curl }}</pre>
                 </details>
               </div>
@@ -363,22 +373,22 @@
                 :disabled="saving || !canEdit"
                 @click="unpublishAgent"
               >
-                下线应用
+                {{ text("下线应用") }}
               </button></template
             >
           </section>
         </div>
         <div class="aw-row aw-between aw-section-title">
-          <h2>版本历史</h2>
+          <h2>{{ text("版本历史") }}</h2>
           <button class="aw-link" @click="loadVersions">刷新</button>
         </div>
-        <p v-if="versionsLoading" class="aw-muted">正在读取版本…</p>
-        <p v-else-if="!versions.length" class="aw-empty aw-empty-compact">尚无发布版本。</p>
+        <p v-if="versionsLoading" class="aw-muted">{{ text("正在读取版本…") }}</p>
+        <p v-else-if="!versions.length" class="aw-empty aw-empty-compact">{{ text("尚无发布版本。") }}</p>
         <div v-for="version in versions" :key="version.id" class="aw-version-row">
           <div>
             <strong>v{{ version.version }}</strong>
             <p class="aw-muted">
-              {{ version.description || '发布快照' }} · {{ formatTime(version.published_at) }}
+              {{ version.description || text('发布快照') }} · {{ formatTime(version.published_at) }}
             </p>
           </div>
           <button
@@ -387,8 +397,8 @@
             :disabled="saving || !canEdit"
             @click="rollback(version)"
           >
-            回滚到此版本</button
-          ><span v-else class="aw-pill aw-green">当前版本</span>
+            {{ text("回滚到此版本") }}</button
+          ><span v-else class="aw-pill aw-green">{{ text("当前版本") }}</span>
         </div>
       </section>
     </template>
@@ -402,14 +412,14 @@
         <section class="aw-drawer" role="dialog" aria-modal="true" :aria-label="drawerTitle">
           <header class="aw-row aw-between">
             <h2>{{ drawerTitle }}</h2>
-            <button class="aw-icon" aria-label="关闭" @click="drawer = null">×</button>
+            <button class="aw-icon" :aria-label="text('关闭')" @click="drawer = null">×</button>
           </header>
           <template v-if="drawer === 'skills'"
             ><p class="aw-muted">
-              选择可访问的已发布技能，固定版本后挂载。依赖必须在当前本体和对象范围内。
+              {{ text("选择可访问的已发布技能，固定版本后挂载。依赖必须在当前本体和对象范围内。") }}
             </p>
-            <p v-if="drawerLoading" class="aw-empty">正在检查技能版本依赖…</p>
-            <p v-else-if="!skillCandidates.length" class="aw-empty">没有可访问的已发布技能。</p>
+            <p v-if="drawerLoading" class="aw-empty">{{ text("正在检查技能版本依赖…") }}</p>
+            <p v-else-if="!skillCandidates.length" class="aw-empty">{{ text("没有可访问的已发布技能。") }}</p>
             <article v-for="candidate in skillCandidates" :key="candidate.skill.id" class="aw-card">
               <div class="aw-row">
                 <input
@@ -425,7 +435,7 @@
               </div>
               <p class="aw-muted">{{ candidate.skill.description }}</p>
               <label class="aw-field"
-                ><span>固定发布版本</span
+                ><span>{{ text("固定发布版本") }}</span
                 ><select
                   v-model.number="candidate.version"
                   @change="loadCandidateVersion(candidate)"
@@ -442,11 +452,11 @@
               <p v-for="problem in candidate.problems" :key="problem" class="aw-text-error">
                 {{ problem }}
               </p>
-              <span v-if="!candidate.problems.length" class="aw-pill aw-green">依赖匹配</span
+              <span v-if="!candidate.problems.length" class="aw-pill aw-green">{{ text("依赖匹配") }}</span
               ><span
                 v-if="form.skill_bindings.some((b) => b.skill_id === candidate.skill.id)"
                 class="aw-pill"
-                >已挂载</span
+                >{{ text("已挂载") }}</span
               >
             </article>
             <footer class="aw-drawer-footer">
@@ -457,33 +467,33 @@
                 "
                 @click="attachSkills"
               >
-                添加选中技能
+                {{ text("添加选中技能") }}
               </button>
             </footer></template
           >
           <template v-else-if="drawer === 'upgrade'"
-            ><p class="aw-muted">升级技能不会自动改变在线应用。保存并调试草稿后重新发布。</p>
-            <p v-if="drawerLoading" class="aw-empty">正在读取版本变更…</p>
+            ><p class="aw-muted">{{ text("升级技能不会自动改变在线应用。保存并调试草稿后重新发布。") }}</p>
+            <p v-if="drawerLoading" class="aw-empty">{{ text("正在读取版本变更…") }}</p>
             <template v-else-if="upgrade"
               ><h3>
                 {{ upgrade.skill.name }} · v{{ upgrade.from.version }} → v{{ upgrade.to.version }}
               </h3>
               <div class="aw-two">
                 <section>
-                  <h3>当前版本</h3>
+                  <h3>{{ text("当前版本") }}</h3>
                   <p>{{ upgrade.from.description }}</p>
                   <pre>{{ upgrade.from.prompt_template }}</pre>
                   <details>
-                    <summary>输入、输出与依赖</summary>
+                    <summary>{{ text("输入、输出与依赖") }}</summary>
                     <pre>{{ JSON.stringify(upgradeDependencies(upgrade.from), null, 2) }}</pre>
                   </details>
                 </section>
                 <section>
-                  <h3>目标版本</h3>
+                  <h3>{{ text("目标版本") }}</h3>
                   <p>{{ upgrade.to.description }}</p>
                   <pre>{{ upgrade.to.prompt_template }}</pre>
                   <details>
-                    <summary>输入、输出与依赖</summary>
+                    <summary>{{ text("输入、输出与依赖") }}</summary>
                     <pre>{{ JSON.stringify(upgradeDependencies(upgrade.to), null, 2) }}</pre>
                   </details>
                 </section>
@@ -497,13 +507,13 @@
                   :disabled="!!upgrade.problems.length"
                   @click="applyUpgrade"
                 >
-                  使用目标版本
+                  {{ text("使用目标版本") }}
                 </button>
               </footer></template
             ></template
           >
           <template v-else-if="drawer === 'publish'"
-            ><p class="aw-muted">发布业务应用配置，固定本体、技能与执行策略。</p>
+            ><p class="aw-muted">{{ text("发布业务应用配置，固定本体、技能与执行策略。") }}</p>
             <div class="aw-card">
               <strong>{{ form.name }} · {{ form.skill_bindings.length }} 项技能</strong>
               <p>
@@ -514,7 +524,7 @@
             <div class="aw-publish-check">
               <span>草稿配置</span
               ><span class="aw-pill" :class="isDirty ? 'aw-amber' : 'aw-green'">{{
-                isDirty ? '待保存' : '已保存'
+                isDirty ? '待保存' : text('已保存')
               }}</span>
             </div>
             <div class="aw-publish-check">
@@ -524,9 +534,9 @@
               }}</span>
             </div>
             <div class="aw-publish-check">
-              <span>执行策略</span
+              <span>{{ text("执行策略") }}</span
               ><span class="aw-pill">{{
-                form.action_mode === 'confirm' ? '执行前授权确认' : '模拟执行'
+                form.action_mode === 'confirm' ? text('执行前授权确认') : text('模拟执行')
               }}</span>
             </div>
             <p v-for="problem in publishProblems" :key="problem" class="aw-text-error">
@@ -538,12 +548,12 @@
                 :disabled="publishing || publishProblems.length > 0"
                 @click="publishAgent"
               >
-                {{ publishing ? '发布中…' : '确认发布' }}
+                {{ publishing ? text('发布中…') : text('确认发布') }}
               </button>
             </footer></template
           >
           <template v-else-if="drawer === 'run'"
-            ><p v-if="drawerLoading" class="aw-empty">正在读取运行详情…</p>
+            ><p v-if="drawerLoading" class="aw-empty">{{ text("正在读取运行详情…") }}</p>
             <template v-else-if="selectedRun"
               ><h3>{{ selectedRun.question }}</h3>
               <p>{{ runStatus(selectedRun.status) }} · {{ formatTime(selectedRun.started_at) }}</p>
@@ -566,21 +576,21 @@
                 <strong>{{ pending.action_name }}</strong>
                 <p>{{ pending.summary }}</p>
                 <pre>{{ JSON.stringify(pending.params, null, 2) }}</pre>
-                <p>状态：{{ runStatus(pending.status || 'pending') }}</p>
+                <p>{{ text('状态') }}：{{ runStatus(pending.status || 'pending') }}</p>
                 <pre v-if="pending.result">{{ JSON.stringify(pending.result, null, 2) }}</pre>
                 <div v-if="!pending.status || pending.status === 'pending'" class="aw-row">
                   <button
                     class="aw-button aw-primary"
-                    :disabled="!!deciding || !canEdit"
+                    :disabled="!!deciding || !canConfirmActions"
                     @click="decideRunAction(pending.pending_id, true)"
                   >
-                    授权并执行</button
+                    {{ text("授权并执行") }}</button
                   ><button
                     class="aw-button"
-                    :disabled="!!deciding || !canEdit"
+                    :disabled="!!deciding || !canConfirmActions"
                     @click="decideRunAction(pending.pending_id, false)"
                   >
-                    拒绝执行
+                    {{ text("拒绝执行") }}
                   </button>
                 </div>
               </article></template
@@ -594,6 +604,10 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
+
+import { formatPlatformDateTime } from '../../utils/platformTime'
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, onBeforeRouteUpdate, useRoute, useRouter } from 'vue-router'
 import {
@@ -648,7 +662,9 @@ interface Candidate {
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
-const canEdit = computed(() => ['admin', 'editor'].includes(authStore.user?.role || ''))
+const canEdit = computed(() => authStore.hasPermission('rule:write'))
+const canAuthorize = computed(() => authStore.hasPermission('strategy:execute') || authStore.hasPermission('rule:write'))
+const canConfirmActions = computed(() => authStore.hasPermission('rule:execute') || authStore.hasPermission('rule:write'))
 const workspaceTabs = ['配置与调试', '运行记录', '发布与接入'] as const
 const configTabs = ['基本设置', '本体与能力', '行为规则'] as const
 const workspaceTab = ref<(typeof workspaceTabs)[number]>('配置与调试')
@@ -686,6 +702,8 @@ const form = reactive({
   skill_bindings: [] as AgentSkillBinding[],
   action_mode: 'simulation' as 'simulation' | 'confirm',
   max_tool_rounds: 12,
+  execution_mode: 'react' as 'react' | 'graph',
+  graph_json: '{"nodes": [], "edges": []}',
 })
 const savedSnapshot = ref('')
 const versions = ref<AgentVersion[]>([])
@@ -737,6 +755,30 @@ function inSelectedObjectScope(item: SkillCatalogItem) {
 }
 const availableFunctions = computed(() => catalog.value.functions.filter(inSelectedObjectScope))
 const availableActions = computed(() => catalog.value.actions.filter(inSelectedObjectScope))
+const graphActionId = ref('')
+const parsedGraph = computed(() => { try { return JSON.parse(form.graph_json) } catch { return null } })
+const graphProblem = computed(() => {
+  if (form.execution_mode !== 'graph') return ''
+  const graph = parsedGraph.value
+  if (!graph || !Array.isArray(graph.nodes) || !Array.isArray(graph.edges)) return '图定义必须是包含 nodes 和 edges 数组的有效 JSON。'
+  if (!graph.nodes.length) return '图至少需要一个节点。'
+  const ids = graph.nodes.map((node: any) => node.id)
+  if (ids.some((id: any) => typeof id !== 'string' || !id) || new Set(ids).size !== ids.length) return '节点 ID 不能为空或重复。'
+  if (graph.edges.some((edge: any) => !ids.includes(edge.source) || !ids.includes(edge.target))) return '连线两端必须引用已存在节点。'
+  for (const node of graph.nodes) {
+    const data = node.data || {}
+    if (['action', 'human-approval'].includes(node.type) && !availableActions.value.some(action => action.id === data.action_id)) return `节点 ${node.id} 需要当前本体发布版本中的动作 action_id。`
+    if (node.type === 'function' && !availableFunctions.value.some(fn => fn.id === data.function_id)) return `节点 ${node.id} 需要当前本体发布版本中的函数 function_id。`
+  }
+  return ''
+})
+function setApprovalGraph() {
+  form.graph_json = JSON.stringify({ nodes: [
+    { id: 'input', type: 'input', data: {} },
+    { id: 'approval', type: 'human-approval', data: { action_id: graphActionId.value, params: {} } },
+    { id: 'output', type: 'output', data: {} },
+  ], edges: [{ source: 'input', target: 'approval' }, { source: 'approval', target: 'output' }] }, null, 2)
+}
 const isNew = computed(() => route.name === 'agent-new')
 const isDirty = computed(() => JSON.stringify(payload()) !== savedSnapshot.value)
 const testPassed = computed(
@@ -751,7 +793,7 @@ const drawerTitle = computed(
         publish: '发布智能体',
         run: '运行详情',
       }) as Record<string, string>
-    )[drawer.value || ''] || '',
+    )[drawer.value || ''] ? text(({skills:'添加业务技能',upgrade:'检查技能升级',publish:'发布智能体',run:'运行详情'} as Record<string,string>)[drawer.value || '']) : '',
 )
 const publishedSnapshot = computed(
   () => versions.value.find((v) => v.version === current.value?.current_version)?.config_snapshot,
@@ -789,6 +831,7 @@ const publishProblems = computed(() => {
     problems.push('当前模型已停用或不可访问。')
   for (const binding of form.skill_bindings)
     problems.push(...bindingProblems(binding).map((p) => `${skillName(binding.skill_id)}：${p}`))
+  if (graphProblem.value) problems.push(graphProblem.value)
   if (!testPassed.value) problems.push('当前草稿尚未通过联合调试。')
   return problems
 })
@@ -803,6 +846,8 @@ function payload(): Partial<AgentItem> {
     model_id: form.model_id || null,
     system_prompt: form.system_prompt,
     entity_ids: [...form.entity_ids],
+    nodes_json: form.execution_mode === 'graph' ? (parsedGraph.value?.nodes || []) : [],
+    edges_json: form.execution_mode === 'graph' ? (parsedGraph.value?.edges || []) : [],
     tools_config: {
       ...(current.value?.tools_config || {}),
       ontology_id: form.ontology_id || null,
@@ -830,6 +875,8 @@ function hydrate(agent: AgentItem) {
     ),
     action_mode: config.action_mode === 'confirm' ? 'confirm' : 'simulation',
     max_tool_rounds: config.max_tool_rounds || 12,
+    execution_mode: agent.nodes_json?.length ? 'graph' : 'react',
+    graph_json: JSON.stringify({ nodes: agent.nodes_json || [], edges: agent.edges_json || [] }, null, 2),
   })
   savedSnapshot.value = JSON.stringify(payload())
 }
@@ -881,7 +928,7 @@ function bindingProblems(binding: AgentSkillBinding) {
 async function fetchPinned(id: string, version: number): Promise<PinnedSkill> {
   const result = await skillsApi.version(id, version)
   const snapshot = result.snapshot_json || result.snapshot || result.definition
-  if (!snapshot) throw new Error('发布版本未提供依赖快照')
+  if (!snapshot) throw new Error(text('发布版本未提供依赖快照'))
   const value = { ...snapshot, version }
   pinned[`${id}:${version}`] = value
   delete pinErrors[`${id}:${version}`]
@@ -926,11 +973,11 @@ async function changeOntologyVersion() {
 async function saveAgent() {
   if (saving.value || chatBusy.value || !canEdit.value) return
   if (!isNew.value && !current.value) {
-    error.value = '智能体尚未加载，请刷新后重试。'
+    error.value = text('智能体尚未加载，请刷新后重试。')
     return
   }
   if (!form.name.trim()) {
-    error.value = '请填写智能体名称。'
+    error.value = text('请填写智能体名称。')
     configTab.value = '基本设置'
     return
   }
@@ -939,9 +986,10 @@ async function saveAgent() {
     form.max_tool_rounds < 2 ||
     form.max_tool_rounds > 20
   ) {
-    error.value = '工具调用轮次应为 2–20。'
+    error.value = text('工具调用轮次应为 2–20。')
     return
   }
+  if (graphProblem.value) { error.value = graphProblem.value; return }
   saving.value = true
   error.value = ''
   notice.value = ''
@@ -951,7 +999,7 @@ async function saveAgent() {
       ? await agentsApi.update(current.value.id, data)
       : await agentsApi.create(data)
     hydrate(result)
-    notice.value = '草稿已保存，请调试验证当前配置。'
+    notice.value = text('草稿已保存，请调试验证当前配置。')
     if (isNew.value) {
       savingNew = true
       await router.replace(`/agent/manage/${result.id}`)
@@ -1153,14 +1201,14 @@ async function unpublishAgent() {
     saving.value ||
     publishing.value ||
     !current.value ||
-    !window.confirm('下线后外部应用将无法调用此智能体，确认下线？')
+    !window.confirm(text('下线后外部应用将无法调用此智能体，确认下线？'))
   )
     return
   saving.value = true
   try {
     current.value = await agentsApi.update(current.value.id, { status: 'draft' })
     apiInfo.value = null
-    notice.value = '应用已下线。'
+    notice.value = text('应用已下线。')
   } catch (e) {
     error.value = skillError(e)
   } finally {
@@ -1190,7 +1238,7 @@ async function rollback(version: AgentVersion) {
 }
 async function copyApi() {
   if (apiInfo.value && !(await copyText(apiInfo.value.curl)))
-    error.value = '复制失败，请手动复制调用示例。'
+    error.value = text('复制失败，请手动复制调用示例。')
 }
 async function openRun(id: string) {
   if (deciding.value || !current.value) return
@@ -1211,7 +1259,7 @@ async function openRun(id: string) {
   }
 }
 async function decideRunAction(pendingId: string, approve: boolean) {
-  if (deciding.value || !current.value || !selectedRun.value) return
+  if (!canConfirmActions.value || deciding.value || !current.value || !selectedRun.value) return
   const agentId = current.value.id
   const runId = selectedRun.value.id
   const generation = loadGeneration
@@ -1229,7 +1277,7 @@ async function decideRunAction(pendingId: string, approve: boolean) {
   }
 }
 function runStatus(status: string) {
-  return (
+  return text(
     (
       {
         ok: '完成',
@@ -1246,12 +1294,13 @@ function runStatus(status: string) {
         expired: '授权已过期',
         executing: '行动正在执行',
         cancelled: '已中止',
+        partial_committed: '部分写入已提交，已完成写入保留；请核查回执，原行动不可重试',
       } as Record<string, string>
     )[status] || status
   )
 }
 function formatTime(value?: string) {
-  return value ? new Date(value).toLocaleString('zh-CN') : '—'
+  return formatPlatformDateTime(value)
 }
 watch(drawer, () => {
   drawerError.value = ''
@@ -1295,6 +1344,8 @@ watch(
       skill_bindings: [],
       action_mode: 'simulation',
       max_tool_rounds: 12,
+      execution_mode: 'react',
+      graph_json: '{"nodes": [], "edges": []}',
     })
     savedSnapshot.value = JSON.stringify(payload())
     try {
@@ -1330,19 +1381,19 @@ watch(
 onBeforeRouteLeave(() => {
   if (savingNew) return true
   if (saving.value || publishing.value || deciding.value) {
-    error.value = '操作正在进行，请等待完成后再离开。'
+    error.value = text('操作正在进行，请等待完成后再离开。')
     return false
   }
-  if (chatBusy.value) return window.confirm('离开页面将中止调试响应，确认离开？')
-  if (isDirty.value) return window.confirm('当前草稿尚未保存，确认离开？')
+  if (chatBusy.value) return window.confirm(text('离开页面将中止调试响应，确认离开？'))
+  if (isDirty.value) return window.confirm(text('当前草稿尚未保存，确认离开？'))
 })
 onBeforeRouteUpdate(() => {
   if (!savingNew && (saving.value || publishing.value || deciding.value)) {
-    error.value = '操作正在进行，请等待完成后再切换智能体。'
+    error.value = text('操作正在进行，请等待完成后再切换智能体。')
     return false
   }
   if (!savingNew && (isDirty.value || chatBusy.value))
-    return window.confirm('当前配置尚未保存或仍在调试，确认切换智能体？')
+    return window.confirm(text('当前配置尚未保存或仍在调试，确认切换智能体？'))
 })
 onBeforeUnmount(() => {
   loadGeneration++

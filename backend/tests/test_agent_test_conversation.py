@@ -1,6 +1,14 @@
 import unittest
 
-from app.database import SessionLocal
+from app.database import Base, get_db
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+import app.models
+
+_TEST_ENGINE = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+Base.metadata.create_all(_TEST_ENGINE)
+SessionLocal = sessionmaker(bind=_TEST_ENGINE, expire_on_commit=False)
 from app.models.agent_test_conversation import AgentTestConversation
 
 

@@ -18,13 +18,13 @@
         v-for="table in filteredTables"
         :key="table.asset_id"
         class="asset-picker__table-item"
-        :class="{ 'asset-picker__table-item--recommended': recommendedSet.has(table.table_name) }"
+        :class="{ 'asset-picker__table-item--recommended': recommendedSet.has(table.asset_id) }"
       >
-        <input v-model="selectedTables" type="checkbox" :value="table.table_name" />
+        <input v-model="selectedTables" type="checkbox" :value="table.asset_id" />
         <span class="asset-picker__table-name">{{ table.table_name }}</span>
         <span class="asset-picker__table-desc">{{ table.table_desc }}</span>
         <span v-if="table.domain" class="asset-picker__table-tag">{{ table.domain }}</span>
-        <span v-if="recommendedSet.has(table.table_name)" class="asset-picker__badge">AI推荐</span>
+        <span v-if="recommendedSet.has(table.asset_id)" class="asset-picker__badge">AI推荐</span>
       </label>
       <div v-if="!filteredTables.length" class="asset-picker__empty">没有匹配的数据表</div>
     </div>
@@ -41,11 +41,11 @@ import { computed, onMounted, ref } from 'vue'
 import { listTables, recommendTables } from '../../../../api/aiBuilderV2'
 import type { TableInfo } from '../../../../api/aiBuilderV2'
 
-const props = defineProps<{ businessDesc: string }>()
+const props = defineProps<{ businessDesc: string; initialSelected?: string[] }>()
 const emit = defineEmits<{ (e: 'next', tables: string[]): void }>()
 
 const tables = ref<TableInfo[]>([])
-const selectedTables = ref<string[]>([])
+const selectedTables = ref<string[]>([...(props.initialSelected || [])])
 const recommendedTables = ref<string[]>([])
 const loading = ref(true)
 const recommending = ref(false)

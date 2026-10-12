@@ -2,8 +2,8 @@
   <div class="logic-modeling">
     <div class="logic-modeling__header">
       <div>
-        <h1 class="text-display">逻辑建模</h1>
-        <p class="text-caption" style="margin-top: 4px;">在对象模型之上定义可复用的计算逻辑</p>
+        <h1 class="text-display">{{ text('逻辑建模') }}</h1>
+        <p class="text-caption" style="margin-top: 4px;">{{ text('在对象模型之上定义可复用的计算逻辑') }}</p>
       </div>
     </div>
 
@@ -14,6 +14,8 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
 import FunctionsView from './FunctionsView.vue'
 </script>
 

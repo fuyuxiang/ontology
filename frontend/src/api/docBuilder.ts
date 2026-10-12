@@ -1,7 +1,6 @@
 import client from './client'
 import { post } from './client'
-
-const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+import { postJsonSse, readJsonSse } from './sse'
 
 export interface DocFileInfo {
   name: string
@@ -15,17 +14,21 @@ export interface UploadResult {
   files: DocFileInfo[]
 }
 
-export function downloadTemplate(): void {
-  window.open(`${baseURL}/doc-builder/template`, '_blank')
+export async function downloadTemplate(): Promise<void> {
+  const response = await client.get('/doc-builder/template', { responseType: 'blob' })
+  const url = URL.createObjectURL(response.data)
+  const link = document.createElement('a'); link.href = url; link.download = '本体建模业务文档模板.md'; link.click()
+  URL.revokeObjectURL(url)
 }
 
-export function uploadDocuments(files: File[]): Promise<{ data: UploadResult }> {
+export function uploadDocuments(files: File[], signal?: AbortSignal): Promise<{ data: UploadResult }> {
   const fd = new FormData()
   for (const f of files) {
     fd.append('files', f, f.name)
   }
   return client.post('/doc-builder/upload', fd, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    signal,
   })
 }
 
@@ -35,49 +38,21 @@ export function docBuilderChat(
   businessDesc: string,
   onEvent: (ev: { event: string; [key: string]: any }) => void,
   onDone: () => void,
-  onError: () => void,
+  onError: (message: string) => void,
 ): { abort: () => void } {
-  const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-  const body = JSON.stringify({ session_id: sessionId, message, business_desc: businessDesc })
-
   const ctrl = new AbortController()
-
-  fetch(`${baseURL}/doc-builder/chat`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(localStorage.getItem('token') ? { Authorization: `Bearer ${localStorage.getItem('token')}` } : {}),
-    },
-    body,
-    signal: ctrl.signal,
-  }).then(async res => {
-    const reader = res.body!.getReader()
-    const decoder = new TextDecoder()
-    let buf = ''
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
-      const lines = buf.split('\n')
-      buf = lines.pop() ?? ''
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6)
-          if (data === '[DONE]') {
-            onDone()
-          } else {
-            try {
-              onEvent(JSON.parse(data))
-            } catch { /* skip */ }
-          }
-        }
-      }
-    }
-    onDone()
-  }).catch(() => onError())
+  void postJsonSse('/doc-builder/chat', {
+    session_id: sessionId, message, business_desc: businessDesc,
+  }, ctrl.signal).then(response => readJsonSse(response, onEvent)).then(() => {
+    if (!ctrl.signal.aborted) onDone()
+  }).catch(error => {
+    if (!ctrl.signal.aborted) onError(error.message || '请求失败')
+  })
 
   return { abort: () => ctrl.abort() }
 }
+
+export async function readDocumentSession(sessionId: string) { return (await client.get<{ history: Array<{role:string;content:string}>; current_ontology:any }>(`/doc-builder/sessions/${encodeURIComponent(sessionId)}`)).data }
 
 // ─── 映射持久化 ───────────────────────────────────────
 
@@ -86,6 +61,11 @@ export interface MappingPreviewItem {
   entity_id: string | null
   table_name: string | null
   asset_id: string | null
+  backing_asset_ids?: string[]
+  primary_key?: string | null
+  id_column?: string | null
+  enrichment_bindings?: import('../types/builder').OntologyObjectDraft['enrichment_bindings']
+  conflict_action?: 'keep' | 'overwrite' | null
   asset_registered: boolean
   confidence: number
   conflict: { existing_binding_id: string; existing_asset_name: string } | null
@@ -93,6 +73,11 @@ export interface MappingPreviewItem {
     attribute_name: string
     attribute_id: string | null
     source_column: string | null
+    source_asset_id?: string | null
+    transform?: import('../types/builder').OntologyProperty['transform']
+    type?: string
+    required?: boolean
+    description?: string | null
     confidence: number
   }>
 }
@@ -102,6 +87,7 @@ export interface MappingPreviewResponse {
 }
 
 export interface MappingApplyItem {
+  entity_name: string
   entity_id: string | null
   asset_id: string | null
   conflict_action: 'overwrite' | 'keep' | null
@@ -113,12 +99,13 @@ export interface MappingApplyResponse {
   updated: number
   skipped: number
   binding_ids: string[]
+  items: MappingPreviewItem[]
 }
 
-export function previewMappingPersist(sessionId: string, mappingResult: any): Promise<MappingPreviewResponse> {
-  return post<MappingPreviewResponse>('/doc-builder/mapping/preview', { session_id: sessionId, mapping_result: mappingResult })
+export function previewMappingPersist(sessionId: string, mappingResult: any, ontologyId?: string): Promise<MappingPreviewResponse> {
+  return post<MappingPreviewResponse>('/doc-builder/mapping/preview', { session_id: sessionId, mapping_result: mappingResult, ontology_id: ontologyId })
 }
 
-export function applyMappingPersist(sessionId: string, items: MappingApplyItem[]): Promise<MappingApplyResponse> {
-  return post<MappingApplyResponse>('/doc-builder/mapping/apply', { session_id: sessionId, items })
+export function applyMappingPersist(sessionId: string, items: MappingApplyItem[], mappingResult?: any, ontologyId?: string): Promise<MappingApplyResponse> {
+  return post<MappingApplyResponse>('/doc-builder/mapping/apply', { session_id: sessionId, items, mapping_result: mappingResult, ontology_id: ontologyId })
 }

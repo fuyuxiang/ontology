@@ -65,8 +65,12 @@ class GraphEngine(NodeHandlersMixin):
         self.node_io: dict[str, dict] = {}
 
 
-    def run(self, question: str) -> Generator[dict, None, None]:
+    def run(self, question: str, *, initial_context=None) -> Generator[dict, None, None]:
         """按拓扑排序执行画布节点，yield SSE 事件"""
+        if self._runtime_context is None:
+            yield {"type": "error", "message": "图执行需要已发布本体版本、对象范围和有效用户的授权上下文"}
+            yield {"type": "done", "suggestions": []}
+            return
         topo_order = self._topological_sort()
         if not topo_order or (self._runtime_context is not None and len(topo_order) != len(self.nodes)):
             if self._runtime_context is not None:
@@ -76,13 +80,33 @@ class GraphEngine(NodeHandlersMixin):
             yield {"type": "done", "suggestions": []}
             return
 
-        context: dict[str, Any] = {"question": question, "system_prompt": self.system_prompt}
+        context: dict[str, Any] = dict(initial_context or {})
+        context.update(question=question, system_prompt=self.system_prompt)
         tool_runs: list[dict] = []
+        from app.services.agent.graph_data_mapper import get_incoming_edges, resolve_node_input
+        children = {nid: [edge["target"] for edge in self.edges if edge.get("source") == nid] for nid in self.nodes}
+        skipped = set()
+        for nid in topo_order:
+            if self.nodes[nid].get("type") == "condition" and isinstance(context.get(nid), dict):
+                self._route_condition_branches(nid, context[nid], children, skipped, context)
 
         for node_id in topo_order:
+            if node_id in skipped:
+                continue
+            loop_resume = None
+            if isinstance(context.get(node_id), dict) and context[node_id].get("_resume_loop"):
+                loop_resume = context.pop(node_id)["_resume_loop"]
+            elif node_id in context:
+                # Resumption never reruns a node whose result was checkpointed.
+                continue
             node = self.nodes[node_id]
             ntype = node.get("type", "")
             data = node.get("data", {})
+            if loop_resume:
+                data = {**data, "_loop_resume": loop_resume}
+            mapped_input = resolve_node_input(node_id, get_incoming_edges(node_id, self.edges), context)
+            if mapped_input:
+                data = {**data, "_mapped_input": mapped_input}
             label = data.get("label", ntype)
 
             node_started_at = time.time()
@@ -211,9 +235,11 @@ class GraphEngine(NodeHandlersMixin):
                     yield from self._managed_node_events(result, node_id)
                     self._raise_managed_failure(result)
                 context[node_id] = result
+                if ntype == "condition":
+                    self._route_condition_branches(node_id, result, children, skipped, context)
             except Exception as e:
                 logger.error(f"节点 {node_id} ({ntype}) 执行失败: {e}")
-                result = {"error": str(e)}
+                result = getattr(e, "result", None) or {"error": str(e)}
                 summary = f"执行失败: {e}"
                 context[node_id] = result
                 failed = True
@@ -232,6 +258,12 @@ class GraphEngine(NodeHandlersMixin):
                 yield {"type": "error", "message": summary, "node_id": node_id}
                 yield {"type": "done", "suggestions": [], "actions": []}
                 return
+            if isinstance(result, dict) and result.get("pending_action"):
+                self._checkpoint_pending(result, node_id, context)
+                # A downstream node must not consume a preview as a completed write.
+                yield {"type": "content", "content": "业务行动已提出，等待有权限的用户确认后执行。"}
+                yield {"type": "done", "suggestions": [], "actions": []}
+                return
 
         if tool_runs:
             yield {"type": "tool_summary", "toolRuns": tool_runs}
@@ -242,10 +274,33 @@ class GraphEngine(NodeHandlersMixin):
             yield {"type": "content", "content": final_answer[i:i + chunk_size]}
         yield {"type": "done", "suggestions": self._generate_suggestions(context, question), "actions": []}
 
-    def run_for_scene(self, input_params: dict | None = None) -> Generator[dict, None, None]:
+    def _checkpoint_pending(self, result, node_id, context, *, mode="chat", executed=None, skipped=None):
+        from app.models.agent_runtime import AgentPendingAction
+        from app.utils.json import json_safe
+        pending = self.db.get(AgentPendingAction, result["pending_action"]["pending_id"])
+        if not pending:
+            raise ValueError("图行动未保存，无法继续")
+        checkpoint = {"node_id": node_id, "context": json_safe(context),
+                      "mode": mode, "executed": list(executed or []), "skipped": list(skipped or []),
+                      "node_io": json_safe(self.node_io),
+                      "snapshot": (self._runtime_context or {}).get("agent_snapshot"),
+                      "runtime_context": {k: v for k, v in (self._runtime_context or {}).items()
+                                          if k not in {"user", "agent_snapshot"}},
+                      "model_name": self.model_name,
+                      "model_config": {k: v for k, v in self.model_config.items() if k != "api_key"},
+                      "nodes": list(self.nodes.values()), "edges": self.edges, "system_prompt": self.system_prompt}
+        pending.action_snapshot = {**pending.action_snapshot, "_graph_checkpoint": json_safe(checkpoint)}
+        self.db.add(pending)
+        self.db.commit()
+
+    def run_for_scene(self, input_params: dict | None = None, *, checkpoint=None) -> Generator[dict, None, None]:
         """AIP 场景模式入口：就绪队列执行，支持条件分支路由、并行、数据映射。"""
 
         from app.services.agent.graph_data_mapper import get_incoming_edges, resolve_node_input
+
+        if self._runtime_context is None:
+            yield {"type": "scene_failed", "error": "图执行需要已发布本体版本、对象范围和有效用户的授权上下文"}
+            return
 
         self.emit_node_io = True
         if not self.nodes:
@@ -261,6 +316,8 @@ class GraphEngine(NodeHandlersMixin):
         }
         for k, v in (input_params or {}).items():
             context[k] = v
+        if checkpoint:
+            context.update(checkpoint.get("context") or {})
 
         # 构建 DAG 依赖关系
         in_degree: dict[str, int] = {nid: 0 for nid in self.nodes}
@@ -274,8 +331,13 @@ class GraphEngine(NodeHandlersMixin):
                 parent_edges[tgt].append(e)
 
         # 状态追踪
-        executed: set[str] = set()
-        skipped: set[str] = set()
+        executed: set[str] = set((checkpoint or {}).get("executed") or [])
+        for nid, result in context.items():
+            if isinstance(result, dict) and result.get("_resume_loop"):
+                executed.discard(nid)
+        skipped: set[str] = set((checkpoint or {}).get("skipped") or [])
+        if checkpoint:
+            self.node_io.update((checkpoint or {}).get("node_io") or {})
         ready = deque(nid for nid, deg in in_degree.items() if deg == 0)
 
         active_nodes = [nid for nid in self.nodes if self.nodes[nid].get("type") not in ("skillNode", "memoryNode", "toolNode")]
@@ -294,6 +356,8 @@ class GraphEngine(NodeHandlersMixin):
             node = self.nodes[node_id]
             ntype = node.get("type", "")
             data = node.get("data", {})
+            if isinstance(context.get(node_id), dict) and context[node_id].get("_resume_loop"):
+                data = {**data, "_loop_resume": context.pop(node_id)["_resume_loop"]}
             label = data.get("label", ntype)
             node_started_at = time.time()
 
@@ -334,6 +398,10 @@ class GraphEngine(NodeHandlersMixin):
                 self._record_node_io(node_id, ntype, label, data, result, summary, node_started_at, status="success")
                 yield self._make_node_finished_event(node_id, ntype, label, result, summary, node_started_at)
                 executed.add(node_id)
+                if isinstance(result, dict) and result.get("pending_action"):
+                    self._checkpoint_pending(result, node_id, context, mode="scene", executed=executed, skipped=skipped)
+                    yield {"type": "scene_waiting_confirmation", "pending_action": result["pending_action"], "node_io": self.node_io}
+                    return
 
                 # 条件分支路由：标记未命中分支的下游为 skipped
                 if ntype == "condition":
@@ -341,13 +409,13 @@ class GraphEngine(NodeHandlersMixin):
 
             except Exception as e:
                 logger.error(f"[scene] 节点 {node_id} ({ntype}) 执行失败: {e}")
-                err = {"error": str(e)}
+                err = getattr(e, "result", None) or {"error": str(e)}
                 context[node_id] = err
                 self._record_node_io(node_id, ntype, label, data, err, str(e), node_started_at, status="failed")
                 yield self._make_node_failed_event(node_id, ntype, label, str(e), node_started_at)
                 executed.add(node_id)
                 if self._runtime_context is not None or data.get("on_error", "continue") == "stop":
-                    yield {"type": "scene_failed", "failed_node": node_id, "error": str(e)}
+                    yield {"type": "scene_failed", "failed_node": node_id, "error": str(e), "result": err}
                     return
 
             # 推进后续就绪节点
@@ -536,13 +604,20 @@ class GraphEngine(NodeHandlersMixin):
             key = m.group(1)
             if key == "question":
                 return context.get("question", "")
+            if "." in key:
+                head, remainder = key.split(".", 1)
+                if head in context:
+                    from app.services.agent.graph_data_mapper import _deep_get
+                    value = _deep_get(context[head], remainder)
+                    if value is not None:
+                        return str(value)
             for nid, val in context.items():
                 if nid == key and isinstance(val, str):
                     return val
                 if isinstance(val, dict) and key in val:
                     return str(val[key])
             return m.group(0)
-        return re.sub(r'\{(\w+(?:\.\w+)?)\}', replacer, template)
+        return re.sub(r'\{(\w+(?:\.\w+)*)\}', replacer, template)
 
     def _collect_upstream_data(self, context: dict) -> str:
         """收集上游节点的执行结果作为上下文"""

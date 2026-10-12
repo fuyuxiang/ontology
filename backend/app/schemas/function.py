@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+from typing import Literal
 
 
 class FunctionInputParam(BaseModel):
@@ -34,9 +36,9 @@ class FunctionCreate(BaseModel):
     description: str = ""
     return_type: str = "string"
     input_schema: list | None = None
-    logic_type: str = "expression"
+    logic_type: Literal["expression", "sql", "python"] = "expression"
     logic_body: str = ""
-    status: str = "active"
+    status: Literal["active", "inactive", "draft"] = "active"
     tags: list[str] | None = None
 
 
@@ -49,10 +51,19 @@ class FunctionUpdate(BaseModel):
     description: str | None = None
     return_type: str | None = None
     input_schema: list | None = None
-    logic_type: str | None = None
+    logic_type: Literal["expression", "sql", "python"] | None = None
     logic_body: str | None = None
-    status: str | None = None
+    status: Literal["active", "inactive", "draft"] | None = None
     tags: list[str] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_null_required_fields(cls, values):
+        if isinstance(values, dict):
+            for key in {"name", "callable_name", "description", "return_type", "logic_type", "logic_body", "status"}:
+                if key in values and values[key] is None:
+                    raise ValueError(f"{key} 不能为空")
+        return values
 
 
 class FunctionOut(BaseModel):
@@ -84,6 +95,10 @@ class FunctionTestRequest(BaseModel):
 
 class FunctionTestResult(BaseModel):
     success: bool
-    result: str | int | float | bool | None = None
+    result: Any = None
     error: str | None = None
     execution_ms: float = 0
+    outcome: str | None = None
+    simulated: bool = False
+    requested_write: dict | None = None
+    execution_complete: bool = True

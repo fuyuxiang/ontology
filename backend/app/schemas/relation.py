@@ -8,6 +8,8 @@ class RelationCreate(BaseModel):
     rel_type: str = "has_many"
     cardinality: str = "1:N"
     description: str | None = None
+    source_field: str | None = None
+    target_field: str | None = None
 
 
 class RelationOut(BaseModel):
@@ -20,3 +22,5 @@ class RelationOut(BaseModel):
     rel_type: str
     cardinality: str
     description: str | None
+    source_field: str | None = None
+    target_field: str | None = None

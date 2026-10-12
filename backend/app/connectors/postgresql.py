@@ -38,7 +38,7 @@ class PostgreSQLConnector:
         cur = conn.cursor()
         cur.execute(f'SELECT * FROM "{table_name}" LIMIT {limit}')
         columns = [desc[0] for desc in cur.description]
-        rows = [list(row) for row in cur.fetchall()]
+        rows = [list(row) for row in cur.fetchall()] if cur.description else []
         cur.close()
         return {"table": table_name, "columns": columns, "rows": rows}
 
@@ -75,9 +75,10 @@ class PostgreSQLConnector:
         cur = conn.cursor()
         cur.execute(sql)
         columns = [desc[0] for desc in cur.description] if cur.description else []
-        rows = [list(row) for row in cur.fetchall()]
+        rows = [list(row) for row in cur.fetchall()] if cur.description else []
+        affected = cur.rowcount
         cur.close()
-        return {"columns": columns, "rows": rows, "rowCount": len(rows)}
+        return {"columns": columns, "rows": rows, "rowCount": len(rows), "rowsAffected": affected}
 
     def execute_sql_with_params(self, conn: Any, sql: str, params: dict) -> dict:
         from app.connectors._param_style import to_pyformat
@@ -85,6 +86,7 @@ class PostgreSQLConnector:
         cur = conn.cursor()
         cur.execute(rendered, args)
         columns = [desc[0] for desc in cur.description] if cur.description else []
-        rows = [list(row) for row in cur.fetchall()]
+        rows = [list(row) for row in cur.fetchall()] if cur.description else []
+        affected = cur.rowcount
         cur.close()
-        return {"columns": columns, "rows": rows, "rowCount": len(rows)}
+        return {"columns": columns, "rows": rows, "rowCount": len(rows), "rowsAffected": affected}

@@ -13,6 +13,8 @@ const props = defineProps<{
   targetType: 'function' | 'action'
   targetId: string
   contextEntityIds: string[]
+  ontologyId?: string | null
+  executionMode?: 'expression' | 'sql' | 'python' | 'custom_script'
 }>()
 
 const emit = defineEmits<{
@@ -34,7 +36,7 @@ const toast = useToast()
 let sessionGeneration = 0
 let activeRequest: AbortController | null = null
 watch(
-  () => [props.visible, props.targetType, props.targetId] as const,
+  () => [props.visible, props.targetType, props.targetId, props.executionMode, props.ontologyId] as const,
   async ([visible]) => {
     const generation = ++sessionGeneration
     activeRequest?.abort()
@@ -48,12 +50,13 @@ watch(
     historyLoading.value = true
     try {
       const [objects, conversation] = await Promise.all([
-        entityApi.list(),
+        entityApi.list({ontology_id:props.ontologyId || undefined}),
         aiCodeApi.getConversation(props.targetType, props.targetId),
       ])
       if (generation !== sessionGeneration) return
       entities.value = objects
-      messages.value = conversation?.messages || []
+      const mode = props.executionMode || (props.targetType === 'action' ? 'custom_script' : 'python')
+      messages.value = (conversation?.messages || []).filter(message => !message.execution_mode || message.execution_mode === mode)
       await nextTick()
       scrollToBottom()
     } catch (e) {
@@ -91,6 +94,7 @@ async function send() {
       {
         target_type: props.targetType,
         target_id: props.targetId,
+        execution_mode: props.executionMode,
         message: text,
         extra_entity_ids: [...props.contextEntityIds, ...extraEntityIds.value],
       },
@@ -106,9 +110,11 @@ async function send() {
       const parsed = JSON.parse(payload)
       if (parsed.event === 'chunk') currentResponse.value += parsed.content
       else if (parsed.event === 'done') {
+        if (typeof parsed.full_code !== 'string' || !parsed.full_code.trim()) throw new Error('模型未生成有效代码，请重试')
         messages.value.push({
           role: 'assistant',
           content: parsed.full_code,
+          execution_mode: props.executionMode || (props.targetType === 'action' ? 'custom_script' : 'python'),
           timestamp: new Date().toISOString(),
         })
         currentResponse.value = ''
@@ -156,7 +162,7 @@ async function applyCode(code: string) {
   const generation = sessionGeneration
   applying.value = true
   try {
-    const result = await aiCodeApi.validate(code)
+    const result = await aiCodeApi.validate(code, props.executionMode || (props.targetType === 'action' ? 'custom_script' : 'python'))
     if (generation !== sessionGeneration) return
     if (!result.safe) {
       const reasons = result.violations.map((v) => `行${v.line}: ${v.reason}`).join('\n')

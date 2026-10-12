@@ -1,13 +1,13 @@
 <template>
-  <ModalDialog :visible="visible" title="创建逻辑" width="560px" @close="close">
+  <ModalDialog :visible="visible" :title="text('创建逻辑')" width="560px" @close="close">
     <div class="create-form">
       <div class="form-section">
-        <label class="form-label form-label--required">中文名称</label>
+        <label class="form-label form-label--required">{{ text("中文名称") }}</label>
         <div class="input-wrap">
           <input
             v-model="form.name"
             class="form-input"
-            placeholder="请输入中文名称"
+            :placeholder="text('请输入中文名称')"
             maxlength="100"
           />
           <span class="input-count">{{ form.name.length }}/100</span>
@@ -15,12 +15,12 @@
       </div>
 
       <div class="form-section">
-        <label class="form-label form-label--required">英文名称</label>
+        <label class="form-label form-label--required">{{ text("英文名称") }}</label>
         <div class="input-wrap">
           <input
             v-model="form.callable_name"
             class="form-input"
-            placeholder="请输入英文名称"
+            :placeholder="text('请输入英文名称')"
             maxlength="100"
           />
           <span class="input-count">{{ form.callable_name.length }}/100</span>
@@ -28,12 +28,12 @@
       </div>
 
       <div class="form-section">
-        <label class="form-label">描述</label>
+        <label class="form-label">{{ text("描述") }}</label>
         <div class="input-wrap">
           <textarea
             v-model="form.description"
             class="form-input form-textarea"
-            placeholder="请输入描述"
+            :placeholder="text('请输入描述')"
             maxlength="2000"
             rows="3"
           />
@@ -43,22 +43,27 @@
       <div class="form-section">
         <label class="form-label">对象</label>
         <select v-model="form.entity_id" class="form-input form-select">
-          <option value="">请选择对象</option>
+          <option value="">{{ text("请选择对象") }}</option>
           <option v-for="e in entities" :key="e.id" :value="e.id">{{ e.name_cn || e.name }}</option>
         </select>
       </div>
     </div>
 
     <template #footer>
-      <button class="btn-secondary" :disabled="saving" @click="close">取消</button>
-      <button class="btn-primary" :disabled="saving" @click="handleCreate">
-        {{ saving ? '创建中…' : '创建' }}
+      <button class="btn-secondary" :disabled="saving" @click="close">{{ text("取消") }}</button>
+      <button class="btn-primary" :disabled="!canEdit || (saving)" @click="handleCreate">
+        {{ saving ? text('创建中…') : text('创建') }}
       </button>
     </template>
   </ModalDialog>
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
+
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit } = useManagementPermission('rule:write')
 import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { functionApi } from '../../api/functions'
@@ -121,15 +126,15 @@ onMounted(() => {
 async function handleCreate() {
   if (saving.value) return
   if (!form.value.name.trim()) {
-    toast.error('请填写中文名称')
+    toast.error(text('请填写中文名称'))
     return
   }
   if (!form.value.callable_name.trim()) {
-    toast.error('请填写英文名称')
+    toast.error(text('请填写英文名称'))
     return
   }
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(form.value.callable_name.trim())) {
-    toast.error('英文名称必须是合法标识符（字母或下划线开头，仅含字母、数字、下划线）')
+    toast.error(text('英文名称必须是合法标识符（字母或下划线开头，仅含字母、数字、下划线）'))
     return
   }
   saving.value = true
@@ -147,7 +152,7 @@ async function handleCreate() {
       status: 'active',
       ontology_id: ontologyStore.currentOntologyId || undefined,
     } as any)
-    toast.success('函数创建成功')
+    toast.success(text('函数创建成功'))
     if (route.fullPath !== origin) return
     emit('created', { id: result.id, name: result.name })
     const query: Record<string, string> = {}

@@ -4,6 +4,7 @@ The language model selects procedures; versioned programs enforce scope and
 business writes are either previews or single-use, authenticated approvals.
 """
 import copy
+import hashlib
 import json
 from datetime import datetime, timedelta
 
@@ -15,6 +16,7 @@ from app.models.version import OntologyVersion
 from app.services.agent.tool_router import ToolRouter
 from app.services.agent_actions import execute_action_snapshot, validate_parameters
 from app.services.function_executor import FunctionExecutor
+from app.services.function_runtime.models import ExecContext
 from app.utils.time import utc_iso
 
 
@@ -47,6 +49,9 @@ class ManagedToolRouter(ToolRouter):
                     "entity_id": entity_id, "callable_name": fn.callable_name,
                     "logic_type": fn.logic_type, "logic_body": fn.logic_body,
                     "input_schema": fn.input_schema, "return_type": fn.return_type,
+                    "source_code": getattr(fn, "source_code", None), "func_name": getattr(fn, "func_name", None),
+                    "checksum": getattr(fn, "checksum", None), "ontology_id": version.ontology_id,
+                    "version_id": version.id,
                 }
         for action in version.actions if version else []:
             entity_id = snapshot_to_source.get(action.version_entity_id)
@@ -56,6 +61,8 @@ class ManagedToolRouter(ToolRouter):
             if entity_id in ids or (entity_id is None and referenced):
                 self.actions[action.source_action_id] = {
                     "id": action.source_action_id, "name": action.name, "entity_id": entity_id,
+                    "version_id": version.id, "version_entity_id": action.version_entity_id,
+                    "ontology_id": version.ontology_id,
                     "action_type": action.action_type, "type_config": copy.deepcopy(action.type_config or {}),
                     "parameters_json": copy.deepcopy(action.parameters_json or []),
                     "description": action.description,
@@ -148,18 +155,38 @@ class ManagedToolRouter(ToolRouter):
                 entity_id = self.entities[name].source_entity_id
                 if not valid:
                     return {"error": "当前对象没有可查询属性"}, "对象未配置属性", 0
-                result = EntityDataService(self.db).query_entity_data(entity_id, filters=filters,
+                from app.services.version_entity_data import VersionEntityDataService
+                result = VersionEntityDataService(self.db, self.entities[name]).query_entity_data(entity_id, filters=filters,
                     fields=fields or sorted(valid), valid_attrs=valid, purpose="agent.managed_query",
                     limit=min(max(int(args.get("limit", 20)), 1), 100))
                 return result, "查询业务实例", result.get("rowCount", 0)
             if tool_name == "run_function":
+                from app.core.permissions import has_permission
+                user = self.context.get("user")
+                if not (has_permission(user, "rule:execute", self.db) or has_permission(user, "rule:write", self.db)):
+                    return {"error": "当前身份没有业务函数执行权限"}, "函数执行被拒绝", 0
                 fn = self.functions.get(args.get("function_id"))
                 if not fn:
                     return {"error": "函数不在授权范围内"}, "函数调用被拒绝", 0
-                instance = OntologyFunction(**fn)
                 params = validate_parameters(fn["input_schema"], args.get("params") or {})
-                result = FunctionExecutor(self.db).execute(instance, params)
+                context = ExecContext(ontology_id=fn["ontology_id"], version_id=fn["version_id"],
+                    entity_ids=frozenset(self.context.get("entity_ids") or []),
+                    function_ids=frozenset(self.functions), user=self.context.get("user"),
+                    action_mode=self.context.get("action_mode", "simulation"),
+                    allowed_tools=frozenset(self.allowed) if self.allowed is not None else None)
+                result = FunctionExecutor(self.db).execute_snapshot(fn, params, version_id=fn["version_id"], context=context)
+                if result.requested_write:
+                    if context.action_mode == "simulation":
+                        return {"success": True, "simulated": True, "value": None, "outcome": "simulated",
+                                "requested_write": result.requested_write}, f"模拟「{fn['name']}」，未写入业务系统", 1
+                    action = {"id": "fn:" + hashlib.sha256(fn["id"].encode()).hexdigest()[:32], "name": fn["name"], "entity_id": fn["entity_id"],
+                        "version_id": fn["version_id"], "ontology_id": fn["ontology_id"],
+                        "action_type": "call_function", "type_config": {}, "parameters_json": fn["input_schema"],
+                        "function_snapshot": copy.deepcopy(fn), "requested_write": result.requested_write}
+                    return self._create_pending(action, params)
                 return {"success": result.success, "value": result.value, "error": result.error,
+                        "outcome": result.outcome,
+                        "committed_writes": result.committed_writes,
                         "execution_ms": result.execution_ms}, f"{fn['name']}：{'完成' if result.success else '失败'}", int(result.success)
             if tool_name == "run_action":
                 return self._run_action(args)
@@ -205,13 +232,27 @@ class ManagedToolRouter(ToolRouter):
             return {"success": result.success, "simulated": True, "message": result.message,
                     "output": result.output}, f"模拟「{action['name']}」，未写入业务系统", int(result.success)
         user = self.context.get("user")
-        if not user or user.role not in ("admin", "editor") or not user.is_active:
+        from app.core.permissions import has_permission
+        if not (has_permission(user, "rule:execute", self.db) or has_permission(user, "rule:write", self.db)):
             return {"error": "当前身份没有业务动作执行权限"}, "动作执行被拒绝", 0
         if not self.context.get("agent_id"):
             return {"error": "缺少智能体运行身份"}, "动作执行被拒绝", 0
+        return self._create_pending(action, params)
+
+    def _create_pending(self, action, params):
+        user = self.context.get("user")
+        from app.core.permissions import has_permission
+        if not (has_permission(user, "rule:execute", self.db) or has_permission(user, "rule:write", self.db)):
+            return {"error": "当前身份没有业务动作执行权限"}, "动作执行被拒绝", 0
+        if not self.context.get("agent_id"):
+            return {"error": "缺少智能体运行身份"}, "动作执行被拒绝", 0
+        action = copy.deepcopy(action)
+        action["_runtime_scope"] = {"entity_ids": list(self.context.get("entity_ids") or []),
+            "function_ids": list(self.functions), "allowed_tools": list(self.allowed) if self.allowed is not None else None}
         existing = self.db.query(AgentPendingAction).filter_by(agent_id=self.context["agent_id"],
             run_id=self.context.get("run_id"), action_id=action["id"], status="pending").all()
-        pending = next((p for p in existing if p.params == params and p.expires_at > datetime.utcnow()), None)
+        pending = next((p for p in existing if p.params == params and p.config_hash == self.context["config_hash"]
+                        and p.expires_at > datetime.utcnow()), None)
         if pending is None:
             pending = AgentPendingAction(agent_id=self.context["agent_id"], run_id=self.context.get("run_id"),
             user_id=user.id, action_id=action["id"], action_snapshot=copy.deepcopy(action), params=params,

@@ -11,28 +11,25 @@ class CallFunctionExecutor(BaseActionExecutor):
             return ExecutionResult(
                 success=True,
                 message=f"[Dry Run] Would call function {function_name}",
-                output={"function_name": function_name, "params": mapped_params},
+                output={"function_name": function_name, "function_id": type_config.get("function_id"), "params": mapped_params},
             )
 
         from app.database import SessionLocal
-        from app.services.function_runtime.executor import FunctionRuntimeExecutor
-        from app.services.function_runtime.registry import FunctionRegistry
-        from app.services.function_runtime.sandbox import UnifiedSandbox
+        from app.services.function_executor import FunctionExecutor
 
-        db = SessionLocal()
+        db = self.db or SessionLocal()
         try:
-            registry = FunctionRegistry(db)
-            registry.sync_from_db()
-            sandbox = UnifiedSandbox()
-            runtime = FunctionRuntimeExecutor(registry=registry, sandbox=sandbox, db=db)
-            result = runtime.execute(function_name, mapped_params)
+            result = FunctionExecutor(db).execute_by_callable_name(function_name, mapped_params, type_config.get("ontology_id"),
+                context=type_config.get("_exec_context"))
             return ExecutionResult(
                 success=result.success,
                 message=result.error or "执行成功",
-                output={"function_name": function_name, "result": result.result},
+                output={"function_name": function_name, "result": result.value, "outcome": result.outcome,
+                        "committed_writes": result.committed_writes},
             )
         finally:
-            db.close()
+            if self.db is None:
+                db.close()
 
     @classmethod
     def get_config_schema(cls) -> dict:

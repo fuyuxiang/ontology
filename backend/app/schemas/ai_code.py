@@ -1,17 +1,20 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel
 
 
 class AiCodeGenerateRequest(BaseModel):
-    target_type: str  # "function" | "action"
+    target_type: Literal["function", "action"]
     target_id: str
     message: str
     extra_entity_ids: list[str] = []
+    execution_mode: Literal["expression", "sql", "python", "custom_script"] | None = None
 
 
 class AiCodeValidateRequest(BaseModel):
     code: str
+    execution_mode: Literal["expression", "sql", "python", "custom_script"] = "python"
 
 
 class ViolationOut(BaseModel):
@@ -25,6 +28,7 @@ class AiCodeValidateResponse(BaseModel):
 
 
 class ConversationMessageOut(BaseModel):
+    execution_mode: str | None = None
     role: str
     content: str
     timestamp: str

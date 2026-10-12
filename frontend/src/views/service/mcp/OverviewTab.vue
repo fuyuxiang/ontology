@@ -1,7 +1,7 @@
 <template>
   <div ref="overviewEl" class="overview">
     <a-alert v-if="errorSummary" type="warning" show-icon message="部分服务指标加载失败" :description="errorSummary" style="margin-bottom:16px">
-      <template #action><a-button size="small" :loading="loading" @click="loadAll">重试</a-button></template>
+      <template #action><a-button size="small" :loading="loading" @click="loadAll">{{ text('重试') }}</a-button></template>
     </a-alert>
     <a-spin :spinning="loading" tip="正在加载服务指标…">
     <!-- 统计卡片 -->
@@ -17,7 +17,7 @@
               :class="callsTrend >= 0 ? 'trend--up' : 'trend--down'"
             >{{ callsTrend >= 0 ? '↑' : '↓' }} {{ Math.abs(callsTrend).toFixed(1) }}%</span>
           </div>
-          <span class="stat-card__label">今日调用</span>
+          <span class="stat-card__label">{{ text('今日调用') }}</span>
         </div>
       </div>
       <div class="stat-card">
@@ -26,7 +26,7 @@
           <div class="stat-card__value">
             {{ overviewLoaded ? overview.avg_response_ms : '—' }}<small>ms</small>
           </div>
-          <span class="stat-card__label">平均响应</span>
+          <span class="stat-card__label">{{ text('平均响应') }}</span>
         </div>
       </div>
       <div class="stat-card">
@@ -35,14 +35,14 @@
           <div class="stat-card__value">
             {{ overviewLoaded ? (overview.error_rate * 100).toFixed(2) : '—' }}<small>%</small>
           </div>
-          <span class="stat-card__label">错误率</span>
+          <span class="stat-card__label">{{ text('错误率') }}</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-card__icon stat-card__icon--conn">🔗</div>
         <div class="stat-card__body">
-          <div class="stat-card__value">{{ overviewLoaded ? overview.active_connections : '—' }}</div>
-          <span class="stat-card__label">活跃连接</span>
+          <div class="stat-card__value">{{ overviewLoaded ? overview.active_requests : '—' }}</div>
+          <span class="stat-card__label">{{ text('并发请求') }}</span>
         </div>
       </div>
     </div>
@@ -51,7 +51,7 @@
     <div class="overview__charts">
       <div class="chart-panel chart-panel--main">
         <div class="chart-panel__header">
-          <h3>调用趋势</h3>
+          <h3>{{ text('调用趋势') }}</h3>
           <div class="range-btns">
             <button
               v-for="r in ranges"
@@ -69,7 +69,7 @@
       </div>
       <div class="chart-panel chart-panel--side">
         <div class="chart-panel__header">
-          <h3>工具分布</h3>
+          <h3>{{ text('工具分布') }}</h3>
         </div>
         <div class="chart-panel__body">
           <div ref="pieEl" class="chart-panel__canvas" :class="{ 'chart-panel__canvas--empty': !loading && (!toolStats.length || errors.toolsStats) }"></div>
@@ -80,16 +80,16 @@
 
     <!-- 工具健康表格 -->
     <div class="overview__table">
-      <h3 class="section-title">工具健康</h3>
+      <h3 class="section-title">{{ text('工具健康') }}</h3>
       <table class="tool-table">
         <thead>
           <tr>
-            <th>工具名称</th>
-            <th>描述</th>
-            <th>调用次数</th>
-            <th>平均耗时</th>
-            <th>错误数</th>
-            <th>最近调用</th>
+            <th>{{ text('工具名称') }}</th>
+            <th>{{ text('描述') }}</th>
+            <th>{{ text('调用次数') }}</th>
+            <th>{{ text('平均耗时') }}</th>
+            <th>{{ text('错误数') }}</th>
+            <th>{{ text('最近调用') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -102,7 +102,7 @@
             <td>{{ formatTime(stat.last_called) }}</td>
           </tr>
           <tr v-if="!toolStats.length && !errors.toolsStats">
-            <td colspan="6" style="text-align: center; color: var(--neutral-400);">暂无数据</td>
+            <td colspan="6" style="text-align: center; color: var(--neutral-400);">{{ text('暂无数据') }}</td>
           </tr>
         </tbody>
       </table>
@@ -111,9 +111,15 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useProductText } from '../../../composables/useProductText'
+const { text } = useProductText()
+import { ref, reactive, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { Alert as AAlert, Button as AButton, Spin as ASpin } from 'ant-design-vue'
 import * as echarts from 'echarts'
+import { formatPlatformDateTime } from '../../../utils/platformTime'
+import { usePlatformConfigStore } from '../../../store/platformConfig'
+const platform = usePlatformConfigStore()
+const trendPoints = ref<Array<{ time: string; count: number }>>([])
 import {
   getMcpOverview,
   getMcpTrend,
@@ -130,6 +136,7 @@ const overview = ref<McpOverview>({
   avg_response_ms: 0,
   error_rate: 0,
   active_connections: 0,
+  active_requests: 0,
 })
 const toolStats = ref<McpToolStat[]>([])
 const tools = ref<McpToolSchema[]>([])
@@ -162,10 +169,7 @@ function toolDesc(name: string): string {
 }
 
 function formatTime(t: string | null): string {
-  if (!t) return '-'
-  const d = new Date(t)
-  if (Number.isNaN(d.getTime())) return t
-  return d.toLocaleString('zh-CN', { hour12: false })
+  return formatPlatformDateTime(t)
 }
 
 function handleResize() {
@@ -182,13 +186,18 @@ async function loadTrend() {
     const res = await getMcpTrend(trendRange.value)
     if (request !== trendRequest || disposed) return
     trendEmpty.value = res.data.length === 0
+    trendPoints.value = res.data
     trendChart?.setOption({
-      xAxis: { data: res.data.map(p => p.time) },
+      xAxis: { data: res.data.map(p => formatPlatformDateTime(p.time, { second: undefined })) },
       series: [{ data: res.data.map(p => p.count) }],
     })
   } catch { if (request === trendRequest && !disposed) errors.trend = '调用趋势加载失败，请重试' }
   finally { if (request === trendRequest) trendChart?.hideLoading() }
 }
+
+watch(() => [platform.timezone, platform.language], () => {
+  trendChart?.setOption({ xAxis: { data: trendPoints.value.map(point => formatPlatformDateTime(point.time, { second: undefined })) } })
+})
 
 async function changeRange(r: '1h' | '24h' | '7d') {
   trendRange.value = r

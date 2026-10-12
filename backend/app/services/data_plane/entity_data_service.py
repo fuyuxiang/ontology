@@ -14,6 +14,8 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.connectors import ConnectorRegistry
+from app.models.connection import Connection
 from app.models.asset import Asset
 from app.models.entity import EntityAttribute, OntologyEntity
 from app.models.object_binding import ObjectBinding
@@ -50,76 +52,272 @@ class EntityDataService:
         return (asset.locator or {}).get("table") or ""
 
     def get_attr_field_map(self, entity_id: str) -> dict[str, str]:
-        """属性名 → 物理字段名。未配置 source_field 时回退为属性名本身。
-
-        本体对外统一用属性名(本体语言),查询下发时必须翻译成物理列名，
-        否则被重命名过的属性(如 related_order_no→order_id)会导致 Unknown column。
-        """
+        """Only explicit primary mappings become physical SELECT columns."""
         attrs = (
             self.db.query(EntityAttribute)
             .filter(EntityAttribute.entity_id == entity_id)
             .all()
         )
-        return {a.name: (a.source_field or a.name) for a in attrs}
+        resolved = self.resolve_entity_asset(entity_id)
+        if not resolved:
+            return {}
+        asset, binding = resolved
+        mapping = {fm.get("attribute_id"): fm.get("source_column") for fm in binding.field_mappings or []}
+        columns = {c.get("name") for c in asset.schema_snapshot or []}
+        # Bindings are authoritative, with no source_field compatibility fallback.
+        return {a.name: col for a in attrs
+                if (col := mapping.get(a.id))
+                and (not columns or col in columns)}
 
-    def query_entity_data(
+    def get_query_attribute_names(self, entity_id: str) -> dict[str, str]:
+        return {attribute.id: attribute.name for attribute in self.db.query(EntityAttribute).filter_by(entity_id=entity_id).all()}
+
+    def get_query_attribute_specs(self, entity_id: str) -> dict[str, dict]:
+        return {attribute.name: {"type": attribute.type, "required": attribute.required,
+                                 "enum": (attribute.constraints_json or {}).get("enum")}
+                for attribute in self.db.query(EntityAttribute).filter_by(entity_id=entity_id).all()}
+
+    def resolve_entity_enrichments(self, entity_id: str) -> list[tuple[Asset, ObjectBinding]]:
+        return [(self.db.get(Asset, binding.asset_id), binding)
+                for binding in self._binding_repo.list(object_type_id=entity_id, role="enrichment")
+                if binding.status != "deprecated"]
+
+    def _source_sql(self, asset: Asset) -> str:
+        connection = self.db.get(Connection, asset.connection_id)
+        alias = "_enrichment" if connection and connection.type == "oracle" else "AS _enrichment"
+        return "<asset>" if asset.kind == "table" else f"({(asset.locator or {}).get('sql') or ''}) {alias}"
+
+    def _quote(self, asset: Asset, column: str) -> str:
+        connection = self.db.get(Connection, asset.connection_id)
+        if not connection:
+            raise ValueError("数据资产缺少有效连接")
+        if column not in {c.get("name") for c in asset.schema_snapshot or []}:
+            raise ValueError(f"源关联或映射字段不存在: {column}")
+        quote = ConnectorRegistry.get(connection.type).quote_identifier()
+        return quote + column.replace(quote, quote + quote) + quote
+
+    def _assert_unique_join_key(self, asset, binding, key, *, purpose):
+        column = self._quote(asset, key)
+        clauses = [f"{column} IS NOT NULL"]
+        if binding.filter_expr:
+            clauses.append(f"({binding.filter_expr})")
+        sql = f"SELECT {column}, COUNT(*) FROM {self._source_sql(asset)} WHERE {' AND '.join(clauses)} GROUP BY {column} HAVING COUNT(*) > 1"
+        connection = self.db.get(Connection, asset.connection_id)
+        sql += f" ORDER BY {column} OFFSET 0 ROWS FETCH NEXT 1 ROWS ONLY" if connection.type in {"oracle", "sqlserver"} else " LIMIT 1"
+        result = self._exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=sql, params={}, purpose=purpose, bypass_cache=True))
+        if result.rows:
+            raise ValueError(f"一对一关联列 {key} 存在重复匹配，请修复源数据后重试")
+
+    def _join_enrichment_rows(self, rows, columns, entries, *, purpose):
+        merged = [dict(zip(columns, row)) for row in rows]
+        for index, (asset, binding, mapping) in enumerate(entries):
+            hidden = f"__join_primary_{index}"
+            keys = list(dict.fromkeys(row.get(hidden) for row in merged if row.get(hidden) is not None))
+            lookup = {}
+            if keys:
+                key_column = self._quote(asset, binding.enrichment_source_column)
+                names = list(mapping)
+                physical = [self._quote(asset, mapping[name]) for name in names]
+                params = {f"join_{i}": value for i, value in enumerate(keys)}
+                placeholders = ', '.join(':' + name for name in params)
+                clauses = [f"{key_column} IN ({placeholders})"]
+                if binding.filter_expr:
+                    clauses.append(f"({binding.filter_expr})")
+                sql = f"SELECT {', '.join([key_column, *physical])} FROM {self._source_sql(asset)} WHERE {' AND '.join(clauses)}"
+                result = self._exec_svc.execute(ExecuteRequest(asset_id=asset.id, sql=sql, params=params, purpose=purpose, bypass_cache=True, apply_sensitivity=False))
+                for raw in result.rows:
+                    key = raw[0]
+                    if key in lookup:
+                        raise ValueError("一对一 enrichment 关联出现重复匹配，未返回不完整实例")
+                    lookup[key] = dict(zip(names, raw[1:]))
+            for row in merged:
+                row.update(lookup.get(row.get(hidden), {name: None for name in mapping}))
+        return merged
+
+    def query_entity_data(self, entity_id: str, *, filters: dict | None = None,
+                          fields: list[str] | None = None, limit: int = 20, offset: int = 0,
+                          purpose: str = "entity_data_query", valid_attrs: set[str] | None = None) -> dict:
+        try:
+            resolved = self.resolve_entity_asset(entity_id)
+            if not resolved:
+                return {"error": f"实体 '{entity_id}' 未绑定活动主数据资产"}
+            primary_asset, primary_binding = resolved
+            primary_map = self.get_attr_field_map(entity_id)
+            names_by_id = self.get_query_attribute_names(entity_id)
+            entries, all_map = [], dict(primary_map)
+            transformations = {names_by_id[m["attribute_id"]]: m["transform"]
+                               for m in primary_binding.field_mappings or []
+                               if m.get("attribute_id") in names_by_id and m.get("transform")}
+            self._validate_transform_keys(primary_asset, primary_binding)
+            for asset, binding in self.resolve_entity_enrichments(entity_id):
+                if asset:
+                    self._validate_transform_keys(asset, binding)
+                mapping = {names_by_id[m.get("attribute_id")]: m.get("source_column")
+                           for m in (binding.field_mappings or []) if m.get("attribute_id") in names_by_id}
+                for name in mapping:
+                    if name in all_map:
+                        raise ValueError(f"属性 {name} 被多个来源重复映射，请确认唯一属性来源")
+                all_map.update(mapping)
+                transformations.update({names_by_id[m["attribute_id"]]: m["transform"]
+                    for m in binding.field_mappings or [] if m.get("attribute_id") in names_by_id and m.get("transform")})
+                entries.append((asset, binding, mapping))
+            allowed = set(all_map) if valid_attrs is None else set(all_map) & valid_attrs
+            selected = list(dict.fromkeys(fields)) if fields else [name for name in all_map if name in allowed]
+            invalid = (set(selected) | set(filters or {})) - allowed
+            if invalid:
+                return {"error": f"属性未定义或未绑定: {', '.join(sorted(invalid))}"}
+            needed = set(selected) | set(filters or {})
+            transformations = {name: expression for name, expression in transformations.items() if name in needed}
+            entries = [entry for entry in entries if set(entry[2]) & needed]
+            if not entries and not transformations:
+                return self._query_primary_data(entity_id, filters=filters, fields=fields, limit=limit,
+                                                offset=offset, purpose=purpose, valid_attrs=valid_attrs)
+            limit, offset = max(1, min(int(limit), 200)), max(0, int(offset))
+            for asset, binding, mapping in entries:
+                if not asset or asset.status != "active" or binding.status != "active":
+                    raise ValueError("enrichment 数据绑定或资产尚未审核/已失效，请修复后重试")
+                if not binding.primary_source_column or not binding.enrichment_source_column:
+                    raise ValueError("enrichment 缺少明确关联列，请配置后重新审核")
+                self._quote(primary_asset, binding.primary_source_column)
+                self._quote(asset, binding.enrichment_source_column)
+                self._assert_unique_join_key(primary_asset, primary_binding, binding.primary_source_column, purpose=purpose + ".primary_key_check")
+                self._assert_unique_join_key(asset, binding, binding.enrichment_source_column, purpose=purpose + ".enrichment_key_check")
+            hidden_fields = {f"__join_primary_{i}": binding.primary_source_column for i, (_, binding, _) in enumerate(entries)}
+            primary_fields = list(dict.fromkeys(name for name in [*selected, *(filters or {})] if name in primary_map))
+            primary_filters = {k: v for k, v in (filters or {}).items() if k in primary_map and k not in transformations}
+            enrichment_filters = {k: v for k, v in (filters or {}).items() if k not in primary_map or k in transformations}
+            fetched_fields = [*primary_fields, *hidden_fields]
+            # Enrichment filtering must precede pagination. For distinct connections
+            # scan bounded pages; reaching the guard is an explicit error, never a
+            # silently truncated successful query.
+            scan_offset = 0 if enrichment_filters else offset
+            matches = []
+            while True:
+                batch_limit = 200 if enrichment_filters else limit
+                result = self._query_primary_data(entity_id, filters=primary_filters, fields=fetched_fields,
+                    limit=batch_limit, offset=scan_offset, purpose=purpose, _physical_fields=hidden_fields, _unredacted=True)
+                if result.get("error"):
+                    return result
+                rows = self._join_enrichment_rows(result["rows"], result["columns"], entries, purpose=purpose + ".enrichment")
+                from app.services.data_plane.mapping_transform import apply_transform
+                from app.services.agent_actions import validate_parameters
+                specs = self.get_query_attribute_specs(entity_id) if transformations else {}
+                for row in rows:
+                    for name, expression in transformations.items():
+                        row[name] = apply_transform(row.get(name), expression)
+                        if row[name] is None and specs.get(name, {}).get("required"):
+                            raise ValueError(f"transform 转换后必填属性 {name} 为空")
+                        if row[name] is not None:
+                            validate_parameters([{"name": name, **specs.get(name, {})}], {name: row[name]})
+                matches.extend(row for row in rows if all(row.get(key) == value for key, value in enrichment_filters.items()))
+                if not enrichment_filters or len(matches) >= offset + limit or len(result["rows"]) < batch_limit:
+                    break
+                scan_offset += batch_limit
+                if scan_offset >= 10000:
+                    raise ValueError("转换或跨源过滤扫描超过10000行，请先增加原始主资产过滤条件")
+            if enrichment_filters:
+                matches = matches[offset:offset + limit]
+            from app.services.data_plane.execute_service import _redact_value
+            levels = {name: (primary_asset.sensitivity_tags or {}).get(column) for name, column in primary_map.items()}
+            for asset, _, mapping in entries:
+                levels.update({name: (asset.sensitivity_tags or {}).get(column) for name, column in mapping.items()})
+            return {"columns": selected, "rows": [[_redact_value(row.get(name), levels[name]) if levels.get(name) else row.get(name)
+                for name in selected] for row in matches], "rowCount": len(matches)}
+        except Exception as exc:
+            logger.warning("entity enrichment query failed: %s", type(exc).__name__)
+            return {"error": f"实例关联查询失败：{exc}"}
+
+    @staticmethod
+    def _validate_transform_keys(asset, binding):
+        from app.services.data_plane.mapping_transform import validate_transform
+        primary_keys = set(getattr(binding, "asset_primary_keys", None) or asset.primary_key or []) | {getattr(binding, "id_column", None)}
+        for mapping in binding.field_mappings or []:
+            if mapping.get("transform"):
+                validate_transform(mapping["transform"])
+                if mapping.get("source_column") in primary_keys:
+                    raise ValueError("主键字段禁止 transform，请修复旧绑定后重新审核")
+
+    def _query_primary_data(
         self,
         entity_id: str,
         *,
         filters: dict | None = None,
         fields: list[str] | None = None,
         limit: int = 20,
+        offset: int = 0,
         purpose: str = "entity_data_query",
         valid_attrs: set[str] | None = None,
+        _physical_fields: dict[str, str] | None = None,
+        _unredacted: bool = False,
     ) -> dict:
         result = self.resolve_entity_asset(entity_id)
         if not result:
             return {"error": f"实体 '{entity_id}' 未绑定数据资产，请先在数据集成中创建 ObjectBinding"}
         asset, binding = result
         table_name = self.get_table_name(asset)
-        if not table_name:
+        if not table_name and asset.kind != "sql_view":
             return {"error": f"资产 '{asset.name}' 未配置表名（locator.table 为空）"}
 
         try:
-            limit = min(int(limit), 200)
+            limit = max(1, min(int(limit), 200))
+            offset = max(0, int(offset))
         except (TypeError, ValueError):
-            limit = 20
+            return {"error": "limit/offset 必须为整数"}
 
         # 属性名 → 物理字段名翻译层：本体对外用属性名，下发 SQL 必须用物理列名
-        field_map = self.get_attr_field_map(entity_id)
+        field_map = {**self.get_attr_field_map(entity_id), **(_physical_fields or {})}
 
-        select_cols = "*"
-        if fields:
-            phys_fields = [
-                field_map.get(f, f)
-                for f in fields
-                if not valid_attrs or f in valid_attrs
-            ]
-            if phys_fields:
-                select_cols = ", ".join(phys_fields)
-
-        sql = f"SELECT {select_cols} FROM {table_name}"
+        allowed = set(field_map) if valid_attrs is None else set(field_map) & valid_attrs
+        selected = list(dict.fromkeys(fields)) if fields else [name for name in field_map if name in allowed]
+        invalid = (set(selected) | set(filters or {})) - allowed
+        if invalid:
+            return {"error": f"属性未定义或未绑定: {', '.join(sorted(invalid))}"}
+        if not selected:
+            return {"error": "对象没有可查询的已映射属性"}
+        connection = self.db.get(Connection, asset.connection_id) if asset.connection_id else None
+        if not connection:
+            return {"error": "数据资产缺少有效连接"}
+        quote = ConnectorRegistry.get(connection.type).quote_identifier()
+        def quoted(name):
+            return quote + name.replace(quote, quote + quote) + quote
+        select_cols = ", ".join(quoted(field_map[f]) for f in selected)
+        alias = "_entity" if connection.type == "oracle" else "AS _entity"
+        source = "<asset>" if asset.kind == "table" else f"({(asset.locator or {}).get('sql') or ''}) {alias}"
+        sql = f"SELECT {select_cols} FROM {source}"
 
         where_parts: list[str] = []
         params: dict[str, Any] = {}
         for i, (attr_name, value) in enumerate((filters or {}).items()):
-            if valid_attrs and attr_name not in valid_attrs:
-                continue
-            phys_col = field_map.get(attr_name, attr_name)
+            phys_col = quoted(field_map[attr_name])
             param_key = f"p{i}"
-            where_parts.append(f"{phys_col} = :{param_key}")
-            params[param_key] = value
+            if value is None:
+                where_parts.append(f"{phys_col} IS NULL")
+            else:
+                where_parts.append(f"{phys_col} = :{param_key}")
+                params[param_key] = value
+
+        if binding.filter_expr:
+            where_parts.append(f"({binding.filter_expr})")
 
         if where_parts:
             sql += " WHERE " + " AND ".join(where_parts)
-        sql += f" LIMIT {limit}"
+        order_column = binding.id_column
+        if order_column and order_column in {c.get("name") for c in asset.schema_snapshot or []}:
+            sql += f" ORDER BY {quoted(order_column)}"
+        if connection.type in ("oracle", "sqlserver"):
+            if connection.type == "sqlserver" and not order_column:
+                sql += " ORDER BY (SELECT NULL)"
+            sql += f" OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY"
+        else:
+            sql += f" LIMIT {limit} OFFSET {offset}"
 
         try:
             exec_result = self._exec_svc.execute(ExecuteRequest(
-                asset_id=asset.id, sql=sql, params=params, purpose=purpose,
+                asset_id=asset.id, sql=sql, params=params, purpose=purpose, bypass_cache=bool(_physical_fields) or _unredacted,
+                apply_sensitivity=not (bool(_physical_fields) or _unredacted),
             ))
             return {
-                "columns": exec_result.columns,
+                "columns": selected,
                 "rows": exec_result.rows,
                 "rowCount": exec_result.rows_returned,
             }

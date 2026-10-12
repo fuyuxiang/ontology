@@ -3,7 +3,7 @@
     <!-- 顶部 Banner，与本体列表风格一致 -->
     <div class="page-banner">
       <div class="page-banner__content">
-        <h1 class="page-banner__title">本体服务</h1>
+        <h1 class="page-banner__title">{{ text('本体服务') }}</h1>
         <p class="page-banner__desc">基于 MCP 协议对外暴露本体查询、数据探索与 Python 运行时能力，支持 Claude Desktop、Cursor 等 AI 客户端直接接入</p>
       </div>
       <div class="page-banner__right">
@@ -37,6 +37,8 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../composables/useProductText'
+const { text } = useProductText()
 import { ref, onBeforeUnmount } from 'vue'
 import { message } from 'ant-design-vue'
 import OverviewTab from './mcp/OverviewTab.vue'
@@ -49,7 +51,7 @@ const tabs = [
 ]
 const activeTab = ref('overview')
 
-const endpoint = `${window.location.origin}/api/v1/mcp`
+const endpoint = `${new URL(import.meta.env.VITE_API_BASE_URL || '/api/v1', window.location.origin).toString().replace(/\/$/, '')}/mcp`
 const copied = ref(false)
 let copyTimer: ReturnType<typeof setTimeout> | undefined
 

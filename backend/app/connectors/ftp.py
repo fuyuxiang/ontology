@@ -26,10 +26,7 @@ def _connect_ftp(host: str, port: int, params: dict, credential: dict | None):
     ftp.connect(host=host, port=port or 21, timeout=8)
     ftp.login(user=user, passwd=pwd)
     if use_tls:
-        try:
-            ftp.prot_p()
-        except Exception:
-            pass
+        ftp.prot_p()
     if not params.get("passive", True):
         ftp.set_pasv(False)
     return ftp

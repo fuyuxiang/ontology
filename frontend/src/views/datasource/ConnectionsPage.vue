@@ -1,35 +1,34 @@
 <template>
   <div class="cp-page">
     <div class="cp-page__header">
-      <h1 class="cp-page__title">数据接入</h1>
-      <p class="cp-page__subtitle">统一管理数据源连接、凭据与访问权限。支持数据库 / 对象存储 / 文件传输 / 消息队列 / API。</p>
+      <h1 class="cp-page__title">{{ text("数据接入") }}</h1>
+      <p class="cp-page__subtitle">{{ text("统一管理数据源连接、凭据与访问权限。支持数据库 / 对象存储 / 文件传输 / 消息队列 / API。") }}</p>
     </div>
 
     <!-- 统计 -->
     <div class="cp-stats">
-      <a-statistic title="连接总数" :value="store.stats.total">
+      <a-statistic :title="text('连接总数')" :value="store.stats.total">
         <template #prefix><DatabaseOutlined style="color:#3b82f6" /></template>
       </a-statistic>
-      <a-statistic title="已启用" :value="store.stats.enabled" :value-style="{ color: '#10b981' }">
+      <a-statistic :title="text('已启用')" :value="store.stats.enabled" :value-style="{ color: '#10b981' }">
         <template #prefix><CheckCircleOutlined style="color:#10b981" /></template>
       </a-statistic>
-      <a-statistic title="已禁用" :value="store.stats.stopped" :value-style="{ color: '#6b7280' }" />
-      <a-statistic v-if="store.stats.error > 0" title="异常" :value="store.stats.error"
+      <a-statistic :title="text('已禁用')" :value="store.stats.stopped" :value-style="{ color: '#6b7280' }" />
+      <a-statistic v-if="store.stats.error > 0" :title="text('异常')" :value="store.stats.error"
                    :value-style="{ color: '#ef4444' }" />
       <span class="cp-spacer" />
-      <a-button type="primary" @click="openCreate">
-        <template #icon><PlusOutlined /></template>新增数据源
-      </a-button>
+      <a-button type="primary" @click="openCreate" :disabled="!canEdit">
+        <template #icon><PlusOutlined /></template>{{ text("新增数据源") }} </a-button>
     </div>
 
     <!-- 工具栏 -->
     <div class="cp-toolbar">
-      <a-input-search v-model:value="search" placeholder="搜索连接名称 / 主机..." style="width:300px"
+      <a-input-search v-model:value="search" :placeholder="text('搜索连接名称 / 主机...')" style="width:300px"
                       allow-clear @search="onSearch" @change="onSearch" />
       <a-segmented v-model:value="categoryFilter" :options="categoryFilters" @change="onSearch" />
     </div>
-    <a-alert v-if="store.error" type="error" show-icon message="数据源加载失败" :description="store.error" class="cp-load-error">
-      <template #action><a-button size="small" @click="load">重试</a-button></template>
+    <a-alert v-if="store.error" type="error" show-icon :message="text('数据源加载失败')" :description="store.error" class="cp-load-error">
+      <template #action><a-button size="small" @click="load">{{ text("重试") }}</a-button></template>
     </a-alert>
 
     <!-- 表格 -->
@@ -53,51 +52,48 @@
           </span>
         </template>
         <template v-else-if="column.key === 'writable'">
-          <a-tag v-if="record.writable" color="orange">可写</a-tag>
-          <a-tag v-else color="default">只读</a-tag>
+          <a-tag v-if="record.writable" color="orange">{{ text("可写") }}</a-tag>
+          <a-tag v-else color="default">{{ text("只读") }}</a-tag>
         </template>
         <template v-else-if="column.key === 'actions'">
           <a-space :size="4" wrap>
             <a-button type="link" size="small" :loading="testing === record.id" :disabled="!!testing && testing !== record.id" @click="testOne(record as Connection)">
-              <template #icon><LinkOutlined /></template>测试
-            </a-button>
+              <template #icon><LinkOutlined /></template>{{ text("测试") }} </a-button>
             <a-button type="link" size="small" @click="openBrowser(record as Connection)">
-              <template #icon><TableOutlined /></template>列表
-            </a-button>
-            <a-button type="link" size="small" @click="openEdit(record as Connection)">编辑</a-button>
-            <a-button type="link" size="small" danger @click="openDelete(record as Connection)">删除</a-button>
+              <template #icon><TableOutlined /></template>{{ text("列表") }} </a-button>
+            <a-button type="link" size="small" @click="openEdit(record as Connection)" :disabled="!canEdit">{{ text("编辑") }}</a-button>
+            <a-button type="link" size="small" danger @click="openDelete(record as Connection)" :disabled="!canDelete">{{ text("删除") }}</a-button>
           </a-space>
         </template>
       </template>
       <template #emptyText>
-        <a-empty v-if="!store.error" :description="search || categoryFilter !== 'all' ? '没有匹配的数据源，请调整搜索或筛选条件' : '暂无数据源，点击「新增数据源」添加'" />
+        <a-empty v-if="!store.error" :description="search || categoryFilter !== 'all' ? text('没有匹配的数据源，请调整搜索或筛选条件') : text('暂无数据源，点击「新增数据源」添加')" />
       </template>
     </a-table>
 
     <!-- 删除确认（按资产引用数提示，支持级联） -->
-    <a-modal :open="del_.open" title="删除数据源" :confirm-loading="del_.loading"
-             :ok-text="del_.cascade ? '级联删除' : '删除'" ok-type="danger" cancel-text="取消"
+    <a-modal :open="del_.open" :title="text('删除数据源')" :confirm-loading="del_.loading"
+             :ok-text="del_.cascade ? text('级联删除') : text('删除')" ok-type="danger" :cancel-text="text('取消')"
              :ok-button-props="{ disabled: del_.checking || !!del_.error || (del_.assetCount > 0 && !del_.cascade) }"
              :cancel-button-props="{ disabled: del_.loading }" :closable="!del_.loading" :mask-closable="!del_.loading" :keyboard="!del_.loading"
              @ok="confirmDelete" @cancel="del_.open = false"
              @update:open="(v) => del_.open = v" destroy-on-close>
       <a-spin :spinning="del_.checking">
-        <p>确认删除数据源「<b>{{ del_.name }}</b>」？</p>
+        <p>{{ text("确认删除数据源「") }}<b>{{ del_.name }}</b>」？</p>
         <a-alert v-if="del_.error" type="error" show-icon :message="del_.error">
-          <template #action><a-button size="small" @click="checkDeleteAssets">重试</a-button></template>
+          <template #action><a-button size="small" @click="checkDeleteAssets">{{ text("重试") }}</a-button></template>
         </a-alert>
         <template v-else-if="del_.assetCount > 0">
-          <p style="color:#ef4444">该数据源下有 <b>{{ del_.assetCount }}</b> 个资产。直接删除会被拒绝。</p>
-          <a-checkbox v-model:checked="del_.cascade">
-            同时删除这 {{ del_.assetCount }} 个资产（含对象绑定、质量规则等下游引用，<b>不可恢复</b>）
+          <p style="color:#ef4444">{{ text("该数据源下有") }} <b>{{ del_.assetCount }}</b> {{ text("个资产。直接删除会被拒绝。") }}</p>
+          <a-checkbox v-model:checked="del_.cascade"> {{ text("同时删除这") }} {{ del_.assetCount }} {{ text("个资产（含对象绑定、质量规则等下游引用，") }}<b>{{ text("不可恢复") }}</b>）
           </a-checkbox>
         </template>
-        <p v-else-if="!del_.checking" style="color:#6b7280">该数据源下没有资产，可直接删除。</p>
+        <p v-else-if="!del_.checking" style="color:#6b7280">{{ text("该数据源下没有资产，可直接删除。") }}</p>
       </a-spin>
     </a-modal>
 
     <!-- 第一步：选大类（仅新建时显示） -->
-    <a-modal :open="picker.open" title="选择数据源类型" :width="720" :footer="null"
+    <a-modal :open="picker.open" :title="text('选择数据源类型')" :width="720" :footer="null"
              @update:open="(v) => picker.open = v" destroy-on-close>
       <div class="cp-cat-grid">
         <button v-for="cat in CATEGORIES" :key="cat.key" type="button" class="cp-cat-card"
@@ -105,48 +101,51 @@
              :class="{ 'cp-cat-card--disabled': !(capabilities[cat.key] && capabilities[cat.key].length) }"
              @click="selectCategory(cat.key)">
           <div class="cp-cat-card__icon" :style="{ background: cat.color }">{{ cat.glyph }}</div>
-          <div class="cp-cat-card__title">{{ cat.label }}</div>
-          <div class="cp-cat-card__sub">{{ (capabilities[cat.key] || []).join(' · ') || '后端未启用' }}</div>
-          <div class="cp-cat-card__hint">{{ cat.hint }}</div>
+          <div class="cp-cat-card__title">{{ text(cat.label) }}</div>
+          <div class="cp-cat-card__sub">{{ (capabilities[cat.key] || []).join(' · ') || text("后端未启用") }}</div>
+          <div class="cp-cat-card__hint">{{ text(cat.hint) }}</div>
         </button>
       </div>
     </a-modal>
 
     <!-- 第二步：表单抽屉（新建/编辑共用） -->
-    <a-drawer :open="modal.open" :title="modalTitle" width="560"
+    <a-drawer :open="modal.open" :title="modalTitle" width="min(560px, 100vw)"
               :closable="!saving" :mask-closable="!saving" :keyboard="!saving"
               @update:open="(v) => modal.open = v" destroy-on-close>
       <a-form layout="vertical">
-        <a-form-item label="连接名称 *">
+        <a-form-item :label="text('连接名称 *')">
           <a-input v-model:value="form.name" placeholder="example_conn" :disabled="!!modal.editingId" />
         </a-form-item>
         <a-row :gutter="12">
           <a-col :span="12">
-            <a-form-item label="分类">
+            <a-form-item :label="text('分类')">
               <a-input :value="categoryLabel(form.category)" disabled />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="具体类型 *">
+            <a-form-item :label="text('具体类型 *')">
               <a-select v-model:value="form.type" :options="typeOptionsForCategory" :disabled="!!modal.editingId" />
             </a-form-item>
           </a-col>
         </a-row>
 
         <!-- ─── 数据库 ─── -->
-        <template v-if="form.category === 'database'">
+        <template v-if="form.category === 'database' && form.type === 'sqlite'">
+          <a-form-item :label="text('SQLite 文件绝对路径 *')"><a-input v-model:value="form.database" placeholder="/absolute/path/source.db" /></a-form-item>
+        </template>
+        <template v-else-if="form.category === 'database'">
           <a-row :gutter="12">
             <a-col :span="16">
-              <a-form-item label="主机 *"><a-input v-model:value="form.host" placeholder="127.0.0.1" /></a-form-item>
+              <a-form-item :label="text('主机 *')"><a-input v-model:value="form.host" placeholder="127.0.0.1" /></a-form-item>
             </a-col>
             <a-col :span="8">
-              <a-form-item label="端口"><a-input-number v-model:value="form.port" style="width:100%" /></a-form-item>
+              <a-form-item :label="text('端口')"><a-input-number v-model:value="form.port" style="width:100%" /></a-form-item>
             </a-col>
           </a-row>
-          <a-form-item label="数据库 / Schema"><a-input v-model:value="form.database" /></a-form-item>
+          <a-form-item :label="text('数据库 / Schema')"><a-input v-model:value="form.database" /></a-form-item>
           <a-row :gutter="12">
-            <a-col :span="12"><a-form-item label="用户名 *"><a-input v-model:value="form.username" /></a-form-item></a-col>
-            <a-col :span="12"><a-form-item :label="modal.editingId ? '密码（留空不改）' : '密码 *'">
+            <a-col :span="12"><a-form-item :label="text('用户名 *')"><a-input v-model:value="form.username" /></a-form-item></a-col>
+            <a-col :span="12"><a-form-item :label="modal.editingId ? text('密码（留空不改）') : text('密码 *')">
               <a-input-password v-model:value="form.password" /></a-form-item></a-col>
           </a-row>
         </template>
@@ -154,7 +153,7 @@
         <!-- ─── 对象存储 (S3/OSS/...) ─── -->
         <template v-else-if="form.category === 'object_storage'">
           <a-form-item label="Endpoint">
-            <a-input v-model:value="paramStr.endpoint" placeholder="https://s3.amazonaws.com 或留空走 AWS 默认" />
+            <a-input v-model:value="paramStr.endpoint" :placeholder="text('https://s3.amazonaws.com 或留空走 AWS 默认')" />
           </a-form-item>
           <a-row :gutter="12">
             <a-col :span="12">
@@ -164,14 +163,14 @@
               <a-form-item label="Bucket *"><a-input v-model:value="paramStr.bucket" /></a-form-item>
             </a-col>
           </a-row>
-          <a-form-item label="Path-Style 寻址">
+          <a-form-item :label="text('Path-Style 寻址')">
             <a-switch v-model:checked="paramBool.path_style" />
-            <span class="cp-hint">非 AWS 兼容服务（MinIO 等）通常需要打开</span>
+            <span class="cp-hint">{{ text("非 AWS 兼容服务（MinIO 等）通常需要打开") }}</span>
           </a-form-item>
           <a-row :gutter="12">
-            <a-col :span="12"><a-form-item :label="modal.editingId ? 'Access Key（留空不改）' : 'Access Key *'">
+            <a-col :span="12"><a-form-item :label="modal.editingId ? text('Access Key（留空不改）') : 'Access Key *'">
               <a-input v-model:value="credStr.access_key" /></a-form-item></a-col>
-            <a-col :span="12"><a-form-item :label="modal.editingId ? 'Secret Key（留空不改）' : 'Secret Key *'">
+            <a-col :span="12"><a-form-item :label="modal.editingId ? text('Secret Key（留空不改）') : 'Secret Key *'">
               <a-input-password v-model:value="credStr.secret_key" /></a-form-item></a-col>
           </a-row>
         </template>
@@ -179,19 +178,19 @@
         <!-- ─── 文件传输 (FTP/SFTP) ─── -->
         <template v-else-if="form.category === 'file_transfer'">
           <a-row :gutter="12">
-            <a-col :span="16"><a-form-item label="主机 *"><a-input v-model:value="paramStr.host" /></a-form-item></a-col>
-            <a-col :span="8"><a-form-item label="端口"><a-input-number v-model:value="paramNum.port"
+            <a-col :span="16"><a-form-item :label="text('主机 *')"><a-input v-model:value="paramStr.host" /></a-form-item></a-col>
+            <a-col :span="8"><a-form-item :label="text('端口')"><a-input-number v-model:value="paramNum.port"
                                                                        :placeholder="form.type === 'sftp' ? '22' : '21'"
                                                                        style="width:100%" /></a-form-item></a-col>
           </a-row>
-          <a-form-item label="根目录"><a-input v-model:value="paramStr.root_path" placeholder="/" /></a-form-item>
-          <a-form-item v-if="form.type === 'ftp'" label="启用 FTPS">
+          <a-form-item :label="text('根目录')"><a-input v-model:value="paramStr.root_path" placeholder="/" /></a-form-item>
+          <a-form-item v-if="form.type === 'ftp'" :label="text('启用 FTPS')">
             <a-switch v-model:checked="paramBool.use_tls" />
           </a-form-item>
           <a-row :gutter="12">
-            <a-col :span="12"><a-form-item label="用户名">
+            <a-col :span="12"><a-form-item :label="text('用户名')">
               <a-input v-model:value="credStr.username" placeholder="anonymous" /></a-form-item></a-col>
-            <a-col :span="12"><a-form-item :label="modal.editingId ? '密码（留空不改）' : '密码'">
+            <a-col :span="12"><a-form-item :label="modal.editingId ? text('密码（留空不改）') : text('密码')">
               <a-input-password v-model:value="credStr.password" /></a-form-item></a-col>
           </a-row>
         </template>
@@ -205,9 +204,9 @@
             <a-select v-model:value="paramStr.security_protocol" :options="kafkaSecurityOptions" />
           </a-form-item>
           <a-row v-if="paramStr.security_protocol && paramStr.security_protocol !== 'PLAINTEXT'" :gutter="12">
-            <a-col :span="12"><a-form-item label="SASL 用户">
+            <a-col :span="12"><a-form-item :label="text('SASL 用户')">
               <a-input v-model:value="credStr.username" /></a-form-item></a-col>
-            <a-col :span="12"><a-form-item :label="modal.editingId ? 'SASL 密码（留空不改）' : 'SASL 密码'">
+            <a-col :span="12"><a-form-item :label="modal.editingId ? text('SASL 密码（留空不改）') : text('SASL 密码')">
               <a-input-password v-model:value="credStr.password" /></a-form-item></a-col>
           </a-row>
         </template>
@@ -217,25 +216,25 @@
           <a-form-item label="Base URL *">
             <a-input v-model:value="paramStr.base_url" placeholder="https://api.example.com/v1" />
           </a-form-item>
-          <a-form-item label="探测路径">
-            <a-input v-model:value="paramStr.probe_path" placeholder="/health 或 /" />
+          <a-form-item :label="text('探测路径')">
+            <a-input v-model:value="paramStr.probe_path" :placeholder="text('/health 或 /')" />
           </a-form-item>
-          <a-form-item label="认证方式">
+          <a-form-item :label="text('认证方式')">
             <a-select v-model:value="paramStr.auth_type" :options="apiAuthOptions" />
           </a-form-item>
-          <a-form-item v-if="paramStr.auth_type === 'bearer'" :label="modal.editingId ? 'Bearer Token（留空不改）' : 'Bearer Token'">
+          <a-form-item v-if="paramStr.auth_type === 'bearer'" :label="modal.editingId ? text('Bearer Token（留空不改）') : 'Bearer Token'">
             <a-input-password v-model:value="credStr.token" />
           </a-form-item>
           <a-row v-else-if="paramStr.auth_type === 'basic'" :gutter="12">
-            <a-col :span="12"><a-form-item label="用户名"><a-input v-model:value="credStr.username" /></a-form-item></a-col>
-            <a-col :span="12"><a-form-item :label="modal.editingId ? '密码（留空不改）' : '密码'">
+            <a-col :span="12"><a-form-item :label="text('用户名')"><a-input v-model:value="credStr.username" /></a-form-item></a-col>
+            <a-col :span="12"><a-form-item :label="modal.editingId ? text('密码（留空不改）') : text('密码')">
               <a-input-password v-model:value="credStr.password" /></a-form-item></a-col>
           </a-row>
           <template v-else-if="paramStr.auth_type === 'api_key'">
-            <a-form-item label="Header 名称">
+            <a-form-item :label="text('Header 名称')">
               <a-input v-model:value="credStr.key" placeholder="X-API-Key" />
             </a-form-item>
-            <a-form-item :label="modal.editingId ? 'API Key 值（留空不改）' : 'API Key 值'">
+            <a-form-item :label="modal.editingId ? text('API Key 值（留空不改）') : text('API Key 值')">
               <a-input-password v-model:value="credStr.value" />
             </a-form-item>
           </template>
@@ -245,57 +244,55 @@
         <a-divider />
         <a-row :gutter="12">
           <a-col :span="8">
-            <a-form-item label="池容量"><a-input-number v-model:value="form.pool_size" :min="1" :max="32" style="width:100%" /></a-form-item>
+            <a-form-item :label="text('池容量')"><a-input-number v-model:value="form.pool_size" :min="1" :max="32" style="width:100%" /></a-form-item>
           </a-col>
           <a-col :span="8">
-            <a-form-item label="QPS 限流"><a-input-number v-model:value="form.rate_limit_qps" :min="1" :max="500" style="width:100%" /></a-form-item>
+            <a-form-item :label="text('QPS 限流')"><a-input-number v-model:value="form.rate_limit_qps" :min="1" :max="500" style="width:100%" /></a-form-item>
           </a-col>
           <a-col :span="8" v-if="form.category === 'database'">
-            <a-form-item label="允许写入"><a-switch v-model:checked="form.writable" /></a-form-item>
+            <a-form-item :label="text('允许写入')"><a-switch v-model:checked="form.writable" /></a-form-item>
           </a-col>
         </a-row>
-        <a-form-item label="描述"><a-textarea v-model:value="form.description" :rows="2" /></a-form-item>
+        <a-form-item :label="text('描述')"><a-textarea v-model:value="form.description" :rows="2" /></a-form-item>
         <a-form-item>
-          <a-button type="primary" :loading="saving" @click="save">保存</a-button>
+          <a-button type="primary" :loading="saving" @click="save" :disabled="!canEdit">{{ text("保存") }}</a-button>
         </a-form-item>
       </a-form>
     </a-drawer>
 
     <!-- 浏览弹窗（按 category 切换内容） -->
-    <a-modal :open="browser.open" :title="`浏览：${browser.title}`" :width="720" :footer="null"
+    <a-modal :open="browser.open" :title="text('浏览：{name}', { name: browser.title })" :width="720" :footer="null"
              :closable="!bulkSaving && !singleSaving" :mask-closable="!bulkSaving && !singleSaving" :keyboard="!bulkSaving && !singleSaving"
              @update:open="(v) => browser.open = v">
       <a-spin :spinning="browser.loading || bulkSaving">
         <a-alert v-if="browser.error" type="error" show-icon :message="browser.error" style="margin-bottom:12px">
-          <template #action><a-button size="small" @click="reloadBrowser">重试</a-button></template>
+          <template #action><a-button size="small" @click="reloadBrowser">{{ text("重试") }}</a-button></template>
         </a-alert>
         <!-- 批量操作工具条（除 API 外通用） -->
         <div v-if="browser.category !== 'api'" class="cp-bulk-bar">
-          <a-checkbox :checked="allSelected" :indeterminate="someSelected" @change="toggleAll">
-            全选 <span class="cp-muted">（已选 {{ browser.selected.length }}/{{ totalRows }}）</span>
+          <a-checkbox :checked="allSelected" :indeterminate="someSelected" @change="toggleAll"> {{ text("全选") }} <span class="cp-muted">{{ text("（已选") }} {{ browser.selected.length }}/{{ totalRows }}）</span>
           </a-checkbox>
           <span class="cp-spacer" />
-          <a-button type="primary" :disabled="browser.loading || !!singleSaving || browser.selected.length === 0"
-                    :loading="bulkSaving" @click="bulkRegister">
-            批量注册为 Asset（{{ browser.selected.length }}）
+          <a-button type="primary" :disabled="!canEdit || browser.loading || !!singleSaving || browser.selected.length === 0"
+                    :loading="bulkSaving" @click="bulkRegister"> {{ text("批量注册为 Asset（") }}{{ browser.selected.length }}）
           </a-button>
         </div>
 
         <!-- 数据库 -->
         <a-tabs v-if="browser.category === 'database'">
-          <a-tab-pane key="dbs" tab="数据库">
+          <a-tab-pane key="dbs" :tab="text('数据库')">
             <a-list size="small" :data-source="browser.databases">
               <template #renderItem="{ item }"><a-list-item>{{ item }}</a-list-item></template>
             </a-list>
           </a-tab-pane>
-          <a-tab-pane key="tables" :tab="`表（${browser.tables.length}）`">
+          <a-tab-pane key="tables" :tab="text('表（{count}）', { count: browser.tables.length })">
             <a-list size="small" :data-source="browser.tables">
               <template #renderItem="{ item }">
                 <a-list-item>
                   <a-checkbox :checked="browser.selected.includes(item)" @change="toggleOne(item)">
                     {{ item }}
                   </a-checkbox>
-                  <a-button type="link" size="small" :loading="singleSaving === item" :disabled="!!singleSaving && singleSaving !== item" @click="registerAsAsset(item)">注册为 Asset</a-button>
+                  <a-button type="link" size="small" :loading="singleSaving === item" :disabled="!canEdit || !!singleSaving && singleSaving !== item" @click="registerAsAsset(item)">{{ text("注册为 Asset") }}</a-button>
                 </a-list-item>
               </template>
             </a-list>
@@ -304,7 +301,7 @@
 
         <!-- 对象存储 -->
         <div v-else-if="browser.category === 'object_storage'">
-          <a-input-search v-model:value="browser.prefix" placeholder="prefix 前缀" enter-button="筛选"
+          <a-input-search v-model:value="browser.prefix" :placeholder="text('prefix 前缀')" :enter-button="text('筛选')"
                           @search="reloadBrowser" style="margin-bottom:12px" />
           <a-list size="small" :data-source="browser.objects">
             <template #renderItem="{ item }">
@@ -313,7 +310,7 @@
                   <code class="cp-mono">{{ item.key }}</code>
                   <span class="cp-muted" style="margin-left:8px">{{ formatSize(item.size) }}</span>
                 </a-checkbox>
-                <a-button type="link" size="small" :loading="singleSaving === item.key" :disabled="!!singleSaving && singleSaving !== item.key" @click="registerObjectAsAsset(item)">注册为 Asset</a-button>
+                <a-button type="link" size="small" :loading="singleSaving === item.key" :disabled="!canEdit || !!singleSaving && singleSaving !== item.key" @click="registerObjectAsAsset(item)">{{ text("注册为 Asset") }}</a-button>
               </a-list-item>
             </template>
           </a-list>
@@ -321,7 +318,7 @@
 
         <!-- 文件传输 -->
         <div v-else-if="browser.category === 'file_transfer'">
-          <a-input-search v-model:value="browser.path" placeholder="路径" enter-button="进入"
+          <a-input-search v-model:value="browser.path" :placeholder="text('路径')" :enter-button="text('进入')"
                           @search="reloadBrowser" style="margin-bottom:12px" />
           <a-list size="small" :data-source="browser.paths">
             <template #renderItem="{ item }">
@@ -336,9 +333,7 @@
                   </span>
                   <span class="cp-muted" style="margin-left:8px">{{ formatSize(item.size) }}</span>
                 </span>
-                <a-button v-if="!item.is_dir" type="link" size="small" :loading="singleSaving === item.name" :disabled="!!singleSaving && singleSaving !== item.name" @click="registerPathAsAsset(item)">
-                  注册为 Asset
-                </a-button>
+                <a-button v-if="!item.is_dir" type="link" size="small" :loading="singleSaving === item.name" :disabled="!canEdit || !!singleSaving && singleSaving !== item.name" @click="registerPathAsAsset(item)"> {{ text("注册为 Asset") }} </a-button>
               </a-list-item>
             </template>
           </a-list>
@@ -352,7 +347,7 @@
                 <a-checkbox :checked="browser.selected.includes(item)" @change="toggleOne(item)">
                   <code class="cp-mono">{{ item }}</code>
                 </a-checkbox>
-                <a-button type="link" size="small" :loading="singleSaving === item" :disabled="!!singleSaving && singleSaving !== item" @click="registerTopicAsAsset(item)">注册为 Asset</a-button>
+                <a-button type="link" size="small" :loading="singleSaving === item" :disabled="!canEdit || !!singleSaving && singleSaving !== item" @click="registerTopicAsAsset(item)">{{ text("注册为 Asset") }}</a-button>
               </a-list-item>
             </template>
           </a-list>
@@ -360,8 +355,8 @@
 
         <!-- API -->
         <div v-else-if="browser.category === 'api'" class="cp-empty">
-          <p>API 类型暂不支持自动列举端点。</p>
-          <p>请直接在「资产目录」中注册为 document 资产，关联此连接。</p>
+          <p>{{ text("API 类型暂不支持自动列举端点。") }}</p>
+          <p>{{ text("请直接在「资产目录」中注册为 document 资产，关联此连接。") }}</p>
         </div>
       </a-spin>
     </a-modal>
@@ -369,6 +364,11 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from "../../composables/useProductText"
+const { text } = useProductText()
+
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit, canDelete } = useManagementPermission('entity:write')
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import {
   Alert as AAlert, Button as AButton, Checkbox as ACheckbox, Col as ACol, Divider as ADivider, Drawer as ADrawer, Empty as AEmpty,
@@ -411,19 +411,19 @@ const CATEGORIES: { key: ConnectionCategory; label: string; glyph: string; color
 ]
 
 const categoryFilters = computed(() => [
-  { label: '全部', value: 'all' },
-  ...CATEGORIES.map(c => ({ label: c.label, value: c.key })),
+  { label: text("全部"), value: 'all' },
+  ...CATEGORIES.map(c => ({ label: text(c.label), value: c.key })),
 ])
 
-const columns = [
-  { title: '名称', dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
-  { title: '分类', key: 'category', width: 110 },
-  { title: '类型', key: 'type', width: 110 },
-  { title: '端点', key: 'endpoint', width: 230, ellipsis: true },
-  { title: '权限', key: 'writable', width: 80 },
-  { title: '状态', key: 'status', width: 110 },
-  { title: '操作', key: 'actions', width: 280, fixed: 'right' as const },
-]
+const columns = computed(() => [
+  { title: text("名称"), dataIndex: 'name', key: 'name', width: 200, ellipsis: true },
+  { title: text("分类"), key: 'category', width: 110 },
+  { title: text("类型"), key: 'type', width: 110 },
+  { title: text("端点"), key: 'endpoint', width: 230, ellipsis: true },
+  { title: text("权限"), key: 'writable', width: 80 },
+  { title: text("状态"), key: 'status', width: 110 },
+  { title: text("操作"), key: 'actions', width: 280, fixed: 'right' as const },
+])
 
 const testing = ref<string | null>(null)
 const saving = ref(false)
@@ -507,7 +507,7 @@ function toggleOne(key: string) {
   else browser.selected.push(key)
 }
 
-const modalTitle = computed(() => (modal.editingId ? '编辑数据源' : '新增数据源'))
+const modalTitle = computed(() => (modal.editingId ? text("编辑数据源") : text("新增数据源")))
 
 const typeOptionsForCategory = computed(() => {
   const types = capabilities.value[form.category] || []
@@ -520,12 +520,12 @@ const kafkaSecurityOptions = [
   { label: 'SASL_SSL', value: 'SASL_SSL' },
 ]
 
-const apiAuthOptions = [
-  { label: '无', value: 'none' },
+const apiAuthOptions = computed(() => [
+  { label: text("无"), value: 'none' },
   { label: 'Bearer Token', value: 'bearer' },
   { label: 'Basic', value: 'basic' },
   { label: 'API Key (Header)', value: 'api_key' },
-]
+])
 
 async function load() { await store.fetchList(buildFilters()) }
 function buildFilters() {
@@ -615,7 +615,7 @@ async function save() {
     if (modal.editingId) {
       const payload: Record<string, unknown> = {
         host: form.host, port: form.port, database: form.database,
-        params: buildParams(),
+        params: form.type === 'sqlite' ? { database: form.database } : buildParams(),
         pool_size: form.pool_size, rate_limit_qps: form.rate_limit_qps,
         writable: form.writable, description: form.description,
       }
@@ -627,13 +627,13 @@ async function save() {
         if (form.password) payload.password = form.password
       }
       await store.update(modal.editingId, payload as any)
-      message.success('已更新')
+      message.success(text("已更新"))
     } else {
-      if (!form.name.trim()) { message.error('请填写连接名称'); return }
+      if (!form.name.trim()) { message.error(text("请填写连接名称")); return }
       const payload: Record<string, unknown> = {
         name: form.name.trim(), category: form.category, type: form.type,
         host: form.host || '', port: form.port || 0,
-        database: form.database, params: buildParams(),
+        database: form.database, params: form.type === 'sqlite' ? { database: form.database } : buildParams(),
         pool_size: form.pool_size, rate_limit_qps: form.rate_limit_qps,
         writable: form.writable, description: form.description,
       }
@@ -644,7 +644,7 @@ async function save() {
         payload.password = form.password
       }
       await store.create(payload as any)
-      message.success('已创建')
+      message.success(text("已创建"))
     }
     modal.open = false
   } catch (e: any) {
@@ -659,11 +659,11 @@ async function testOne(record: Connection) {
   testing.value = record.id
   try {
     const r = await store.test(record.id)
-    if (r.success) message.success(`连接成功（${r.latency_ms}ms）`)
+    if (r.success) message.success(text('连接成功（{latency}ms）', { latency: r.latency_ms }))
     else message.error(r.message)
     await load()
   } catch (e: any) {
-    message.error(e.response?.data?.detail || e.message || '连接测试失败，请重试')
+    message.error(e.response?.data?.detail || e.message || text("连接测试失败，请重试"))
   } finally { testing.value = null }
 }
 
@@ -684,7 +684,7 @@ async function checkDeleteAssets() {
     const assets = await listAssets({ connection_id: id, status: '' })
     if (request === deleteRequest && del_.id === id) del_.assetCount = assets.length
   } catch (e: any) {
-    if (request === deleteRequest && del_.id === id) del_.error = e.response?.data?.detail || '无法确认资产引用，请重试后再删除'
+    if (request === deleteRequest && del_.id === id) del_.error = e.response?.data?.detail || text("无法确认资产引用，请重试后再删除")
   } finally {
     if (request === deleteRequest && del_.id === id) del_.checking = false
   }
@@ -695,10 +695,10 @@ async function confirmDelete() {
   del_.loading = true
   try {
     await store.remove(del_.id, del_.cascade)
-    message.success(del_.cascade ? `已删除数据源及 ${del_.assetCount} 个资产` : '已删除')
+    message.success(del_.cascade ? text('已删除数据源及 {count} 个资产', { count: del_.assetCount }) : text("已删除"))
     del_.open = false
   } catch (e: any) {
-    message.error(e.response?.data?.detail || '删除失败')
+    message.error(e.response?.data?.detail || text("删除失败"))
   } finally {
     del_.loading = false
   }
@@ -739,7 +739,7 @@ async function reloadBrowser() {
       if (request === browserRequest) browser.topics = topics
     }
   } catch (e: any) {
-    if (request === browserRequest) browser.error = e.response?.data?.detail || e.message || '列表加载失败，请重试'
+    if (request === browserRequest) browser.error = e.response?.data?.detail || e.message || text("列表加载失败，请重试")
   } finally {
     if (request === browserRequest) browser.loading = false
   }
@@ -782,7 +782,7 @@ async function registerPayload(payload: AssetCreate, name: string) {
   singleSaving.value = name
   try {
     await assetStore.create(payload)
-    message.success(`已注册资产：${name}`)
+    message.success(text('已注册资产：{name}', { name }))
   } catch (e: any) {
     message.error(e.response?.data?.detail || e.message)
   } finally {
@@ -802,18 +802,18 @@ async function bulkRegister() {
       await assetStore.create(payload as any)
       ok += 1
     } catch (e: any) {
-      failed.push({ key: sel, reason: e.response?.data?.detail || e.message || '未知错误' })
+      failed.push({ key: sel, reason: e.response?.data?.detail || e.message || text("未知错误") })
     }
   }
   // 成功的从 selected 移除；失败的保留
   browser.selected = failed.map(f => f.key)
   bulkSaving.value = false
   if (failed.length === 0) {
-    message.success(`已批量注册 ${ok} 个资产`)
+    message.success(text('已批量注册 {count} 个资产', { count: ok }))
   } else if (ok > 0) {
-    message.warning(`成功 ${ok}，失败 ${failed.length}：${failed.slice(0, 3).map(f => f.key).join('、')}${failed.length > 3 ? ' ...' : ''}`)
+    message.warning(text('成功 {ok}，失败 {count}：{names}', { ok, count: failed.length, names: failed.slice(0, 3).map(f => f.key).join(', ') + (failed.length > 3 ? ' …' : '') }))
   } else {
-    message.error(`全部失败：${failed[0].reason}`)
+    message.error(text('全部失败：{reason}', { reason: failed[0].reason }))
   }
 }
 
@@ -844,13 +844,13 @@ function statusColor(c: Connection) {
   return '#3b82f6'
 }
 function statusLabel(c: Connection) {
-  if (!c.enabled) return '已禁用'
-  if (c.status === 'error') return '异常'
-  if (c.last_test_ok) return '在线'
-  return '待测试'
+  if (!c.enabled) return text("已禁用")
+  if (c.status === 'error') return text("异常")
+  if (c.last_test_ok) return text("在线")
+  return text("待测试")
 }
 function categoryLabel(cat: string) {
-  return CATEGORIES.find(c => c.key === cat)?.label || cat
+  return text(CATEGORIES.find(c => c.key === cat)?.label || cat)
 }
 function categoryColor(cat: string) {
   return ({ database: 'blue', object_storage: 'green', file_transfer: 'orange',
@@ -867,6 +867,7 @@ function typeColor(t: string) {
 
 function endpointBrief(c: Connection) {
   const p = (c.params || {}) as Record<string, any>
+  if (c.type === 'sqlite') return p.database || c.database || '—'
   if (c.category === 'database') return `${c.host}:${c.port}/${c.database || '-'}`
   if (c.category === 'object_storage') return `${p.endpoint || 'aws'}/${p.bucket || '-'}`
   if (c.category === 'file_transfer') return `${c.type}://${p.host || ''}:${p.port || ''}${p.root_path || ''}`

@@ -36,6 +36,9 @@ class AlertItem(BaseModel):
 
 class LLMStatsResponse(BaseModel):
     total_24h: int
+    success_count: int = 0
+    failed_count: int = 0
+    success_rate: float | None = None
     by_module: dict[str, dict]
 
 

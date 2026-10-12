@@ -1,5 +1,5 @@
 import { get, post, put, del } from './client'
-import type { OntologyEntity, EntityCreatePayload, EntityListItem, EntityRelationDetail, GraphData, Tier, EntityStatus, FileImportResult } from '../types'
+import type { OntologyEntity, EntityCreatePayload, EntityCreateAttribute, EntityAttribute, EntityListItem, EntityRelationDetail, GraphData, Tier, EntityStatus, FileImportResult } from '../types'
 
 export interface EntityQuery {
   tier?: Tier
@@ -36,6 +36,8 @@ export interface PreviewRelation {
   target: string
   cardinality: string
   description: string
+  source_field?: string | null
+  target_field?: string | null
 }
 export interface PreviewAction {
   name: string
@@ -43,6 +45,11 @@ export interface PreviewAction {
   trigger: string
   target_object: string | null
   description: string
+  action_type?: string | null
+  category?: string
+  type_config?: Record<string, unknown> | null
+  parameters_json?: Array<Record<string, unknown>> | null
+  output_schema?: Array<Record<string, unknown>> | null
 }
 export interface PreviewDataSource {
   source_id: string
@@ -135,6 +142,10 @@ export const entityApi = {
   updateAttributeMappings(entityId: string, items: { attribute_id: string; source_table: string | null; source_field: string | null; data_status: string }[]) {
     return put<OntologyEntity>(`/entities/${entityId}/attribute-mappings`, items)
   },
+
+  createAttribute(entityId: string, data: EntityCreateAttribute) { return post<EntityAttribute>(`/entities/${entityId}/attributes`, data) },
+
+  updateAttribute(entityId: string, attributeId: string, data: EntityCreateAttribute) { return put<EntityAttribute>(`/entities/${entityId}/attributes/${attributeId}`, data) },
 
   deleteAttribute(entityId: string, attributeId: string, force = false) {
     return del<void>(`/entities/${entityId}/attributes/${attributeId}`, { params: { force } })

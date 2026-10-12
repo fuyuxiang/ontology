@@ -21,7 +21,7 @@ class FunctionWatcher:
     def start(self) -> None:
         try:
             from watchdog.events import FileSystemEventHandler
-            from watchdog.observers import Observer
+            from watchdog.observers.polling import PollingObserver as Observer
 
             class _Handler(FileSystemEventHandler):
                 def __init__(self, watcher: FunctionWatcher):
@@ -39,6 +39,13 @@ class FunctionWatcher:
                     if not event.is_directory and event.src_path.endswith(".py"):
                         self.watcher._on_file_deleted(event.src_path)
 
+                def on_moved(self, event):
+                    if not event.is_directory:
+                        if event.src_path.endswith(".py"):
+                            self.watcher._on_file_deleted(event.src_path)
+                        if event.dest_path.endswith(".py"):
+                            self.watcher._on_file_changed(event.dest_path)
+
             self._observer = Observer()
             self._observer.schedule(_Handler(self), self.workspace_root, recursive=True)
             self._observer.daemon = True
@@ -50,7 +57,9 @@ class FunctionWatcher:
     def stop(self) -> None:
         if self._observer:
             self._observer.stop()
-            self._observer.join(timeout=5)
+            self._observer.join(timeout=30)
+            if self._observer.is_alive():
+                raise RuntimeError("FunctionWatcher 未完成停止，不能关闭正在使用的资源")
             self._observer = None
             logger.info("FunctionWatcher stopped")
 
@@ -86,15 +95,26 @@ class FunctionWatcher:
         if not root.exists():
             return
         for py_file in root.rglob("*.py"):
-            metas = self.scan_file(str(py_file))
-            for meta in metas:
-                if ontology_id is not None and meta.ontology_id != ontology_id:
-                    continue
-                self.registry.register(meta)
-                self._track_file(str(py_file), meta.callable_name)
+            with self.registry.mutation_lock():
+                metas = self.scan_file(str(py_file))
+                for meta in metas:
+                    if ontology_id is not None and str(meta.ontology_id) != str(ontology_id):
+                        continue
+                    self.registry.register(meta)
+                    self._track_file(str(py_file), meta.callable_name)
         logger.info(f"scan_all complete, workspace={self.workspace_root}")
 
     def _on_file_changed(self, path: str) -> None:
+        with self.registry.mutation_lock():
+            self._rescan_file(path)
+
+    def _rescan_file(self, path: str) -> None:
+        try:
+            ast.parse(Path(path).read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, SyntaxError):
+            # Editors may emit a half-written/syntactically invalid buffer.
+            # Do not delete the UI identity; execution still validates source.
+            return
         old_names = set(self._file_functions.get(path, []))
         metas = self.scan_file(path)
         new_names = {m.callable_name for m in metas}
@@ -103,14 +123,15 @@ class FunctionWatcher:
             self.registry.register(meta)
 
         for removed in old_names - new_names:
-            self.registry.unregister(removed)
+            self.registry.unregister(removed, self._extract_ontology_id(path))
 
         self._file_functions[path] = list(new_names)
 
     def _on_file_deleted(self, path: str) -> None:
-        names = self._file_functions.pop(path, [])
-        for name in names:
-            self.registry.unregister(name)
+        with self.registry.mutation_lock():
+            names = self._file_functions.pop(path, [])
+            for name in names:
+                self.registry.unregister(name, self._extract_ontology_id(path))
 
     def _track_file(self, path: str, callable_name: str) -> None:
         if path not in self._file_functions:
@@ -119,6 +140,17 @@ class FunctionWatcher:
             self._file_functions[path].append(callable_name)
 
     def _extract_ontology_id(self, path: str) -> int:
+        # UI workspaces carry identity separately from mutable source metadata.
+        import json
+        for parent in Path(path).parents:
+            metadata = parent / ".ontology.json"
+            if metadata.is_file():
+                try:
+                    return json.loads(metadata.read_text()).get("ontology_id") or 0
+                except (ValueError, OSError):
+                    return 0
+            if parent == Path(self.workspace_root).resolve():
+                break
         return 0
 
     def _extract_function_meta(
@@ -128,6 +160,8 @@ class FunctionWatcher:
             if not isinstance(decorator, ast.Call):
                 continue
             func = decorator.func
+            if not isinstance(func, (ast.Name, ast.Attribute)):
+                continue
             if isinstance(func, ast.Name) and func.id != "Function":
                 continue
             if isinstance(func, ast.Attribute) and func.attr != "Function":
@@ -150,6 +184,7 @@ class FunctionWatcher:
                     type=p.get("type", "string"),
                     required=p.get("required", False),
                     description=p.get("description", ""),
+                    schema=dict(p),
                 )
                 for p in params_raw
                 if isinstance(p, dict)

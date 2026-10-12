@@ -10,6 +10,9 @@ class ExecutionResult:
 
 
 class BaseActionExecutor(ABC):
+    def __init__(self, db=None):
+        self.db = db
+
     @abstractmethod
     async def execute(self, type_config: dict, params: dict, dry_run: bool = False) -> ExecutionResult:
         pass

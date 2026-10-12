@@ -8,6 +8,7 @@ from app.api.v1.ontology_publish import (
     AddEntitiesRequest,
     CreateVersionRequest,
     add_entities,
+    remove_entity,
     create_version,
     list_published_ontologies,
 )
@@ -75,3 +76,21 @@ def test_cross_ontology_addition_is_rejected_before_partial_write(db):
 
     add_entities(draft.id, AddEntitiesRequest(entity_ids=[own.id]), db)
     assert db.query(OntologyVersionEntity).one().source_entity_id == own.id
+
+
+def test_add_remove_entities_syncs_snapshot_relations_from_current_set(db):
+    from app.models.relation import EntityRelation
+    from app.models.version import OntologyVersionRelation
+    owner=ScenarioDict(code='relation-draft',name='关系本体')
+    db.add(owner);db.flush()
+    first=OntologyEntity(name='first',name_cn='一',tier=1,ontology_id=owner.id)
+    second=OntologyEntity(name='second',name_cn='二',tier=1,ontology_id=owner.id)
+    version=OntologyVersion(name='draft',version_number=1,ontology_id=owner.id,status='draft')
+    db.add_all([first,second,version]);db.flush()
+    db.add(EntityRelation(from_entity_id=first.id,to_entity_id=second.id,name='connects',rel_type='Association',cardinality='1:N',source_field='id',target_field='device_id'))
+    db.commit()
+    assert add_entities(version.id,AddEntitiesRequest(entity_ids=[first.id,second.id]),db)=={'added':2,'total':2}
+    relation=db.query(OntologyVersionRelation).one()
+    assert relation.source_field=='id' and relation.target_field=='device_id'
+    remove_entity(version.id,second.id,db)
+    assert db.query(OntologyVersionEntity).count()==1 and db.query(OntologyVersionRelation).count()==0

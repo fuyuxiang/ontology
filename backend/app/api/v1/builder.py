@@ -9,17 +9,21 @@ from __future__ import annotations
 import json
 import logging
 import re
+import uuid
 from collections.abc import Generator
-from io import BytesIO
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
-from app.config import settings
 from app.database import get_db
+from app.core.deps import require_user
+from app.core.permissions import has_permission
+from app.models.user import User
 from app.services.copilot import get_llm_client
+from app.services.llm_resolver import get_model_name
 
 logger = logging.getLogger(__name__)
 
@@ -29,60 +33,11 @@ router = APIRouter(prefix="/builder", tags=["builder"])
 # ── 文档解析 ─────────────────────────────────────────────────────
 
 def _parse_text(filename: str, raw: bytes) -> str:
-    """解析单个文件，统一转纯文本喂给 LLM。"""
-    name = (filename or "").lower()
-    try:
-        if name.endswith(".txt") or name.endswith(".md"):
-            return raw.decode("utf-8", errors="ignore")
-
-        if name.endswith(".csv"):
-            try:
-                import pandas as pd  # type: ignore
-                df = pd.read_csv(BytesIO(raw))
-                return f"CSV: {filename}\n列：{list(df.columns)}\n前 20 行：\n{df.head(20).to_string()}"
-            except Exception:
-                return raw.decode("utf-8", errors="ignore")
-
-        if name.endswith(".xlsx") or name.endswith(".xls"):
-            try:
-                import pandas as pd  # type: ignore
-                xls = pd.ExcelFile(BytesIO(raw))
-                parts = []
-                for sheet in xls.sheet_names[:5]:
-                    df = xls.parse(sheet)
-                    parts.append(f"Sheet: {sheet}\n列：{list(df.columns)}\n前 10 行：\n{df.head(10).to_string()}")
-                return f"Excel: {filename}\n\n" + "\n\n".join(parts)
-            except Exception as e:
-                return f"Excel 解析失败: {e}"
-
-        if name.endswith(".docx"):
-            try:
-                from docx import Document  # type: ignore
-                doc = Document(BytesIO(raw))
-                paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
-                tables_text = []
-                for ti, t in enumerate(doc.tables[:5]):
-                    rows = []
-                    for row in t.rows[:30]:
-                        rows.append(" | ".join(c.text.strip() for c in row.cells))
-                    tables_text.append(f"[表 {ti+1}]\n" + "\n".join(rows))
-                return f"Word: {filename}\n\n" + "\n".join(paragraphs) + ("\n\n" + "\n\n".join(tables_text) if tables_text else "")
-            except Exception as e:
-                return f"Word 解析失败: {e}"
-
-        if name.endswith(".pdf"):
-            try:
-                import pdfplumber  # type: ignore
-                with pdfplumber.open(BytesIO(raw)) as pdf:
-                    pages = [p.extract_text() or "" for p in pdf.pages[:30]]
-                return f"PDF: {filename}\n\n" + "\n\n".join(pages)
-            except Exception as e:
-                return f"PDF 解析失败: {e}"
-
-        return raw.decode("utf-8", errors="ignore")
-    except Exception as e:
-        logger.exception("文档解析异常")
-        return f"解析失败: {e}"
+    from app.services.doc_builder import parse_file_content
+    text = parse_file_content(filename, raw)
+    if not text.strip():
+        raise ValueError("文档未包含可提取文本")
+    return text
 
 
 # ── LLM Prompt ──────────────────────────────────────────────────
@@ -117,15 +72,15 @@ _EXTRACT_PROMPT = """你是本体建模专家，需要从用户提供的业务�
 """
 
 
-def _call_llm_for_extract(content: str, filename: str) -> list[dict]:
-    client = get_llm_client()
+def _call_llm_for_extract(content: str, filename: str, db: Session | None = None) -> list[dict]:
+    client = get_llm_client(db=db, scene="ontology")
     messages = [
         {"role": "system", "content": _EXTRACT_PROMPT},
-        {"role": "user", "content": f"## 文档：{filename}\n\n{content[:18000]}"},
+        {"role": "user", "content": f"## 文档：{filename}\n\n{content}"},
     ]
     try:
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=get_model_name(db, "ontology"),
             messages=messages,
             temperature=0,
             max_tokens=6000,
@@ -152,8 +107,8 @@ def _call_llm_for_extract(content: str, filename: str) -> list[dict]:
         data = json.loads(text[start: end + 1])
     if isinstance(data, dict) and "events" in data:
         data = data["events"]
-    if not isinstance(data, list):
-        return []
+    if not isinstance(data, list) or not any(isinstance(event, dict) and event.get("type") == "entity_proposed" for event in data):
+        raise ValueError("文档没有生成有效对象事件")
     return [e for e in data if isinstance(e, dict) and "type" in e]
 
 
@@ -169,10 +124,16 @@ async def extract_from_documents(
     """SSE 流式从业务文档抽取本体草稿。"""
     # 先把所有文件读出来（上下文里持久化），避免 yield 时句柄关掉
     docs: list[tuple[str, bytes]] = []
+    from app.services.data_plane.storage_policy import storage_policy
+    policy = storage_policy(db)
     for f in files:
         if not f.filename:
             continue
-        raw = await f.read()
+        if f.filename.rsplit(".", 1)[-1].lower() not in policy["allowed"]:
+            raise HTTPException(422, "存储配置不允许该文档类型")
+        raw = await f.read(policy["max_bytes"] + 1)
+        if len(raw) > policy["max_bytes"]:
+            raise HTTPException(413, "文档超过配置的上传大小限制")
         if raw:
             docs.append((f.filename, raw))
 
@@ -190,18 +151,22 @@ async def extract_from_documents(
 
             # 维护已抛出的对象 name，用于关系/属性合法性校验
             entity_names: set[str] = set()
+            failed_files: list[str] = []
 
             for filename, raw in docs:
                 yield _emit({"type": "file_parsing", "file_name": filename})
-                text = _parse_text(filename, raw)
-                if text.startswith("解析失败") or text.startswith("Word 解析失败") or text.startswith("PDF 解析失败"):
-                    yield _emit({"type": "file_failed", "file_name": filename, "error": text})
+                try:
+                    text = _parse_text(filename, raw)
+                except Exception as exc:
+                    failed_files.append(filename)
+                    yield _emit({"type": "file_failed", "file_name": filename, "error": str(exc)})
                     continue
                 yield _emit({"type": "file_parsed", "file_name": filename, "text_length": len(text)})
 
                 try:
-                    events = _call_llm_for_extract(text, filename)
+                    events = _call_llm_for_extract(text, filename, db)
                 except Exception as e:
+                    failed_files.append(filename)
                     yield _emit({"type": "file_failed", "file_name": filename, "error": f"LLM 抽取失败: {e}"})
                     continue
 
@@ -217,17 +182,23 @@ async def extract_from_documents(
                 for ev in ordered:
                     t = ev.get("type")
                     if t == "entity_proposed":
+                        if not ev.get("name"):
+                            raise ValueError("抽取返回了未命名对象")
                         entity_names.add(ev.get("name", ""))
                     elif t == "attr_proposed":
                         if ev.get("entity_name") not in entity_names:
-                            continue
+                            raise ValueError("抽取属性引用了不存在的对象")
                     elif t == "relation_proposed":
                         if ev.get("from_entity") not in entity_names or ev.get("to_entity") not in entity_names:
-                            continue
+                            raise ValueError("抽取关系引用了不存在的对象")
                     elif t in ("rule_suggested", "action_suggested"):
                         ev.setdefault("source_file", filename)
                     yield _emit(ev)
 
+            if failed_files:
+                yield _emit({"type":"error", "content":"以下文档未完成抽取，请修复后重新提交：" + "、".join(failed_files)})
+                yield "data: [DONE]\n\n"
+                return
             yield _emit({"type": "extract_finished"})
             yield "data: [DONE]\n\n"
 
@@ -317,6 +288,23 @@ class SuggestAttrRequest(BaseModel):
     existing_properties: list[SuggestAttrProperty] = []
 
 
+def _parse_suggestion_list(text: str) -> list[dict]:
+    """An explicit empty array is valid; malformed/non-array output is a failure."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        start, end = text.find("["), text.rfind("]")
+        try:
+            if start < 0 or end < start:
+                raise ValueError("missing array")
+            data = json.loads(text[start:end + 1])
+        except (ValueError, TypeError):
+            raise HTTPException(502, "模型没有返回有效建议数组，请重试") from None
+    if not isinstance(data, list):
+        raise HTTPException(502, "模型没有返回建议数组，请重试")
+    return data
+
+
 _SUGGEST_ATTR_PROMPT = """你是本体建模专家。给定一个业务对象的基本信息和已有属性，请建议缺失的重要属性。
 
 ## 输入
@@ -338,7 +326,7 @@ _SUGGEST_ATTR_PROMPT = """你是本体建模专家。给定一个业务对象的
 
 
 @router.post("/suggest-attributes")
-async def suggest_attributes(body: SuggestAttrRequest):
+def suggest_attributes(body: SuggestAttrRequest, db: Session = Depends(get_db)):
     """AI 补全属性：根据对象信息和已有属性，让 LLM 建议缺失属性。"""
     existing_names = {p.name for p in body.existing_properties}
     existing_desc = "\n".join(
@@ -353,10 +341,10 @@ async def suggest_attributes(body: SuggestAttrRequest):
         f"已有属性：\n{existing_desc}"
     )
 
-    client = get_llm_client()
+    client = get_llm_client(db=db, scene="ontology")
     try:
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=get_model_name(db, "ontology"),
             messages=[
                 {"role": "system", "content": _SUGGEST_ATTR_PROMPT},
                 {"role": "user", "content": user_msg},
@@ -375,17 +363,12 @@ async def suggest_attributes(body: SuggestAttrRequest):
         text = re.sub(r"^```\w*\n", "", text)
         text = re.sub(r"\n```\s*$", "", text)
 
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("[")
-        end = text.rfind("]")
-        if start < 0 or end < 0:
-            return {"suggested_properties": []}
-        data = json.loads(text[start:end + 1])
-
-    if not isinstance(data, list):
-        data = []
+    data = _parse_suggestion_list(text)
+    if any(not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"].strip()
+           or not isinstance(item.get("type", "string"), str)
+           or item.get("type", "string") not in {"string", "number", "date", "boolean", "enum"}
+           or ("required" in item and not isinstance(item["required"], bool)) for item in data):
+        raise HTTPException(502, "模型返回了无效属性建议，请重试")
 
     # 过滤已有属性
     suggested = [
@@ -439,7 +422,7 @@ _SUGGEST_REL_PROMPT = """你是本体建模专家。给定一组业务对象及�
 
 
 @router.post("/suggest-relations")
-async def suggest_relations(body: SuggestRelRequest):
+def suggest_relations(body: SuggestRelRequest, db: Session = Depends(get_db)):
     """AI 推断关系：根据对象信息让 LLM 推断可能的关系。"""
     if len(body.objects) < 2:
         return {"suggested_relations": []}
@@ -452,10 +435,10 @@ async def suggest_relations(body: SuggestRelRequest):
     )
     user_msg = f"对象列表：\n{obj_desc}"
 
-    client = get_llm_client()
+    client = get_llm_client(db=db, scene="ontology")
     try:
         resp = client.chat.completions.create(
-            model=settings.LLM_MODEL,
+            model=get_model_name(db, "ontology"),
             messages=[
                 {"role": "system", "content": _SUGGEST_REL_PROMPT},
                 {"role": "user", "content": user_msg},
@@ -474,17 +457,14 @@ async def suggest_relations(body: SuggestRelRequest):
         text = re.sub(r"^```\w*\n", "", text)
         text = re.sub(r"\n```\s*$", "", text)
 
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        start = text.find("[")
-        end = text.rfind("]")
-        if start < 0 or end < 0:
-            return {"suggested_relations": []}
-        data = json.loads(text[start:end + 1])
-
-    if not isinstance(data, list):
-        data = []
+    data = _parse_suggestion_list(text)
+    obj_names = {o.name for o in body.objects}
+    if any(not isinstance(item, dict) or not isinstance(item.get("name"), str) or not item["name"].strip()
+           or not isinstance(item.get("source"), str) or not isinstance(item.get("target"), str)
+           or item.get("source") not in obj_names or item.get("target") not in obj_names
+           or not isinstance(item.get("cardinality", "1:N"), str)
+           or item.get("cardinality", "1:N") not in {"1:1", "1:N", "N:N"} for item in data):
+        raise HTTPException(502, "模型返回了无效关系建议，请重试")
 
     # 过滤已有关系 + 校验 source/target 存在
     obj_names = {o.name for o in body.objects}
@@ -576,6 +556,9 @@ async def auto_map(body: AutoMapRequest, db: Session = Depends(get_db)):
     result: dict[str, dict] = {}
 
     for obj in body.objects:
+        property_names = [prop.name for prop in obj.properties]
+        if any(not name.strip() for name in property_names) or len(property_names) != len(set(property_names)):
+            raise HTTPException(422, f"对象 {obj.name} 的属性名称为空或重复")
         obj_label = obj.displayName or obj.name or obj.id
 
         # 第二层：对象名 → 表名 匹配，找出 top-N 相关表
@@ -777,6 +760,7 @@ class _DraftProperty(BaseModel):
     description: str | None = None
     source_asset_id: str | None = None
     source_column: str | None = None
+    transform: str | None = None
 
 
 class _DraftRelation(BaseModel):
@@ -786,7 +770,15 @@ class _DraftRelation(BaseModel):
     target: str
     cardinality: str = "1:N"
     relationType: str = "ObjectProperty"
+    sourceField: str | None = None
+    targetField: str | None = None
     description: str | None = None
+
+
+class _DraftEnrichment(BaseModel):
+    asset_id: str
+    primary_source_column: str | None = None
+    enrichment_source_column: str | None = None
 
 
 class _DraftObject(BaseModel):
@@ -798,6 +790,7 @@ class _DraftObject(BaseModel):
     primaryKey: str | None = None
     properties: list[_DraftProperty] = []
     backing_asset_ids: list[str] = []
+    enrichment_bindings: list[_DraftEnrichment] = []
 
 
 class FinalizeRequest(BaseModel):
@@ -807,14 +800,46 @@ class FinalizeRequest(BaseModel):
     scenario_codes: list[str] = []
     # 归属本体 ID（从本体详情新建对象时传入）
     ontology_id: str | None = None
+    actions: list[dict] = []
+    document_session_id: str | None = None
 
 
 @router.post("/finalize")
-def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
+def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db), user: User = Depends(require_user)):
+    from app.schemas.action import ACTION_TYPES
+    if any((action.get("action_type") or action.get("type")) in ACTION_TYPES for action in body.actions) and not has_permission(user, "rule:write", db):
+        raise HTTPException(403, "导入可执行动作需要 rule:write 权限")
+    try:
+        from app.services.doc_mapping_persist_service import validate_kept_mappings
+        preserved = validate_kept_mappings(body, db, user.id)
+        result = finalize_draft(body, db, preserve_entity_ids=preserved)
+        if preserved:
+            from app.models.builder_document_session import BuilderDocumentSession
+            from app.services.doc_mapping_persist_service import binding_fingerprint
+            record = db.get(BuilderDocumentSession, body.document_session_id)
+            db.flush()
+            receipt = (record.payload or {})["mapping_receipt"]
+            record.payload = {**record.payload, "mapping_receipt": {**receipt, "kept_entities": {
+                entity_id: binding_fingerprint(db, entity_id) for entity_id in preserved}}}
+        db.commit()
+        return result
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(422, str(exc)) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(409, "构建内容发生并发冲突；请重新读取当前本体后重试保存") from exc
+    except Exception:
+        db.rollback()
+        raise
+
+
+def finalize_draft(body: FinalizeRequest, db: Session, *, sync_bindings: bool = True,
+                   preserve_entity_ids: set[str] | None = None, preserve_definitions: bool = False):
     """把 builder 草稿一次性落库：每个对象创建 OntologyEntity + EntityAttribute；
     若 backing_asset_ids 非空，自动创建 primary ObjectBinding（含 field_mappings）。
 
-    幂等：实体已存在时跳过；binding 已存在时也跳过。
+    幂等：同一本体内以名称更新定义和映射，不重复创建实体或绑定。
     """
     from app.models.entity import EntityAttribute, OntologyEntity
     from app.repositories.asset_repo import AssetRepository
@@ -822,6 +847,7 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
 
     asset_repo = AssetRepository(db)
     binding_svc = ObjectBindingService(db)
+    preserve_entity_ids = preserve_entity_ids or set()
 
     # 本批发布统一归属的场景（去重、去空）
     batch_scenarios = [c for c in dict.fromkeys(body.scenario_codes) if c]
@@ -830,8 +856,49 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
     if body.ontology_id:
         from app.models.scenario import ScenarioDict
         scenario = db.get(ScenarioDict, body.ontology_id)
-        if scenario and scenario.code not in batch_scenarios:
+        if not scenario:
+            raise HTTPException(404, "目标本体不存在")
+        if scenario.code not in batch_scenarios:
             batch_scenarios.append(scenario.code)
+
+    if not body.objects:
+        raise HTTPException(422, "没有可保存的对象")
+    names = [obj.name for obj in body.objects]
+    if any(not name.strip() for name in names) or len(set(names)) != len(names):
+        raise HTTPException(422, "对象名称不能为空或重复")
+    for relation in body.relations:
+        if relation.source not in names or relation.target not in names:
+            raise HTTPException(422, f"关系 {relation.name} 引用了本批次之外的对象")
+    # 在任何数据库写入之前核对所有资产及字段，禁止部分成功被报告为完整成功。
+    for obj in body.objects:
+        if len(obj.backing_asset_ids) != len(set(obj.backing_asset_ids)):
+            raise HTTPException(422, f"对象 {obj.name} 的来源资产不能重复")
+        property_names = [prop.name for prop in obj.properties]
+        if any(not name.strip() for name in property_names) or len(property_names) != len(set(property_names)):
+            raise HTTPException(422, f"对象 {obj.name} 的属性名称为空或重复")
+        if obj.backing_asset_ids:
+            primary = next((prop for prop in obj.properties if prop.name == obj.primaryKey), None)
+            if not primary or primary.source_asset_id != obj.backing_asset_ids[0] or not primary.source_column:
+                raise HTTPException(422, f"对象 {obj.name} 的主键必须映射到首个数据资产字段")
+        join_ids = [rule.asset_id for rule in obj.enrichment_bindings]
+        if len(join_ids) != len(set(join_ids)) or any(asset_id not in obj.backing_asset_ids[1:] for asset_id in join_ids):
+            raise HTTPException(422, f"对象 {obj.name} 的 enrichment 规则重复或不是已绑定补充资产")
+        for asset_id in obj.backing_asset_ids:
+            asset = asset_repo.get_by_id(asset_id)
+            if not asset or asset.status != "active":
+                raise HTTPException(422, f"资产不可用: {asset_id}")
+            columns = {column.get("name") for column in (asset.schema_snapshot or [])}
+            for prop in obj.properties:
+                if prop.source_asset_id == asset_id and prop.source_column and prop.source_column not in columns:
+                    raise HTTPException(422, f"资产 {asset_id} 中不存在字段 {prop.source_column}")
+        for prop in obj.properties:
+            if prop.transform:
+                from app.services.data_plane.mapping_transform import validate_transform
+                validate_transform(prop.transform)
+                if prop.name == obj.primaryKey:
+                    raise ValueError("主键属性不能配置 transform")
+            if prop.source_column and prop.source_asset_id not in obj.backing_asset_ids:
+                raise HTTPException(422, f"属性 {obj.name}.{prop.name} 的来源资产未绑定")
 
     created_entities = 0
     created_bindings = 0
@@ -841,22 +908,24 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
     entity_id_map: dict[str, str] = {}
 
     for obj in body.objects:
-        eid = (f"{obj.namespace}_{obj.name}" if obj.namespace else obj.name)
-        # 幂等查重：先按主键 id，再按 name（name 列有唯一约束，
-        # 带 namespace 时 id 与已有裸 name 记录不同，仅查 id 会漏判导致 1062 冲突）
-        existing = db.get(OntologyEntity, eid)
-        if existing is None:
-            existing = (
-                db.query(OntologyEntity)
-                .filter(OntologyEntity.name == obj.name)
-                .first()
-            )
+        # name 唯一性属于本体；裸 name/namespace 不是全局实体标识。
+        existing = db.query(OntologyEntity).filter(
+            OntologyEntity.name == obj.name,
+            OntologyEntity.ontology_id == body.ontology_id,
+        ).first()
+        if existing and existing.id in preserve_entity_ids and preserve_definitions:
+            entity_id_map[obj.name] = existing.id
+            skipped += 1
+            continue
+        eid = str(uuid.uuid5(uuid.NAMESPACE_URL, f"ontology:{body.ontology_id or 'legacy'}:{obj.namespace or ''}:{obj.name}"))
         if existing:
             skipped += 1
             entity = existing
-            if body.ontology_id and not entity.ontology_id:
-                entity.ontology_id = body.ontology_id
-                db.flush()
+            entity.name_cn = obj.displayName or obj.name
+            entity.description = obj.description
+            entity.tier = int(obj.tier or 2)
+            entity.config_json = {**(entity.config_json or {}), "primary_key": obj.primaryKey,
+                                  "backing_asset_ids": obj.backing_asset_ids}
         else:
             entity = OntologyEntity(
                 id=eid, name=obj.name, name_cn=obj.displayName or obj.name,
@@ -881,8 +950,33 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
 
         # 属性（按 name 去重）
         attr_by_name: dict[str, EntityAttribute] = {a.name: a for a in entity.attributes}
+        # The supplied definition for each object is complete; retained objects
+        # outside this batch are untouched. Remove obsolete bindings before a
+        # new primary is created, using the same cleanup path as the data UI.
+        preserving = entity.id in preserve_entity_ids
+        if sync_bindings and not preserving:
+            binding_svc.prepare_data_replacement(entity.id, {
+                (asset_id, "primary" if index == 0 else "enrichment")
+                for index, asset_id in enumerate(obj.backing_asset_ids)})
+        removed_attributes = [attribute for name, attribute in attr_by_name.items() if name not in {prop.name for prop in obj.properties}]
+        if removed_attributes:
+            removed_ids = {attribute.id for attribute in removed_attributes}
+            for binding in binding_svc.list(object_type_id=entity.id, status=None):
+                mappings = [mapping for mapping in binding.field_mappings or [] if mapping.get("attribute_id") not in removed_ids]
+                if len(mappings) != len(binding.field_mappings or []):
+                    # The old set is suspended until its replacement is validated.
+                    # Clearing a removed attribute here must not validate stale joins.
+                    binding.field_mappings = mappings
+            for attribute in removed_attributes:
+                entity.attributes.remove(attribute)
+                attr_by_name.pop(attribute.name)
+            db.flush()
         for p in obj.properties:
             if p.name in attr_by_name:
+                attr = attr_by_name[p.name]
+                attr.type = p.type
+                attr.required = p.required
+                attr.description = p.description or p.displayName or p.name
                 continue
             attr = EntityAttribute(
                 entity_id=entity.id, name=p.name, type=p.type,
@@ -895,14 +989,15 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
         db.flush()
 
         # ObjectBinding（每个 backing_asset_id 一个 primary，role 区分）
-        for idx, asset_id in enumerate(obj.backing_asset_ids):
+        for idx, asset_id in enumerate([] if preserving else obj.backing_asset_ids):
             asset = asset_repo.get_by_id(asset_id)
             if not asset:
-                continue
+                raise HTTPException(422, f"资产不存在: {asset_id}")
             role = "primary" if idx == 0 else "enrichment"
             existing_binding = binding_svc.repo.find_existing(entity.id, asset_id, role)
-            if existing_binding:
-                continue
+            join_rule = next((rule for rule in obj.enrichment_bindings if rule.asset_id == asset_id), None)
+            join_config = ({"primary_source_column": join_rule.primary_source_column if join_rule else None,
+                            "enrichment_source_column": join_rule.enrichment_source_column if join_rule else None} if role == "enrichment" else {})
             field_mappings = []
             for p in obj.properties:
                 if p.source_asset_id == asset_id and p.source_column:
@@ -911,19 +1006,34 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
                         field_mappings.append({
                             "attribute_id": attr.id,
                             "source_column": p.source_column,
-                            "transform": None,
+                            "transform": p.transform,
                         })
+            primary_property = next((p for p in obj.properties if p.name == obj.primaryKey), None)
+            id_column = primary_property.source_column if primary_property and primary_property.source_asset_id == asset_id else None
             try:
-                binding_svc.create(
-                    object_type_id=entity.id,
-                    asset_id=asset_id,
-                    role=role,
-                    field_mappings=field_mappings,
-                    id_column=obj.primaryKey,
-                )
-                created_bindings += 1
+                if existing_binding:
+                    # Saving an explicitly checked mapping resolves schema-change
+                    # review; otherwise hydration's schema refresh can leave the
+                    # valid binding unmirrored and the next publish unusable.
+                    binding_svc.update(existing_binding.id, field_mappings=field_mappings,
+                                       status="active", review_reason=None, **join_config,
+                                       **({"id_column": id_column} if id_column else {}))
+                else:
+                    binding_svc.create(
+                        object_type_id=entity.id, asset_id=asset_id, role=role,
+                        field_mappings=field_mappings, id_column=id_column, **join_config,
+                    )
+                    created_bindings += 1
+            except (ValueError, LookupError) as exc:
+                db.rollback()
+                raise HTTPException(422, str(exc)) from exc
             except Exception:
-                logger.exception("create binding failed for %s", entity.id)
+                db.rollback()
+                raise
+        if preserving:
+            for binding in binding_svc.list(object_type_id=entity.id, status=None):
+                binding_svc._remove_auto_rules(binding)
+                binding_svc._remount_asset_rules(binding.asset_id)
 
     # ── 关系持久化 ──
     from app.models.relation import EntityRelation
@@ -941,6 +1051,11 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
             EntityRelation.name == rel.name,
         ).first()
         if existing_rel:
+            existing_rel.rel_type = rel.relationType or "ObjectProperty"
+            existing_rel.cardinality = rel.cardinality or "1:N"
+            existing_rel.description = rel.description or rel.displayName or rel.name
+            existing_rel.source_field = rel.sourceField
+            existing_rel.target_field = rel.targetField
             continue
         new_rel = EntityRelation(
             from_entity_id=from_eid,
@@ -948,16 +1063,25 @@ def builder_finalize(body: FinalizeRequest, db: Session = Depends(get_db)):
             name=rel.name,
             rel_type=rel.relationType or "ObjectProperty",
             cardinality=rel.cardinality or "1:N",
+            source_field=rel.sourceField,
+            target_field=rel.targetField,
             description=rel.description or rel.displayName or rel.name,
         )
         db.add(new_rel)
         created_relations += 1
 
-    db.commit()
+    db.flush()
+    from app.services.file_import import persist_import_actions
+    created_actions, action_warnings = persist_import_actions(body.actions, entity_id_map, body.ontology_id, db)
     return {
         "created_entities": created_entities,
         "created_bindings": created_bindings,
         "created_relations": created_relations,
+        "created_actions": created_actions,
+        "warnings": action_warnings,
         "skipped": skipped,
         "total": len(body.objects),
+        "entity_ids": entity_id_map,
+        "ontology_id": body.ontology_id,
+        "state": "saved",
     }

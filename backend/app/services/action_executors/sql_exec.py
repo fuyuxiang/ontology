@@ -1,3 +1,4 @@
+import re
 from .base import BaseActionExecutor, ExecutionResult
 
 
@@ -13,7 +14,8 @@ class SqlExecExecutor(BaseActionExecutor):
         for key, value in params.items():
             placeholder = f"${key}"
             if placeholder in sql_template:
-                sql_template = sql_template.replace(placeholder, f":{key}")
+                sql_template = sql_template.replace(f"'{placeholder}'", f":{key}")
+                sql_template = re.sub(r"\$" + re.escape(key) + r"\b", f":{key}", sql_template)
                 sql_params[key] = value
 
         if dry_run:
@@ -26,7 +28,7 @@ class SqlExecExecutor(BaseActionExecutor):
         from app.database import SessionLocal
         from app.services.data_plane.execute_service import ExecuteService
 
-        db = SessionLocal()
+        db = self.db or SessionLocal()
         try:
             svc = ExecuteService(db)
             result = svc.execute_on_connection(
@@ -39,17 +41,18 @@ class SqlExecExecutor(BaseActionExecutor):
             )
             return ExecutionResult(
                 success=True,
-                message=f"SQL 执行成功，影响 {result.row_count} 行",
-                output={"rows_affected": result.row_count, "columns": result.columns, "data": result.rows[:100]},
+                message=f"SQL 已提交，影响 {getattr(result, 'rows_affected', result.rows_returned)} 行",
+                output={"rows_affected": getattr(result, 'rows_affected', result.rows_returned), "columns": result.columns, "data": result.rows[:100]},
             )
         except Exception as e:
             return ExecutionResult(
                 success=False,
                 message=f"SQL 执行失败: {str(e)}",
-                output={"error": str(e)},
+                output={"error": str(e), "outcome": getattr(e, "outcome", "failed")},
             )
         finally:
-            db.close()
+            if self.db is None:
+                db.close()
 
     @classmethod
     def get_config_schema(cls) -> dict:

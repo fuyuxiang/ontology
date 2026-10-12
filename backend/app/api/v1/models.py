@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_user
+from app.core.permissions import has_permission
 from app.database import get_db
 from app.models.agent import Agent, ModelRegistry
 from app.models.agent_runtime import AgentVersion
@@ -27,9 +28,9 @@ def require_model_user(user: User = Depends(require_user)) -> User:
     return user
 
 
-def require_model_editor(user: User = Depends(require_model_user)) -> User:
-    if user.role not in {"admin", "editor"}:
-        raise HTTPException(403, "需要管理员或编辑者权限")
+def require_model_editor(user: User = Depends(require_model_user), db: Session = Depends(get_db)) -> User:
+    if not has_permission(user, "rule:write", db):
+        raise HTTPException(403, "需要规则编写权限")
     return user
 
 
@@ -143,7 +144,7 @@ def _model_out(m: ModelRegistry) -> dict:
 @router.get("")
 def list_models(db: Session = Depends(get_db), user: User = Depends(require_model_user)):
     query = db.query(ModelRegistry)
-    if user.role not in {"admin", "editor"}:
+    if not has_permission(user, "rule:write", db):
         query = query.filter_by(status="active")
     return [_model_out(m) for m in query.all()]
 
@@ -160,7 +161,7 @@ def create_model(body: ModelCreate, db: Session = Depends(get_db), user: User = 
 @router.get("/{mid}")
 def get_model(mid: str, db: Session = Depends(get_db), user: User = Depends(require_model_user)):
     m = db.get(ModelRegistry, mid)
-    if not m or (m.status != "active" and user.role not in {"admin", "editor"}):
+    if not m or (m.status != "active" and not has_permission(user, "rule:write", db)):
         raise HTTPException(404, "Model not found")
     return _model_out(m)
 

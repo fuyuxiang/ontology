@@ -5,7 +5,7 @@
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M10 12L6 8l4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        返回对象定义
+        {{ text('返回对象定义') }}
       </button>
       <div class="ob-shell-title">
         <span class="name">{{ session.ontologyName }}</span>
@@ -42,20 +42,21 @@
         :session="session"
         @next="goNext"
       />
-      <Step2Review
+      <Step3Mapping
         v-else-if="currentStep === 2"
         :session="session"
         @prev="goPrev"
         @next="goNext"
       />
-      <Step3Mapping
-        v-else-if="currentStep === 3 && session.buildMethod === 'manual'"
+      <Step2Review
+        v-else-if="currentStep === 3"
         :session="session"
+        :mapping-complete="true"
         @prev="goPrev"
         @next="goNext"
       />
       <Step3Hydrate
-        v-else-if="(currentStep === 4 && session.buildMethod === 'manual') || (currentStep === 3 && session.buildMethod !== 'manual')"
+        v-else-if="currentStep === 4"
         :session="session"
         @prev="goPrev"
         @goto-studio="$emit('goto-studio')"
@@ -65,6 +66,8 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../../composables/useProductText'
+const { text } = useProductText()
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { BuilderSession, BuildMethod } from '../../../types/builder'
@@ -75,6 +78,7 @@ import Step1Build from './Step1Build.vue'
 import Step2Review from './Step2Review.vue'
 import Step3Mapping from './Step3Mapping.vue'
 import Step3Hydrate from './Step3Hydrate.vue'
+import { useBuilderStore } from '../../../store/builder'
 
 const props = defineProps<{ session: BuilderSession }>()
 defineEmits<{
@@ -83,6 +87,7 @@ defineEmits<{
 
 const route = useRoute()
 const router = useRouter()
+const store = useBuilderStore()
 
 const returnPath = computed(() => {
   if (route.query.from === 'ontology-detail' && route.query.code) {
@@ -109,33 +114,36 @@ const METHOD_LABEL: Record<BuildMethod, string> = {
   extract: '文档抽取',
   chat: '对话生成',
 }
-const methodLabel = computed(() => METHOD_LABEL[props.session.buildMethod] || '手工建模')
+const methodLabel = computed(() => text(METHOD_LABEL[props.session.buildMethod] || '手工建模'))
 
 const STEP_DEFS: Record<BuildMethod, { key: string; label: string; sub: string }[]> = {
   manual: [
     { key: 'build', label: '手工建模', sub: '定义对象、属性、关系' },
-    { key: 'review', label: '专家审批', sub: '审核对象与关系的业务正确性' },
     { key: 'mapping', label: '数据映射', sub: '数据源接入 · 属性列映射' },
+    { key: 'review', label: '最终审核', sub: '审核对象、关系与已确认映射' },
     { key: 'hydrate', label: '验证发布', sub: '端到端数据验证 · 发布上线' },
   ],
   import: [
     { key: 'import', label: '文件导入', sub: 'OWL / RDF / JSON 标准本体' },
-    { key: 'review', label: '专家审批', sub: '审核对象与关系的业务正确性' },
+    { key: 'mapping', label: '数据映射', sub: '数据源接入 · 属性列映射' },
+    { key: 'review', label: '最终审核', sub: '审核对象、关系与已确认映射' },
     { key: 'hydrate', label: '验证发布', sub: '端到端数据验证 · 发布上线' },
   ],
   extract: [
     { key: 'extract', label: '文档抽取', sub: '业务文档 LLM 流式抽取' },
-    { key: 'review', label: '专家审批', sub: '审核对象与关系的业务正确性' },
+    { key: 'mapping', label: '数据映射', sub: '数据源接入 · 属性列映射' },
+    { key: 'review', label: '最终审核', sub: '审核对象、关系与已确认映射' },
     { key: 'hydrate', label: '验证发布', sub: '端到端数据验证 · 发布上线' },
   ],
   chat: [
     { key: 'chat', label: '对话生成', sub: '场景驱动 · 资产联动' },
-    { key: 'review', label: '专家审批', sub: '审核对象与关系的业务正确性' },
+    { key: 'mapping', label: '数据映射', sub: '数据源接入 · 属性列映射' },
+    { key: 'review', label: '最终审核', sub: '审核对象、关系与已确认映射' },
     { key: 'hydrate', label: '验证发布', sub: '端到端数据验证 · 发布上线' },
   ],
 }
 
-const stepsForMethod = computed(() => STEP_DEFS[props.session.buildMethod] || STEP_DEFS.manual)
+const stepsForMethod = computed(() => (STEP_DEFS[props.session.buildMethod] || STEP_DEFS.manual).map(step => ({ ...step, label: text(step.label), sub: text(step.sub) })))
 
 const versionLabel = computed(() => {
   if (props.session.publishedVersion) return `已发布 · ${props.session.publishedVersion}`
@@ -146,20 +154,23 @@ const versionLabel = computed(() => {
 function stepForStatus() {
   const status = props.session.status
   if (status === 'pending_review' || status === 'reviewing') return 2
-  if (status === 'pending_hydration') return 3
+  if (status === 'pending_hydration') return 4
   if (status === 'hydrating' || status === 'pending_publish' || status === 'publishing' || status === 'published') {
-    return props.session.buildMethod === 'manual' ? 4 : 3
+    return 4
   }
   return 1
 }
 
 watch(() => props.session.sessionId, () => {
-  currentStep.value = stepForStatus()
+  const saved = props.session.builderState
+  currentStep.value = saved?.workflowVersion === 2 && saved.shellStep ? Math.min(4, Math.max(1, saved.shellStep)) : stepForStatus()
 }, { immediate: true })
 
 watch(() => props.session.status, () => {
   currentStep.value = Math.max(currentStep.value, stepForStatus())
 })
+
+watch(currentStep, step => store.updateSession(props.session.sessionId, { builderState: { ...props.session.builderState, workflowVersion: 2, shellStep: step } }))
 
 function onStepClick(n: number) {
   if (n <= currentStep.value) currentStep.value = n
@@ -241,4 +252,12 @@ function goPrev() { currentStep.value = Math.max(1, currentStep.value - 1) }
 
 .ob-shell-body { flex: 1; overflow: hidden; }
 .ob-step:focus-visible { outline: 2px solid #4f46e5; outline-offset: 3px; border-radius: 6px; }
+@media (max-width: 640px) {
+  .ob-shell-header { flex-wrap: wrap; padding: 10px 12px; }
+  .ob-shell-actions { flex-wrap: wrap; }
+  .ob-steps { flex-wrap: wrap; gap: 10px; padding: 12px; }
+  .ob-step { width: calc(50% - 5px); min-width: 0; }
+  .ob-step-sub { display: none; }
+  .ob-step-connector { display: none; }
+}
 </style>

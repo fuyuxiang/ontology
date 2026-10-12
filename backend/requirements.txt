@@ -3,6 +3,10 @@ uvicorn[standard]==0.34.*
 sqlalchemy==2.0.*
 alembic==1.14.*
 psycopg2-binary==2.9.*
+PyMySQL>=1.1,<2
+pymssql>=2.3,<3
+oracledb>=2,<4
+paramiko>=3.4,<5
 pydantic==2.11.*
 pydantic-settings==2.9.*
 python-jose[cryptography]==3.4.*
@@ -22,3 +26,4 @@ sqlglot>=30.0
 sse-starlette>=3.0
 psutil>=5.9
 watchdog>=4.0
+kafka-python>=2.2,<3

@@ -35,8 +35,14 @@ export interface AlertItem {
 
 export interface LLMStatsResponse {
   total_24h: number
+  success_count?: number
+  failed_count?: number
+  success_rate?: number
   by_module: Record<string, {
     count: number
+    success_count?: number
+    failed_count?: number
+    success_rate?: number
     total_prompt_tokens: number
     total_completion_tokens: number
     avg_latency_ms: number

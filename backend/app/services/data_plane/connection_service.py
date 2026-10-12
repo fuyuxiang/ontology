@@ -273,8 +273,11 @@ class ConnectionService:
                         password_changed = True
         self.repo.commit()
         self.repo.refresh(conn)
-        if password_changed:
+        if any(v is not None for v in (host, port, database, username, password, params, credential, pool_size, enabled)):
             _dispose_pool(conn.id)
+            from app.services.data_plane.execute_service import ExecuteService
+            ExecuteService.invalidate_cache_for_asset("")
+        if password_changed:
             self.bus.emit("connection.updated.password", {"connection_id": conn.id})
         return conn
 
@@ -366,14 +369,11 @@ class ConnectionService:
         if conn.category != CATEGORY_DATABASE:
             return [conn.database] if conn.database else []
         connector = ConnectorRegistry.get(conn.type)
-        if not hasattr(connector, "list_databases"):
-            return [conn.database] if conn.database else []
         with self.with_conn(conn_id) as raw:
-            try:
+            if hasattr(connector, "list_databases"):
                 return connector.list_databases(raw)
-            except Exception as e:
-                logger.warning("list_databases failed: %s", e)
-                return [conn.database] if conn.database else []
+            # Providers that only connect to one database expose its verified name.
+            return [conn.database] if conn.database else []
 
     def list_tables(self, conn_id: str, database: str | None = None) -> list[str]:
         conn = self._must_get(conn_id)
@@ -425,7 +425,15 @@ class ConnectionService:
                 except Exception:
                     pass
             else:
-                pool.release(raw)
+                # Reset the read transaction too: pooled REPEATABLE READ sessions otherwise
+                # keep serving stale rows after a write through a different connection.
+                try:
+                    if hasattr(raw, "rollback"):
+                        raw.rollback()
+                except Exception:
+                    _ConnectionPool._safe_close(raw)
+                else:
+                    pool.release(raw)
 
     def _must_get(self, conn_id: str) -> Connection:
         c = self.repo.get_by_id(conn_id)

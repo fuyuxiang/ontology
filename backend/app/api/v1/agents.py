@@ -1,4 +1,5 @@
 import copy
+import json
 import secrets
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from app.models.agent import Agent, ModelRegistry
 from app.models.agent_runtime import AgentPendingAction, AgentRun, AgentVersion
 from app.models.agent_test_conversation import AgentTestConversation
 from app.models.user import User
+from app.schemas.action import ActionReconciliation
 from app.services.agent.orchestrator import AgentService
 from app.services.agent_management import (
     CONFIG_FIELDS,
@@ -89,6 +91,7 @@ class ChatRequest(BaseModel):
 
 
 def _agent_out(a: Agent, db: Session, user: User | None = None) -> dict:
+    from app.core.permissions import has_permission
     model_name = None
     if a.model_id:
         m = db.get(ModelRegistry, a.model_id)
@@ -110,9 +113,11 @@ def _agent_out(a: Agent, db: Session, user: User | None = None) -> dict:
         "system_prompt": a.system_prompt,
         "kb_ids": a.kb_ids or [],
         "entity_ids": a.entity_ids or [],
+        "nodes_json": a.nodes_json or [],
+        "edges_json": a.edges_json or [],
         "tools_config": a.tools_config or {},
         "status": a.status,
-        "api_key": a.api_key if a.status == "published" and user and user.role in ("admin", "editor") else None,
+        "api_key": a.api_key if a.status == "published" and user and has_permission(user, "rule:write", db) else None,
         "ontology_id": cfg.get("ontology_id"),
         "referenced_ontology_ids": sorted(referenced_ontology_ids),
         "ontology_version_id": cfg.get("ontology_version_id") or a.ontology_version_id,
@@ -385,14 +390,14 @@ class _collect_steps:
 def _writeback_conversation(
     db: Session, conv, question: str, answer: str, steps: list | None = None,
     pending_actions: list | None = None,
-) -> None:
-    """把本轮问答追加写回会话；title 若为默认值则用首条 user 消息生成。失败静默。
+) -> bool:
+    """把本轮问答追加写回会话；返回是否完成持久化，调用者记录保存失败。
 
     steps 为本轮 assistant 的思考过程（工具调用链），一并存入 assistant 消息，
     便于历史会话回看时重现"使用本体、调用逻辑、执行动作"的过程。
     """
     if conv is None:
-        return
+        return True
     try:
         msgs = list(conv.messages or [])
         msgs.append({"role": "user", "content": question})
@@ -409,8 +414,10 @@ def _writeback_conversation(
         flag_modified(conv, "messages")
         db.add(conv)
         db.commit()
+        return True
     except Exception:
         db.rollback()
+        return False
 
 
 @router.post("/{aid}/chat")
@@ -531,11 +538,13 @@ class ActionDecisionRequest(BaseModel):
 
 
 @router.post("/{aid}/actions/{pending_id}/confirm")
-def confirm_action(aid: str, pending_id: str, body: ActionDecisionRequest,
+def confirm_action(aid: str, pending_id: str, body: ActionDecisionRequest, request: Request,
                    db: Session = Depends(get_db), user: User = Depends(require_agent_user)):
     from app.services.agent_actions import execute_action_snapshot
     from app.services.audit import write_audit
-    require_edit(user)
+    from app.core.permissions import has_permission
+    if not (has_permission(user, "rule:execute", db) or has_permission(user, "rule:write", db)):
+        raise HTTPException(403, "需要行动执行权限")
     pending = db.get(AgentPendingAction, pending_id)
     if not pending or pending.agent_id != aid or (user.role != "admin" and pending.user_id != user.id):
         raise HTTPException(404, "待确认行动不存在")
@@ -558,22 +567,150 @@ def confirm_action(aid: str, pending_id: str, body: ActionDecisionRequest,
         db.commit()
         db.refresh(pending)
         if changed and body.approve:
+            _sync_pending_status(db, pending)
             action = pending.action_snapshot
             try:
-                result = execute_action_snapshot(db, action, pending.params, dry_run=False)
+                from app.services.agent_actions import action_execution_context
+                result = execute_action_snapshot(db, action, pending.params, dry_run=False,
+                    context=action_execution_context(action, user=user))
                 pending.result = json_safe({"success": result.success, "message": result.message, "output": result.output})
-                pending.status = "approved" if result.success else "failed"
+                uncertain = isinstance(result.output, dict) and result.output.get("outcome") in {"unknown", "committed_unrecorded", "partial_committed"}
+                pending.status = "unknown" if uncertain else "approved" if result.success else "failed"
+            except (TimeoutError, ConnectionError) as exc:
+                pending.result, pending.status = {"success": False, "message": str(exc),
+                    "outcome": getattr(exc, "outcome", "unknown"),
+                    "observed_result": getattr(exc, "observed_result", None)}, "unknown"
             except Exception as exc:
                 pending.result, pending.status = {"success": False, "message": str(exc)}, "failed"
             db.add(pending)
-            write_audit(db, user_id=user.id, user_name=user.name, action="execute", target_type="agent_action",
-                        target_id=pending.id, target_name=action.get("name", ""), details=pending.status)
-            db.commit()
+            observed_result = pending.result
+            try:
+                if pending.status == "approved":
+                    _increment_action_impact(db, pending.action_id)
+                write_audit(db, user_id=user.id, user_name=user.name, action="execute", target_type="agent_action",
+                            target_id=pending.id, target_name=action.get("name", ""), details=pending.status,
+                            status="success" if pending.status == "approved" else pending.status)
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                _record_uncertain_pending(db, pending.id, observed_result,
+                    "行动执行已返回，但结果记录失败；请核查业务回执，原授权不会重发")
+                raise HTTPException(503, detail={"status": "unknown", "result": observed_result,
+                    "message": "行动执行已返回，但结果记录失败；不要重新执行，请核查业务数据和运行记录"}) from exc
+            if pending.status == "approved" and action.get("_graph_checkpoint"):
+                from app.services.agent_graph_resume import resume_confirmed_graph
+                try:
+                    resume_confirmed_graph(db, pending, user, request)
+                except Exception as exc:
+                    db.rollback()
+                    _record_uncertain_pending(db, pending.id, observed_result,
+                        "行动已完成，但后续图执行或记录未确认；请核查后续结果，原检查点不可重放", continuation=True)
+                    raise HTTPException(503, detail={"status": "unknown", "result": observed_result,
+                        "message": "行动已完成，但后续图执行或记录未确认；不要重复执行，请核查业务回执和运行记录"}) from exc
         if changed:
             _sync_pending_status(db, pending)
+    elif pending.status != "pending":
+        # Repair an interrupted projection write without replaying the external action.
+        _sync_pending_status(db, pending)
     summaries = {"approved": "行动已授权并执行", "rejected": "行动已拒绝，未执行", "expired": "授权已过期，未执行",
                  "executing": "行动正在执行，请稍后刷新", "failed": "行动执行失败，请查看原因"}
+    summaries["unknown"] = "行动结果未知，请核查业务回执；该授权不会重复执行"
+    summaries["resuming"] = "行动已完成，后续图执行正在处理；请刷新运行记录"
     return {"status": pending.status, "result": pending.result, "summary": summaries.get(pending.status, pending.status)}
+
+
+def _increment_action_impact(db, action_id):
+    from sqlalchemy import func
+    from app.models.action import EntityAction
+    db.query(EntityAction).filter_by(id=action_id).update(
+        {"impact_count": func.coalesce(EntityAction.impact_count, 0) + 1}, synchronize_session=False)
+
+
+def _record_uncertain_pending(db, pending_id, observed_result, message, *, continuation=False):
+    """Best-effort durable recovery after a failed projection commit, with no replay."""
+    try:
+        pending = db.get(AgentPendingAction, pending_id)
+        if not pending:
+            return
+        result = {**(observed_result or {}), "success": False, "message": message,
+                  "outcome": "committed_unrecorded" if (observed_result or {}).get("success") else "unknown",
+                  "observed_result": observed_result}
+        if continuation:
+            result.update(graph_resume_started=True, continuation_status="unknown", continuation_error=message)
+        pending.status, pending.result = "unknown", json_safe(result)
+        db.commit()
+        _sync_pending_status(db, pending)
+    except Exception:
+        db.rollback()
+
+
+def _owned_pending(db, aid, pending_id, user):
+    from app.core.permissions import has_permission
+    if not (has_permission(user, "rule:execute", db) or has_permission(user, "rule:write", db)):
+        raise HTTPException(403, "需要行动执行权限")
+    pending = db.get(AgentPendingAction, pending_id)
+    if not pending or pending.agent_id != aid or (user.role != "admin" and pending.user_id != user.id):
+        raise HTTPException(404, "待确认行动不存在")
+    return pending
+
+
+@router.post("/{aid}/actions/{pending_id}/reconcile")
+def reconcile_pending_action(aid: str, pending_id: str, body: ActionReconciliation,
+                             db: Session = Depends(get_db), user: User = Depends(require_agent_user)):
+    """Record independently checked evidence; never dispatch the original action."""
+    from app.services.audit import write_audit
+    pending = _owned_pending(db, aid, pending_id, user)
+    if pending.status not in {"unknown", "committed_unrecorded"}:
+        raise HTTPException(409, "仅结果未知的行动可以人工核查；执行中请等待，终态不会再次变更")
+    if len(body.evidence.strip()) < 10:
+        raise HTTPException(422, "请填写实际核查的源数据或外部回执证据")
+    previous = copy.deepcopy(pending.result or {})
+    verification = {"resolution": body.resolution, "evidence": body.evidence.strip(),
+                    "receipt_id": body.receipt_id, "user_id": user.id, "user_name": user.name,
+                    "verified_at": datetime.utcnow().isoformat(), "method": "manual"}
+    result = {**previous, "success": body.resolution == "succeeded", "outcome": "manually_reconciled",
+              "observed_result": previous, "manual_reconciliation": verification,
+              "message": "经人工核查确认为" + ("成功" if body.resolution == "succeeded" else "失败") + "；原授权保留，不会重新执行"}
+    if body.resolution == "succeeded" and (pending.action_snapshot or {}).get("_graph_checkpoint"):
+        if previous.get("graph_resume_started"):
+            # A crashed suffix may already have effects. The original checkpoint cannot
+            # replay it, even when the first action is independently confirmed successful.
+            result["continuation_status"] = previous.get("continuation_status") or "unknown"
+            result["continuation_error"] = previous.get("continuation_error") or "图后续执行已开始但结果未知；请核查后续运行记录，不可重放该检查点"
+        else:
+            result["continuation_status"] = "awaiting_resume"
+            result["continuation_error"] = None
+    status = "approved" if body.resolution == "succeeded" else "failed"
+    changed = db.query(AgentPendingAction).filter(AgentPendingAction.id == pending.id,
+        AgentPendingAction.status.in_(["unknown", "committed_unrecorded"])).update(
+            {"status": status, "result": json_safe(result), "confirmed_at": datetime.utcnow()}, synchronize_session=False)
+    if not changed:
+        db.rollback()
+        raise HTTPException(409, "该行动已被其他核查请求更新，请重新读取结果")
+    if status == "approved":
+        _increment_action_impact(db, pending.action_id)
+    write_audit(db, user_id=user.id, user_name=user.name, action="manual_reconciliation", target_type="agent_action",
+                target_id=pending.id, target_name=(pending.action_snapshot or {}).get("name", ""),
+                details=json.dumps({"run_id": pending.run_id, "previous_state": pending.status,
+                                               "previous_result": previous, **verification}, ensure_ascii=False),
+                status="success" if status == "approved" else "failed")
+    db.commit()
+    db.refresh(pending)
+    _sync_pending_status(db, pending)
+    return {"status": pending.status, "result": pending.result, "summary": result["message"]}
+
+
+@router.post("/{aid}/actions/{pending_id}/resume")
+def resume_reconciled_action(aid: str, pending_id: str, request: Request,
+                             db: Session = Depends(get_db), user: User = Depends(require_agent_user)):
+    pending = _owned_pending(db, aid, pending_id, user)
+    if pending.status != "approved" or (pending.result or {}).get("continuation_status") != "awaiting_resume":
+        raise HTTPException(409, "该行动没有可安全恢复的未执行图后缀，请读取运行记录")
+    from app.services.agent_graph_resume import resume_confirmed_graph
+    if not resume_confirmed_graph(db, pending, user, request):
+        raise HTTPException(409, "图后缀已被其他请求恢复，请读取运行记录")
+    _sync_pending_status(db, pending)
+    return {"status": pending.status, "result": pending.result, "summary": "已恢复未执行图后缀；原行动未重新执行"}
 
 
 def _sync_pending_status(db, pending):
@@ -582,14 +719,38 @@ def _sync_pending_status(db, pending):
                 if item.get("pending_id") == pending.id else item for item in items or []]
     run = db.get(AgentRun, pending.run_id) if pending.run_id else None
     if run:
+        projected_errors = {str((item.get("result") or {}).get("message") or "行动执行失败")
+                            for item in run.pending_actions or [] if item.get("status") in {"failed", "unknown", "committed_unrecorded"}}
+        projected_errors.update(str((item.get("result") or {}).get("continuation_error"))
+                                for item in run.pending_actions or [] if (item.get("result") or {}).get("continuation_error"))
+        independent_errors = [error for error in (run.error or "").splitlines() if error and error not in projected_errors]
         run.pending_actions = updated(run.pending_actions)
-        if run.status == "pending_confirmation" and all(
-                item.get("status") not in {"pending", "executing"} for item in run.pending_actions):
-            failures = [item for item in run.pending_actions if item.get("status") == "failed"]
-            run.status = "failed" if failures else "completed"
-            if failures:
-                run.error = "\n".join(str((item.get("result") or {}).get("message") or "行动执行失败") for item in failures)
+        if run.status in {"pending_confirmation", "unknown", "failed"}:
+            failures = [item for item in run.pending_actions if item.get("status") in {"failed", "unknown", "committed_unrecorded"}]
+            continuations = [item.get("result") or {} for item in run.pending_actions]
+            tools = [item for item in run.tool_runs or [] if item.get("success") is False]
+            def uncertain_tool(item):
+                result = item.get("result") if isinstance(item.get("result"), dict) else {}
+                output = result.get("output") if isinstance(result.get("output"), dict) else {}
+                return (result.get("outcome") or output.get("outcome")) in {"unknown", "committed_unrecorded", "partial_committed"}
+            unknown = any(i.get("status") in {"unknown", "committed_unrecorded"} for i in failures) or any(
+                i.get("continuation_status") == "unknown" for i in continuations) or any(
+                uncertain_tool(i) for i in tools)
+            errors = independent_errors + [str((item.get("result") or {}).get("message") or "行动执行失败") for item in failures]
+            errors += [str(i.get("continuation_error")) for i in continuations if i.get("continuation_error")]
+            errors += [str((i.get("result") or {}).get("error") or (i.get("result") or {}).get("message") or "工具执行失败") for i in tools]
+            waiting = any(item.get("status") in {"pending", "executing", "resuming"} for item in run.pending_actions) or any(
+                i.get("continuation_status") == "awaiting_resume" for i in continuations)
+            run.status = "unknown" if unknown else "failed" if errors else "pending_confirmation" if waiting else "completed"
+            run.finished_at = None if waiting else datetime.utcnow()
+            run.error = "\n".join(dict.fromkeys(errors)) or None
         db.add(run)
+        from app.models.trace import AgentTrace
+        trace = db.get(AgentTrace, run.id)
+        if trace:
+            trace.status = "pending" if run.status == "pending_confirmation" else "ok" if run.status == "completed" else "error"
+            trace.output_text = run.answer
+            db.add(trace)
     for conv in db.query(AgentTestConversation).filter_by(agent_id=pending.agent_id, user_id=pending.user_id).all():
         conv.messages = [{**m, "pending_actions": updated(m["pending_actions"])}
                          if "pending_actions" in m else m for m in conv.messages or []]

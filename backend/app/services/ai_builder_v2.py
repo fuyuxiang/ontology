@@ -43,12 +43,12 @@ def recommend_tables(business_desc: str, tables: list[dict], db: Session | None 
 
     table_summaries = []
     for t in tables[:50]:
-        schema = asset_catalog.get_table_schema(t["table_name"], db)
+        schema = asset_catalog.get_table_schema(t["asset_id"], db)
         fields_preview = ", ".join(f["field_name"] + "(" + (f["field_desc"] or "") + ")" for f in schema[:10])
-        table_summaries.append(f"- {t['table_name']}: {t['table_desc'] or '无描述'} | 字段: {fields_preview}")
+        table_summaries.append(f"- {t['asset_id']} ({t['table_name']}): {t['table_desc'] or '无描述'} | 字段: {fields_preview}")
 
     tables_text = "\n".join(table_summaries)
-    table_names = [t["table_name"] for t in tables[:50]]
+    table_names = [t["asset_id"] for t in tables[:50]]
 
     prompt = f"""你是一名资深的业务建模与本体建模专家。根据用户的业务描述，从以下候选数据表中选出与该业务最相关的表。
 
@@ -58,11 +58,11 @@ def recommend_tables(business_desc: str, tables: list[dict], db: Session | None 
 {tables_text}
 
 请选出与业务场景最相关的表，返回 JSON 格式（不要返回其他内容）：
-{{"recommended": ["表名1", "表名2", ...], "reason": "选择理由"}}"""
+{{"recommended": ["asset_id1", "asset_id2", ...], "reason": "选择理由"}}"""
 
-    client = _get_llm_client()
+    client = _get_llm_client(db)
     resp = client.chat.completions.create(
-        model=_get_model_name(),
+        model=_get_model_name(db),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
     )
@@ -74,34 +74,82 @@ def recommend_tables(business_desc: str, tables: list[dict], db: Session | None 
         return recommended
     except json.JSONDecodeError:
         logger.warning("recommend_tables JSON 解析失败: %s", resp.choices[0].message.content)
-        return []
+        raise ValueError("模型未返回有效的资产推荐 JSON，请重试")
+
+
+def read_document_content(key: str, db: Session | None = None, user_id: str | None = None) -> str:
+    if key.startswith("asset:"):
+        from app.services.data_plane.asset_service import AssetService
+        if db is None:
+            raise ValueError("缺少资产数据会话")
+        asset = db.get(Asset, key[6:])
+        if not asset or asset.kind != "document" or asset.status != "active":
+            raise ValueError("文档资产不存在或不可用")
+        if asset.document_source_type == "directory" or asset.document_source_type in ("s3", "oss") and not (asset.locator or {}).get("key"):
+            raise ValueError("请选择有明确文件或对象 key 的文档资产，文件清单不是文档正文")
+        text = AssetService(db).read_document_content(asset)
+        if not text.strip():
+            raise ValueError("文档资产未返回可抽取正文")
+        return text
+    if key.startswith("doc-upload:"):
+        from app.services.doc_builder import get_session
+        parts = key.split(":", 2)
+        if len(parts) != 3 or db is None or not user_id:
+            raise ValueError("本地文档引用无效或缺少登录账户")
+        session = get_session(parts[1], db, user_id)
+        if not session:
+            raise ValueError("本地文档会话不存在或不可访问")
+        file = next((item for item in session["files"] if item["name"] == parts[2]), None)
+        if not file:
+            raise ValueError("本地文档已不存在")
+        return file["content"]
+    text = minio_docs.get_document_content(key, db)
+    if not text.strip() or text.startswith("["):
+        raise ValueError(f"文档 {key} 无法读取或解析: {text[:200]}")
+    return text
 
 
 def extract_ontology_stream(
+    table_names: list[str], document_keys: list[str], business_desc: str,
+    db: Session | None = None, user_id: str | None = None,
+) -> Generator[str, None, None]:
+    try:
+        yield from _extract_ontology_stream(table_names, document_keys, business_desc, db, user_id)
+    except Exception as exc:
+        logger.exception("ontology extraction failed")
+        yield f"data: {json.dumps({'event':'error','message':str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+
+def _extract_ontology_stream(
     table_names: list[str],
     document_keys: list[str],
     business_desc: str,
     db: Session | None = None,
+    user_id: str | None = None,
 ) -> Generator[str, None, None]:
     tables_schema = {}
     for tn in table_names:
         schema = asset_catalog.get_table_schema(tn, db)
-        tables_schema[tn] = {"fields": schema}
+        asset = asset_catalog._find_asset(db, tn)
+        tables_schema[tn] = {"table_name": asset_catalog._table_name(asset) if asset else tn, "fields": schema}
 
     yield f"data: {json.dumps({'event': 'progress', 'message': f'已加载 {len(table_names)} 张表的 schema'})}\n\n"
 
     doc_texts = {}
     for key in document_keys:
         try:
-            text = minio_docs.get_document_content(key)
-            doc_texts[key] = text[:3000]
+            text = read_document_content(key, db, user_id)
+            doc_texts[key] = text
         except Exception as e:
-            doc_texts[key] = f"[读取失败: {e}]"
+            yield f"data: {json.dumps({'event':'error','message':f'读取文档失败: {e}'})}\n\n"
+            yield "data: [DONE]\n\n"
+            return
 
     yield f"data: {json.dumps({'event': 'progress', 'message': f'已解析 {len(document_keys)} 篇文档'})}\n\n"
 
     schema_json = json.dumps(tables_schema, ensure_ascii=False, indent=2)
-    doc_summary = "\n\n".join(f"### {k}\n{v[:2000]}" for k, v in doc_texts.items())
+    doc_summary = "\n\n".join(f"### {k}\n{v}" for k, v in doc_texts.items())
 
     prompt = f"""你是一名资深的业务建模与本体建模专家。根据以下结构化数据表 schema 和业务文档，提取本体的实体、属性和关系。
 
@@ -126,7 +174,9 @@ def extract_ontology_stream(
     {{
       "name": "PascalCase英文名",
       "displayName": "中文名",
-      "table": "对应表名",
+      "table": "输入结构的asset_id键",
+      "asset_id": "对应asset_id",
+      "primaryKey": "主键属性名",
       "description": "业务含义",
       "properties": [
         {{"name": "字段英文名", "displayName": "字段中文名", "type": "string|integer|number|date|boolean", "required": true/false}}
@@ -140,9 +190,9 @@ def extract_ontology_stream(
 
     yield f"data: {json.dumps({'event': 'progress', 'message': '正在调用大模型提取实体和关系...'})}\n\n"
 
-    client = _get_llm_client()
+    client = _get_llm_client(db)
     resp = client.chat.completions.create(
-        model=_get_model_name(),
+        model=_get_model_name(db),
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
         stream=True,
@@ -160,7 +210,7 @@ def extract_ontology_stream(
     try:
         result = json.loads(full_content)
     except json.JSONDecodeError:
-        yield f"data: {json.dumps({'event': 'result', 'data': {'entities': [], 'relations': [], 'asset_ids': []}, 'raw': full_content})}\n\n"
+        yield f"data: {json.dumps({'event': 'error', 'message': '模型未返回有效本体 JSON，请重新提取'})}\n\n"
         yield "data: [DONE]\n\n"
         return
 
@@ -169,42 +219,53 @@ def extract_ontology_stream(
     all_asset_ids: list[str] = []
     if db:
         for tn in table_names:
-            asset = (
-                db.query(Asset)
-                .filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"]))
-                .filter(Asset.locator["table"].as_string() == tn)
-                .first()
-            )
-            if not asset:
-                asset = (
-                    db.query(Asset)
-                    .filter(Asset.status == "active", Asset.kind.in_(["table", "sql_view"]),
-                            Asset.name == tn)
-                    .first()
-                )
-            if asset:
-                table_asset_map[tn] = asset.id
-                all_asset_ids.append(asset.id)
+            try:
+                asset = asset_catalog._find_asset(db, tn)
+                if not asset:
+                    raise ValueError(f"数据表 {tn} 尚未注册为可用资产")
+            except ValueError as exc:
+                yield f"data: {json.dumps({'event':'error','message':str(exc)})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
+            table_asset_map[tn] = asset.id
+            all_asset_ids.append(asset.id)
+        # 兼容模型返回物理表名，但同名表必须返回明确 asset_id。
+        for aid in all_asset_ids:
+            physical = asset_catalog._table_name(db.get(Asset, aid))
+            matches = [candidate for candidate in all_asset_ids if asset_catalog._table_name(db.get(Asset, candidate)) == physical]
+            if len(matches) == 1:
+                table_asset_map[physical] = aid
 
-    for ent in result.get("entities", []):
+    entities = result.get("entities") if isinstance(result, dict) else None
+    if not isinstance(entities, list) or not entities:
+        raise ValueError("模型未返回任何有效对象，请重新提取")
+    names = [entity.get("name") for entity in entities if isinstance(entity, dict)]
+    if len(names) != len(entities) or any(not name for name in names) or len(set(names)) != len(names):
+        raise ValueError("模型对象名称缺失或重复，请重新提取")
+    for relation in result.get("relations", []):
+        if relation.get("source") not in names or relation.get("target") not in names:
+            raise ValueError("模型关系引用了未定义对象，请重新提取")
+    for ent in entities:
+        if not isinstance(ent.get("properties"), list) or not ent["properties"]:
+            raise ValueError(f"对象 {ent['name']} 未定义属性，请重新提取")
         table_for_ent = ent.get("table", "")
-        asset_id = table_asset_map.get(table_for_ent)
+        asset_id = table_asset_map.get(ent.get("asset_id")) or table_asset_map.get(table_for_ent)
         if asset_id:
             ent["backing_asset_ids"] = [asset_id]
-        elif all_asset_ids:
-            ent["backing_asset_ids"] = list(all_asset_ids)
+            ent["asset_id"] = asset_id
         else:
-            ent["backing_asset_ids"] = []
+            raise ValueError(f"对象 {ent['name']} 未关联所选数据资产，请重新提取")
 
         if asset_id and db:
             asset_obj = db.get(Asset, asset_id)
             schema_cols = asset_obj.schema_snapshot or [] if asset_obj else []
             col_names = {c.get("name", "").lower() for c in schema_cols}
             for prop in ent.get("properties", []):
-                prop_name = (prop.get("name") or "").lower()
-                if prop_name in col_names:
+                requested = prop.get("source_column") or prop.get("source_field") or prop.get("field") or prop.get("name")
+                physical = next((column.get("name") for column in schema_cols if column.get("name", "").lower() == (requested or "").lower()), None)
+                if physical:
                     prop["source_asset_id"] = asset_id
-                    prop["source_column"] = prop.get("name")
+                    prop["source_column"] = physical
 
     result["asset_ids"] = all_asset_ids
     yield f"data: {json.dumps({'event': 'result', 'data': result})}\n\n"

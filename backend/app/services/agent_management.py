@@ -34,7 +34,8 @@ def latest_version(db, aid):
 
 
 def require_edit(user):
-    if not user or not user.is_active or user.role not in ("admin", "editor"):
+    from app.core.permissions import has_permission
+    if not has_permission(user, "rule:write"):
         raise HTTPException(403, "需要管理员或编辑者权限")
 
 

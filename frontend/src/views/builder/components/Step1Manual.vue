@@ -2,8 +2,8 @@
   <div class="manual-root" tabindex="0" @keydown="onShortcut">
     <header class="manual-topbar">
       <div class="manual-topbar-title">
-        <span>手工建模</span>
-        <small>定义对象、属性、关系</small>
+        <span>{{ text('手工建模') }}</span>
+        <small>{{ text('定义对象、属性、关系') }}</small>
       </div>
       <div class="manual-topbar-stats">
         <span>{{ objects.length }} 对象</span>
@@ -11,10 +11,10 @@
         <span>{{ totalProps }} 属性</span>
       </div>
       <div class="manual-topbar-actions">
-        <button class="btn btn-ghost" @click="undo" :disabled="!canUndo" title="Cmd/Ctrl+Z">↶ 撤销</button>
-        <button class="btn btn-ghost" @click="redo" :disabled="!canRedo" title="Cmd/Ctrl+Y">↷ 重做</button>
-        <button class="btn btn-ghost" @click="previewOpen = true" :disabled="!objects.length">👁 在图谱中预览</button>
-        <button class="btn btn-primary" :disabled="!canSubmit" @click="confirmAll">提交进入走测 →</button>
+        <button class="btn btn-ghost" @click="undo" :disabled="!canUndo" title="Cmd/Ctrl+Z">{{ text("↶ 撤销") }}</button>
+        <button class="btn btn-ghost" @click="redo" :disabled="!canRedo" title="Cmd/Ctrl+Y">{{ text("↷ 重做") }}</button>
+        <button class="btn btn-ghost" @click="previewOpen = true" :disabled="!objects.length">{{ text("👁 在图谱中预览") }}</button>
+        <button class="btn btn-primary" :disabled="!canSubmit" @click="confirmAll">{{ text("提交进入数据映射 →") }}</button>
       </div>
     </header>
 
@@ -24,8 +24,8 @@
         <div class="col-head">
           <span>对象 · {{ objects.length }}</span>
           <div class="col-head-btns">
-            <button class="iconbtn" title="批量粘贴 CSV" @click="csvOpen = true">⎘</button>
-            <button class="iconbtn iconbtn-primary" title="新建对象 (N)" @click="addObject()">＋</button>
+            <button class="iconbtn" :title="text('批量粘贴 CSV')" @click="csvOpen = true">⎘</button>
+            <button class="iconbtn iconbtn-primary" :title="text('新建对象 (N)')" @click="addObject()">＋</button>
           </div>
         </div>
         <div class="obj-list">
@@ -37,12 +37,12 @@
           >
             <span class="obj-icon" :style="{ background: tierBg(o.tier), color: tierColor(o.tier) }">{{ o.icon || '🔷' }}</span>
             <div class="obj-meta">
-              <div class="obj-name">{{ o.displayName || '(未命名)' }}</div>
+              <div class="obj-name">{{ o.displayName || text('(未命名)') }}</div>
               <div class="obj-en">{{ o.name }} · {{ o.properties.length }} 属性</div>
             </div>
-            <button class="iconbtn iconbtn-danger" title="删除 (Del)" @click.stop="removeObject(o.id)">×</button>
+            <button class="iconbtn iconbtn-danger" :title="text('删除 (Del)')" @click.stop="removeObject(o.id)">×</button>
           </div>
-          <div v-if="!objects.length" class="empty-tip">还没有对象 — 点 ＋ 或按 N 创建</div>
+          <div v-if="!objects.length" class="empty-tip">{{ text("还没有对象 — 点 ＋ 或按 N 创建") }}</div>
         </div>
       </aside>
 
@@ -50,16 +50,19 @@
       <main class="manual-col manual-col-mid">
         <div v-if="selected" class="detail-card">
           <div class="detail-section">
-            <div class="section-title">基本信息</div>
+            <div class="section-title">{{ text('基本信息') }}</div>
             <div class="form-grid">
-              <label>名称（英文，PascalCase）<span class="req">*</span>
+              <label>{{ text('名称（英文，PascalCase）') }}<span class="req">*</span>
                 <input v-model="selected.name" :class="{ err: nameErr }" @blur="syncBlur" />
               </label>
-              <label>中文名 <span class="req">*</span>
+              <label>{{ text('中文名 ') }}<span class="req">*</span>
                 <input v-model="selected.displayName" @blur="syncBlur" />
               </label>
-              <label class="form-grid-full">描述
+              <label class="form-grid-full">{{ text('描述') }}
                 <textarea v-model="selected.description" rows="2" @blur="syncBlur"></textarea>
+              </label>
+              <label>{{ text('实例主键属性') }} <span class="req">*</span>
+                <select v-model="selected.primaryKey" @change="syncBlur"><option v-for="property in selected.properties" :key="property.id" :value="property.name">{{ property.name || text('(未命名)') }}</option></select>
               </label>
             </div>
             <div v-if="nameErr" class="field-err">{{ nameErr }}</div>
@@ -68,14 +71,14 @@
           <div class="detail-section">
             <div class="section-head">
               <div class="section-title">属性 ({{ selected.properties.length }})</div>
-              <button class="btn btn-mini" @click="addProp">＋ 添加属性</button>
+              <button class="btn btn-mini" @click="addProp">{{ text('＋ 添加属性') }}</button>
             </div>
             <div class="prop-table">
               <div class="prop-row prop-head">
-                <div>中文名</div><div>英文名</div><div>类型</div><div></div>
+                <div>{{ text('中文名') }}</div><div>{{ text('英文名') }}</div><div>{{ text('类型') }}</div><div></div>
               </div>
               <div v-for="p in selected.properties" :key="p.id" class="prop-row">
-                <input v-model="p.displayName" placeholder="中文属性名" @blur="syncBlur" />
+                <input v-model="p.displayName" :placeholder="text('中文属性名')" @blur="syncBlur" />
                 <input v-model="p.name" placeholder="snake_case" @blur="syncBlur" />
                 <select v-model="p.type" @change="syncBlur">
                   <option value="string">string</option>
@@ -86,14 +89,14 @@
                 </select>
                 <button class="iconbtn iconbtn-danger" @click="removeProp(p.id)">×</button>
               </div>
-              <div v-if="!selected.properties.length" class="empty-tip">至少需要 1 个属性</div>
+              <div v-if="!selected.properties.length" class="empty-tip">{{ text("至少需要 1 个属性") }}</div>
             </div>
           </div>
 
         </div>
         <div v-else class="detail-empty">
-          <div>左侧选一个对象进行编辑</div>
-          <button class="btn btn-primary" @click="addObject()">＋ 新建对象</button>
+          <div>{{ text("左侧选一个对象进行编辑") }}</div>
+          <button class="btn btn-primary" @click="addObject()">{{ text('＋ 新建对象') }}</button>
         </div>
       </main>
 
@@ -101,40 +104,41 @@
       <aside class="manual-col manual-col-right">
         <div class="col-head">
           <span>关系 · {{ relations.length }}</span>
-          <button class="iconbtn iconbtn-primary" title="新建关系 (R)" @click="openRelForm">＋</button>
+          <button class="iconbtn iconbtn-primary" :title="text('新建关系 (R)')" @click="openRelForm">＋</button>
         </div>
         <div v-if="relForm.open" class="rel-form">
-          <label>源对象
+          <label>{{ text("源对象") }}
             <select v-model="relForm.from">
-              <option value="">请选择</option>
+              <option value="">{{ text("请选择") }}</option>
               <option v-for="o in objects" :key="o.id" :value="o.id">{{ o.displayName }}（{{ o.name }}）</option>
             </select>
           </label>
-          <label>目标对象
+          <label>{{ text("目标对象") }}
             <select v-model="relForm.to">
-              <option value="">请选择</option>
+              <option value="">{{ text("请选择") }}</option>
               <option v-for="o in objects" :key="o.id" :value="o.id">{{ o.displayName }}（{{ o.name }}）</option>
             </select>
           </label>
-          <label>正向关系名
-            <input v-model="relForm.label" placeholder="关系名称" />
+          <label>{{ text("正向关系名") }}
+            <input v-model="relForm.label" :placeholder="text('关系名称')" />
           </label>
-          <label>反向关系名
-            <input v-model="relForm.inverseLabel" placeholder="反向关系名称" />
+          <label>{{ text("反向关系名") }}
+            <input v-model="relForm.inverseLabel" :placeholder="text('反向关系名称')" />
           </label>
-          <label>基数
+          <label>{{ text("基数") }}
             <select v-model="relForm.cardinality">
-              <option value="1:1">一对一</option>
-              <option value="1:N">一对多</option>
-              <option value="N:N">多对多</option>
+              <option value="1:1">{{ text("一对一") }}</option>
+              <option value="1:N">{{ text("一对多") }}</option>
+              <option value="N:1">{{ text("多对一") }}</option>
+              <option value="N:N">{{ text("多对多") }}</option>
             </select>
           </label>
-          <label>描述（可选）
-            <input v-model="relForm.description" placeholder="补充说明这条关系的业务含义" />
+          <label>{{ text("描述（可选）") }}
+            <input v-model="relForm.description" :placeholder="text('补充说明这条关系的业务含义')" />
           </label>
           <div class="rel-form-actions">
-            <button class="btn btn-ghost" @click="relForm.open = false">取消</button>
-            <button class="btn btn-primary" :disabled="!canSaveRel" @click="saveRelation">保存</button>
+            <button class="btn btn-ghost" @click="relForm.open = false">{{ text("取消") }}</button>
+            <button class="btn btn-primary" :disabled="!canSaveRel" @click="saveRelation">{{ text("保存") }}</button>
           </div>
         </div>
         <div class="rel-list">
@@ -151,7 +155,7 @@
               <span v-if="r.inverseDisplayName" class="rel-label rel-inverse">← {{ r.inverseDisplayName }}</span>
             </div>
           </div>
-          <div v-if="!relations.length" class="empty-tip">还没有关系 — 点 ＋ 或按 R 创建</div>
+          <div v-if="!relations.length" class="empty-tip">{{ text("还没有关系 — 点 ＋ 或按 R 创建") }}</div>
         </div>
       </aside>
     </div>
@@ -159,10 +163,10 @@
     <!-- 批量 CSV 弹窗 -->
     <div v-if="csvOpen" class="modal-mask" @click.self="csvOpen = false">
       <div class="modal-card">
-        <div class="modal-head">批量粘贴 CSV — name,displayName,tier,description</div>
-        <textarea v-model="csvText" rows="10" placeholder="在此粘贴 CSV 内容"></textarea>
+        <div class="modal-head">{{ text("批量粘贴 CSV — name,displayName,tier,description") }}</div>
+        <textarea v-model="csvText" rows="10" :placeholder="text('在此粘贴 CSV 内容')"></textarea>
         <div class="modal-actions">
-          <button class="btn btn-ghost" @click="csvOpen = false">取消</button>
+          <button class="btn btn-ghost" @click="csvOpen = false">{{ text("取消") }}</button>
           <button class="btn btn-primary" @click="commitCsv">导入</button>
         </div>
       </div>
@@ -172,7 +176,7 @@
     <div v-if="previewOpen" class="modal-mask" @click.self="previewOpen = false">
       <div class="modal-card modal-card-large">
         <div class="modal-head">
-          图谱预览（只读）
+          {{ text("图谱预览（只读）") }}
           <button class="iconbtn" @click="previewOpen = false">×</button>
         </div>
         <div class="preview-body">
@@ -189,6 +193,8 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../../composables/useProductText'
+const { text } = useProductText()
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
@@ -219,7 +225,7 @@ const relForm = reactive({
   label: '',
   inverseLabel: '',
   description: '',
-  cardinality: '1:N' as '1:1' | '1:N' | 'N:N',
+  cardinality: '1:N' as '1:1' | '1:N' | 'N:1' | 'N:N',
   relationType: 'ObjectProperty' as OntologyRelationDraft['relationType'],
   semanticType: 'association' as OntologyRelationDraft['semanticType'],
 })
@@ -310,7 +316,7 @@ function addObject(seed?: Partial<OntologyObjectDraft>) {
     primaryKey: 'id',
     icon: seed?.icon || '🔷',
     instanceCount: 0,
-    properties: seed?.properties || [{ id: uid('prop'), name: 'name', displayName: '名称', type: 'string', required: true }],
+    properties: seed?.properties || [{ id: uid('prop'), name: 'id', displayName: 'ID', type: 'string', required: true }, { id: uid('prop'), name: 'name', displayName: '名称', type: 'string', required: true }],
     derivedProperties: [], actions: [], approved: false,
   }
   objects.value.push(o)

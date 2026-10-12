@@ -41,6 +41,8 @@ export interface AgentItem {
   kb_ids: string[]
   entity_ids: string[]
   tools_config: Record<string, any>
+  nodes_json?: Array<Record<string, any>>
+  edges_json?: Array<Record<string, any>>
   status: string
   api_key: string | null
   created_at: string
@@ -77,7 +79,7 @@ export interface PendingAgentAction {
   params: Record<string, any>
   summary?: string
   expires_at?: string
-  status?: 'pending' | 'approved' | 'rejected' | 'expired' | 'failed' | 'executing'
+  status?: 'pending' | 'approved' | 'rejected' | 'expired' | 'failed' | 'executing' | 'unknown' | 'committed_unrecorded'
   result?: unknown
 }
 
@@ -95,7 +97,7 @@ export interface AgentRun {
 }
 
 export interface ActionDecision {
-  status: 'approved' | 'rejected' | 'expired' | 'failed' | 'executing'
+  status: 'approved' | 'rejected' | 'expired' | 'failed' | 'executing' | 'unknown' | 'committed_unrecorded'
   result?: unknown
   summary?: string
 }
@@ -176,6 +178,8 @@ export const agentsApi = {
   runs: (id: string) => client.get<AgentRun[]>(`/agents/${id}/runs`).then((r) => r.data),
   run: (id: string, rid: string) =>
     client.get<AgentRun>(`/agents/${id}/runs/${rid}`).then((r) => r.data),
+  reconcileAction: (id: string, pendingId: string, body: {resolution:'succeeded'|'failed'; evidence:string; receipt_id?:string}) => client.post<ActionDecision>(`/agents/${id}/actions/${pendingId}/reconcile`,body).then(r=>r.data),
+  resumeAction: (id: string, pendingId: string) => client.post<ActionDecision>(`/agents/${id}/actions/${pendingId}/resume`,{}).then(r=>r.data),
   confirmAction: (id: string, pendingId: string, approve: boolean) =>
     client
       .post<ActionDecision>(`/agents/${id}/actions/${pendingId}/confirm`, { approve })

@@ -181,6 +181,7 @@
 <script setup lang="ts">
 import { ref, computed, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
+import { useRoute } from 'vue-router'
 import {
   previewMappingPersist,
   applyMappingPersist,
@@ -195,9 +196,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   prev: []
-  next: []
+  next: [items: MappingPreviewItem[]]
 }>()
 
+const route = useRoute()
+const ontologyId = computed(() => (route.query.ontology_id as string) || undefined)
 const loading = ref(false)
 const applying = ref(false)
 const errorMessage = ref('')
@@ -223,7 +226,7 @@ const unregisteredCount = computed(() => items.value.filter(i => !i.asset_regist
 
 // 某实体已成功映射到字段的属性数（attribute_id + source_column 都有值）
 function mappedFieldCount(item: MappingPreviewItem): number {
-  return (item.field_mappings || []).filter(fm => fm.attribute_id && fm.source_column).length
+  return (item.field_mappings || []).filter(fm => fm.source_column).length
 }
 
 // 字段映射不完整的实体（有属性但一个都没映射上，或映射率低于 50%）——仅统计将要落库的实体
@@ -256,7 +259,7 @@ async function loadPreview() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const resp = await previewMappingPersist(props.sessionId, props.mappingResult)
+    const resp = await previewMappingPersist(props.sessionId, props.mappingResult, ontologyId.value)
     items.value = resp.items || []
     if (items.value.length) {
       selectedEntity.value = items.value[0].entity_name
@@ -275,6 +278,7 @@ async function loadPreview() {
 }
 
 async function onApply() {
+  if (applying.value) return
   // 字段映射不完整时，落库前明确提示，避免静默产生「有对象无数据源」的本体
   if (incompleteItems.value.length) {
     const names = incompleteItems.value.map(i => i.entity_name).join('、')
@@ -294,6 +298,7 @@ async function onApply() {
         return true
       })
       .map(i => ({
+        entity_name: i.entity_name,
         entity_id: i.entity_id,
         asset_id: i.asset_id,
         conflict_action: i.conflict ? (conflictActions[i.entity_name] ?? null) : null,
@@ -302,11 +307,11 @@ async function onApply() {
           .map(fm => ({ attribute_id: fm.attribute_id!, source_column: fm.source_column })),
       }))
 
-    const result = await applyMappingPersist(props.sessionId, applyItems)
+    const result = await applyMappingPersist(props.sessionId, applyItems, props.mappingResult, ontologyId.value)
     message.success(
       `落库成功：新建 ${result.created}，更新 ${result.updated}，跳过 ${result.skipped}`,
     )
-    emit('next')
+    emit('next', result.items)
   } catch (e: any) {
     message.error(`落库失败: ${e?.message || '未知错误'}`)
   } finally {

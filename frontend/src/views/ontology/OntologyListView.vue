@@ -7,7 +7,7 @@
         <p class="page-banner__desc">提供本体设计器，支持以人机协同方式，基于 AI 快速自动化构建本体；也支持通过手动定义的形式自顶向...</p>
       </div>
       <div class="page-banner__actions">
-        <button class="btn-filled" @click="showCreate = true; createError = ''">
+        <button class="btn-filled" @click="showCreate = true; createError = ''" :disabled="!canEdit">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           新建本体
         </button>
@@ -46,7 +46,7 @@
             </div>
             <span class="onto-card__code">{{ item.code }}</span>
           </div>
-          <span class="onto-card__badge">已构建</span>
+          <span class="onto-card__badge">{{ item.entity_count > 0 ? '已建模' : '待构建' }}</span>
         </div>
 
         <p class="onto-card__desc">{{ item.description || '暂无描述' }}</p>
@@ -66,10 +66,10 @@
         </div>
 
         <div class="onto-card__footer">
-          <span class="onto-card__status onto-card__status--active">已启用</span>
+          <span class="onto-card__status" :class="{'onto-card__status--active':item.active_version_id}">{{ item.active_version_id ? '已发布 · ' + (item.version_number || '活动版本') : '尚未发布' }}</span>
           <div class="onto-card__actions">
             <button class="onto-card__action-btn" @click.stop="goDetail(item.code)">详情</button>
-            <button class="onto-card__action-btn onto-card__action-btn--del" :disabled="deletingId === item.id" :aria-label="`删除本体 ${item.name}`" @click.stop="handleDelete(item)">
+            <button class="onto-card__action-btn onto-card__action-btn--del" :disabled="!canDelete || deletingId === item.id" :aria-label="`删除本体 ${item.name}`" @click.stop="handleDelete(item)">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 4h8M5 4V3h4v1M4 4v7h6V4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
           </div>
@@ -111,13 +111,15 @@
       <p v-if="createError" class="modal-error" role="alert">{{ createError }}</p>
       <template #footer>
         <button class="btn-cancel" :disabled="creating" @click="showCreate = false">取消</button>
-        <button class="btn-filled" :disabled="creating || !createForm.name.trim() || !createForm.code.trim()" @click="handleCreate">{{ creating ? '创建中…' : '确认并前往构建' }}</button>
+        <button class="btn-filled" :disabled="!canEdit || (creating || !createForm.name.trim() || !createForm.code.trim())" @click="handleCreate">{{ creating ? '创建中…' : '确认并查看本体' }}</button>
       </template>
     </ModalDialog>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit } = useManagementPermission('entity:write')
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useScenarioStore } from '../../store/scenarios'
@@ -125,6 +127,7 @@ import { scenarioApi } from '../../api/scenarios'
 import { message } from 'ant-design-vue'
 import ModalDialog from '../../components/common/ModalDialog.vue'
 
+const { canEdit:canDelete } = useManagementPermission('entity:delete')
 const router = useRouter()
 const scenarioStore = useScenarioStore()
 
@@ -176,7 +179,7 @@ async function handleCreate() {
 }
 
 async function handleDelete(item: any) {
-  if (deletingId.value || !confirm(`确定删除本体「${item.name}」？`)) return
+  if (!canDelete.value || deletingId.value || !confirm(`确定删除本体「${item.name}」？`)) return
   deletingId.value = item.id
   try {
     await scenarioApi.remove(item.id)

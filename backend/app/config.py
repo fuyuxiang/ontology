@@ -36,6 +36,12 @@ class Settings(BaseSettings):
     # 仅反向代理场景需要：code-server 不在 `<当前访问主机>:CODE_SERVER_PORT` 上时，
     # 填写其对外基址（如 https://example.com/code-server）。留空表示由前端自行推导。
     CODE_SERVER_PUBLIC_URL: str = ""
+    WORKSPACE_ROOT: str = str(Path(__file__).resolve().parents[2] / "workspace")
+    LOCAL_DATA_ROOT: str = str(Path(__file__).resolve().parents[2] / "local-data")
+    MONITOR_ENABLED: bool = True
+    DATA_PLANE_REFRESH_ENABLED: bool = True
+    OFFICE_CONVERTER: str = ""
+    OFFICE_CONVERSION_TIMEOUT_SECONDS: int = 45
 
     model_config = {"env_file": str(_ENV_FILE), "extra": "ignore"}
 

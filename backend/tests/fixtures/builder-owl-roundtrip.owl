@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<Ontology xmlns="http://www.w3.org/2002/07/owl#"
+    xmlns:owl="http://www.w3.org/2002/07/owl#"
+    xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+    xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+    xmlns:xsd="http://www.w3.org/2001/XMLSchema#"
+    xmlns:xml="http://www.w3.org/XML/1998/namespace"
+    xmlns:ex="https://example.test/ontology#"
+    xml:base="https://example.test/ontology"
+    ontologyIRI="https://example.test/ontology"
+    versionIRI="https://example.test/ontology/v1">
+
+    <Prefix name="owl:" IRI="http://www.w3.org/2002/07/owl#"/>
+    <Prefix name="rdf:" IRI="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/>
+    <Prefix name="rdfs:" IRI="http://www.w3.org/2000/01/rdf-schema#"/>
+    <Prefix name="xsd:" IRI="http://www.w3.org/2001/XMLSchema#"/>
+    <Prefix name="xml:" IRI="http://www.w3.org/XML/1998/namespace"/>
+    <Prefix name="ex:" IRI="https://example.test/ontology#"/>
+
+    <Declaration><Class abbreviatedIRI="ex:Asset"/></Declaration>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>ex:Asset</IRI>
+        <Literal xml:lang="zh">Asset</Literal>
+    </AnnotationAssertion>
+
+    <Declaration><Class abbreviatedIRI="ex:Device"/></Declaration>
+    <SubClassOf>
+        <Class abbreviatedIRI="ex:Device"/>
+        <Class abbreviatedIRI="ex:Asset"/>
+    </SubClassOf>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>ex:Device</IRI>
+        <Literal xml:lang="zh">设备 &amp; 告警</Literal>
+    </AnnotationAssertion>
+
+    <Declaration><Class abbreviatedIRI="ex:WorkOrder"/></Declaration>
+    <AnnotationAssertion>
+        <AnnotationProperty abbreviatedIRI="rdfs:label"/>
+        <IRI>ex:WorkOrder</IRI>
+        <Literal xml:lang="zh">WorkOrder</Literal>
+    </AnnotationAssertion>
+
+    <Declaration><ObjectProperty abbreviatedIRI="ex:hasOrder"/></Declaration>
+    <ObjectPropertyDomain>
+        <ObjectProperty abbreviatedIRI="ex:hasOrder"/>
+        <Class abbreviatedIRI="ex:Device"/>
+    </ObjectPropertyDomain>
+    <ObjectPropertyRange>
+        <ObjectProperty abbreviatedIRI="ex:hasOrder"/>
+        <Class abbreviatedIRI="ex:WorkOrder"/>
+    </ObjectPropertyRange>
+
+    <Declaration><DataProperty abbreviatedIRI="ex:risk"/></Declaration>
+    <DataPropertyDomain>
+        <DataProperty abbreviatedIRI="ex:risk"/>
+        <Class abbreviatedIRI="ex:Device"/>
+    </DataPropertyDomain>
+    <DataPropertyRange>
+        <DataProperty abbreviatedIRI="ex:risk"/>
+        <Datatype abbreviatedIRI="xsd:double"/>
+    </DataPropertyRange>
+
+</Ontology>

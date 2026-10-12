@@ -92,6 +92,7 @@ def _func_to_item(func: OntologyFunction, entity_name: str, ref_count: int) -> R
 def list_registry_items(
     type: str | None = Query(None, description="Filter by type: 'rule' or 'function'"),
     entity_id: str | None = Query(None),
+    ontology_id: str | None = Query(None),
     search: str | None = Query(None),
     tags: list[str] = Query(default=[]),
     db: Session = Depends(get_db),
@@ -107,6 +108,9 @@ def list_registry_items(
         q = db.query(OntologyFunction).filter(OntologyFunction.status == "active")
         if entity_id:
             q = q.filter(OntologyFunction.entity_id == entity_id)
+        if ontology_id:
+            q = q.filter((OntologyFunction.ontology_id == ontology_id) |
+                         OntologyFunction.entity_id.in_(db.query(OntologyEntity.id).filter_by(ontology_id=ontology_id)))
         for func in q.all():
             if search and search.lower() not in func.name.lower() and search.lower() not in (func.description or "").lower():
                 continue
@@ -123,6 +127,7 @@ def list_registry_items(
 @router.get("/grouped", response_model=list[RegistryGroup])
 def list_registry_grouped(
     search: str | None = Query(None),
+    ontology_id: str | None = Query(None),
     db: Session = Depends(get_db),
 ):
     """List active functions grouped by entity."""
@@ -137,7 +142,11 @@ def list_registry_grouped(
         return groups[eid]
 
     # Functions
-    for func in db.query(OntologyFunction).filter(OntologyFunction.status == "active").all():
+    query = db.query(OntologyFunction).filter(OntologyFunction.status == "active")
+    if ontology_id:
+        query = query.filter((OntologyFunction.ontology_id == ontology_id) |
+                             OntologyFunction.entity_id.in_(db.query(OntologyEntity.id).filter_by(ontology_id=ontology_id)))
+    for func in query.all():
         if search and search.lower() not in func.name.lower() and search.lower() not in (func.description or "").lower():
             continue
         entity_name = emap.get(func.entity_id or "", "")

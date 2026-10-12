@@ -13,6 +13,7 @@ class AttributeBase(BaseModel):
     source_table: str | None = None
     source_field: str | None = None
     data_status: str = "未确认来源"
+    shared_attribute_id: str | None = None
 
 
 class AttributeOut(AttributeBase):
@@ -25,6 +26,7 @@ class AttributeMappingUpdate(BaseModel):
     source_table: str | None = None
     source_field: str | None = None
     data_status: str = "未确认来源"
+    asset_id: str | None = None
 
 
 class EntityBase(BaseModel):
@@ -58,6 +60,7 @@ class FromDatasourceRequest(BaseModel):
     name_cn: str
     tier: int = 3
     namespace: str = ""
+    ontology_id: str
 
 
 class EntityListItem(BaseModel):
@@ -90,6 +93,8 @@ class RelationOut(BaseModel):
     cardinality: str
     acyclic: bool = False
     description: str | None = None
+    source_field: str | None = None
+    target_field: str | None = None
     model_config = {"from_attributes": True}
 
 
@@ -120,6 +125,7 @@ class FunctionBriefOut(BaseModel):
 
 class EntityDetail(EntityBase):
     id: str
+    ontology_id: str | None = None
     attributes: list[AttributeOut] = []
     relations: list[RelationOut] = []
     actions: list[ActionOut] = []
@@ -170,6 +176,8 @@ class PreviewRelation(BaseModel):
     target: str
     cardinality: str
     description: str = ""
+    source_field: str | None = None
+    target_field: str | None = None
 
 
 class PreviewAction(BaseModel):
@@ -178,6 +186,11 @@ class PreviewAction(BaseModel):
     trigger: str = "automatic"
     target_object: str | None = None
     description: str = ""
+    action_type: str | None = None
+    category: str = "domain"
+    type_config: dict | None = None
+    parameters_json: list | None = None
+    output_schema: list | None = None
 
 
 class PreviewDataSource(BaseModel):

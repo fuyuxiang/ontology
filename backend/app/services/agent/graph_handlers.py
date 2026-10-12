@@ -240,14 +240,16 @@ class NodeHandlersMixin:
             question += "\n任务输入：" + json.dumps(mapped, ensure_ascii=False, default=str)
         if upstream != "无上游数据":
             question += "\n上游节点结果：" + upstream
-        answer_parts, final_answer, tool_runs = [], "", []
+        answer_parts, final_answer, tool_runs, pending_action = [], "", [], None
         for event in service.ask(question):
             event = dict(event)
             event["node_id"] = node_id
             event_type = event.get("type")
             if event_type == "error":
                 raise RuntimeError(event.get("message") or "Agent 执行失败")
-            if event_type == "content":
+            if event_type == "action_pending":
+                pending_action = {k: v for k, v in event.items() if k not in {"type", "node_id"}}
+            elif event_type == "content":
                 answer_parts.append(event.get("content", ""))
             elif event_type == "answer":
                 final_answer = event.get("content", "")
@@ -260,6 +262,8 @@ class NodeHandlersMixin:
         if not final_answer:
             raise RuntimeError("Agent 未产生有效业务回答")
         result = {"answer": final_answer, "tool_runs": tool_runs}
+        if pending_action:
+            result["pending_action"] = pending_action
         return result, f"授权 Agent 执行完成 ({len(tool_runs)} 次工具调用)"
 
     def _exec_managed_agent(self, data: dict, context: dict, question: str):
@@ -289,7 +293,9 @@ class NodeHandlersMixin:
     @staticmethod
     def _raise_managed_failure(result):
         if isinstance(result, dict) and (result.get("error") or result.get("success") is False):
-            raise RuntimeError(str(result.get("error") or result.get("message") or "授权能力执行失败"))
+            error = RuntimeError(str(result.get("error") or result.get("message") or "授权能力执行失败"))
+            error.result = result
+            raise error
 
     def _exec_ontology_query(self, data: dict, context: dict, question: str):
         entity_type = data.get("ontology_type", "")
@@ -538,20 +544,34 @@ class NodeHandlersMixin:
         return None
 
     def _exec_loop(self, data: dict, context: dict, question: str):
-        """循环节点：对上游列表数据逐项处理。
-        data: { source_field: 要迭代的字段路径, item_var: 每项的变量名 }
-        """
+        """Map a scoped published Function over an explicit list (maximum 100)."""
         source_field = data.get("source_field", "")
-        items = self._lookup_in_context(source_field, context) if source_field else None
-        if not items:
-            upstream = self._collect_upstream_data(context)
-            try:
-                items = json.loads(upstream) if upstream.startswith("[") else []
-            except Exception:
-                items = []
+        resume = data.get("_loop_resume") or {}
+        items = resume.get("items") if resume else self._lookup_in_context(source_field, context) if source_field else None
         if not isinstance(items, list):
-            items = [items] if items else []
-        return {"looped": True, "item_count": len(items), "items": items[:100]}, f"循环 {len(items)} 项"
+            return {"error": "循环 source_field 必须指向列表"}, "循环输入无效"
+        if len(items) > 100:
+            return {"error": "循环最多100项，请分批执行"}, "循环输入超过限制"
+        if not data.get("function_id") or self._runtime_context is None:
+            return {"error": "循环必须指定已发布授权范围内的 function_id 和 params"}, "循环未配置执行函数"
+        item_var = data.get("item_var") or "item"
+        if not isinstance(item_var, str) or not item_var.isidentifier() or item_var.startswith("__"):
+            return {"error": "循环 item_var 必须为有效变量名"}, "循环变量无效"
+        outputs = list(resume.get("outputs") or [])
+        for index, item in enumerate(items):
+            if index < resume.get("next_index", 0):
+                continue
+            iteration = {**context, item_var: item, "loop_index": index}
+            result, summary = self._exec_managed_function(data, iteration, question)
+            outputs.append(result)
+            if result.get("pending_action"):
+                return {"success": True, "outputs": outputs, "pending_action": result["pending_action"],
+                    "_loop_resume": {"items": items, "next_index": index+1, "outputs": outputs}}, "循环等待当前项确认"
+            if result.get("success") is False or result.get("error"):
+                return {"success": False, "error": result.get("error") or summary,
+                        "outcome": result.get("outcome"), "failed_index": index,
+                        "item_count": len(items), "outputs": outputs}, f"循环第{index + 1}项失败"
+        return {"success": True, "item_count": len(items), "outputs": outputs}, f"已实际处理 {len(items)} 项"
 
     def _exec_merge(self, data: dict, context: dict, question: str):
         return {"merged": True}, "分支合并完成"
@@ -654,8 +674,11 @@ class NodeHandlersMixin:
         return {"meta": data, "passthrough": True}, "子节点元数据"
 
     def _exec_human_approval(self, data: dict, context: dict, question: str):
-        role = data.get("approver_role", "审批人")
-        return {"approval_requested": True, "role": role}, f"已发起人工审批 ({role})"
+        if getattr(self, "_runtime_context", None) is None:
+            return {"error": "人工确认需要有效的授权运行上下文"}, "未发起确认"
+        # A gate reviews a concrete immutable business action; a label alone
+        # cannot create a persistent or executable approval request.
+        return self._exec_managed_action(data, context, question)
 
     def _exec_write_back(self, data: dict, context: dict, question: str):
         """真正把上游数据写回本体实例表。

@@ -111,10 +111,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { authenticatedFetch } from '../../../api/authenticatedFetch'
+import { computed, ref, onUnmounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
 import { authHeaders } from '../../../utils/authHeaders'
+import { readJsonSse } from '../../../api/sse'
 import type {
   BuilderSession,
   OntologyObjectDraft,
@@ -141,9 +143,11 @@ const extracting = ref(false)
 const elapsed = ref(0)
 const streamRef = ref<HTMLElement | null>(null)
 let elapsedTimer: number | null = null
+let extractController: AbortController | null = null
+const extractionComplete = ref(false)
 
 const canSubmit = computed(() =>
-  proposedObjects.value.some(o => o.checked) && !extracting.value,
+  extractionComplete.value && proposedObjects.value.some(o => o.checked) && !extracting.value,
 )
 
 function uid(p: string) { return `${p}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}` }
@@ -180,8 +184,9 @@ function removeFile(id: string) {
 }
 
 async function startExtract() {
-  if (!files.value.length) return
+  if (extracting.value || !files.value.length) return
   extracting.value = true
+  extractionComplete.value = false
   elapsed.value = 0
   if (elapsedTimer) clearInterval(elapsedTimer)
   elapsedTimer = window.setInterval(() => elapsed.value++, 1000)
@@ -198,27 +203,16 @@ async function startExtract() {
   }
 
   try {
-    const resp = await fetch('/api/v1/builder/extract', { method: 'POST', headers: authHeaders(), body: fd })
-    if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let buf = ''
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
-      let idx
-      while ((idx = buf.indexOf('\n\n')) >= 0) {
-        const chunk = buf.slice(0, idx).trim()
-        buf = buf.slice(idx + 2)
-        if (!chunk.startsWith('data:')) continue
-        const payload = chunk.slice(5).trim()
-        if (payload === '[DONE]') continue
-        try { handleEvent(JSON.parse(payload)) } catch { /* ignore */ }
-      }
-    }
+    extractController = new AbortController()
+    const base = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+    const response = await authenticatedFetch(`${base}/builder/extract`, { method: 'POST', headers: authHeaders(), body: fd, signal: extractController.signal })
+    await readJsonSse(response, handleEvent)
+    if (!proposedObjects.value.length) throw new Error('文档没有生成可用对象，请检查文件解析和模型配置后重试')
+    extractionComplete.value = true
   } catch (e: any) {
+    if (extractController?.signal.aborted) return
     message.error('抽取失败：' + (e?.message || '未知错误'))
+    proposedObjects.value = []; proposedRelations.value = []; suggestedActions.value = []
     files.value.forEach(f => { if (f.status === 'parsing') f.status = 'error' })
   } finally {
     extracting.value = false
@@ -287,7 +281,7 @@ function handleEvent(ev: any) {
       targetObjectId: matchObj(ev.target_entity)?.id,
       source: ev.source_file,
     })
-  } else if (t === 'extract_finished') {
+  } else if (t === 'extract_finished' && proposedObjects.value.length) {
     message.success(`抽取完成 — 共 ${proposedObjects.value.length} 对象 / ${proposedRelations.value.length} 关系`)
   }
   // 自动滚到底部
@@ -301,6 +295,7 @@ function matchObj(name: string) {
 }
 
 function confirmAll() {
+  if (!canSubmit.value) return
   const objs = proposedObjects.value.filter(o => o.checked).map(({ checked: _c, ...rest }) => rest as OntologyObjectDraft)
   const objIds = new Set(objs.map(o => o.id))
   const rels = proposedRelations.value
@@ -317,6 +312,7 @@ function confirmAll() {
   })
   emit('next')
 }
+onUnmounted(() => { extractController?.abort(); if (elapsedTimer) clearInterval(elapsedTimer) })
 </script>
 
 <style scoped>

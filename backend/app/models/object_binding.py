@@ -10,7 +10,7 @@
 """
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, Index, String, Text, UniqueConstraint, event
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -36,10 +36,15 @@ class ObjectBinding(Base):
         # 主键列（来自 asset.schema_snapshot）
     filter_expr: Mapped[str | None] = mapped_column(Text)
         # 可选：限定该 Object 仅取此 Asset 中满足条件的行（参数化 WHERE 片段）
+    primary_source_column: Mapped[str | None] = mapped_column(String(120))
+    enrichment_source_column: Mapped[str | None] = mapped_column(String(120))
+        # Explicit one-to-one left association; never infer from source primary keys.
 
     status: Mapped[str] = mapped_column(String(20), default="active")
         # active | needs_review（schema 漂移触发） | deprecated
     review_reason: Mapped[str | None] = mapped_column(Text)
+    # NULL permits many enrichment/inactive bindings on every supported metadata DB.
+    active_primary_key: Mapped[str | None] = mapped_column(String(36), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -51,3 +56,10 @@ class ObjectBinding(Base):
 
 
 Index("ix_binding_status", ObjectBinding.status)
+Index("uq_binding_active_primary", ObjectBinding.active_primary_key, unique=True)
+
+
+@event.listens_for(ObjectBinding, "before_insert")
+@event.listens_for(ObjectBinding, "before_update")
+def _set_active_primary_key(mapper, connection, binding):
+    binding.active_primary_key = binding.object_type_id if binding.role == "primary" and binding.status in (None, "active") else None

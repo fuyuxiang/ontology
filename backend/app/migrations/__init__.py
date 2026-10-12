@@ -41,4 +41,10 @@ def run_startup_migrations(engine: Engine) -> None:
         _migrate_ontology_functions(conn, inspector, tables)
         _migrate_ontology_isolation(conn, inspector, tables)
 
+    from .runtime_snapshots import migrate_runtime_snapshots
+    migrate_runtime_snapshots(engine)
+    from .binding_integrity import migrate_binding_integrity
+    migrate_binding_integrity(engine)
+    from .ai_code_ownership import migrate_ai_code_ownership
+    migrate_ai_code_ownership(engine)
     logger.info("Schema 兼容迁移完成")

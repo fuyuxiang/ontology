@@ -1,8 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '../store/auth'
+import { canAccessRoute } from '../utils/access'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/forbidden', name: 'forbidden', component: () => import('../views/auth/ForbiddenView.vue'), meta: { title: '无访问权限' } },
     { path: '/', redirect: '/ontology/list' },
     {
       path: '/login',
@@ -180,11 +183,10 @@ router.beforeEach((to) => {
   if (to.meta.public) return true
   const token = localStorage.getItem('token')
   if (!token) return { name: 'login', query: { redirect: to.fullPath } }
+  const auth = useAuthStore()
+  if (auth.user && !canAccessRoute(to.path, permission => auth.hasPermission(permission))) return { name: 'forbidden' }
   return true
 })
 
-router.afterEach((to) => {
-  document.title = `${to.meta.title ?? '元枢Ontology'} — 元枢Ontology`
-})
 
 export default router

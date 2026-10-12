@@ -3,8 +3,11 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
+from app.core.deps import require_user
 from app.models.agent import Agent
+from app.models.agent_runtime import AgentRun
 from app.models.trace import AgentTrace
+from app.models.user import User
 
 router = APIRouter(prefix="/traces", tags=["traces"])
 
@@ -18,8 +21,11 @@ def list_traces(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    user: User = Depends(require_user),
 ):
     q = db.query(AgentTrace).order_by(AgentTrace.created_at.desc())
+    if user.role != "admin":
+        q = q.join(AgentRun, AgentRun.id == AgentTrace.id).filter(AgentRun.user_id == user.id)
     if agent_id:
         q = q.filter(AgentTrace.agent_id == agent_id)
     if status:
@@ -60,10 +66,11 @@ def list_traces(
 
 
 @router.get("/{tid}")
-def get_trace(tid: str, db: Session = Depends(get_db)):
+def get_trace(tid: str, db: Session = Depends(get_db), user: User = Depends(require_user)):
     from fastapi import HTTPException
     t = db.get(AgentTrace, tid)
-    if not t:
+    run = db.get(AgentRun, tid)
+    if not t or (user.role != "admin" and (not run or run.user_id != user.id)):
         raise HTTPException(404, "Trace not found")
     agent_name = ""
     if t.agent_id:

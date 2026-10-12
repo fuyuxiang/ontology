@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from sqlalchemy import desc, func
+from sqlalchemy import case, desc, func
 from sqlalchemy.orm import Session
 
 from app.models.monitor import Alert, LLMCallRecord, ServiceMetric
@@ -69,6 +69,7 @@ class MonitorRepository:
             self.db.query(
                 LLMCallRecord.caller_module,
                 func.count(LLMCallRecord.id).label("count"),
+                func.sum(case((LLMCallRecord.success.is_(True), 1), else_=0)).label("success_count"),
                 func.sum(LLMCallRecord.prompt_tokens).label("total_prompt_tokens"),
                 func.sum(LLMCallRecord.completion_tokens).label("total_completion_tokens"),
                 func.avg(LLMCallRecord.latency_ms).label("avg_latency_ms"),
@@ -82,11 +83,16 @@ class MonitorRepository:
         for r in rows:
             by_module[r.caller_module] = {
                 "count": r.count,
+                "success_count": int(r.success_count or 0),
+                "failed_count": r.count - int(r.success_count or 0),
+                "success_rate": round(100 * int(r.success_count or 0) / r.count, 1),
                 "total_prompt_tokens": int(r.total_prompt_tokens or 0),
                 "total_completion_tokens": int(r.total_completion_tokens or 0),
                 "avg_latency_ms": round(float(r.avg_latency_ms or 0), 1),
             }
-        return {"total_24h": total, "by_module": by_module}
+        success = sum(int(r.success_count or 0) for r in rows)
+        return {"total_24h": total, "success_count": success, "failed_count": total - success,
+                "success_rate": round(success * 100 / total, 1) if total else None, "by_module": by_module}
 
     # ── Alerts ──
 

@@ -21,6 +21,7 @@ export interface ActionItem {
   description?: string
   category: 'domain' | 'system'
   entity_id?: string
+  ontology_id?: string | null
   entity_name?: string
   action_type: string
   type_config?: Record<string, any>
@@ -52,6 +53,8 @@ export interface ActionExecuteResult {
   success: boolean
   message: string
   output?: Record<string, any>
+  execution_id?: string
+  state?: string
 }
 
 export const actionApi = {
@@ -60,8 +63,10 @@ export const actionApi = {
   create: (data: Partial<ActionItem>) => post<ActionItem>('/actions', data),
   update: (id: string, data: Partial<ActionItem>) => put<ActionItem>(`/actions/${id}`, data),
   remove: (id: string) => del(`/actions/${id}`),
-  execute: (id: string, params: Record<string, any>, dryRun = false) =>
-    post<ActionExecuteResult>(`/actions/${id}/execute`, { params, dry_run: dryRun }),
+  execute: (id: string, params: Record<string, any>, dryRun = false, idempotencyKey?:string) =>
+    post<ActionExecuteResult>(`/actions/${id}/execute`, { params, dry_run: dryRun, ...(idempotencyKey ? {idempotency_key:idempotencyKey}: {}) }),
+  executionByKey: (id:string, key:string) => get<ActionExecuteResult & {params:Record<string, unknown>}>(`/actions/${id}/executions/by-key`, {params:{key}}),
+  reconcile: (id:string,executionId:string,body:{resolution:'succeeded'|'failed';evidence:string;receipt_id?:string}) => post<ActionExecuteResult>(`/actions/${id}/executions/${executionId}/reconcile`,body),
   types: () => get<ActionTypeInfo[]>('/actions/types'),
-  openWorkspace: (id: string) => post<{ folder: string; port: number; public_url?: string }>(`/actions/${id}/workspace`),
+  openWorkspace: (id: string) => post<{ folder: string; port: number; public_url?: string; registration_error?: string }>(`/actions/${id}/workspace`),
 }

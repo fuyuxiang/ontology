@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useAuthStore } from './auth'
+import { builderContentSignature } from '../utils/builderSession'
 import type {
   BuilderSession,
   BuildMethod,
@@ -53,6 +55,9 @@ function migrateSession(s: any): BuilderSession {
     ontologyObjects: objects,
     ontologyRelations: s.ontologyRelations || [],
     hints: s.hints || emptyHints(),
+    // 旧演练没有输入指纹，不能证明当前内容仍通过。
+    drillResult: s.drillFingerprint ? s.drillResult : undefined,
+    drillStatus: s.drillFingerprint ? s.drillStatus : undefined,
   } as BuilderSession
 }
 
@@ -78,16 +83,17 @@ function persist<T>(key: string, val: T) {
 }
 
 export const useBuilderStore = defineStore('builder', () => {
+  const auth = useAuthStore()
   const sessions = ref<BuilderSession[]>(loadSessions())
   const activeSessionId = ref<string | null>(localStorage.getItem(ACTIVE_KEY) || null)
   const uploads = ref<UploadRecord[]>(loadUploads())
 
   const activeSession = computed(() =>
-    sessions.value.find(s => s.sessionId === activeSessionId.value) || null,
+    sessions.value.find(s => s.sessionId === activeSessionId.value && !!auth.user?.id && s.ownerId === auth.user.id) || null,
   )
 
   const reviewableSessions = computed(() =>
-    sessions.value.filter(s => s.status === 'pending_review' || s.status === 'reviewing'),
+    sessions.value.filter(s => s.ownerId === auth.user?.id && (s.status === 'pending_review' || s.status === 'reviewing')),
   )
 
   function syncSessions() {
@@ -104,10 +110,15 @@ export const useBuilderStore = defineStore('builder', () => {
     createdBy?: string
     scenarioId?: string
     scenarioName?: string
+    ontologyId?: string
+    builderKind?: string
   }): BuilderSession {
     const session: BuilderSession = {
       sessionId: uid('sess'),
       ontologyName: payload.ontologyName,
+      ontologyId: payload.ontologyId,
+      builderKind: payload.builderKind || payload.buildMethod,
+      ownerId: auth.user?.id,
       scenarioId: payload.scenarioId,
       scenarioName: payload.scenarioName,
       buildMethod: payload.buildMethod,
@@ -125,6 +136,7 @@ export const useBuilderStore = defineStore('builder', () => {
       reviewLog: [],
       businessRules: [],
     }
+    session.contentFingerprint = builderContentSignature(session)
     sessions.value = [session, ...sessions.value]
     activeSessionId.value = session.sessionId
     localStorage.setItem(ACTIVE_KEY, session.sessionId)
@@ -133,16 +145,29 @@ export const useBuilderStore = defineStore('builder', () => {
   }
 
   function updateSession(sessionId: string, patch: Partial<BuilderSession>) {
-    sessions.value = sessions.value.map(s =>
-      s.sessionId === sessionId
-        ? { ...s, ...patch, updatedAt: new Date().toISOString() }
-        : s,
-    )
+    sessions.value = sessions.value.map(s => {
+      if (s.sessionId !== sessionId) return s
+      const updated = { ...s, ...patch, updatedAt: new Date().toISOString() }
+      const before = s.contentFingerprint || builderContentSignature(s)
+      const after = builderContentSignature(updated)
+      if (before !== after) {
+        updated.drillResult = undefined
+        updated.drillStatus = undefined
+        updated.drillFingerprint = undefined
+        updated.publishedVersion = undefined
+        updated.publishedAt = undefined
+        updated.approvedScenarios = []
+        updated.ontologyObjects = updated.ontologyObjects.map(object => ({ ...object, approved: false }))
+        updated.status = 'drafting'
+      }
+      updated.contentFingerprint = after
+      return updated
+    })
     syncSessions()
   }
 
   function patchActive(patch: Partial<BuilderSession>) {
-    if (activeSessionId.value) updateSession(activeSessionId.value, patch)
+    if (activeSession.value) updateSession(activeSession.value.sessionId, patch)
   }
 
   function deleteSession(sessionId: string) {

@@ -6,6 +6,10 @@ import json
 import logging
 import re
 import uuid
+import copy
+
+from sqlalchemy.orm import Session
+from app.models.builder_document_session import BuilderDocumentSession
 from collections.abc import Generator
 
 from openai import OpenAI
@@ -78,75 +82,90 @@ def _sanitize_docx(data: bytes) -> bytes:
 
 
 def parse_file_content(filename: str, content: bytes) -> str:
+    """Extract complete textual content; never silently cut off later business rules."""
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
-
+    if ext in ("doc", "xls", "ppt"):
+        from app.services.office_conversion import convert_legacy_office
+        content = convert_legacy_office(content, ext)
+        ext = {"doc": "docx", "xls": "xlsx", "ppt": "pptx"}[ext]
     if ext in ("txt", "csv", "md"):
-        return content.decode("utf-8", errors="ignore")[:8000]
-
+        try:
+            return content.decode("utf-8-sig")
+        except UnicodeDecodeError:
+            return content.decode("gb18030")
     if ext == "pdf":
+        import pdfplumber
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            return "\n".join(page.extract_text() or "" for page in pdf.pages)
+    if ext == "docx":
+        import docx
+        from docx.table import Table
+        from docx.text.paragraph import Paragraph
+        doc = docx.Document(io.BytesIO(_sanitize_docx(content)))
+        texts = []
+        for element in doc.element.body:
+            if element.tag.endswith("}p"):
+                paragraph = Paragraph(element, doc)
+                if paragraph.text.strip():
+                    texts.append(paragraph.text)
+            elif element.tag.endswith("}tbl"):
+                table = Table(element, doc)
+                texts.extend("\t".join(cell.text for cell in row.cells) for row in table.rows)
+        return "\n".join(texts)
+    if ext == "xlsx":
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         try:
-            import pdfplumber
-            with pdfplumber.open(io.BytesIO(content)) as pdf:
-                texts = [p.extract_text() or "" for p in pdf.pages[:20]]
-            return "\n".join(texts)[:8000]
-        except Exception as e:
-            return f"[PDF 解析失败: {e}]"
-
-    if ext in ("docx", "doc"):
-        try:
-            import docx
-            doc = docx.Document(io.BytesIO(_sanitize_docx(content)))
-            texts = [p.text for p in doc.paragraphs if p.text.strip()]
-            return "\n".join(texts)[:8000]
-        except Exception as e:
-            return f"[DOCX 解析失败: {e}]"
-
-    if ext in ("xlsx", "xls"):
-        try:
-            import openpyxl
-            wb = openpyxl.load_workbook(io.BytesIO(content), read_only=True, data_only=True)
             lines = []
-            for ws in wb.worksheets[:5]:
+            for ws in wb.worksheets:
                 lines.append(f"## Sheet: {ws.title}")
-                for row in ws.iter_rows(max_row=100, values_only=True):
-                    line = "\t".join(str(c) if c is not None else "" for c in row)
+                for row in ws.iter_rows(values_only=True):
+                    line = "\t".join(str(cell) if cell is not None else "" for cell in row)
                     if line.strip():
                         lines.append(line)
-            return "\n".join(lines)[:8000]
-        except Exception as e:
-            return f"[Excel 解析失败: {e}]"
-
-    if ext in ("pptx", "ppt"):
-        try:
-            from pptx import Presentation
-            prs = Presentation(io.BytesIO(content))
-            texts = []
-            for slide in prs.slides[:30]:
-                for shape in slide.shapes:
-                    if shape.has_text_frame:
-                        for para in shape.text_frame.paragraphs:
-                            if para.text.strip():
-                                texts.append(para.text)
-            return "\n".join(texts)[:8000]
-        except Exception as e:
-            return f"[PPT 解析失败: {e}]"
-
-    return f"[不支持的文件格式: {ext}]"
+            return "\n".join(lines)
+        finally:
+            wb.close()
+    if ext == "pptx":
+        from pptx import Presentation
+        prs = Presentation(io.BytesIO(content))
+        texts = []
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if shape.has_text_frame:
+                    texts.extend(paragraph.text for paragraph in shape.text_frame.paragraphs if paragraph.text.strip())
+                if shape.has_table:
+                    texts.extend("\t".join(cell.text for cell in row.cells) for row in shape.table.rows)
+        return "\n".join(texts)
+    raise ValueError(f"不支持的文件格式: {ext}")
 
 
-def create_session(files: list[dict]) -> dict:
+def create_session(files: list[dict], db: Session | None = None, user_id: str | None = None) -> dict:
     session_id = str(uuid.uuid4())
-    _sessions[session_id] = {
-        "id": session_id,
-        "files": files,
-        "history": [],
-        "current_ontology": None,
-    }
-    return _sessions[session_id]
+    payload = {"id": session_id, "files": files, "history": [], "current_ontology": None}
+    if db is not None:
+        db.add(BuilderDocumentSession(id=session_id, user_id=user_id, payload=payload))
+        db.flush()
+    else:
+        _sessions[session_id] = payload
+    return payload
 
 
-def get_session(session_id: str) -> dict | None:
-    return _sessions.get(session_id)
+def get_session(session_id: str, db: Session | None = None, user_id: str | None = None) -> dict | None:
+    if db is None:
+        return _sessions.get(session_id)
+    record = db.get(BuilderDocumentSession, session_id)
+    if not record or (record.user_id is not None and record.user_id != user_id):
+        return None
+    return copy.deepcopy(record.payload)
+
+
+def _save_session(session: dict, db: Session | None) -> None:
+    if db is not None:
+        record = db.get(BuilderDocumentSession, session["id"])
+        if record:
+            record.payload = copy.deepcopy(session)
+            db.commit()
 
 
 _BASE_SYSTEM_PROMPT = """你是一名资深的业务建模与本体建模专家。你的任务是从用户提供的业务文档中提取本体（实体、属性、关系）。
@@ -161,12 +180,62 @@ def _build_system_prompt() -> str:
     return _BASE_SYSTEM_PROMPT + "\n" + build_constraint_prompt()
 
 
-def chat_stream(
+def _document_contract(result: dict) -> dict:
+    """Convert the validated extraction schema into the document/mapping UI schema."""
+    return {
+        "entities": [{"name": entity["name"], "displayName": entity["name_cn"], "tier": entity["tier"], "description": entity["description"],
+                      "properties": [{**attribute, "displayName": attribute["display_name"]} for attribute in entity["attributes"]]} for entity in result["entities"]],
+        "relations": [{**relation, "source": relation["from_entity"], "target": relation["to_entity"], "displayName": relation["name"]} for relation in result["relations"]],
+    }
+
+
+def _validate_document_output(raw: str):
+    # Existing document callers also supplied properties/displayName; normalize
+    # aliases before the same strict structural validator used by other builders.
+    try:
+        candidate = json.loads(raw)
+        if isinstance(candidate, dict):
+            for entity in candidate.get("entities", []):
+                if "attributes" not in entity and "properties" in entity:
+                    entity["attributes"] = entity["properties"]
+                    entity.setdefault("name_cn", entity.get("displayName", entity.get("name", "")))
+                    entity.setdefault("tier", 3)
+                    entity.setdefault("description", "")
+                    for attribute in entity["attributes"]:
+                        attribute.setdefault("display_name", attribute.get("displayName", attribute.get("name", "")))
+                        attribute.setdefault("required", False)
+                        attribute.setdefault("description", "")
+            for relation in candidate.get("relations", []):
+                relation.setdefault("from_entity", relation.get("source"))
+                relation.setdefault("to_entity", relation.get("target"))
+                relation.setdefault("rel_type", {"1:1":"has_one", "1:N":"has_many", "N:1":"belongs_to", "N:N":"many_to_many"}.get(relation.get("cardinality"), "has_many"))
+        return validate_ontology_output(json.dumps(candidate))
+    except (ValueError, TypeError, AttributeError):
+        return None, "文档抽取结果格式无效"
+
+
+def chat_stream(session_id: str, message: str, business_desc: str, db: Session | None = None, user_id: str | None = None) -> Generator[str, None, None]:
+    try:
+        yield from _chat_stream(session_id, message, business_desc, db, user_id)
+    except Exception as exc:
+        if db is not None:
+            db.rollback()
+        session = get_session(session_id, db, user_id)
+        if session:
+            session["current_ontology"] = None
+            _save_session(session, db)
+        yield f"data: {json.dumps({'event':'error', 'message':str(exc)})}\n\n"
+        yield "data: [DONE]\n\n"
+
+
+def _chat_stream(
     session_id: str,
     message: str,
     business_desc: str,
+    db: Session | None = None,
+    user_id: str | None = None,
 ) -> Generator[str, None, None]:
-    session = _sessions.get(session_id)
+    session = get_session(session_id, db, user_id)
     if not session:
         yield f"data: {json.dumps({'event': 'error', 'message': 'session not found'})}\n\n"
         return
@@ -194,16 +263,19 @@ def chat_stream(
         messages.append({"role": "user", "content": message})
         session["history"].append({"role": "user", "content": message})
 
-    client = _get_llm_client()
+    session["current_ontology"] = None
+    client = _get_llm_client(db)
     try:
         resp = client.chat.completions.create(
-            model=_get_model_name(),
+            model=_get_model_name(db),
             messages=messages,
             temperature=0.3,
             stream=True,
         )
     except Exception as e:
+        _save_session(session, db)
         yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+        yield "data: [DONE]\n\n"
         return
 
     full_content = ""
@@ -251,17 +323,17 @@ def chat_stream(
 
     ontology_json = _extract_json(full_content)
     if ontology_json:
-        result, errors = validate_ontology_output(ontology_json)
+        result, errors = _validate_document_output(ontology_json)
         if result is not None:
-            session["current_ontology"] = result
-            yield f"data: {json.dumps({'event': 'ontology', 'data': result})}\n\n"
+            session["current_ontology"] = _document_contract(result)
+            yield f"data: {json.dumps({'event': 'ontology', 'data': session['current_ontology']})}\n\n"
         else:
             yield f"data: {json.dumps({'event': 'validating', 'message': '正在校验修正输出...'})}\n\n"
-            client = _get_llm_client()
+            client = _get_llm_client(db)
 
             def retry_caller(retry_prompt: str) -> str:
                 resp = client.chat.completions.create(
-                    model=_get_model_name(),
+                    model=_get_model_name(db),
                     messages=[
                         {"role": "system", "content": retry_prompt},
                         {"role": "user", "content": "请输出修正后的完整JSON。"},
@@ -272,17 +344,26 @@ def chat_stream(
 
             result, warnings = validate_and_retry(retry_caller, full_content, max_retries=5)
             if result is not None:
-                session["current_ontology"] = result
-                yield f"data: {json.dumps({'event': 'ontology', 'data': result})}\n\n"
+                # The shared historical helper may return an unvalidated JSON
+                # fallback after exhausting retries; it is not usable output.
+                result, validation_error = _validate_document_output(json.dumps(result))
+                warnings = validation_error or warnings
+            if result is not None:
+                session["current_ontology"] = _document_contract(result)
+                yield f"data: {json.dumps({'event': 'ontology', 'data': session['current_ontology']})}\n\n"
                 if warnings:
                     yield f"data: {json.dumps({'event': 'validation_warning', 'message': warnings})}\n\n"
             else:
-                try:
-                    fallback = json.loads(ontology_json)
-                    session["current_ontology"] = fallback
-                    yield f"data: {json.dumps({'event': 'ontology', 'data': fallback})}\n\n"
-                    yield f"data: {json.dumps({'event': 'validation_warning', 'message': '输出未完全通过校验，请人工检查'})}\n\n"
-                except json.JSONDecodeError:
-                    pass
+                _save_session(session, db)
+                yield f"data: {json.dumps({'event':'error','message':'文档抽取结果未通过校验，请重试或调整文档'})}\n\n"
+                yield "data: [DONE]\n\n"
+                return
 
+    if not session["current_ontology"]:
+        _save_session(session, db)
+        yield f"data: {json.dumps({'event':'error','message':'文档抽取未生成有效本体，请重试'})}\n\n"
+        yield "data: [DONE]\n\n"
+        return
+
+    _save_session(session, db)
     yield "data: [DONE]\n\n"

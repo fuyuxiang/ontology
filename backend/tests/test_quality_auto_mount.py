@@ -37,10 +37,10 @@ def test_auto_mount_creates_rules_for_required_attrs():
         calls = mock_svc.create_rule.call_args_list
         kinds = [c.kwargs.get("kind") for c in calls]
         assert "row_count_min" in kinds
-        assert "freshness" in kinds
+        assert "freshness" not in kinds  # a user_id PK is not a timestamp
         assert "null_ratio_max" in kinds
         assert "pk_uniqueness" in kinds
-        assert len(calls) == 4  # row_count + freshness + pk_unique + email_null
+        assert len(calls) == 3  # row_count + pk_unique + email_null
 
 
 def test_auto_mount_skips_existing_rules():
@@ -53,6 +53,7 @@ def test_auto_mount_skips_existing_rules():
         existing = MagicMock()
         existing.kind = "row_count_min"
         existing.column_name = None
+        existing.params = {}
         mock_svc.list_rules.return_value = [existing]
         _auto_mount_quality_rules(db, "asset-001", "entity-001")
 

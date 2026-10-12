@@ -9,19 +9,23 @@ from app.database import SessionLocal
 from app.repositories.monitor_repo import MonitorRepository
 from app.services.monitor.event_bus import event_bus
 from app.services.monitor.ws_manager import ws_manager
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 # ── Service definitions ──
 
 SERVICES = [
-    {"name": "后端API", "check": "http", "url": "http://localhost:8001/api/health"},
+    {"name": "后端API", "check": "http", "url": f"http://127.0.0.1:{settings.PORT}/api/health"},
     {"name": "数据库", "check": "db"},
     {"name": "图数据库", "check": "neo4j"},
-    {"name": "大模型网关", "check": "http", "url": "https://dashscope.aliyuncs.com"},
+    {"name": "大模型网关", "check": "http", "url": settings.LLM_BASE_URL},
     {"name": "MinIO", "check": "minio"},
     {"name": "Redis", "check": "redis"},
 ]
+
+_collector_tasks: list[asyncio.Task] = []
+_alert_subscribed = False
 
 
 async def _check_http(url: str, timeout: float = 3.0) -> tuple[str, float | None]:
@@ -39,64 +43,70 @@ async def _check_http(url: str, timeout: float = 3.0) -> tuple[str, float | None
 
 
 async def _check_db() -> tuple[str, float | None]:
-    from sqlalchemy import text
-    db = SessionLocal()
+    def probe():
+        from sqlalchemy import text
+        with SessionLocal() as db:
+            start = time.monotonic()
+            db.execute(text("SELECT 1"))
+            return "healthy", round((time.monotonic() - start) * 1000, 1)
     try:
-        start = time.monotonic()
-        db.execute(text("SELECT 1"))
-        elapsed = (time.monotonic() - start) * 1000
-        return "healthy", round(elapsed, 1)
+        return await asyncio.to_thread(probe)
     except Exception:
         return "unhealthy", None
-    finally:
-        db.close()
 
 
 async def _check_neo4j() -> tuple[str, float | None]:
-    try:
+    def probe():
         from neo4j import GraphDatabase
-
-        from app.config import settings
-        driver = GraphDatabase.driver(settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD))
-        start = time.monotonic()
-        with driver.session() as session:
-            session.run("RETURN 1")
-        elapsed = (time.monotonic() - start) * 1000
-        driver.close()
-        return "healthy", round(elapsed, 1)
+        driver = GraphDatabase.driver(settings.NEO4J_URI,
+            auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD),
+            connection_timeout=3, connection_acquisition_timeout=3,
+            max_transaction_retry_time=0)
+        try:
+            start = time.monotonic()
+            with driver.session() as session:
+                from neo4j import Query
+                session.run(Query("RETURN 1", timeout=3)).consume()
+            return "healthy", round((time.monotonic() - start) * 1000, 1)
+        finally:
+            driver.close()
+    try:
+        return await asyncio.to_thread(probe)
     except Exception:
         return "unhealthy", None
 
 
 async def _check_minio() -> tuple[str, float | None]:
+    def probe():
+        from app.connectors.s3 import S3Connector
+        from app.services.data_plane.storage_policy import storage_policy
+        with SessionLocal() as db:
+            policy = storage_policy(db)
+        client = S3Connector()._client(policy, policy)
+        try:
+            start = time.monotonic()
+            client.head_bucket(Bucket=policy["bucket"])
+            return "healthy", round((time.monotonic() - start) * 1000, 1)
+        finally:
+            client.close()
     try:
-        import boto3
-
-        from app.config import settings
-        client = boto3.client(
-            "s3",
-            endpoint_url=settings.MINIO_ENDPOINT,
-            aws_access_key_id=settings.MINIO_ACCESS_KEY,
-            aws_secret_access_key=settings.MINIO_SECRET_KEY,
-        )
-        start = time.monotonic()
-        client.head_bucket(Bucket=settings.MINIO_BUCKET)
-        elapsed = (time.monotonic() - start) * 1000
-        return "healthy", round(elapsed, 1)
+        return await asyncio.to_thread(probe)
     except Exception:
         return "unhealthy", None
 
 
 async def _check_redis() -> tuple[str, float | None]:
-    try:
+    def probe():
         import redis
-
-        from app.config import settings
-        r = redis.from_url(settings.REDIS_URL, socket_timeout=3)
-        start = time.monotonic()
-        r.ping()
-        elapsed = (time.monotonic() - start) * 1000
-        return "healthy", round(elapsed, 1)
+        client = redis.from_url(settings.REDIS_URL, socket_timeout=3, socket_connect_timeout=3)
+        try:
+            start = time.monotonic()
+            client.ping()
+            return "healthy", round((time.monotonic() - start) * 1000, 1)
+        finally:
+            client.close()
+    try:
+        return await asyncio.to_thread(probe)
     except Exception:
         return "unhealthy", None
 
@@ -125,7 +135,7 @@ async def _check_service(svc: dict) -> tuple[str, str, float | None]:
 async def collect_service_metrics():
     while True:
         try:
-            cpu = psutil.cpu_percent(interval=0.1)
+            cpu = await asyncio.to_thread(psutil.cpu_percent, interval=0.1)
             mem = psutil.virtual_memory()
             disk = shutil.disk_usage("/")
             disk_pct = round(disk.used / disk.total * 100, 1) if disk.total else 0
@@ -210,13 +220,25 @@ async def cleanup_old_data():
 
 
 async def start_collector():
-    asyncio.create_task(collect_service_metrics())
-    asyncio.create_task(check_alerts())
-    asyncio.create_task(cleanup_old_data())
+    global _alert_subscribed
+    if not settings.MONITOR_ENABLED or _collector_tasks:
+        return
+    _collector_tasks.extend(asyncio.create_task(task()) for task in
+                            (collect_service_metrics, check_alerts, cleanup_old_data))
     ws_manager.start_heartbeat()
     logger.info("Monitor collector started")
 
     async def _on_alert(data: dict):
         await ws_manager.broadcast({"type": "alert", "data": data})
 
-    event_bus.subscribe("alert", _on_alert)
+    if not _alert_subscribed:
+        event_bus.subscribe("alert", _on_alert)
+        _alert_subscribed = True
+
+
+async def stop_collector():
+    tasks, _collector_tasks[:] = list(_collector_tasks), []
+    for task in tasks:
+        task.cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    await ws_manager.stop()

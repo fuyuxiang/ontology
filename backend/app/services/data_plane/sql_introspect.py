@@ -86,9 +86,9 @@ def introspect(sql: str, *, dialect: str | None = None) -> IntrospectResult:
             return IntrospectResult(ok=False, reason="dangerous_function")
 
     # 类型判定
-    is_select = isinstance(ast, exp.Select) or ast.find(exp.Select) is not None and not _is_modifying(ast)
     is_dml = _is_modifying(ast)
-    is_ddl = isinstance(ast, (exp.Create, exp.Drop, exp.Alter, exp.TruncateTable))
+    is_ddl = any(isinstance(node, (exp.Create, exp.Drop, exp.Alter, exp.TruncateTable, exp.Into)) for node in ast.walk())
+    is_select = (isinstance(ast, exp.Select) or ast.find(exp.Select) is not None) and not is_dml and not is_ddl
 
     return IntrospectResult(
         ok=True,
@@ -130,6 +130,7 @@ def _dialect_name(dialect: str | None) -> str | None:
         return None
     aliases = {
         "mysql": "mysql",
+        "sqlite": "sqlite",
         "postgresql": "postgres",
         "postgres": "postgres",
         "oracle": "oracle",
@@ -151,6 +152,12 @@ def _looks_like_multi_statement(sql: str) -> bool:
 
 
 def _extract_tables(ast: exp.Expression) -> list[str]:
+    if not _is_modifying(ast):
+        from sqlglot.optimizer.scope import traverse_scope
+        scopes = list(traverse_scope(ast))
+        if scopes:
+            return list(dict.fromkeys(".".join(filter(None, [source.catalog, source.db, source.name]))
+                for scope in scopes for source in scope.sources.values() if isinstance(source, exp.Table)))
     tables: list[str] = []
     for t in ast.find_all(exp.Table):
         # t.name 是表名；t.db 是 schema/database 前缀
@@ -172,4 +179,4 @@ def _extract_placeholders(sql: str) -> list[str]:
 
 
 def _is_modifying(ast: exp.Expression) -> bool:
-    return isinstance(ast, (exp.Insert, exp.Update, exp.Delete, exp.Merge))
+    return any(isinstance(node, (exp.Insert, exp.Update, exp.Delete, exp.Merge)) for node in ast.walk())

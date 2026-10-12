@@ -17,13 +17,14 @@ from app.services.mcp_tools.resolve import resolve_ontology_id
 @register
 class GetAttrMappingTool(MCPTool):
     name = "ontology_get_attr_mapping"
-    description = "返回各对象「属性名 -> 物理字段名」及主键信息。对查询的 WHERE/SQL 应使用物理字段名。"
+    description = "返回属性到物理字段映射、主键和冻结transform定义。原生WHERE/SQL使用物理字段且返回源原值；ontology_object_find应用transform后返回本体属性值。"
 
     def input_schema(self) -> dict:
         return {
             "type": "object",
             "properties": {
                 "ontology_name": {"type": "string", "description": "本体英文标识"},
+                "version_id": {"type": "string"},
                 "object_names": {
                     "type": "array",
                     "items": {"type": "string"},
@@ -53,45 +54,35 @@ class GetAttrMappingTool(MCPTool):
         ).all()}
         all_entity_ids = owned_ids | shared_ids
 
+        from app.services.mcp_tools.data_query import _get_entity_in_ontology, _entity_service
         results = []
         for obj_name in object_names:
-            entity = (
-                db.query(OntologyEntity)
-                .filter(
-                    OntologyEntity.name == obj_name,
-                    OntologyEntity.id.in_(all_entity_ids),
-                )
-                .first()
-            )
+            entity = _get_entity_in_ontology(db, ontology_id, obj_name, arguments.get("version_id"))
             if not entity:
-                continue
+                return {"error": f"对象 {obj_name} 不存在或名称有歧义"}
 
             # 获取属性映射：属性名 → 物理字段名（source_field）
-            attrs = (
-                db.query(EntityAttribute)
-                .filter(EntityAttribute.entity_id == entity.id)
-                .all()
-            )
-            attr_to_col = {}
-            for a in attrs:
-                attr_to_col[a.name] = a.source_field or a.name
+            svc = _entity_service(db, entity)
+            attr_to_col = svc.get_attr_field_map(entity.id)
 
             # 主键：从 ObjectBinding.id_column 获取
-            binding = (
-                db.query(ObjectBinding)
-                .filter(
-                    ObjectBinding.object_type_id == entity.id,
-                    ObjectBinding.role == "primary",
-                    ObjectBinding.status == "active",
-                )
-                .first()
-            )
-            pk_col = binding.id_column if binding and binding.id_column else "ID"
+            resolved = svc.resolve_entity_asset(entity.id)
+            if not resolved:
+                return {"error": f"对象 {obj_name} 未绑定有效资产"}
+            pk_col = resolved[1].id_column
+            attribute_names = svc.get_query_attribute_names(entity.id)
+            bindings = [resolved[1]] + [binding for _, binding in svc.resolve_entity_enrichments(entity.id)]
+            transforms = {attribute_names[mapping["attribute_id"]]: mapping["transform"]
+                for binding in bindings for mapping in binding.field_mappings or []
+                if mapping.get("attribute_id") in attribute_names and mapping.get("transform")}
 
             results.append({
                 "object_name": obj_name,
                 "primary_key_column": pk_col,
                 "attr_to_col": attr_to_col,
+                "attribute_transforms": transforms,
+                "sql_value_semantics": "physical_source",
+                "object_value_semantics": "mapped_transformed",
             })
 
         if not results:
@@ -110,6 +101,7 @@ class ListCapabilitiesTool(MCPTool):
             "type": "object",
             "properties": {
                 "ontology_name": {"type": "string", "description": "本体英文标识"},
+                "version_id": {"type": "string"},
                 "user_id": {"type": "string", "description": "当前用户 ID"},
                 "list_type": {
                     "type": "string",
@@ -129,6 +121,15 @@ class ListCapabilitiesTool(MCPTool):
         ontology_id = resolve_ontology_id(db, ontology_name)
         if not ontology_id:
             return {"error": f"本体 '{ontology_name}' 不存在"}
+        from app.models.version import OntologyVersion
+        query = db.query(OntologyVersion).filter_by(ontology_id=ontology_id, status="published")
+        version = query.filter_by(id=arguments["version_id"]).first() if arguments.get("version_id") else query.filter_by(is_active=True).first()
+        if arguments.get("version_id") and not version:
+            return {"error": "指定发布版本不存在"}
+        if version:
+            logics = [{"name": f.callable_name or f.name, "description": f.description or ""} for f in version.functions] if list_type in ("logics", "all") else []
+            actions = [{"name": a.name, "description": a.description or ""} for a in version.actions] if list_type in ("actions", "all") else []
+            return {"logics": logics, "actions": actions, "total_logics": len(logics), "total_actions": len(actions), "version_id": version.id}
 
         # 该本体范围内的实体 ID
         owned_ids = {r[0] for r in db.query(OntologyEntity.id).filter(

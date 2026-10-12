@@ -88,7 +88,7 @@ class DashboardRepository:
             "agent_count": agent_count,
             "agent_active": agent_active,
             "datasources": [
-                {"id": d.id, "name": d.name, "type": d.type, "status": d.status}
+                {"id": d.id, "name": d.name, "type": d.kind, "status": d.status}
                 for d in datasources
             ],
             "recent_activities": [

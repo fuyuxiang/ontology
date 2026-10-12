@@ -20,7 +20,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, defineComponent, h, ref, watch } from 'vue'
+import { computed, defineComponent, h, ref, watch, onBeforeUnmount } from 'vue'
 import { Drawer as ADrawer, Tag as ATag, Space as ASpace } from 'ant-design-vue'
 import { getAsset, getAssetUsage, syncAssetSchema, profileAsset, previewAsset, getAssetQuality } from '../../api/asset'
 import type { Asset, AssetWithUsage, PreviewResult } from '../../types/asset'
@@ -44,24 +44,28 @@ const metrics = ref<QualityMetric[]>([])
 const loading = ref(false)
 const syncing = ref(false)
 const profiling = ref(false)
+const loadError = ref(''), previewError = ref(''), metricsError = ref(''), usageError = ref('')
+let request = 0
+const describeError = (error: any) => error?.response?.data?.detail || error.message || '资产请求失败'
+onBeforeUnmount(() => { ++request })
 
 async function load(id: string) {
+  const current = ++request
   loading.value = true
+  asset.value = null; usage.value = null; preview.value = null; metrics.value = []
+  loadError.value = ''; previewError.value = ''; metricsError.value = ''; usageError.value = ''
   try {
-    asset.value = await getAsset(id)
-    const [u, m] = await Promise.all([
-      getAssetUsage(id),
-      getAssetQuality(id).catch(() => []),
-    ])
-    usage.value = u
-    metrics.value = m
-    try {
-      preview.value = await previewAsset(id, 20)
-    } catch {
-      preview.value = null
-    }
+    const result = await getAsset(id)
+    if (current !== request || id !== props.assetId) return
+    asset.value = result
+    const [u, m, p] = await Promise.allSettled([getAssetUsage(id), getAssetQuality(id), previewAsset(id, 20)])
+    if (current !== request || id !== props.assetId) return
+    if (u.status === 'fulfilled') usage.value = u.value; else usageError.value = describeError(u.reason)
+    if (m.status === 'fulfilled') metrics.value = m.value; else metricsError.value = describeError(m.reason)
+    if (p.status === 'fulfilled') preview.value = p.value; else previewError.value = describeError(p.reason)
+  } catch (exception:any) { if (current === request) loadError.value = describeError(exception)
   } finally {
-    loading.value = false
+    if (current === request) loading.value = false
   }
 }
 
@@ -69,7 +73,7 @@ watch(
   () => props.assetId,
   (id) => {
     if (id) load(id)
-    else { asset.value = null; usage.value = null; preview.value = null; metrics.value = [] }
+    else { ++request; loading.value = false; asset.value = null; usage.value = null; preview.value = null; metrics.value = []; loadError.value = '' }
   },
   { immediate: true },
 )
@@ -80,22 +84,26 @@ watch(
 )
 
 async function doSyncSchema() {
-  if (!asset.value || asset.value.kind === 'document') return
+  if (!asset.value || syncing.value || asset.value.kind === 'document') return
+  const id = asset.value.id
   syncing.value = true
   try {
-    await syncAssetSchema(asset.value.id)
-    await load(asset.value.id)
+    await syncAssetSchema(id)
+    if (id === props.assetId) await load(id)
+  } catch (exception:any) { if (id === props.assetId) previewError.value = describeError(exception)
   } finally {
     syncing.value = false
   }
 }
 
 async function doProfile() {
-  if (!asset.value || asset.value.kind === 'document') return
+  if (!asset.value || profiling.value || asset.value.kind === 'document') return
+  const id = asset.value.id
   profiling.value = true
   try {
-    await profileAsset(asset.value.id)
-    await load(asset.value.id)
+    await profileAsset(id)
+    if (id === props.assetId) await load(id)
+  } catch (exception:any) { if (id === props.assetId) metricsError.value = describeError(exception)
   } finally {
     profiling.value = false
   }
@@ -114,6 +122,8 @@ const bodyProps = computed(() => ({
   preview: preview.value,
   metrics: metrics.value,
   loading: loading.value,
+  loadError: loadError.value, previewError: previewError.value, metricsError: metricsError.value, usageError: usageError.value,
+  onReload: () => { if (props.assetId) void load(props.assetId) },
   syncing: syncing.value,
   profiling: profiling.value,
   onSyncSchema: doSyncSchema,

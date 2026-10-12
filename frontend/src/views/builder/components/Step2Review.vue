@@ -1,36 +1,36 @@
 <template>
   <div class="step2-root">
     <header class="step2-topbar">
-      <button class="step2-back-btn" @click="$emit('prev')">← 返回</button>
-      <div class="step2-topbar-title">专家审批</div>
+      <button class="step2-back-btn" @click="$emit('prev')">{{ text('← 返回') }}</button>
+      <div class="step2-topbar-title">{{ text('专家审批') }}</div>
       <div class="step2-topbar-progress">
-        <span class="step2-progress-label">已通过 {{ approvedCount }} / {{ objects.length }}</span>
+        <span class="step2-progress-label">{{ text('已通过') }} {{ approvedCount }} / {{ objects.length }}</span>
         <div class="step2-progress-track">
           <div class="step2-progress-bar" :style="{ width: progressPct + '%' }"></div>
         </div>
         <span class="step2-progress-pct">{{ Math.round(progressPct) }}%</span>
       </div>
-      <button class="step2-approve-all-btn" @click="approveAll">✅ 一键全部通过</button>
+      <button class="step2-approve-all-btn" @click="approveAll">{{ text('✅ 一键全部通过') }}</button>
       <button
         :class="['step2-complete-btn', { active: approvedCount === objects.length && objects.length > 0 }]"
         :disabled="!objects.length || approvedCount < objects.length || busy"
         @click="finishReview"
-      >完成审批</button>
+      >{{ text('完成审批') }}</button>
     </header>
 
     <!-- 数据源绑定面板（仅文档抽取/导入路径显示，手工建模在独立步骤处理） -->
-    <div class="step2-binding-panel" v-if="props.session.buildMethod !== 'chat' && props.session.buildMethod !== 'manual'">
+    <div class="step2-binding-panel" v-if="!props.mappingComplete && props.session.buildMethod !== 'chat' && props.session.buildMethod !== 'manual'">
       <div class="step2-binding-head" @click="bindingOpen = !bindingOpen">
-        <span>🔗 数据源绑定与自动映射</span>
-        <span class="step2-binding-toggle">{{ bindingOpen ? '收起' : '展开' }}</span>
+        <span>{{ text("🔗 数据源绑定与自动映射") }}</span>
+        <span class="step2-binding-toggle">{{ bindingOpen ? text('收起') : text('展开') }}</span>
       </div>
       <div v-if="bindingOpen" class="step2-binding-body">
         <div class="step2-binding-row">
-          <label>选择数据源：</label>
+          <label>{{ text("选择数据源：") }}</label>
           <a-select
             v-model:value="selectedAssetIds"
             mode="multiple"
-            placeholder="选择要映射的数据资产"
+            :placeholder="text('选择要映射的数据资产')"
             :options="assetOptions"
             :loading="assetLoading"
             :disabled="autoMapping"
@@ -40,7 +40,7 @@
             @change="syncStore"
           />
           <button class="step2-ai-btn" :disabled="autoMapping || !selectedAssetIds.length" @click="runAutoMap">
-            {{ autoMapping ? '映射中...' : '自动映射' }}
+            {{ autoMapping ? text('映射中...') : text('自动映射') }}
           </button>
         </div>
         <div v-if="mapCoverage" class="step2-binding-stats">
@@ -52,11 +52,18 @@
       </div>
     </div>
 
-
+    <div v-if="session.importedActions?.length" class="step2-hints">
+      <div class="step2-hints-head">{{ text("导入动作定义与业务建议") }}</div>
+      <div v-for="action in session.importedActions" :key="action.name" class="step2-hints-body">
+        <strong>{{ action.display_name || action.name }} · {{ action.target_object || text('系统') }}</strong>
+        <span>{{ action.action_type || text('待配置执行器：业务建议不会自动执行，请发布结构后在行动页面选择类型并配置') }}</span>
+        <p>{{ action.description }}</p><pre v-if="action.type_config">{{ JSON.stringify(action.type_config, null, 2) }}</pre>
+      </div>
+    </div>
     <div class="step2-body">
       <!-- 左：对象列表 -->
       <aside class="step2-left">
-        <div class="step2-left-header">本体对象 · {{ objects.length }}</div>
+        <div class="step2-left-header">{{ text('本体对象') }} · {{ objects.length }}</div>
         <div class="step2-story-list">
           <div
             v-for="c in objects"
@@ -67,9 +74,9 @@
             <div class="step2-story-icon" :style="{ background: tierBg(c.tier), color: tierColor(c.tier) }">{{ c.icon || '🔷' }}</div>
             <div class="step2-story-meta">
               <div class="step2-story-name">{{ c.displayName }}</div>
-              <div class="step2-story-output">{{ c.name }} · T{{ c.tier }} · {{ c.properties.length }} 属性</div>
+              <div class="step2-story-output">{{ c.name }} · T{{ c.tier }} · {{ c.properties.length }} {{ text('属性') }}</div>
             </div>
-            <span :class="['step2-status-tag', c.approved ? 'approved' : 'pending']">{{ c.approved ? '已通过' : '待确认' }}</span>
+            <span :class="['step2-status-tag', c.approved ? 'approved' : 'pending']">{{ c.approved ? text('已通过') : text('待确认') }}</span>
           </div>
         </div>
       </aside>
@@ -78,8 +85,8 @@
       <main class="step2-mid">
         <div class="step2-layer-header">
           <div class="step2-layer-title">
-            图谱展示
-            <span class="step2-layer-title-sub">点击节点在右侧编辑，拖拽节点调整布局</span>
+            {{ text("图谱展示") }}
+            <span class="step2-layer-title-sub">{{ text("点击节点在右侧编辑，拖拽节点调整布局") }}</span>
           </div>
         </div>
         <div class="step2-layers-scroll" style="padding:0">
@@ -96,15 +103,18 @@
       <aside class="step2-right">
         <div v-if="selected" class="step2-editor-card">
           <div class="step2-editor-head">
-            <span>📝 对象编辑</span>
-            <span :class="['step2-status-tag', selected.approved ? 'approved' : 'pending']">{{ selected.approved ? '已通过' : '待确认' }}</span>
+            <span>{{ text("📝 对象编辑") }}</span>
+            <span :class="['step2-status-tag', selected.approved ? 'approved' : 'pending']">{{ selected.approved ? text('已通过') : text('待确认') }}</span>
           </div>
-          <label class="step2-editor-label">对象名称（中文）</label>
+          <label class="step2-editor-label">{{ text("对象名称（中文）") }}</label>
           <a-input v-model:value="selected.displayName" size="small" @change="syncStore" />
-          <label class="step2-editor-label">英文名 (API)</label>
+          <label class="step2-editor-label">{{ text("英文名 (API)") }}</label>
           <a-input v-model:value="selected.name" size="small" @change="syncStore" />
-          <label class="step2-editor-label">层级</label>
+          <label class="step2-editor-label">{{ text("层级") }}</label>
           <a-select v-model:value="selected.tier" size="small" :options="tierOptions" @change="syncStore" />
+          <label class="step2-editor-label">{{ text('实例主键属性') }}</label>
+          <a-select v-model:value="selected.primaryKey" size="small" :options="selected.properties.filter(property => property.name.trim()).map(property => ({label:property.name,value:property.name}))" @change="syncStore" />
+          <p v-if="!canApprove(selected)" role="alert" class="step2-review-error">{{ text("请填写唯一对象名、唯一属性名，并选择已有属性作为主键。") }}</p>
           <div class="step2-editor-meta">
             <span>关系：{{ relationCountFor(selected.id) }} 条</span>
             <span>属性：{{ selected.properties.length }} 个</span>
@@ -114,16 +124,17 @@
             <span>属性 ({{ selected.properties.length }})</span>
             <div style="display:flex;gap:6px">
               <button class="step2-ai-btn" :disabled="aiSuggesting" @click="suggestAttributes">
-                {{ aiSuggesting ? 'AI 思考中...' : 'AI 补全' }}
+                {{ aiSuggesting ? text('AI 思考中...') : text('AI 补全') }}
               </button>
-              <button @click="addProp">+ 增加属性</button>
+              <button @click="addProp">{{ text("+ 增加属性") }}</button>
             </div>
           </div>
           <div class="step2-editor-props">
             <div v-for="p in selected.properties" :key="p.id" class="step2-editor-prop">
-              <a-input v-model:value="p.name" size="small" placeholder="属性名" @change="syncStore" />
+              <a-input v-model:value="p.name" size="small" :placeholder="text('属性名')" @change="syncStore" />
               <a-select v-model:value="p.type" size="small" :options="typeOptions" @change="syncStore" />
-              <button class="step2-editor-del" title="删除属性" @click="removeProp(p.id)">×</button>
+              <label><input v-model="p.required" type="checkbox" @change="syncStore" />{{ text("必填") }}</label>
+              <button class="step2-editor-del" :title="text('删除属性')" @click="removeProp(p.id)">×</button>
             </div>
           </div>
 
@@ -132,14 +143,14 @@
             class="step2-editor-approve"
             :disabled="!canApprove(selected)"
             @click="approveSelected"
-          >{{ selected.approved ? '✓ 已通过' : '确认通过' }}</button>
+          >{{ selected.approved ? text('✓ 已通过') : text('确认通过') }}</button>
         </div>
 
         <div class="step2-editor-card step2-relation-card">
           <div class="step2-editor-head">
-            <span>🔗 关系</span>
+            <span>{{ text("🔗 关系") }}</span>
             <button class="step2-ai-btn" :disabled="aiRelSuggesting" @click="suggestRelations" style="margin-left:auto">
-              {{ aiRelSuggesting ? 'AI 思考中...' : 'AI 推断' }}
+              {{ aiRelSuggesting ? text('AI 思考中...') : text('AI 推断') }}
             </button>
           </div>
           <div v-for="r in relations" :key="r.id" class="step2-rel-row">
@@ -149,7 +160,7 @@
             <span class="step2-rel-label">{{ r.displayName }}</span>
             <button class="step2-editor-del" @click="removeRelation(r.id)">×</button>
           </div>
-          <div v-if="!relations.length" class="step2-rel-empty">尚无关系</div>
+          <div v-if="!relations.length" class="step2-rel-empty">{{ text("尚无关系") }}</div>
         </div>
 
       </aside>
@@ -158,6 +169,9 @@
 </template>
 
 <script setup lang="ts">
+import { useProductText } from '../../../composables/useProductText'
+const { text } = useProductText()
+import { authenticatedFetch } from '../../../api/authenticatedFetch'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
@@ -167,15 +181,15 @@ import type {
 } from '../../../types/builder'
 import SemanticCanvas from './graph/SemanticCanvas.vue'
 
-const props = defineProps<{ session: BuilderSession }>()
+const props = defineProps<{ session: BuilderSession; mappingComplete?: boolean }>()
 const emit = defineEmits<{ (e: 'prev'): void; (e: 'next'): void }>()
 const store = useBuilderStore()
 let requestEpoch = 0
 let mounted = true
 
 const selectedId = ref<string | null>(props.session.ontologyObjects[0]?.id || null)
-const objects = ref([...props.session.ontologyObjects])
-const relations = ref([...props.session.ontologyRelations])
+const objects = ref(JSON.parse(JSON.stringify(props.session.ontologyObjects)) as typeof props.session.ontologyObjects)
+const relations = ref(JSON.parse(JSON.stringify(props.session.ontologyRelations)) as typeof props.session.ontologyRelations)
 const aiSuggesting = ref(false)
 const aiRelSuggesting = ref(false)
 
@@ -218,12 +232,13 @@ function syncStore() {
   })
 }
 
-function canApprove(_o: typeof objects.value[0]) {
-  return true
+function canApprove(object: typeof objects.value[0]) {
+  const names = object.properties.map(property => property.name.trim())
+  return !!object.name.trim() && names.length > 0 && names.every(Boolean) && new Set(names).size === names.length && names.includes(object.primaryKey) && objects.value.filter(candidate => candidate.name === object.name).length === 1
 }
 
 function approveSelected() {
-  if (!selected.value) return
+  if (!selected.value || !canApprove(selected.value)) return
   selected.value.approved = true
   syncStore()
   const next = objects.value.find(c => !c.approved)
@@ -231,9 +246,10 @@ function approveSelected() {
 }
 
 function approveAll() {
+  if (!objects.value.every(canApprove)) { alert("请先补齐对象名称、唯一属性名和主键属性"); return }
   objects.value = objects.value.map(c => ({ ...c, approved: true }))
   syncStore()
-  message.success('已一键通过全部对象')
+  message.success(text('已一键通过全部对象'))
 }
 
 function addProp() {
@@ -255,7 +271,7 @@ async function suggestAttributes() {
   const source = selected.value
   aiSuggesting.value = true
   try {
-    const resp = await fetch('/api/v1/builder/suggest-attributes', {
+    const resp = await authenticatedFetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/builder/suggest-attributes`, {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
@@ -308,7 +324,7 @@ async function suggestRelations() {
   const request = requestEpoch
   aiRelSuggesting.value = true
   try {
-    const resp = await fetch('/api/v1/builder/suggest-relations', {
+    const resp = await authenticatedFetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/builder/suggest-relations`, {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
@@ -375,7 +391,7 @@ async function onAssetDropdownOpen(open: boolean) {
   if (!open || assetOptions.value.length) return
   assetLoading.value = true
   try {
-    const resp = await fetch('/api/v1/assets?page=1&page_size=200', { headers: authHeaders() })
+    const resp = await authenticatedFetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/assets?page=1&page_size=200`, { headers: authHeaders() })
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
     const data = await resp.json()
     const items = data.items || data || []
@@ -396,7 +412,7 @@ async function runAutoMap() {
   autoMapping.value = true
   mapCoverage.value = null
   try {
-    const resp = await fetch('/api/v1/builder/auto-map', {
+    const resp = await authenticatedFetch(`${import.meta.env.VITE_API_BASE_URL || "/api/v1"}/builder/auto-map`, {
       method: 'POST',
       headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
@@ -473,7 +489,7 @@ function finishReview() {
       },
     ],
   })
-  message.success('审批完成，进入验证发布')
+  message.success(text('审批完成，进入验证发布'))
   emit('next')
 }
 
@@ -484,14 +500,14 @@ watch(() => props.session.sessionId, () => {
   autoMapping.value = false
   selectedAssetIds.value = [...(props.session.selectedAssetIds || [])]
   mapCoverage.value = null
-  objects.value = [...props.session.ontologyObjects]
-  relations.value = [...props.session.ontologyRelations]
+  objects.value = JSON.parse(JSON.stringify(props.session.ontologyObjects))
+  relations.value = JSON.parse(JSON.stringify(props.session.ontologyRelations))
   selectedId.value = objects.value[0]?.id || null
 })
 
 // 父级 OntologyBuilderView 已通过 query 自动挂载新建 ID，这里同步本地 state
 watch(() => props.session.ontologyObjects, (v) => {
-  objects.value = [...v]
+  objects.value = JSON.parse(JSON.stringify(v))
 }, { deep: true })
 onUnmounted(() => { mounted = false; ++requestEpoch })
 </script>
@@ -590,4 +606,17 @@ onUnmounted(() => { mounted = false; ++requestEpoch })
 
 .step2-right { overflow-y: auto; }
 .step2-editor-props { max-height: 360px; overflow-y: auto; }
+.step2-review-error { color:#b91c1c;font-size:12px; }.step2-editor-prop label { display:flex;gap:4px;align-items:center;white-space:nowrap;font-size:11px; }
+@media (max-width: 640px) {
+  .step2-topbar { flex-wrap: wrap; padding: 10px 12px; gap: 8px; }
+  .step2-topbar-progress { flex-wrap: wrap; margin-left: 0; }
+  .step2-topbar button { min-height: 44px; }
+  .step2-body { display: block; overflow-y: auto; }
+  .step2-left, .step2-right { width: 100%; min-width: 0; max-width: none; overflow: visible; border: 0; }
+  .step2-story-list { display: flex; overflow-x: auto; padding: 8px; gap: 8px; }
+  .step2-story-item { min-width: 180px; margin: 0; }
+  .step2-mid { height: 240px; }
+  .step2-editor-card { padding: 12px; }
+  .step2-editor-prop { flex-wrap: wrap; }
+}
 </style>

@@ -25,17 +25,21 @@ MAX_HISTORY_ROUNDS = 10
 
 
 class AiCodeService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, owner_id: str | None = None):
         self.db = db
+        self.owner_id = owner_id
 
-    def generate_stream(self, target_type: str, target_id: str, message: str, extra_entity_ids: list[str]) -> Generator[str, None, str]:
+    def generate_stream(self, target_type: str, target_id: str, message: str, extra_entity_ids: list[str], execution_mode: str | None = None) -> Generator[str, None, str]:
+        mode = self._execution_mode(target_type, target_id, execution_mode)
         context = self._build_context(target_type, target_id, extra_entity_ids)
+        if mode == "sql":
+            context += "\n" + self._build_sql_context(target_type, target_id, extra_entity_ids)
         conversation = self._get_or_create_conversation(target_type, target_id, extra_entity_ids)
 
-        history = conversation.messages[-MAX_HISTORY_ROUNDS * 2:] if conversation.messages else []
-        history.append({"role": "user", "content": message, "timestamp": datetime.now(UTC).isoformat()})
+        history = [dict(item) for item in (conversation.messages or []) if item.get("execution_mode", mode) == mode][-MAX_HISTORY_ROUNDS * 2:]
+        history.append({"role": "user", "content": message, "timestamp": datetime.now(UTC).isoformat(), "execution_mode": mode})
 
-        llm_messages = [{"role": "system", "content": SYSTEM_PROMPT + "\n\n" + context}]
+        llm_messages = [{"role": "system", "content": self._prompt_for_mode(mode) + "\n\n" + context}]
         for msg in history:
             llm_messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -54,7 +58,9 @@ class AiCodeService:
                 full_response += token
                 yield token
 
-        history.append({"role": "assistant", "content": full_response, "timestamp": datetime.now(UTC).isoformat()})
+        if not full_response.strip():
+            raise ValueError("模型未生成有效代码，请重试")
+        history.append({"role": "assistant", "content": full_response, "timestamp": datetime.now(UTC).isoformat(), "execution_mode": mode})
         conversation.messages = history
         conversation.updated_at = datetime.now(UTC)
         self.db.commit()
@@ -65,12 +71,14 @@ class AiCodeService:
         return self.db.query(AiCodeConversation).filter(
             AiCodeConversation.target_type == target_type,
             AiCodeConversation.target_id == target_id,
+            AiCodeConversation.owner_id == self.owner_id,
         ).first()
 
     def _get_or_create_conversation(self, target_type: str, target_id: str, extra_entity_ids: list[str]) -> AiCodeConversation:
         conv = self.get_conversation(target_type, target_id)
         if not conv:
             conv = AiCodeConversation(
+                owner_id=self.owner_id,
                 target_type=target_type,
                 target_id=target_id,
                 messages=[],
@@ -79,6 +87,46 @@ class AiCodeService:
             self.db.add(conv)
             self.db.flush()
         return conv
+
+    def _execution_mode(self, target_type, target_id, requested):
+        if target_type == "action":
+            from app.models.action import EntityAction
+            action = self.db.get(EntityAction, target_id) if not target_id.startswith("tmp_") else None
+            if action and action.action_type != "custom_script":
+                raise ValueError("AI Python 逻辑仅适用于自定义脚本行动；其他行动请编辑执行配置")
+            if requested not in {None, "custom_script"}:
+                raise ValueError("行动代码必须使用 custom_script 模式")
+            return "custom_script"
+        function = self.db.get(OntologyFunction, target_id) if not target_id.startswith("tmp_") else None
+        mode = requested or (function.logic_type if function else "python")
+        if mode not in {"expression", "sql", "python"}:
+            raise ValueError("函数逻辑模式无效")
+        return mode
+
+    @staticmethod
+    def _prompt_for_mode(mode):
+        contract = {
+            "expression": "仅生成一个可 eval 的 Python 表达式。通过 params[参数名] 读取输入；不允许赋值、def、import、result变量或markdown。可用纯函数 abs/max/min/round/len/int/float/str/bool。",
+            "sql": "仅生成一条只读 SELECT SQL，不要Python或markdown。参数必须使用 :参数名 命名占位符，使用上下文真实资产/字段，不允许DDL/DML、多语句或拼接参数。",
+            "python": "生成可放入函数执行体的纯Python语句。通过 params 字典读取输入，结果写入 result 变量；不要 def、@Function或markdown。允许math/datetime/json/re/decimal/collections；禁止文件、网络、系统调用。",
+            "custom_script": "生成可放入行动执行体的纯Python语句。通过 params 字典读取输入，必须把输出写入 result 字典；不要 def、@Function或markdown。允许math/datetime/json/re/decimal/collections；禁止文件、网络、系统调用。",
+        }
+        return "你为本体平台生成执行逻辑。当前执行模式：" + mode + "。\n" + contract[mode] + "\n语义不充分时先说明缺少的目标与输入，不能编造业务规则。"
+
+    def _build_sql_context(self, target_type, target_id, extra_entity_ids):
+        from app.models.object_binding import ObjectBinding
+        from app.models.asset import Asset
+        function = self.db.get(OntologyFunction, target_id) if target_type == "function" else None
+        ids = set(extra_entity_ids)
+        if function and function.entity_id:
+            ids.add(function.entity_id)
+        rows = []
+        for binding in self.db.query(ObjectBinding).filter(ObjectBinding.object_type_id.in_(ids), ObjectBinding.status == "active").all():
+            asset = self.db.get(Asset, binding.asset_id)
+            if asset:
+                rows.append({"table":(asset.locator or {}).get("table"), "schema":asset.schema_snapshot or [], "field_mappings":binding.field_mappings or []})
+        import json
+        return "SQL仅可查询已绑定资产（未提供凭据）：" + json.dumps(rows,ensure_ascii=False,default=str)
 
     def _build_context(self, target_type: str, target_id: str, extra_entity_ids: list[str]) -> str:
         if target_id.startswith("tmp_"):
@@ -91,7 +139,7 @@ class AiCodeService:
         else:
             from app.repositories.action_repo import ActionRepository
             repo = ActionRepository(self.db)
-            action = repo.get(target_id)
+            action = repo.get_by_id(target_id)
             if not action:
                 return self._build_entity_only_context(extra_entity_ids)
             return self._build_action_context(action, extra_entity_ids)

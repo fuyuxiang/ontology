@@ -5,7 +5,15 @@ from fastapi.testclient import TestClient
 
 from app.api.v1 import agents as agents_api
 from app.core.security import create_access_token
-from app.database import SessionLocal
+from app.database import Base, get_db
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+import app.models
+
+_TEST_ENGINE = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+Base.metadata.create_all(_TEST_ENGINE)
+SessionLocal = sessionmaker(bind=_TEST_ENGINE, expire_on_commit=False)
 from app.main import app
 from app.models.agent import Agent
 from app.models.agent_test_conversation import AgentTestConversation
@@ -31,6 +39,12 @@ class FakeAgentService:
 class AgentChatHistoryTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # Main imports policy/config models after this module's initial schema setup.
+        Base.metadata.create_all(_TEST_ENGINE)
+        def isolated_db():
+            with SessionLocal() as session:
+                yield session
+        app.dependency_overrides[get_db] = isolated_db
         db = SessionLocal()
         cls.user = User(username="chat_hist_user", password_hash="x", name="chat_hist_user", role="admin")
         db.add(cls.user)
@@ -42,6 +56,7 @@ class AgentChatHistoryTests(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
+        app.dependency_overrides.pop(get_db, None)
         db = SessionLocal()
         db.query(AgentTestConversation).filter_by(agent_id=cls.aid).delete()
         db.query(Agent).filter_by(id=cls.aid).delete()

@@ -17,6 +17,7 @@ export interface AssetProfile {
   max_updated_at?: string | null
   null_ratio?: Record<string, number>
   sampled_at?: string | null
+  source_refresh?: { status: string; at?: string; error?: string | null }
 }
 
 export interface Asset {

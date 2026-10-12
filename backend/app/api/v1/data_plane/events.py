@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import asyncio
 import logging
 import queue
 from collections.abc import AsyncIterator
@@ -33,7 +34,7 @@ async def stream_events(request: Request, topics: str | None = None):
                 if await request.is_disconnected():
                     break
                 try:
-                    env = sink.get(timeout=1.0)
+                    env = await asyncio.to_thread(sink.get, True, 1.0)
                 except queue.Empty:
                     # 心跳，保持连接
                     yield {"event": "ping", "data": "{}"}

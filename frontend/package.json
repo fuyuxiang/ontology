@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
     "preview": "vite preview",
-    "test:ui-state": "node --test tests/client-refresh.test.cjs tests/logic-stream.test.mjs",
+    "test:ui-state": "node --test tests/client-refresh.test.cjs tests/logic-stream.test.mjs tests/builder-delivery.test.mjs tests/platform-config.test.mjs",
     "lint": "eslint . --max-warnings 0",
     "lint:report": "eslint . -f json -o eslint-report.json || true",
     "format:check": "prettier --check \"src/**/*.{ts,vue,js,json,css}\"",

@@ -1,3 +1,4 @@
+import { formatPlatformDateTime } from './platformTime'
 import { renderMarkdownSafe } from './sanitize'
 
 // 判断一段文本是否包含 markdown 结构（表格、标题、列表、引用、代码块）
@@ -102,7 +103,7 @@ const DOCUMENT_STYLE = `
 export function buildHtmlDocument(markdown: string, title = '智能体分析报告'): string {
   const bodyHtml = renderMarkdownSafe(markdown)
   const safeTitle = title.replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' })[c] as string)
-  const stamp = new Date().toLocaleString('zh-CN')
+  const stamp = formatPlatformDateTime(new Date())
   return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>

@@ -47,6 +47,8 @@ def _with_db(fn):
 
 
 def _on_binding_created(env: dict) -> None:
+    if env.get("lineage_persisted"):
+        return
     asset_id = env.get("asset_id")
     object_type_id = env.get("object_type_id")
     if not (asset_id and object_type_id):
@@ -58,6 +60,8 @@ def _on_binding_created(env: dict) -> None:
 
 
 def _on_binding_updated(env: dict) -> None:
+    if env.get("lineage_persisted"):
+        return
     asset_id = env.get("asset_id")
     object_type_id = env.get("object_type_id")
     if not (asset_id and object_type_id):
@@ -69,6 +73,8 @@ def _on_binding_updated(env: dict) -> None:
 
 
 def _on_binding_deleted(env: dict) -> None:
+    if env.get("lineage_persisted"):
+        return
     asset_id = env.get("asset_id")
     object_type_id = env.get("object_type_id")
     if not (asset_id and object_type_id):
@@ -95,6 +101,8 @@ def _on_execution_completed(env: dict) -> None:
 
 def _on_schema_changed(env: dict) -> None:
     """把绑定到这个 Asset 的 binding 标 needs_review。"""
+    if env.get("bindings_reviewed"):
+        return
     asset_id = env.get("asset_id")
     diff = env.get("diff") or {}
     if not asset_id:

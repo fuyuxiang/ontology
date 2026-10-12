@@ -111,10 +111,16 @@ class AgentService:
             text_buffer = ""
             emitted_len = 0  # 已通过 content 事件吐出的 answer 字符数
             tool_calls_acc: dict[int, dict[str, Any]] = {}
+            finish_reason = None
             try:
                 for chunk in stream:
+                    usage = getattr(chunk, "usage", None)
+                    if usage and usage.total_tokens is not None:
+                        yield {"type": "usage", "tokens_used": usage.total_tokens}
                     if not chunk.choices:
                         continue
+                    if chunk.choices[0].finish_reason:
+                        finish_reason = chunk.choices[0].finish_reason
                     delta = chunk.choices[0].delta
                     # 累积工具调用分片
                     if delta and delta.tool_calls:
@@ -125,7 +131,7 @@ class AgentService:
                             if tc.id:
                                 slot["id"] = tc.id
                             if tc.function and tc.function.name:
-                                slot["name"] = tc.function.name
+                                slot["name"] += tc.function.name
                             if tc.function and tc.function.arguments:
                                 slot["arguments"] += tc.function.arguments
                     # 累积正文，并增量提取 answer 字段流式吐出
@@ -140,6 +146,12 @@ class AgentService:
                 logger.error(f"LLM 流式读取失败: {e}")
                 yield {"type": "error", "message": f"AI 服务调用失败: {e}"}
                 yield {"type": "answer", "content": f"AI 服务调用失败: {e}", "suggestions": []}
+                return
+
+            expected_finish = "tool_calls" if tool_calls_acc else "stop"
+            if finish_reason != expected_finish:
+                message = f"AI 流未完整结束（终态: {finish_reason or '缺失'}），请重试"
+                yield {"type": "error", "message": message}
                 return
 
             # 本轮无工具调用 → 最终回答
@@ -222,6 +234,13 @@ class AgentService:
                     "detail": detail,
                     "result": result,
                 }
+
+                if isinstance(result, dict) and result.get("pending_action"):
+                    # No later tool in this turn may consume an unapproved write.
+                    yield {"type": "tool_summary", "toolRuns": tool_runs}
+                    yield {"type": "content", "content": result["pending_action"].get("summary", "业务行动等待用户确认。")}
+                    yield {"type": "done", "suggestions": [], "actions": []}
+                    return
 
                 messages.append({
                     "role": "tool",

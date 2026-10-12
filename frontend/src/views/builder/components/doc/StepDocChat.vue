@@ -35,11 +35,11 @@
         </div>
       </div>
 
-      <div class="step-chat__input-area">
-        <textarea class="step-chat__input" v-model="userInput" placeholder="输入修正指令..." rows="2" @keydown.enter.ctrl="sendMessage" :disabled="streaming"></textarea>
+      <div class="step-chat__input-area"><p v-if="error" role="alert">{{ error }} <button :disabled="streaming || restoring" @click="retry">重试</button></p>
+        <textarea class="step-chat__input" v-model="userInput" placeholder="输入修正指令..." rows="2" @keydown.enter.ctrl="sendMessage" :disabled="streaming || restoring"></textarea>
         <div class="step-chat__actions">
-          <button class="step-chat__btn" :disabled="!userInput.trim() || streaming" @click="sendMessage">发送</button>
-          <button class="step-chat__btn step-chat__btn--confirm" :disabled="!latestOntology || streaming" @click="emit('next', latestOntology!)">
+          <button class="step-chat__btn" :disabled="!userInput.trim() || streaming || restoring" @click="sendMessage">发送</button>
+          <button class="step-chat__btn step-chat__btn--confirm" :disabled="!latestOntology || streaming || restoring" @click="emit('next', latestOntology!)">
             确认本体，进入审核 →
           </button>
         </div>
@@ -49,9 +49,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { renderMarkdownSafe } from '@/utils/sanitize'
-import { docBuilderChat } from '../../../../api/docBuilder'
+import { docBuilderChat, readDocumentSession } from '../../../../api/docBuilder'
 
 interface OntologyData {
   entities: Array<{ name: string; displayName: string; description?: string; properties: Array<{ name: string; displayName?: string; type: string }> }>
@@ -69,6 +69,8 @@ const props = defineProps<{ sessionId: string; businessDesc: string }>()
 const emit = defineEmits<{ (e: 'next', ontology: OntologyData): void }>()
 
 const messages = ref<ChatMessage[]>([])
+const error = ref(''), restoring = ref(false)
+let mounted = true, lastRequest = ''
 const userInput = ref('')
 const streaming = ref(false)
 const streamingText = ref('')
@@ -86,15 +88,20 @@ function scrollToBottom() {
   })
 }
 
+let stream: { abort: () => void } | null = null
 function doChat(message: string) {
+  if (streaming.value || restoring.value) return
+  lastRequest = message; error.value = ''
+  latestOntology.value = null
   streaming.value = true
   streamingText.value = ''
 
-  docBuilderChat(
+  stream = docBuilderChat(
     props.sessionId,
     message,
     props.businessDesc,
     (ev) => {
+      if (!mounted) return
       if (ev.event === 'token') {
         streamingText.value += ev.content
         scrollToBottom()
@@ -105,6 +112,7 @@ function doChat(message: string) {
       }
     },
     () => {
+      if (!mounted) return
       const msg: ChatMessage = {
         role: 'assistant',
         text: streamingText.value,
@@ -116,15 +124,15 @@ function doChat(message: string) {
       streamingText.value = ''
       scrollToBottom()
     },
-    () => {
-      streaming.value = false
-      streamingText.value = '请求失败，请重试'
+    (reason) => {
+      if (!mounted) return
+      streaming.value = false; latestOntology.value = null; streamingText.value = ''; error.value = reason
     },
   )
 }
 
 function sendMessage() {
-  if (!userInput.value.trim() || streaming.value) return
+  if (!userInput.value.trim() || streaming.value || restoring.value) return
   const text = userInput.value.trim()
   messages.value.push({ role: 'user', text })
   userInput.value = ''
@@ -132,9 +140,22 @@ function sendMessage() {
   doChat(text)
 }
 
-onMounted(() => {
-  doChat('')
+function retry() { doChat(lastRequest) }
+onMounted(async () => {
+  restoring.value = true
+  try {
+    const saved = await readDocumentSession(props.sessionId)
+    if (!mounted) return
+    messages.value = saved.history.filter(item => item.role === 'user' || item.role === 'assistant').map(item => ({ role:item.role as 'user'|'assistant', text:item.content }))
+    latestOntology.value = saved.current_ontology
+    if (latestOntology.value) { const latest = [...messages.value].reverse().find(item => item.role === 'assistant'); if (latest) { latest.ontology = latestOntology.value; latest.expanded = true } }
+    restoring.value = false
+    if (!messages.value.length) doChat('')
+    else scrollToBottom()
+  } catch (exception:any) { if (mounted) error.value = exception?.response?.data?.detail || exception.message || '文档会话恢复失败' }
+  finally { if (mounted) restoring.value = false }
 })
+onUnmounted(() => { mounted = false; stream?.abort() })
 </script>
 
 <style scoped>

@@ -11,11 +11,11 @@
           tabindex="-1"
         >
           <div class="settings-dialog__header">
-            <h3 :id="titleId" class="settings-dialog__title">系统设置</h3>
+            <h3 :id="titleId" class="settings-dialog__title">{{ t('shell.settings') }}</h3>
             <button
               type="button"
               class="settings-dialog__close"
-              aria-label="关闭"
+              :aria-label="t('common.cancel')"
               @click="emit('close')"
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -30,24 +30,24 @@
           </div>
           <div class="settings-dialog__body">
             <div class="settings-dialog__section">
-              <div class="settings-dialog__label">用户信息</div>
+              <div class="settings-dialog__label">{{ t('shell.userInfo') }}</div>
               <div class="settings-dialog__user">
                 <div class="settings-dialog__avatar">{{ initial }}</div>
                 <div>
-                  <div class="settings-dialog__name">{{ authStore.user?.name || '用户' }}</div>
+                  <div class="settings-dialog__name">{{ authStore.user?.name || t('shell.user') }}</div>
                   <div class="settings-dialog__role">{{ roleLabel }}</div>
                 </div>
               </div>
             </div>
             <div class="settings-dialog__section">
-              <div class="settings-dialog__label">外观</div>
+              <div class="settings-dialog__label">{{ t('shell.appearance') }}</div>
               <div class="settings-dialog__row">
-                <span>深色模式</span>
+                <span>{{ t('shell.darkMode') }}</span>
                 <button
                   type="button"
                   class="settings-dialog__toggle"
                   role="switch"
-                  aria-label="深色模式"
+                  :aria-label="t('shell.darkMode')"
                   :aria-checked="themeStore.isDark"
                   :class="{ 'settings-dialog__toggle--on': themeStore.isDark }"
                   @click="themeStore.toggle()"
@@ -58,7 +58,7 @@
             </div>
           </div>
           <div class="settings-dialog__footer">
-            <button class="settings-dialog__governance" @click="goGovernance">
+            <button v-if="authStore.hasPermission('admin:users')" class="settings-dialog__governance" @click="goGovernance">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                 <path
                   d="M8 1.5l1.3 2.6 2.9.4-2.1 2 .5 2.9L8 7.9l-2.6 1.5.5-2.9-2.1-2 2.9-.4L8 1.5z"
@@ -73,9 +73,9 @@
                   stroke-linecap="round"
                 />
               </svg>
-              <span>系统设置</span>
+              <span>{{ t('shell.settings') }}</span>
             </button>
-            <button class="settings-dialog__logout" @click="handleLogout">退出登录</button>
+            <button class="settings-dialog__logout" @click="handleLogout">{{ t('shell.logout') }}</button>
           </div>
         </div>
       </div>
@@ -86,6 +86,8 @@
 <script setup lang="ts">
 import { computed, ref, useId } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+const { t } = useI18n()
 import { useAuthStore } from '../../store/auth'
 import { useThemeStore } from '../../store/theme'
 import { useDialogFocus } from '../../composables/useDialogFocus'
@@ -107,7 +109,7 @@ useDialogFocus(
 const initial = computed(() => (authStore.user?.name || 'U').charAt(0).toUpperCase())
 const roleLabel = computed(
   () =>
-    ({ admin: '管理员', editor: '编辑者', operator: '操作员', viewer: '查看者' })[
+    ({ admin: t('shell.admin'), editor: t('shell.editor'), operator: t('shell.operator'), viewer: t('shell.viewer') })[
       authStore.user?.role || 'viewer'
     ],
 )

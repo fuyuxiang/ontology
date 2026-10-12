@@ -21,6 +21,7 @@
       <pre class="code-block"><code>{{ clientConfigs[activeClient] }}</code><button class="copy-btn" @click="copyConfig">{{ copied ? '已复制' : '复制' }}</button></pre>
     </section>
 
+    <p class="docs__auth">Bearer 使用登录获得的访问令牌；令牌过期后需重新登录或刷新。配置的 MCP API Key 使用 <code>X-API-Key: YOUR_MCP_API_KEY</code>，其权限仅限只读。连接后先调用 initialize，再调用 tools/list；写入工具需要有执行权限的用户访问令牌。</p>
     <section class="docs__tools">
       <h2>工具清单</h2>
       <a-alert v-if="loadError" type="error" show-icon message="工具清单加载失败" :description="loadError" style="margin-bottom:16px">
@@ -67,7 +68,7 @@ let copyTimer: ReturnType<typeof setTimeout> | undefined
 const selectedTool = ref<McpToolSchema | null>(null)
 const activeClient = ref<'claude' | 'cursor' | 'curl'>('claude')
 
-const steps = ['获取认证密钥', '配置 MCP 端点', '开始调用']
+const steps = ['获取登录访问令牌或 MCP API Key', '配置 MCP 端点', '初始化并发现工具']
 const clients = [
   { key: 'claude', label: 'Claude Desktop' },
   { key: 'cursor', label: 'Cursor' },
@@ -75,13 +76,14 @@ const clients = [
 ] as const
 
 const origin = window.location.origin
+const endpoint = `${new URL(import.meta.env.VITE_API_BASE_URL || '/api/v1', origin).toString().replace(/\/$/, '')}/mcp`
 const clientConfigs: Record<'claude' | 'cursor' | 'curl', string> = {
   claude: `{
   "mcpServers": {
     "ontology": {
-      "url": "${origin}/api/v1/mcp",
+      "url": "${endpoint}",
       "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+        "Authorization": "Bearer YOUR_ACCESS_TOKEN"
       }
     }
   }
@@ -91,23 +93,25 @@ const clientConfigs: Record<'claude' | 'cursor' | 'curl', string> = {
     "servers": {
       "ontology": {
         "type": "streamable-http",
-        "url": "${origin}/api/v1/mcp",
+        "url": "${endpoint}",
         "headers": {
-          "Authorization": "Bearer YOUR_API_KEY"
+          "Authorization": "Bearer YOUR_ACCESS_TOKEN"
         }
       }
     }
   }
 }`,
-  curl: `curl -X POST ${origin}/api/v1/mcp \\
+  curl: `curl -X POST ${endpoint} \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \\
   -d '{
     "jsonrpc": "2.0",
     "id": 1,
-    "method": "tools/list",
-    "params": {}
-  }'`,
+    "method": "initialize",
+    "params": {"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"review-client","version":"1.0"}}
+  }'
+
+curl -X POST ${endpoint} -H "Content-Type: application/json" -H "Authorization: Bearer YOUR_ACCESS_TOKEN" -d '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' `,
 }
 
 function getCategory(name: string): string {

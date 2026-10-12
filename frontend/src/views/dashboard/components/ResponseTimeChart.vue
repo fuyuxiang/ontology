@@ -34,7 +34,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { formatPlatformTime, parsePlatformTimestamp } from '../../../utils/platformTime'
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
+import { usePlatformConfigStore } from '../../../store/platformConfig'
 import { Alert as AAlert, Button as AButton, Empty as AEmpty } from 'ant-design-vue'
 import type { Dayjs } from 'dayjs'
 import * as echarts from 'echarts'
@@ -42,6 +44,8 @@ import { monitorApi, type ResponseHistoryPoint } from '../../../api/monitor'
 import { buildResponseTimeChartData } from './responseTimeChartData'
 
 const chartEl = ref<HTMLElement>()
+const platform = usePlatformConfigStore()
+let lastData: ResponseHistoryPoint[] = []
 const timeRange = ref('1')
 const customRange = ref<[Dayjs, Dayjs] | null>(null)
 let chart: echarts.ECharts | null = null
@@ -106,6 +110,7 @@ async function loadHistory(hours: number, range?: [number, number]) {
 }
 
 function renderChart(data: ResponseHistoryPoint[]) {
+  lastData = data
   if (!chartEl.value) return
   if (!chart) chart = echarts.init(chartEl.value)
 
@@ -152,17 +157,18 @@ function renderChart(data: ResponseHistoryPoint[]) {
   }, true)
 }
 
+watch(() => [platform.timezone, platform.language], () => { if (chart) renderChart(lastData) })
+
 function toChartTime(value: string) {
-  return /(?:Z|[+-]\d{2}:?\d{2})$/i.test(value) ? value : `${value}Z`
+  return parsePlatformTimestamp(value).toISOString()
 }
 
 function formatCollectedAt(value: string) {
   const date = new Date(/^\d+$/.test(value) ? Number(value) : toChartTime(value))
-  return date.toLocaleTimeString('zh-CN', {
+  return formatPlatformTime(date, {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Shanghai',
+    second: undefined,
   })
 }
 

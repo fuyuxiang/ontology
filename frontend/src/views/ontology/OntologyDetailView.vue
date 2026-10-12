@@ -9,11 +9,11 @@
       </button>
       <span class="ontology-detail__title">{{ scenario?.name || code }}</span>
       <div class="ontology-detail__actions">
-        <button class="btn-action" disabled title="Excel 导入功能开发中">导入Excel</button>
-        <button class="btn-action" disabled title="本体测试功能开发中">测试</button>
-        <button class="btn-action" disabled title="本体仿真功能开发中">仿真</button>
-        <button class="btn-action btn-action--primary" :disabled="publishing || ontologyStore.loading" @click="publishOntology">{{ publishing ? '发布中…' : '发布' }}</button>
-        <button class="btn-action" disabled title="本体详情保存功能开发中">保存</button>
+        <button class="btn-action" @click="goCreate('/builder/template')" :disabled="!canEdit">导入Excel</button>
+        <button class="btn-action" :disabled="checking" @click="checkOntology(false)">测试</button>
+        <button class="btn-action" :disabled="checking" @click="checkOntology(true)">仿真</button>
+        <button class="btn-action btn-action--primary" :disabled="!canEdit || (publishing || ontologyStore.loading)" @click="publishOntology">{{ publishing ? '发布中…' : '发布' }}</button>
+        <button class="btn-action" @click="openMetadata" :disabled="!canEdit">保存</button>
       </div>
     </div>
 
@@ -47,7 +47,7 @@
           </button>
           <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'api' }" :aria-pressed="activeTab === 'api'" @click="activeTab = 'api'">
             <span class="detail-nav__icon">🔌</span> 接口定义
-            <span class="detail-nav__count">0</span>
+
           </button>
           <button type="button" class="detail-nav__item" :class="{ active: activeTab === 'graph' }" :aria-pressed="activeTab === 'graph'" @click="activeTab = 'graph'">
             <span class="detail-nav__icon">🕸️</span> 本体图谱
@@ -112,7 +112,7 @@
               </div>
               <div class="overview-info-item">
                 <span class="overview-info-label">状态</span>
-                <span class="overview-info-value"><span class="badge badge--active">启用</span></span>
+                <span class="overview-info-value"><span class="badge">{{ scenario ? '已保存' : '—' }}</span></span>
               </div>
               <div class="overview-info-item">
                 <span class="overview-info-label">创建</span>
@@ -154,6 +154,7 @@
             v-if="selectedEntity"
             :entity="selectedEntity"
             @back="selectedEntityId = null"
+            @changed="refreshCounts"
           />
 
           <!-- 对象列表 -->
@@ -180,30 +181,30 @@
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 4L5 6.5 7.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
                 <div v-if="showBatchMenu" class="entities-dropdown__menu">
-                  <button class="entities-dropdown__item" @click="batchDelete" :disabled="deleting || selectedIds.length === 0">{{ deleting ? '删除中…' : '批量删除' }}</button>
-                  <button class="entities-dropdown__item" disabled title="批量激活功能开发中">批量激活</button>
-                  <button class="entities-dropdown__item" disabled title="批量导出功能开发中">批量导出</button>
+                  <button class="entities-dropdown__item" @click="batchDelete" :disabled="!canDelete || (deleting || selectedIds.length === 0)">{{ deleting ? '删除中…' : '批量删除' }}</button>
+                  <button class="entities-dropdown__item" :disabled="!canEdit || (deleting || !selectedIds.length)" @click="activateSelected">批量激活</button>
+                  <button class="entities-dropdown__item" :disabled="!selectedIds.length" @click="exportSelected">批量导出</button>
                 </div>
               </div>
               <div class="entities-dropdown" v-click-outside="() => showCreateMenu = false">
-                <button class="entities-dropdown__btn entities-dropdown__btn--primary" @click="showCreateMenu = !showCreateMenu">
+                <button class="entities-dropdown__btn entities-dropdown__btn--primary" @click="showCreateMenu = !showCreateMenu" :disabled="!canEdit">
                   新建对象
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2.5 4L5 6.5 7.5 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                 </button>
                 <div v-if="showCreateMenu" class="entities-dropdown__menu entities-dropdown__menu--grid">
-                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder')">
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder')" :disabled="!canEdit">
                     <span class="entities-dropdown__grid-icon">🛠️</span>
                     <span>手动构建</span>
                   </button>
-                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/template')">
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/template')" :disabled="!canEdit">
                     <span class="entities-dropdown__grid-icon">📋</span>
                     <span>模板构建</span>
                   </button>
-                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/doc')">
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/doc')" :disabled="!canEdit">
                     <span class="entities-dropdown__grid-icon">📄</span>
                     <span>文档构建</span>
                   </button>
-                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/ai')">
+                  <button class="entities-dropdown__grid-item" @click="goCreate('/builder/ai')" :disabled="!canEdit">
                     <span class="entities-dropdown__grid-icon">🤖</span>
                     <span>资产构建</span>
                   </button>
@@ -231,7 +232,7 @@
                   <td><span class="badge" :class="e.status === 'active' ? 'badge--active' : 'badge--draft'">{{ e.status === 'active' ? '已激活' : '草稿' }}</span></td>
                   <td class="entities-table__actions">
                     <button class="entities-table__action-btn" @click="selectedEntityId = e.id">编辑</button>
-                    <button class="entities-table__action-btn entities-table__action-btn--danger" @click="deleteEntity(e.id)">删除</button>
+                    <button class="entities-table__action-btn entities-table__action-btn--danger" @click="deleteEntity(e.id)" :disabled="!canDelete">删除</button>
                   </td>
                 </tr>
               </tbody>
@@ -253,7 +254,7 @@
         <div v-else-if="activeTab === 'relations'" class="tab-relations">
           <div class="relations-header">
             <span class="relations-title">关系定义</span>
-            <span class="relations-count">共 {{ allRelations.length }} 条</span>
+            <span class="relations-count">共 {{ allRelations.length }} 条</span><button class="btn-action" :disabled="!canEdit" @click="openRelation()">新增关系</button>
           </div>
           <div v-if="relationsLoading" class="attr-panel__loading">加载中...</div>
           <div v-else-if="relationsError" class="attr-panel__loading" role="alert"><p>{{ relationsError }}</p><button class="btn-action" @click="loadRelations">重新加载</button></div>
@@ -264,7 +265,7 @@
                 <th>关系类型</th>
                 <th>目标对象</th>
                 <th>基数</th>
-                <th>描述</th>
+                <th>描述</th><th>操作</th>
               </tr>
             </thead>
             <tbody>
@@ -273,7 +274,7 @@
                 <td><span class="rel-type-tag">{{ rel.rel_type }}</span></td>
                 <td>{{ rel.to_entity_name }}</td>
                 <td><code class="text-code">{{ rel.cardinality }}</code></td>
-                <td class="text-caption">{{ rel.description || '—' }}</td>
+                <td class="text-caption">{{ rel.description || '—' }}</td><td><button class="btn-action" :disabled="!canEdit" @click="openRelation(rel)">编辑</button><button class="btn-action" :disabled="!canDelete" @click="removeRelation(rel)">删除</button></td>
               </tr>
             </tbody>
           </table>
@@ -312,16 +313,24 @@
 
         <OntologyApplicationReferences v-else-if="activeTab === 'application-references' && scenario" :ontology-id="scenario.id" />
 
-        <!-- 其他 tab 占位 -->
-        <div v-else class="tab-placeholder">
-          <p class="text-caption">{{ activeTabLabel }} — 开发中</p>
-        </div>
+        <OntologyResourcesPanel v-else-if="scenario && ['history','api','shared-attrs','groups','tasks'].includes(activeTab)" :ontology-id="scenario.id" :kind="activeTab as any" :entities="scenarioEntities" />
       </main>
     </div>
+    <a-modal v-model:open="relationOpen" :title="relationId ? '编辑关系' : '新增关系'" :confirm-loading="relationSaving" @ok="saveRelation">
+      <div class="relation-editor"><label>名称 <a-input v-model:value="relationForm.name" /></label><label>源对象 <a-select v-model:value="relationForm.from_entity_id" :options="scenarioEntities.map(entity => ({value:entity.id,label:entity.name_cn || entity.name}))" /></label><label>目标对象 <a-select v-model:value="relationForm.to_entity_id" :options="scenarioEntities.map(entity => ({value:entity.id,label:entity.name_cn || entity.name}))" /></label><label>类型 <a-select v-model:value="relationForm.rel_type" :options="['has_one','has_many','belongs_to','many_to_many'].map(value => ({value,label:value}))" /></label><label>基数 <a-select v-model:value="relationForm.cardinality" :options="['1:1','1:N','N:1','N:N'].map(value => ({value,label:value}))" /></label><label>源关联属性或字段 <a-input v-model:value="relationForm.source_field" /></label><label>目标关联属性或字段 <a-input v-model:value="relationForm.target_field" /></label><label>说明 <a-textarea v-model:value="relationForm.description" /></label></div>
+    </a-modal>
+    <a-modal v-model:open="metadataOpen" title="本体信息" :confirm-loading="metadataSaving" @ok="saveMetadata">
+      <label>名称 <a-input v-model:value="metadata.name" /></label><label>描述 <a-textarea v-model:value="metadata.description" /></label>
+    </a-modal>
+    <a-modal v-model:open="checkOpen" :title="checkTitle" :footer="null" width="800px">
+      <p v-if="checking" role="status">验证中…</p><p v-if="checkError" role="alert">{{ checkError }}</p><pre class="check-log">{{ checkLog.join('\n') }}</pre>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit, canDelete } = useManagementPermission('entity:write')
 import { ref, computed, onMounted, onActivated, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -336,6 +345,10 @@ import ActionsView from '../logic/ActionsView.vue'
 import EntityAttrPanel from './EntityAttrPanel.vue'
 import SemanticCanvas from '../builder/components/graph/SemanticCanvas.vue'
 import OntologyApplicationReferences from '../skills/OntologyApplicationReferences.vue'
+import OntologyResourcesPanel from './OntologyResourcesPanel.vue'
+import { get, post, put, del } from '../../api/client'
+import { scenarioApi } from '../../api/scenarios'
+import { postJsonSse, readJsonSse } from '../../api/sse'
 
 const vClickOutside = {
   mounted(el: any, binding: any) {
@@ -454,6 +467,7 @@ async function batchDelete() {
 }
 
 async function publishOntology() {
+  if (!canEdit.value) return
   if (publishing.value || !scenario.value) return
   const ontology = scenario.value
   if (ontologyStore.entities.length === 0) {
@@ -474,13 +488,83 @@ async function publishOntology() {
   }
 }
 
-const activeTabLabel = computed(() => {
-  const map: Record<string, string> = {
-    history: '历史', relations: '关系定义', actions: '动作定义',
-    api: '接口定义', graph: '本体图谱', 'shared-attrs': '共享属性', groups: '分组', tasks: '任务记录',
-  }
-  return map[activeTab.value] || activeTab.value
-})
+const metadataOpen = ref(false)
+const metadataSaving = ref(false)
+const metadata = ref({ name: '', description: '' })
+function openMetadata() { metadata.value = { name: scenario.value?.name || '', description: scenario.value?.description || '' }; metadataOpen.value = true }
+async function saveMetadata() {
+  if (!canEdit.value) return
+  if (!scenario.value || metadataSaving.value || !metadata.value.name.trim()) return
+  metadataSaving.value = true
+  try { await scenarioApi.update(scenario.value.id, { name: metadata.value.name.trim(), description: metadata.value.description }); await scenarioStore.fetchScenarios(true); metadataOpen.value = false; message.success('本体信息已保存') }
+  catch (exception: any) { message.error(exception?.response?.data?.detail || '保存失败') }
+  finally { metadataSaving.value = false }
+}
+async function activateSelected() {
+  if (!canEdit.value || deleting.value) return
+  deleting.value = true; showBatchMenu.value = false
+  try {
+    const ids = [...selectedIds.value]
+    const results = await Promise.allSettled(ids.map(id => entityApi.update(id, { status: 'active' })))
+    const failed = ids.filter((_, index) => results[index]?.status === 'rejected')
+    if (failed.length) message.error(`${failed.length} 个对象激活失败`)
+    else message.success('选中对象已激活')
+    await loadData(); selectedIds.value = failed
+  } finally { deleting.value = false }
+}
+async function exportSelected() {
+  try {
+    const entities = await Promise.all(selectedIds.value.map(id => entityApi.detail(id)))
+    const idToName = new Map(entities.map(entity => [entity.id, entity.name]))
+    const relations = (await entityApi.relations(undefined, scenario.value?.id)).filter(relation => idToName.has(relation.from_entity_id) && idToName.has(relation.to_entity_id))
+    const payload = { objects: entities.map(entity => ({ name: entity.name, display_name: entity.name_cn, tier: entity.tier, description: entity.description, primary_key: entity.config_json?.primary_key || 'id', properties: entity.attributes.map(attribute => ({ name: attribute.name, display_name: attribute.name, type: attribute.type, required: attribute.required, description: attribute.description, source_table: attribute.source_table, source_field: attribute.source_field })) })), relations: relations.map(relation => ({ name: relation.name, source: idToName.get(relation.from_entity_id), target: idToName.get(relation.to_entity_id), cardinality: relation.cardinality, description: relation.description, source_field: relation.source_field, target_field: relation.target_field })) }
+    const url = URL.createObjectURL(new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' }))
+    const link = document.createElement('a'); link.href = url; link.download = `${scenario.value?.code || 'ontology'}.json`; link.click(); URL.revokeObjectURL(url)
+    showBatchMenu.value = false
+  } catch (exception: any) { message.error(exception?.response?.data?.detail || '导出失败') }
+}
+const checking = ref(false)
+const checkOpen = ref(false)
+const checkTitle = ref('')
+const checkError = ref('')
+const checkLog = ref<string[]>([])
+async function checkOntology(simulate: boolean) {
+  if (checking.value || !scenario.value) return
+  const ontologyId = scenario.value.id
+  checking.value = true; checkOpen.value = true; checkError.value = ''; checkLog.value = []
+  checkTitle.value = simulate ? '真实数据水合仿真' : '结构与绑定测试'
+  try {
+    const entities = await Promise.all(scenarioEntities.value.filter(entity => !entity.is_shared).map(entity => entityApi.detail(entity.id)))
+    if (!entities.length) throw new Error('本体没有对象')
+    const objects = []
+    const assets = new Set<string>()
+    for (const entity of entities) {
+      if (!entity.name || !entity.attributes.length) throw new Error(`${entity.name_cn} 缺少名称或属性`)
+      const bindings = await get<any[]>('/object-bindings', { params: { object_type_id: entity.id } })
+      for (const binding of bindings) assets.add(binding.asset_id)
+      bindings.sort((a,b) => (a.role === 'primary' ? -1 : 1) - (b.role === 'primary' ? -1 : 1))
+      objects.push({ name: entity.name, displayName: entity.name_cn, primaryKey: entity.config_json?.primary_key || 'id', backing_asset_ids: bindings.map(binding => binding.asset_id), enrichment_bindings: bindings.filter(binding=>binding.role==='enrichment').map(binding=>({asset_id:binding.asset_id,primary_source_column:binding.primary_source_column,enrichment_source_column:binding.enrichment_source_column})), properties: entity.attributes.map(attribute => { const binding = bindings.find(binding => binding.field_mappings?.some((mapping: any) => mapping.attribute_id === attribute.id)); const mapping = binding?.field_mappings.find((mapping: any) => mapping.attribute_id === attribute.id); return { name: attribute.name, type: attribute.type, required: attribute.required, source_asset_id: binding?.asset_id, source_column: mapping?.source_column, transform:mapping?.transform, source_table: attribute.source_table, source_field: attribute.source_field } }) })
+      checkLog.value.push(`${entity.name_cn}: ${entity.attributes.length} 个属性，${bindings.length} 个绑定`)
+    }
+    const idNames = new Map(entities.map(entity => [entity.id, entity.name]))
+    const relations = (await entityApi.relations(undefined, ontologyId)).map(relation => ({ name: relation.name, source: idNames.get(relation.from_entity_id), target: idNames.get(relation.to_entity_id), cardinality: relation.cardinality, sourceField: relation.source_field, targetField: relation.target_field }))
+    if (relations.some(relation => !relation.source || !relation.target)) throw new Error('关系包含不可见的对象')
+    if (simulate) {
+      const response = await postJsonSse('/builder/hydrate', { session_id: `test-${ontologyId}`, objects, relations, asset_ids: [...assets] })
+      let completed = false
+      await readJsonSse(response, event => { if (event.type === 'phase_log') checkLog.value.push(`${event.level}: ${event.msg}`); if (event.type === 'drill_complete') { completed = true; checkLog.value.push(`仿真结果：${event.status}`); if (event.status === 'error') checkError.value = '仿真存在错误，请检查日志修复后重试' } })
+      if (!completed) throw new Error('仿真未返回完成结果')
+    } else checkLog.value.push(`结构测试通过：${entities.length} 个对象，${relations.length} 条关系；真实源数据请运行仿真验证`)
+  } catch (exception: any) { checkError.value = exception?.response?.data?.detail || exception.message || '验证失败' }
+  finally { checking.value = false }
+}
+
+async function refreshCounts() { await Promise.all([scenarioStore.fetchScenarios(true), ontologyStore.fetchEntities()]) }
+const relationOpen = ref(false), relationSaving = ref(false), relationId = ref<string | null>(null)
+const relationForm = ref({ name:'', from_entity_id:'', to_entity_id:'', rel_type:'has_many', cardinality:'1:N', source_field:'', target_field:'', description:'' })
+function openRelation(current?: EntityRelationDetail) { relationId.value = current?.id || null; relationForm.value = { name:current?.name || '', from_entity_id:current?.from_entity_id || '', to_entity_id:current?.to_entity_id || '', rel_type:current?.rel_type || 'has_many', cardinality:current?.cardinality || '1:N', source_field:current?.source_field || '', target_field:current?.target_field || '', description:current?.description || '' }; relationOpen.value = true }
+async function saveRelation() { if (!canEdit.value || relationSaving.value) return; const form = relationForm.value; if (!form.name.trim() || !form.from_entity_id || !form.to_entity_id) { message.error('请填写名称、源对象和目标对象'); return } relationSaving.value = true; try { const payload = { ...form, source_field:form.source_field || null, target_field:form.target_field || null }; if (relationId.value) await put(`/relations/${relationId.value}`, payload); else await post('/relations', payload); relationOpen.value = false; await Promise.all([loadRelations(), scenarioStore.fetchScenarios(true)]); message.success('关系已保存') } catch (exception: any) { message.error(exception?.response?.data?.detail || '关系保存失败') } finally { relationSaving.value = false } }
+async function removeRelation(current: EntityRelationDetail) { if (!canDelete.value || !confirm(`删除关系 ${current.name}？`)) return; try { await del(`/relations/${current.id}`); await Promise.all([loadRelations(), scenarioStore.fetchScenarios(true)]); message.success('关系已删除') } catch (exception: any) { message.error(exception?.response?.data?.detail || '关系删除失败') } }
 
 // --- 本体图谱数据转换 ---
 function tierIcon(tier: number): string {
@@ -535,6 +619,7 @@ function goBack() {
 async function loadData() {
   const request = ++dataRequest
   const requestedCode = code.value
+  relationOpen.value = false
   dataLoading.value = true
   loadError.value = ''
   ++relationsRequest
@@ -1200,4 +1285,11 @@ watch(activeTab, (tab) => {
   .ontology-detail__content { padding: 16px 12px; min-width: 0; }
   .overview-stats, .overview-info-grid, .overview-tables { grid-template-columns: 1fr; }
 }
+.relation-editor { display:grid; gap:12px; } .relation-editor label { display:grid; gap:6px; }
+</style>
+
+<style scoped>
+.check-log { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 60vh; overflow: auto; }
+@media (max-width: 900px) { .ontology-detail__topbar { flex-wrap: wrap; } .ontology-detail__actions { flex-wrap: wrap; } .ontology-detail__body { overflow: auto; } }
+.relation-editor { display:grid; gap:12px; } .relation-editor label { display:grid; gap:6px; }
 </style>

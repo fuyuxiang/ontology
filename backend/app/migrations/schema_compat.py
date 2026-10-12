@@ -25,8 +25,7 @@ def _migrate_rename_schema_json(conn, inspector, tables):
 def _drop_business_rules(conn, inspector, tables):
     for tbl in ("business_rules", "ontology_version_rules"):
         if tbl in tables:
-            conn.execute(text(f"DROP TABLE IF EXISTS {tbl}"))
-    conn.commit()
+            logger.info("保留旧规则表 %s 以便升级后审计与迁移；当前运行时不消费该表", tbl)
 
 
 def _migrate_entity_actions(conn, inspector, tables):
@@ -149,6 +148,8 @@ def _migrate_users(conn, inspector, tables):
         return
     cols = _get_cols(inspector, "users")
     _add = []
+    if "token_version" not in cols:
+        _add.append("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
     if "email" not in cols:
         _add.append("ALTER TABLE users ADD COLUMN email VARCHAR(100)")
     if "is_active" not in cols:
@@ -167,18 +168,23 @@ def _migrate_ontology_functions(conn, inspector, tables):
         return
     cols = _get_cols(inspector, "ontology_functions")
     _add = []
+    for column, definition in {"source_path": "VARCHAR(500)", "func_name": "VARCHAR(100)", "checksum": "VARCHAR(64)",
+                               "registered_by": "VARCHAR(30)", "execution_count": "INTEGER DEFAULT 0", "last_executed": "TIMESTAMP"}.items():
+        if column not in cols:
+            _add.append(f"ALTER TABLE ontology_functions ADD COLUMN {column} {definition}")
     if "callable_name" not in cols:
         _add.append("ALTER TABLE ontology_functions ADD COLUMN callable_name VARCHAR(100)")
     if "tags" not in cols:
         _add.append("ALTER TABLE ontology_functions ADD COLUMN tags JSON")
     if "is_derived_property" not in cols:
-        _add.append("ALTER TABLE ontology_functions ADD COLUMN is_derived_property TINYINT NOT NULL DEFAULT 0")
-    else:
-        _add.append("ALTER TABLE ontology_functions ALTER COLUMN is_derived_property SET DEFAULT 0")
+        _add.append("ALTER TABLE ontology_functions ADD COLUMN is_derived_property BOOLEAN NOT NULL DEFAULT FALSE")
+    elif conn.dialect.name != "sqlite":
+        _add.append("ALTER TABLE ontology_functions ALTER COLUMN is_derived_property SET DEFAULT FALSE")
     if "entity_ids" not in cols:
         _add.append("ALTER TABLE ontology_functions ADD COLUMN entity_ids JSON")
     for stmt in _add:
         conn.execute(text(stmt))
+    conn.execute(text("UPDATE ontology_functions SET is_derived_property = FALSE WHERE is_derived_property IS NULL"))
     conn.commit()
 
 

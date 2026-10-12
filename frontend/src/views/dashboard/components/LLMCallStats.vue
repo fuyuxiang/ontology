@@ -3,6 +3,8 @@
     <div class="stat-icon" style="color: #7950f2;"><ApiOutlined /></div>
     <div class="stat-value">{{ data?.total_24h ?? '-' }}</div>
     <div class="stat-label">大模型调用 (24h)</div>
+    <div class="stat-sub">成功 {{ data?.success_count ?? '—' }} · 失败 {{ data?.failed_count ?? '—' }}</div>
+    <div class="stat-sub">成功率 {{ data?.success_rate == null ? '—' : `${data.success_rate.toFixed(1)}%` }}</div>
     <div class="stat-sub" v-if="topModule">最多: {{ topModule }}</div>
   </a-card>
 </template>

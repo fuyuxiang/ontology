@@ -101,10 +101,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { authenticatedFetch } from '../../../api/authenticatedFetch'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { useBuilderStore } from '../../../store/builder'
 import { authHeaders } from '../../../utils/authHeaders'
+import { readJsonSse } from '../../../api/sse'
 import type {
   BuilderSession,
   OntologyObjectDraft,
@@ -218,35 +220,21 @@ async function onSend() {
   await callChat(text)
 }
 
+let chatController: AbortController | null = null
 async function callChat(userText: string) {
+  if (busy.value) return
   busy.value = true
   const fd = new FormData()
   fd.append('session_id', props.session.sessionId)
   fd.append('message', userText)
   let pendingThinking: ChatMessage | null = null
   try {
-    const resp = await fetch('/api/v1/builder/chat', { method: 'POST', headers: authHeaders(), body: fd })
-    if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
-    const reader = resp.body.getReader()
-    const decoder = new TextDecoder('utf-8')
-    let buf = ''
+    chatController = new AbortController()
+    const base = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+    const response = await authenticatedFetch(`${base}/builder/chat`, { method: 'POST', headers: authHeaders(), body: fd, signal: chatController.signal })
     let assistantBuf = ''
     let assistantMsg: ChatMessage | null = null
-
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buf += decoder.decode(value, { stream: true })
-      let idx
-      while ((idx = buf.indexOf('\n\n')) >= 0) {
-        const chunk = buf.slice(0, idx).trim()
-        buf = buf.slice(idx + 2)
-        if (!chunk.startsWith('data:')) continue
-        const payload = chunk.slice(5).trim()
-        if (payload === '[DONE]') continue
-        let ev: any
-        try { ev = JSON.parse(payload) } catch { continue }
-
+    await readJsonSse(response, ev => {
         if (ev.type === 'tool_start') {
           if (pendingThinking) {
             // 保留
@@ -280,9 +268,9 @@ async function callChat(userText: string) {
         } else if (ev.type === 'error') {
           pushMessage({ role: 'assistant', content: `❌ ${ev.content || '出错了'}` })
         }
-      }
-    }
+    })
   } catch (e: any) {
+    if (chatController?.signal.aborted) return
     pushMessage({ role: 'assistant', content: `❌ 网络错误：${e?.message || e}` })
   } finally {
     busy.value = false
@@ -389,6 +377,7 @@ function confirmAll() {
   })
   emit('next')
 }
+onUnmounted(() => chatController?.abort())
 </script>
 
 <style scoped>

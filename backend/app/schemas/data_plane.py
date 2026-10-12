@@ -157,6 +157,8 @@ class PreviewOut(BaseModel):
     api_url: str | None = None
     host: str | None = None
     topic: str | None = None
+    objects: list[dict] | None = None
+    messages: list[dict] | None = None
     note: str | None = None
     error: str | None = None
 
@@ -222,7 +224,7 @@ class ExecuteRequestModel(BaseModel):
     sql: str
     params: dict = Field(default_factory=dict)
     purpose: str
-    timeout_ms: int = 5000
+    timeout_ms: int = Field(default=5000, ge=1, le=300000)
     bypass_cache: bool = False
 
 
@@ -232,6 +234,7 @@ class ExecuteResultModel(BaseModel):
     rows_returned: int
     duration_ms: int
     cache_hit: bool
+    rows_affected: int | None = None
 
 
 class ExecuteBlockedModel(BaseModel):
@@ -284,6 +287,8 @@ class BindingCreate(BaseModel):
     field_mappings: list[FieldMapping] = Field(default_factory=list)
     id_column: str | None = None
     filter_expr: str | None = None
+    primary_source_column: str | None = None
+    enrichment_source_column: str | None = None
 
 
 class BindingUpdate(BaseModel):
@@ -292,6 +297,8 @@ class BindingUpdate(BaseModel):
     filter_expr: str | None = None
     status: str | None = None
     review_reason: str | None = None
+    primary_source_column: str | None = None
+    enrichment_source_column: str | None = None
 
 
 class BindingDetail(BaseModel):
@@ -302,6 +309,8 @@ class BindingDetail(BaseModel):
     field_mappings: list
     id_column: str | None
     filter_expr: str | None
+    primary_source_column: str | None
+    enrichment_source_column: str | None
     status: str
     review_reason: str | None
     created_at: datetime

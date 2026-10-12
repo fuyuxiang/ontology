@@ -25,7 +25,7 @@ RULE_KINDS = (
 )
 
 # 状态聚合优先级（数字越大越严重）
-STATUS_RANK = {"unknown": 0, "healthy": 1, "warning": 2, "failure": 3}
+STATUS_RANK = {"healthy": 0, "unknown": 1, "warning": 2, "failure": 3}
 
 
 class QualityRule(Base):

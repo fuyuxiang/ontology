@@ -1,6 +1,7 @@
 <template>
   <div v-if="!asset" class="adb-empty">
     <a-spin v-if="loading" />
+    <p v-else-if="loadError" role="alert">{{ loadError }} <button @click="onReload">重试</button></p>
     <a-empty v-else description="选择一个资产查看详情" />
   </div>
   <div v-else class="adb">
@@ -29,8 +30,8 @@
         <!-- table / sql_view -->
         <template v-if="asset.kind !== 'document'">
           <div class="adb-actions">
-            <a-button size="small" :loading="syncing" @click="onSyncSchema">同步 Schema</a-button>
-            <a-button size="small" :loading="profiling" @click="onProfile">跑 Profile</a-button>
+            <a-button size="small" :loading="syncing" @click="onSyncSchema" :disabled="!canEdit">同步 Schema</a-button>
+            <a-button size="small" :loading="profiling" @click="onProfile" :disabled="!canEdit">跑 Profile</a-button>
           </div>
           <h5 class="adb-subtitle">Schema 快照（{{ (asset.schema_snapshot || []).length }} 列）</h5>
           <a-table
@@ -52,21 +53,28 @@
           <a-empty v-else description="尚无 profile，点击「跑 Profile」" :image-style="{ height: '40px' }" />
 
           <h5 class="adb-subtitle">数据预览（前 20 行）</h5>
+          <a-spin v-if="loading" />
+          <p v-else-if="previewError" role="alert">{{ previewError }} <button @click="onReload">重试</button></p>
           <a-table
-            v-if="preview && preview.columns && preview.rows"
+            v-else-if="preview && preview.columns && preview.rows"
             size="small"
             :columns="(preview.columns || []).map(c => ({ title: c, dataIndex: c, key: c }))"
-            :data-source="(preview.rows || []).map((row) => Object.fromEntries((preview!.columns || []).map((c, j) => [c, row[j]])).valueOf() as any)"
+            :data-source="(preview.rows || []).map((row, index) => ({...Object.fromEntries((preview!.columns || []).map((c, j) => [c, row[j]])), $rowIdx:index}))"
             :pagination="false"
             :scroll="{ x: 'max-content' }"
             row-key="$rowIdx"
           />
-          <a-empty v-else description="预览失败或暂无数据" />
+          <a-empty v-else description="暂无可预览数据" />
         </template>
 
         <!-- document -->
         <template v-else>
+          <a-spin v-if="loading" /><p v-else-if="previewError" role="alert">{{ previewError }} <button @click="onReload">重试</button></p>
           <h5 class="adb-subtitle">非结构化资产 · {{ asset.document_source_type }}</h5>
+          <p v-if="asset.profile?.source_refresh" :role="['failed', 'error'].includes(asset.profile.source_refresh.status) ? 'alert' : undefined">
+            源刷新：{{ asset.profile.source_refresh.status }} · {{ asset.profile.source_refresh.at || '—' }}
+            <template v-if="asset.profile.source_refresh.error"> · {{ asset.profile.source_refresh.error }}；下方保留上次已保存摘要，请恢复连接后重试。</template>
+          </p>
           <a-descriptions size="small" bordered :column="1">
             <a-descriptions-item label="locator">
               <pre class="adb-pre">{{ JSON.stringify(asset.locator, null, 2) }}</pre>
@@ -89,7 +97,8 @@
 
         <!-- 质量历史 -->
         <h5 class="adb-subtitle">最近质量探针</h5>
-        <a-empty v-if="metrics.length === 0" description="暂无探针记录" :image-style="{ height: '40px' }" />
+        <a-spin v-if="loading" /><p v-else-if="metricsError" role="alert">{{ metricsError }} <button @click="onReload">重试</button></p>
+        <a-empty v-else-if="metrics.length === 0" description="暂无探针记录" :image-style="{ height: '40px' }" />
         <a-table
           v-else
           size="small"
@@ -103,6 +112,7 @@
       <!-- 右：建模视角 + usage -->
       <a-col :span="10">
         <h4 class="adb-title">建模 / 使用</h4>
+        <p v-if="usageError" role="alert">{{ usageError }} <button @click="onReload">重试</button></p>
 
         <a-descriptions size="small" :column="1" class="adb-usage">
           <a-descriptions-item label="被绑定的 ObjectType">
@@ -144,6 +154,8 @@
 </template>
 
 <script setup lang="ts">
+import { useManagementPermission } from '../../composables/useManagementPermission'
+const { canEdit } = useManagementPermission('entity:write')
 import {
   Button as AButton, Col as ACol, Descriptions as ADescriptions,
   DescriptionsItem as ADescriptionsItem, Empty as AEmpty, List as AList,
@@ -158,6 +170,11 @@ defineProps<{
   preview: PreviewResult | null
   metrics: QualityMetric[]
   loading: boolean
+  loadError: string
+  previewError: string
+  metricsError: string
+  usageError: string
+  onReload: () => void
   syncing: boolean
   profiling: boolean
   onSyncSchema: () => void

@@ -73,7 +73,7 @@ def test_direct_effect_nodes_require_explicit_published_action(managed, monkeypa
 
 def test_mapped_action_uses_fixed_config_and_runtime_simulation(managed, monkeypatch):
     calls = []
-    def execute(action_type, config, params, dry_run):
+    def execute(action_type, config, params, dry_run, db=None):
         calls.append((action_type, config, params, dry_run))
         return SimpleNamespace(success=True, message="预览", output={})
     monkeypatch.setattr("app.services.agent_actions.run_executor_sync", execute)
@@ -82,7 +82,7 @@ def test_mapped_action_uses_fixed_config_and_runtime_simulation(managed, monkeyp
         "type_config": {"url": "https://evil.invalid"}, "dry_run": False, "params": {"device": "{device}"}},
         {"input": {"device": "P-102"}}, "q")
     assert result["simulated"]
-    assert calls == [("http", {"url": "https://published.invalid"}, {"device": "P-102"}, True)]
+    assert calls == [("http", {"url": "https://published.invalid", "_version_entity_id": "device-v1"}, {"device": "P-102"}, True)]
     assert eng._execute_node("action", {"action_id": "foreign-action"}, {}, "q")[0].get("error")
 
 
@@ -161,3 +161,41 @@ def test_empty_or_fully_or_partly_cyclic_managed_graph_is_not_a_success(managed,
     assert eng.node_io == {}
     scene = graph(managed, nodes, edges)
     assert any(event["type"] == "scene_failed" for event in scene.run_for_scene({}))
+
+
+def test_chat_graph_conditions_skip_wrong_branch_and_edge_mapping_is_used(managed):
+    nodes = [{"id": "check", "type": "condition", "data": {"expression": {"field": "question", "operator": "==", "value": "go"}}},
+             {"id": "yes", "type": "function", "data": {"function_id": "risk"}},
+             {"id": "no", "type": "function", "data": {"function_id": "foreign-function"}},
+             {"id": "output", "type": "output", "data": {}}]
+    edges = [{"source": "check", "target": "yes", "sourceHandle": "branch-true"},
+             {"source": "check", "target": "no", "sourceHandle": "branch-false"},
+             {"source": "yes", "target": "output"}, {"source": "no", "target": "output"}]
+    engine = graph(managed, nodes, edges)
+    events = list(engine.run("go"))
+    assert not any(event["type"] == "error" for event in events)
+    assert engine.node_io["yes"]["output"]["value"] == 1
+    assert engine.node_io["no"]["status"] == "skipped" and engine.node_io["output"]["status"] == "success"
+
+
+def test_sql_nested_modifications_are_not_classified_readonly():
+    from app.services.data_plane.sql_introspect import introspect
+    nested = introspect("WITH changed AS (DELETE FROM devices RETURNING *) SELECT * FROM changed", dialect="postgresql")
+    assert nested.is_dml and not nested.is_select
+    into = introspect("SELECT * INTO copied_devices FROM devices", dialect="postgresql")
+    assert into.is_ddl and not into.is_select
+
+
+def test_loop_executes_each_item_with_fixed_function_and_does_not_truncate(managed):
+    db, _ = managed
+    fn = db.get(OntologyVersionFunction, "risk-v1")
+    fn.logic_body = "int(params['value'])*2"
+    fn.input_schema = [{"name": "value", "type": "string", "required": True}]
+    db.commit()
+    engine = graph(managed)
+    config = {"source_field": "input.items", "item_var": "item", "function_id": "risk",
+              "params": {"value": "{item.value}"}}
+    result, _ = engine._execute_node("loop", config, {"input": {"items": [{"value": 2}, {"value": 3}]}}, "q")
+    assert result["success"] and [r["value"] for r in result["outputs"]] == [4, 6]
+    assert engine._execute_node("loop", config, {"input": {"items": [1]*101}}, "q")[0].get("error")
+    assert engine._execute_node("loop", {"source_field": "items"}, {"items": [1]}, "q")[0].get("error")
