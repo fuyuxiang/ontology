@@ -2,773 +2,167 @@
 
 # 元枢本体 · Yuanshu Ontology
 
-**面向企业 AI 的可运行本体智能平台**
+**面向企业 AI 的可运行本体平台**
 
-**AI 自动构建 · 业务语义建模 · 数据接地 · 逻辑行动 · Agent 运行**
-
-**一图 · 一体 · 一闭环**
-
-业务成图 · 能力入体 · 智能成环
-
-**[中文](README.md)** · **[English](README.en.md)**
-
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://python.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-18%2B-green.svg)](https://nodejs.org/)
-
-</div>
-
----
-
-## 元枢是什么？
-
-**元枢（Yuanshu Ontology）是一个开源的企业级可运行本体平台。**
-
-它将企业分散在数据库、文档、业务规则、算法模型和系统接口中的业务知识，组织为统一的**对象、关系、状态、事件、逻辑和行动**，形成可被业务人员、应用系统和 AI Agent 共同理解与调用的企业业务语义。
-
-元枢不仅用于“描述业务世界”，还进一步连接真实数据、承载业务逻辑和模型、定义可执行动作，并通过 MCP、SDK、Agent 与智能流程对外提供能力，使本体成为企业 AI 的**运行时业务上下文**。
-
-与传统从空白画布开始的人工建模方式不同，元枢将 AI 引入本体生产过程，通过文档理解、数据资产分析、语义抽取、关系发现、规则识别和智能映射，辅助完成从业务知识到可运行本体的构建。
-
-> **从企业数据与知识出发，自动构建业务语义，并让语义真正进入运行。**
-
----
-
-## 核心理念 · 一图 · 一体 · 一闭环
-
-### 一图
-
-**业务语义地图**
-
-统一描述企业业务世界中的：
-
-- 对象
-- 属性
-- 关系
-- 状态
-- 事件
-- 证据
-
-让业务人员、应用系统与 AI 使用同一套业务语义。
-
-### 一体
-
-**可运行本体**
-
-在统一业务语义之上进一步组织：
-
-- 事实
-- 规则
-- 函数
-- 模型
-- 行动
-- 治理
-
-让业务语义从“可以理解”进一步变成“可以运行”。
-
-### 一闭环
-
-**本体智能闭环**
-
-贯通：
-
-- 智能构建
-- 数据接地
-- 本体服务
-- 业务执行
-- 结果回写
-- 持续演化
-
-让本体从一次性模型变成持续演进的企业智能资产。
+将业务知识组织为对象与关系，连接真实数据，并供应用与 AI Agent 查询、计算和执行。
 
 **业务成图 · 能力入体 · 智能成环**
 
----
+[中文](README.md) · [English](README.en.md)
 
-## 为什么需要可运行本体？
+![Python](https://img.shields.io/badge/Python-3.11%2B-blue)
+![Node.js](https://img.shields.io/badge/Node.js-22.13%2B-green)
+![Vue](https://img.shields.io/badge/Vue-3-42b883)
+![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688)
 
-企业已经拥有大量数据平台、业务系统、规则、模型和知识库，但这些资产通常以不同形式存在：
+[系统界面](#系统界面) · [快速开始](#快速开始) · [使用指南](docs/usage.md) · [开发与贡献](#开发与贡献)
 
-- 数据存在于表、字段和指标中；
-- 业务知识存在于制度、文档和专家经验中；
-- 业务逻辑存在于 SQL、代码、规则引擎和算法模型中；
-- 执行能力存在于 API、工作流和生产系统中；
-- AI 面对的却往往只是零散的数据、文本和工具。
+</div>
 
-当 AI 从问答和辅助分析进一步进入业务判断与执行时，仅有数据访问或 RAG 并不足以稳定描述企业完整的业务上下文。
+## 项目简介
 
-元枢通过本体把这些能力组织到统一的业务对象之上：
+元枢把分散在数据库、业务文档、规则、函数和系统接口中的知识，组织为统一的业务语义。对象与关系描述业务结构，数据绑定连接业务事实，Logic 和 Action 提供计算与执行能力，发布版本则为应用与 Agent 提供可追踪的业务上下文。
 
-```text
-     数据 · 文档 · 规则 · 模型 · API
-                     │
-                     ▼
-          ┌────────────────────┐
-          │    业务语义地图    │
-          ├────────────────────┤
-          │  Object            │
-          │  Relation          │
-          │  State             │
-          │  Event             │
-          │  Evidence          │
-          └────────────────────┘
-                     │
-                     ▼
-          ┌────────────────────┐
-          │     可运行本体     │
-          ├────────────────────┤
-          │  Fact              │
-          │  Logic             │
-          │  Model             │
-          │  Action            │
-          │  Governance        │
-          └────────────────────┘
-                     │
-                     ▼
-            MCP · SDK · Agent
-             Workflow · API
-                     │
-                     ▼
-        理解 · 判断 · 执行 · 回写
-```
+你可以从文档或数据资产开始，让 AI 提取候选对象、属性与关系，再经过映射、人工审核和真实数据验证，形成可发布的本体；也可以手工建模或导入已有模型。
 
-本体因此不只是 Schema，也不是一张静态关系图，而是企业 AI 可以持续使用的业务运行层。
-
----
+适合需要统一业务语义、构建基于业务数据的 Agent，或复用企业规则与执行能力的团队。AI 构建与对话运行需要配置可用模型服务；手工建模、版本管理和本地数据接入可先独立体验。
 
 ## 核心能力
 
-### 1. AI 原生的本体自动化构建
+| 能力 | 可以完成的工作 |
+| --- | --- |
+| **本体构建** | 手动、模板、文档和数据资产构建；AI 提取建议，逐步完成对象定义、数据映射、最终审核与验证发布 |
+| **可视化建模** | 管理对象、属性、关系、共享属性与引用；查看本体图谱；提供 Protégé 风格和 WebVOWL 编辑视图 |
+| **数据接地** | 通过 `ObjectBinding` 连接主数据、补充数据和文档证据；维护字段映射、转换、质量规则与血缘 |
+| **Logic / Action** | Expression、SQL、Python 函数；接口调用、SQL 执行、属性修改、通知、函数调用和自定义脚本行动 |
+| **Agent / 业务技能** | 组织操作指引、对象范围、工具与参考资料；测试和发布固定版本；对话调试、工具过程与行动确认 |
+| **流程编排** | 可视化 DAG、条件分支、节点参数映射及 Logic / Action / Agent 节点，记录执行过程 |
+| **发布与治理** | 草稿、审批、版本快照、比较、影响分析与回滚申请；RBAC、JWT、OIDC、凭据加密与执行审计 |
+| **应用接入** | 本体 REST API、MCP HTTP JSON-RPC 工具端点，以及根据已发布本体生成的 TypeScript / Python SDK |
 
-元枢将 AI 作为本体生产过程中的协作者，而不是要求用户完全依赖手工建模。
+数据连接器包括 SQLite、MySQL、PostgreSQL、SQL Server、Oracle、S3 / MinIO、FTP / SFTP、REST API 和 Kafka。Kafka 当前用于连接探测、主题元数据与有限消息采样。模型交换支持 OWL / RDF、Turtle、JSON 和 Excel，具体入口与格式见[使用指南](docs/usage.md)。
 
-支持从企业已有数据与知识中辅助识别：
+## 系统界面
 
-- 业务对象与对象属性
-- 对象之间的业务关系
-- 状态与业务事件
-- 业务规则与约束
-- 计算逻辑与模型能力
-- 可执行动作
-- 术语、证据与治理信息
+以下页面来自当前源码运行的独立设备运维演示环境。Agent 和技能示例展示草稿配置，对话调试需配置实际模型凭证。
 
-平台提供多种智能构建入口，包括文档驱动、数据资产驱动和交互式引导等方式。
+### 本体图谱
 
-整体采用：
+把设备、传感器、检修工单和人员组织为可浏览的对象与关系。
 
-**AI 生成 + 程序校验 + 人工确认**
+![本体图谱：设备运维示例中的业务对象与关系](docs/images/screenshots/ontology-graph.png)
 
-的协同机制。
+<details>
+<summary>查看数据资产、发布管理与 Agent 工作台</summary>
 
-```text
-业务材料 / 数据资产
-        │
-        ▼
-   知识解析与理解
-        │
-        ▼
-   候选语义抽取
-        │
-        ▼
-对象 · 属性 · 关系
-规则 · 模型 · 行动
-        │
-        ▼
-结构与语义校验
-        │
-        ▼
-     专家确认
-        │
-        ▼
-     本体模型
-```
+### 数据资产
 
-AI 负责提高知识发现和建模效率，确定性程序负责结构约束与质量校验，专家负责关键业务语义确认。
+统一登记业务数据表与文档，查看字段结构，并为本体映射提供数据来源。
 
----
+![数据资产：设备运维数据表与文档目录](docs/images/screenshots/data-assets.png)
 
-### 2. 可运行本体建模
+### 发布管理
 
-元枢不仅建模实体和关系，还围绕真实业务运行组织完整的本体能力。
+查看已发布版本的对象、关系与逻辑快照，管理后续变更与审批。
 
-#### 对象
+![发布管理：设备运维本体的版本与资源快照](docs/images/screenshots/ontology-publish.png)
 
-描述企业业务世界中的实体、事件和业务概念。
+### Agent 工作台
 
-支持：
+固定本体版本、限定对象范围，并配置业务能力；右侧用于对话调试。
 
-- Object Type
-- Attribute
-- Unique Identifier
-- State
-- Event
-- Shared Attribute
-- Shared Reference
-- 分层本体组织
+![Agent 工作台：固定本体版本与对象范围配置](docs/images/screenshots/agent-workbench.png)
 
-#### 关系
+</details>
 
-描述对象之间稳定、明确的业务连接。
-
-支持：
-
-- 关系方向
-- 关系基数
-- 一对一 / 一对多 / 多对多
-- 关系约束
-- 跨对象引用
-- 图遍历
-- 关系血缘
-
-#### Logic
-
-把企业中的规则、计算和专家经验转化为可被系统与 Agent 调用的逻辑能力。
-
-支持：
-
-- Expression
-- SQL
-- Python
-- Function 调用
-- Function 组合
-- 规则与约束
-- 模型能力挂载
-
-#### Action
-
-把系统接口和业务操作封装成与业务对象关联的执行能力。
-
-支持：
-
-- API Call
-- SQL Execution
-- Function Call
-- Custom Script
-- Attribute Modification
-- Notification
-
-Action 可以与前置条件、权限控制、审批和执行审计结合，使 AI 能够调用企业能力，同时保持明确的执行边界。
-
-#### Governance
-
-治理贯穿本体设计、发布和运行全过程。
-
-包括：
-
-- 责任归属
-- 权限控制
-- 版本管理
-- 审核发布
-- 影响分析
-- 运行监控
-- 审计追溯
-- 回滚恢复
-
----
-
-### 3. 数据接地
-
-本体模型描述业务世界如何被理解，**数据接地（Data Grounding）**负责把这些业务定义连接到企业真实数据。
-
-元枢通过 `ObjectBinding` 建立业务对象与物理数据之间的映射。
-
-支持：
-
-- Primary 主数据绑定
-- Enrichment 补充数据绑定
-- Document Evidence 文档证据绑定
-- 属性映射建议
-- 数据类型兼容检查
-- 主键识别
-- LLM 辅助映射
-- 关系验证
-- 数据质量检查
-- 数据血缘
-
-```text
-物理数据
-Database / Table / Document / API
-              │
-              ▼
-        Object Binding
-              │
-              ▼
-对象 · 属性 · 关系 · 事件 · 证据
-              │
-              ▼
-           本体实例
-```
-
-元枢明确区分：
-
-**本体建模**负责形成业务语义规范；
-
-**数据接地**负责将语义规范映射到真实业务事实；
-
-两者协同，但不是同一过程。
-
----
-
-### 4. 真实数据验证
-
-完成数据绑定后，元枢可以进一步基于真实数据验证本体与数据之间的连接质量。
-
-验证过程包括：
-
-1. 数据源连接与 Schema 检查
-2. 对象属性实例化验证
-3. 对象关系与 JOIN 验证
-4. 数据质量与策略断言
-
-结合数据质量规则、映射置信度和运行探针，减少“模型定义正确、实际数据无法运行”的问题。
-
----
-
-### 5. Logic 与 Action Runtime
-
-发布后的本体不仅可查询，还可以直接承载业务运行能力。
-
-#### Logic Runtime
-
-逻辑函数支持：
-
-- Expression
-- SQL
-- Python
-
-并提供：
-
-- AST 安全校验
-- 沙箱执行
-- 调用超时
-- 调用链追踪
-- Function 嵌套调用
-- 循环调用检测
-
-同时提供在线工作空间，可直接维护 Logic 与 Action 源码。
-
-#### Action Runtime
-
-平台提供统一的 Action Executor，将不同系统能力抽象为可治理的业务动作。
-
-Action 与本体对象关联，使调用方关注：
-
-> “对哪个业务对象执行什么业务动作”
-
-而不是底层：
-
-> “调用哪个接口、修改哪张表、更新哪个字段”。
-
----
-
-### 6. 面向 AI / Agent 的本体服务
-
-发布后的本体可以作为 AI Agent 的运行时业务上下文。
-
-元枢将：
-
-- 对象
-- 属性
-- 关系
-- 数据映射
-- Logic
-- Action
-- 权限信息
-
-组织为 Agent 可以理解和调用的能力。
-
-#### MCP Server
-
-内置 MCP Server，通过标准协议向外部 Agent 与 MCP Client 暴露本体能力。
-
-当前提供覆盖以下类别的 MCP Tools：
-
-- 本体查询
-- 对象实例查询
-- 属性映射查询
-- 数据访问
-- Logic 执行
-- Action 执行
-- Python Workspace
-
-支持：
-
-- JSON-RPC 2.0
-- Bearer JWT
-- API Key
-- 调用日志
-- 调用统计
-
-#### Ontology SDK
-
-元枢可以根据已经发布的本体自动生成：
-
-- TypeScript SDK
-- Python SDK
-
-业务应用可以直接围绕对象语义进行开发，而无需将物理表结构传播到上层应用。
-
-#### ReAct Agent
-
-内置 Agent Runtime，可以基于本体上下文完成：
-
-```text
-理解意图
-   ↓
-查询本体
-   ↓
-获取业务事实
-   ↓
-调用 Logic
-   ↓
-执行 Action
-   ↓
-生成结果
-```
-
-Agent 工具调用过程支持流式追踪与调用链展示。
-
-#### Agent 应用与业务技能
-
-在「本体应用」中进入「Agent 应用」或「业务技能」。业务技能将 Markdown 操作指引、输入输出约定、参考资料和已有 Function / Action 组织成可复用的业务方法。
-
-1. 先发布本体版本，再选择技能适用的对象、函数、行动和资料，编写操作指引及测试用例。
-2. 保存技能草稿并运行测试。测试使用实际配置的模型与授权工具；全部用例通过后才可发布固定版本。
-3. 在 Agent 工作台选择已发布本体版本、对象范围、模型和技能版本。左侧配置，右侧对话调试；运行记录可查看技能加载、计算结果与待确认行动。
-4. 保存并完成当前配置的对话测试后发布 Agent。外部接口为 `POST /api/v1/open/agents/{id}/chat`，使用 `X-Agent-Key`；`stream: false` 返回完整 JSON 运行结果。
-
-保存草稿不会修改在线版本。Agent 发布时固定本体、技能及模型行为配置；凭证可以轮换，业务数据仍实时读取。升级技能或恢复 Agent 历史配置后，应重新测试并发布。归档技能停止新挂载，已有固定版本引用继续保留；仍被应用或历史发布版本引用的技能和模型不能删除。
-
-行动默认使用模拟模式。确认模式需要有权限的登录用户逐项授权，拒绝或过期不会执行，同一授权请求最多执行一次。公开接口不持有登录身份，不能代替用户授权写操作。画布中的行动也遵守同一执行边界。已有仅支持预览的行动执行器会明确报告不可执行或执行失败。
-
-管理员和编辑者可创建 Agent / 技能；查看者只读技能和配置，可以在获准范围内对话。技能可设为个人私有或工作区可见，运行记录和历史会话按用户隔离，管理员可查看应用运行记录。
-
-首次启动自动创建技能版本、技能测试、Agent 发布版本、运行记录及行动授权表，保留原有技能和 Agent 数据。实际调试前请配置可用模型凭证与业务数据连接；旧的未配置 Agent 可对话，但需要完成本体范围配置和测试后才能发布。
-
----
-
-### 7. 智能流程编排
-
-对于需要多步骤协同的业务任务，元枢提供可视化流程编排能力。
-
-支持：
-
-- DAG 执行
-- 条件分支
-- 并行节点
-- 子流程
-- 跨节点数据映射
-- Logic 调用
-- Action 调用
-- Agent 节点
-- 定时触发
-- 事件触发
-- Webhook
-
-本体负责提供统一的业务对象与能力，流程负责组织这些能力如何协同运行。
-
----
-
-### 8. 本体全生命周期治理
-
-元枢将本体作为长期维护的企业资产进行管理。
-
-#### 版本生命周期
-
-```text
-Draft
-  │
-  ▼
-Pending Approval
-  │
-  ├────► Rejected
-  │
-  ▼
-Published
-```
-
-支持：
-
-- Draft 管理
-- 发布审批
-- 版本快照
-- 版本比较
-- 回滚
-- Breaking Change 分析
-- 依赖检查
-- 删除保护
-
-本体、Logic 和 Action 的变更可以被追踪，并分析对已发布能力和上层应用的影响。
-
----
-
-### 9. 数据接入与连接器
-
-元枢提供统一的数据连接器框架。
-
-当前支持：
-
-#### Database
-
-- MySQL
-- PostgreSQL
-- SQL Server
-- Oracle
-
-#### Object Storage
-
-- Amazon S3
-- MinIO
-- OSS / COS / OBS 等 S3 兼容存储
-
-#### File Transfer
-
-- FTP
-- SFTP
-
-#### Streaming
-
-- Kafka
-
-#### API
-
-- REST API
-
-数据资产统一抽象为：
-
-- Table
-- SQL View
-- Document
-
-为本体构建和数据接地提供统一的数据入口。
-
----
-
-### 10. 安全与治理
-
-企业本体不仅需要语义统一，也需要保证数据访问和行动执行处于受控状态。
-
-元枢提供：
-
-- RBAC 权限体系
-- JWT 身份认证
-- API Key 鉴权
-- 连接凭据加密
-- 敏感字段脱敏
-- SQL AST 安全检查
-- 表级访问控制
-- 参数化查询
-- 执行限流
-- 操作审计
-- 执行审计
-- 服务健康监控
-- LLM 调用统计
-
-权限、执行与审计贯穿数据、本体、Logic、Action 和 Agent 调用链。
-
----
-
-## 本体全生命周期
-
-元枢覆盖从业务知识进入平台，到本体进入 AI 与业务运行的完整生命周期。
-
-```text
-  知识与数据
-      │
-      ▼
-  AI 智能构建
-      │
-      ▼
-  本体建模
-      │
-      ▼
-  数据接地
-      │
-      ▼
-  验证与发布
-      │
-      ▼
-  本体服务
-      │
-      ▼
-  Logic / Action / Agent
-      │
-      ▼
-  业务回写
-      │
-      ▼
-  运行反馈 ──────────────► 持续演化
-                              │
-      ▲                       │
-      └───────────────────────┘
-```
-
-这也是元枢的核心技术路线：
-
-> **业务成图 · 能力入体 · 智能成环**
-
----
+页面入口与操作顺序见[使用指南](docs/usage.md)，截图场景与更新方式见[截图说明](docs/screenshots.md)。
 
 ## 系统架构
 
-```text
-┌───────────────────────────────────────────────────────────────┐
-│                      AI & Applications                        │
-│                                                               │
-│   Agent | Workflow | Copilot | Business App                   │
-├───────────────────────────────────────────────────────────────┤
-│                      Ontology Services                        │
-│                                                               │
-│   MCP Server | Ontology API | TypeScript SDK | Python SDK     │
-├───────────────────────────────────────────────────────────────┤
-│                       Runtime Layer                           │
-│                                                               │
-│   Logic | Function | Model | Action | Event                   │
-├───────────────────────────────────────────────────────────────┤
-│                       Ontology Core                           │
-│                                                               │
-│   Object | Attribute | Relation | State | Event               │
-│   Logic | Action | Governance                                 │
-├───────────────────────────────────────────────────────────────┤
-│                       Data Grounding                          │
-│                                                               │
-│   ObjectBinding | Mapping | Validation | Quality | Lineage    │
-├───────────────────────────────────────────────────────────────┤
-│                        Data Sources                           │
-│                                                               │
-│   Database | Analytics DB | Document | Object Storage         │
-│   Kafka | API                                                 │
-└───────────────────────────────────────────────────────────────┘
-
-     Permission | Version | Approval | Audit | Monitor
-              Governance across all layers
+```mermaid
+flowchart LR
+    Sources["数据库 / 文档 / API"] --> Build["AI 辅助构建 / 手工建模"]
+    Build --> Ontology["对象 / 属性 / 关系"]
+    Sources --> Grounding["数据绑定 / 映射 / 质量"]
+    Grounding --> Ontology
+    Ontology --> Runtime["Logic / Action Runtime"]
+    Ontology --> Services["REST API / MCP / SDK"]
+    Runtime --> Services
+    Services --> Apps["Agent / 流程 / 业务应用"]
+    Governance["权限 / 版本 / 审批 / 审计"] -.-> Ontology
+    Governance -.-> Runtime
+    Governance -.-> Services
 ```
 
----
+前端使用 Vue 3、TypeScript、Vite、Pinia 和 Ant Design Vue；图谱与流程使用 d3-force 和 Vue Flow。后端使用 FastAPI、SQLAlchemy 与 Pydantic，元数据默认存储在 SQLite，也可配置 MySQL。代码工作区集成 code-server。
 
-## AI 自动构建与确定性运行
+AI 负责理解与生成候选结果，程序负责结构校验、权限检查和执行，用户在审核发布与行动授权时确认关键业务决策。
 
-元枢在设计上区分两类问题：
+## 快速开始
 
-### 适合 AI 的问题
+### 环境要求
 
-例如：
+- **Python 3.11+**。
+- **Node.js 22.13+（22.x）或 24+，npm**。当前锁定依赖也支持 Node.js 20.19+（20.x）；版本要求同时考虑 Vite 8 与 ESLint 10。
+- 完整启动脚本使用 **code-server**。Linux / macOS 未安装时脚本会尝试联网安装；Windows 需提前安装并确保命令在 PATH 中。
+- Linux / macOS 启动脚本还需 `curl`、`lsof`。导入旧版 `.doc / .xls / .ppt` 文件时另需 LibreOffice `soffice`。
 
-- 理解业务文档
-- 发现候选业务对象
-- 补全属性
-- 识别关系
-- 抽取规则
-- 生成映射建议
-- 生成 Logic / Skill
+本地体验可以使用 SQLite，无需先部署 Redis、Neo4j 或对象存储。外部数据库、存储与 AI 能力使用时再配置对应服务。
 
-这些环节充分利用大模型的语义理解能力。
+### 1. 获取源码并安装依赖
 
-### 必须确定执行的问题
-
-例如：
-
-- Schema 校验
-- 数据类型校验
-- 主键检查
-- JOIN 验证
-- 权限检查
-- SQL 安全检查
-- Action 执行
-- 发布审批
-- 版本快照
-- 审计记录
-
-这些环节由确定性程序和治理机制负责。
-
-因此元枢的 AI 原则不是：
-
-> **让 LLM 决定一切**
-
-而是：
-
-> **让 AI 负责理解和生成，让程序负责验证和执行，让人在关键节点做最终确认。**
-
----
-
-## 开放与互操作
-
-元枢的核心定位是**可运行企业本体平台**，同时支持与标准本体和外部工具之间的数据交换。
-
-当前支持包括：
-
-- OWL/XML
-- RDF/XML
-- Turtle
-- JSON
-- Excel
-
-并提供：
-
-- 平台原生可视化建模
-- Protégé 风格编辑界面
-- WebVOWL 可视化
-- 术语视图
-
-这些能力用于模型交换、已有本体迁移和专业本体工程协作，而不是限定元枢的本体运行模型。
-
----
-
-## Quick Start
-
-### Requirements
-
-- Python 3.11+
-- Node.js 20.19+ 或 22.12+（当前 Vite 8 的最低要求）
-- npm
-- code-server（工作区代码编辑器）；旧版 `.doc/.xls/.ppt` 导入另需 LibreOffice `soffice`
-
----
-
-### 1. Clone
+Linux / macOS：
 
 ```bash
 git clone https://github.com/fuyuxiang/ontology.git
 cd ontology
+
+python3 -m venv backend/venv
+backend/venv/bin/python -m pip install -r backend/requirements.txt
+
+npm --prefix frontend ci
+cp backend/.env.example .env
 ```
 
----
+Windows PowerShell：
 
-### 2. Configure
+```powershell
+git clone https://github.com/fuyuxiang/ontology.git
+cd ontology
 
-在项目根目录创建 `.env`：
+py -3 -m venv backend\venv
+.\backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
+
+npm --prefix frontend ci
+Copy-Item backend\.env.example .env
+```
+
+### 2. 配置根目录 `.env`
+
+修改刚复制的 `.env`，至少设置以下内容：
 
 ```env
-# Metadata database
 DATABASE_URL=sqlite:///./ontology.db
 
-# MySQL example
-# DATABASE_URL=mysql+pymysql://user:pass@host:3306/ontology?charset=utf8mb4
+# 使用随机生成的密钥
+SECRET_KEY=replace-with-a-random-secret
 
-# LLM - OpenAI compatible API
+# 首次创建 admin 必填：至少 8 位，包含大写、小写字母和数字
+ADMIN_INITIAL_PASSWORD=replace-with-your-own-password
+
+CORS_ORIGINS=http://localhost:5177,http://127.0.0.1:5177
+
+# 使用 AI 构建与对话时填写
 LLM_BASE_URL=https://your-llm-endpoint/v1
-LLM_API_KEY=your-api-key
+LLM_API_KEY=
 LLM_MODEL=your-model-name
-
-# Required
-SECRET_KEY=replace-with-strong-random-string
-
-# Optional
-CREDENTIAL_ENCRYPTION_KEY=
-# First initialization requires a password satisfying upper/lower/digit and length >= 8.
-ADMIN_INITIAL_PASSWORD=replace-with-your-own-strong-password
-CORS_ORIGINS=http://localhost:5177
-WORKSPACE_ROOT=/absolute/path/to/ontology/workspace
-LOCAL_DATA_ROOT=/absolute/path/to/ontology/local-data
-# Optional ports
-BACKEND_PORT=8001
-FRONTEND_PORT=5177
-CODE_SERVER_PORT=8443
 ```
 
----
+管理员用户名为 `admin`，密码为你设置的 `ADMIN_INITIAL_PASSWORD`。系统没有默认管理员密码，启动配置也不会重置已有账号的密码。
 
-### 3. Start
+完整变量模板见 [backend/.env.example](backend/.env.example)。工作区与本地 SQLite 数据源目录默认使用仓库下的 `workspace/` 和 `local-data/`。需要保存外部连接凭据时，建议设置稳定的 `CREDENTIAL_ENCRYPTION_KEY`，详见[使用指南](docs/usage.md#配置与部署)。
+
+### 3. 启动与访问
 
 Linux / macOS：
 
@@ -782,252 +176,76 @@ Windows：
 .\start.bat
 ```
 
-启动后：
+| 服务 | 默认地址 |
+| --- | --- |
+| Web 页面 | http://localhost:5177 |
+| API 文档 | http://localhost:8001/docs |
+| 健康检查 | http://localhost:8001/api/health |
+| MCP 工具端点 | `POST http://localhost:8001/api/v1/mcp` |
+| 代码编辑器 | http://localhost:8443 |
 
-| Service     | Address                            |
-| ----------- | ---------------------------------- |
-| Web UI      | `http://localhost:5177`            |
-| API         | `http://localhost:8001`            |
-| API Docs    | `http://localhost:8001/docs`       |
-| MCP Server  | `http://localhost:8001/api/v1/mcp` |
-| Code Server | `http://localhost:8443`            |
+首次启动自动建表、迁移和创建管理员。编辑器密码由 `CODE_SERVER_PASSWORD` 指定，或保存到首次启动生成的 `.code-server-password` 文件。
 
-首次启动会自动初始化数据库并创建管理员账户，必须提供符合密码策略的 `ADMIN_INITIAL_PASSWORD`；既有管理员密码不会被启动配置重置。
+端口可在根目录 `.env` 中通过 `BACKEND_PORT`、`FRONTEND_PORT`、`CODE_SERVER_PORT` 修改。启动日志为 `backend.log`、`frontend.log` 和 `code-server.log`。停止服务使用 `./stop.sh`，Windows 使用 `.\stop.bat`。
 
-启动脚本、直接运行的 `uvicorn` 和 `init_db.py` 均使用项目根目录 `.env`（模板为 `backend/.env.example`），进程环境变量优先。已有依赖可使用 `SKIP_DEPENDENCY_INSTALL=1`；编辑器密码来自 `CODE_SERVER_PASSWORD` 或首次启动生成的本地权限受限文件，启动日志不会输出密码。
+启动脚本用于本地开发与体验。已有依赖可设置 `SKIP_DEPENDENCY_INSTALL=1` 跳过安装；部署配置和服务访问范围见[使用指南](docs/usage.md#配置与部署)。
 
-关键流程的复验命令见下方「回归验证」。单点登录目前支持 OIDC，需配置实际身份源；数据库、对象存储及模型连接需配置对应的真实服务凭据。
+## 第一次使用
 
-> 生产环境请配置高强度 `SECRET_KEY`、`CREDENTIAL_ENCRYPTION_KEY` 和管理员密码，并限制 Code Server、CORS 与 MCP 的访问范围。
+1. 登录后进入「数据接入」，配置业务数据源；在「资产目录」登记表或文档。
+2. 在「本体列表」创建本体，选择手动、模板、文档或资产构建。
+3. 按「对象定义 → 数据映射 → 最终审核 → 验证发布」完成建模，检查主键、字段映射与关系。
+4. 添加业务函数和行动，将计算与操作绑定到业务对象。
+5. 在「业务技能」编写操作指引、选择依赖并测试，发布可复用的技能版本。
+6. 在「智能体应用」固定已发布本体与技能版本，配置对象范围和模型；调试通过后发布，再通过 API 接入应用。
 
-停止服务：
+Agent 行动默认模拟执行。确认模式下，业务写入需要有权限的登录用户授权；公开 Agent 接口不能代替登录用户确认写操作。详细行为见[发布与执行规则](docs/usage.md)。
+
+## 开发与贡献
+
+仅运行 API 与前端时，可以分别启动，不必先启动代码编辑器。先完成上述依赖安装与 `.env` 配置。
 
 ```bash
-./stop.sh
-```
-
----
-
-## Development
-
-### Backend
-
-```bash
+# 终端 1：后端
 cd backend
-
-pip install -r requirements.txt
-# Configure ../.env from .env.example before directly starting the API.
-
-uvicorn app.main:app \
-  --host 0.0.0.0 \
-  --port 8001 \
-  --reload
+venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8001 --reload
 ```
 
-### Frontend
-
 ```bash
+# 终端 2：前端
 cd frontend
-
-npm install
-
 npm run dev
 ```
 
-### 回归验证
+Windows 将 Python 命令替换为 `venv\Scripts\python.exe`。前端代理、页面路由与目录见[前端开发指南](frontend/README.md)。
+
+提交前按改动范围运行：
 
 ```bash
-# Backend: uses isolated databases and local protocol fixtures.
+# 后端回归：使用独立数据库、工作区和本地协议测试数据
 cd backend
-pip install -r requirements-dev.txt
-python3 -m pytest -q
+venv/bin/python -m pip install -r requirements-dev.txt
+venv/bin/python -m pytest -q
 
-# Frontend: state/interaction regressions, type checking and production build.
+# 前端状态回归、类型检查、构建及静态检查
 cd ../frontend
 npm run test:ui-state
 npm run build
+npm run lint
 ```
 
-建模按「对象定义 → 数据映射 → 最终审核 → 验证发布」完成，编辑已审核内容会要求重新审核。文档映射选择保留时，最终发布沿用实际保留的映射。发布检查包含实例主键和字段映射；关系查询返回分页和遍历截断信息，调用方应沿 `pagination.next` 继续读取。
+| 目录 | 职责 |
+| --- | --- |
+| [backend/app/api/v1](backend/app/api/v1) | 本体、发布、数据接地、Agent、技能与服务接口 |
+| [backend/app/services](backend/app/services) | 建模、执行、版本、Agent 与 MCP 工具实现 |
+| [backend/app/connectors](backend/app/connectors) | 数据源、对象存储、文件传输和 API 连接器 |
+| [backend/tests](backend/tests) | 后端回归与验收脚本 |
+| [frontend/src](frontend/src) | 页面、组件、路由、状态与 API 客户端 |
+| [docs](docs) | 使用说明与界面展示资源 |
+| [scripts](scripts) | 启停进程管理；工作区配置位于 [code-server](code-server) |
 
-实例标识使用已发布主键属性，端点和查询元数据通过 `id_property` 声明。SDK 保留原始业务属性 `id` 的值，并使用真实主键定位实例；关联查询支持 `limit`、`offset`、`relation_id` 和 `max_nodes` 分页参数。
+欢迎通过 [Issues](https://github.com/fuyuxiang/ontology/issues) 报告问题、讨论设计，通过 [Pull Requests](https://github.com/fuyuxiang/ontology/pulls) 提交改进。PR 请说明问题、行为变化与验证结果；涉及新能力时同步更新文档，两种语言保持一致。
 
-函数测试模拟业务写入，在首个写入处展示预览并停止。实际写入须通过行动执行或智能体确认；模拟模式不写业务数据。执行途中已有写入但后续失败时会保留回执并进入待核查状态，阻止直接重试造成重复执行。权限按持久化配置即时校验，并保留至少一个启用的系统管理账号。
+## 许可证
 
-自定义 Python 的可导入模块只提供数据处理接口；禁止宿主模块访问、私有属性和反射式字符串格式化，使用 f-string 格式化文本。函数和生成技能共用校验与执行时限。平台保存的时区用于时间显示，业务名称、上传内容及原始服务回执保留其原始文本。
-
----
-
-## 技术栈
-
-| Layer             | Technology                                          |
-| ----------------- | --------------------------------------------------- |
-| Frontend          | Vue 3 · TypeScript · Vite · Pinia · Ant Design Vue  |
-| Visualization     | Vue Flow · d3-force · ECharts                       |
-| Backend           | FastAPI · Uvicorn · SQLAlchemy · Pydantic · Alembic |
-| Metadata DB       | SQLite · MySQL                                      |
-| AI / LLM          | OpenAI-compatible API · Function Calling · ReAct    |
-| Agent Protocol    | MCP · JSON-RPC 2.0                                  |
-| SQL               | sqlglot                                             |
-| Documents         | python-docx · pdfplumber · openpyxl · pandas        |
-| Runtime Workspace | code-server                                         |
-| Auth              | JWT · bcrypt · RBAC                                 |
-| Realtime          | SSE · WebSocket                                     |
-
----
-
-## 项目结构
-
-```text
-ontology/
-│
-├── backend/
-│   └── app/
-│       ├── api/
-│       │   └── v1/
-│       │       ├── entities.py
-│       │       ├── relations.py
-│       │       ├── builder.py
-│       │       ├── ai_ontology.py
-│       │       ├── ai_builder_v2.py
-│       │       ├── doc_builder.py
-│       │       ├── ontology_publish.py
-│       │       ├── impact_analysis.py
-│       │       ├── mcp.py
-│       │       ├── osdk.py
-│       │       └── data_plane/
-│       │
-│       ├── connectors/
-│       ├── models/
-│       │
-│       └── services/
-│           ├── agent/
-│           ├── aip/
-│           ├── builder/
-│           ├── data_plane/
-│           ├── function_runtime/
-│           ├── action_executors/
-│           └── mcp_tools/
-│
-├── frontend/
-│   └── src/
-│       ├── views/
-│       │   ├── builder/
-│       │   ├── ontology/
-│       │   ├── dataflow/
-│       │   ├── agents/
-│       │   └── aip/
-│       │
-│       ├── components/
-│       ├── utils/
-│       ├── store/
-│       └── api/
-│
-├── workspace/
-│
-├── code-server/
-│
-├── docs/
-│
-└── tools/
-```
-
----
-
-## 设计原则
-
-元枢遵循几个核心原则。
-
-### Business Semantics First
-
-上层应用和 AI 应围绕稳定的业务对象工作，而不是直接依赖底层表和字段。
-
-### AI for Construction, Determinism for Execution
-
-AI 用于理解、发现和生成；确定性程序负责校验、执行和治理。
-
-### Ontology as Runtime
-
-本体不是建模结束后的静态文档，而是应用、Agent 和业务流程共同使用的运行时业务上下文。
-
-### Govern Everything
-
-对象、关系、Logic、Action、数据访问和 Agent 执行都应拥有明确的权限、版本和审计边界。
-
-### Build Once, Reuse Across Applications
-
-统一业务语义和能力应能够被多个 Agent、流程和业务应用持续复用，而不是随场景重复建设。
-
----
-
-## Contributing
-
-欢迎参与元枢的建设。
-
-我们尤其欢迎以下方向的贡献：
-
-- AI Ontology Building
-- Ontology Modeling
-- Data Grounding
-- Data Connectors
-- Logic Runtime
-- Action Runtime
-- MCP Tools
-- Agent Runtime
-- Workflow
-- Visualization
-- Governance & Security
-
-贡献流程：
-
-1. Fork 本仓库
-
-2. 创建功能分支
-
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
-
-3. 提交代码
-
-4. 推送分支
-
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-
-5. 创建 Pull Request
-
-对于较大的功能设计，建议先通过 Issue 讨论设计方案。
-
----
-
-## Community
-
-如果你：
-
-- 正在研究企业本体与 AI Agent；
-- 希望完善自动化本体构建能力；
-- 正在建设新的数据连接器；
-- 希望贡献新的 Logic / Action / MCP Tool；
-- 对企业语义建模、知识工程或 Agent Runtime 感兴趣；
-
-欢迎通过 GitHub Issues 与 Pull Requests 参与讨论和建设。
-
----
-
-## License
-
-[MIT License](LICENSE)
-
----
-
-<div align="center">
-
-### 元枢本体 · Yuanshu Ontology
-
-**让企业业务可理解，让智能能力可运行，让本体资产可进化。**
-
-**业务成图 · 能力入体 · 智能成环**
-
-</div>
+项目原 README 声明采用 MIT 许可证，但当前仓库尚未包含 `LICENSE` 文件。正式对外发布前需补齐版权信息与许可证全文。
