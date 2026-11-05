@@ -248,4 +248,6 @@ Use [Issues](https://github.com/fuyuxiang/ontology/issues) to report problems an
 
 ## License
 
-The original README declared the MIT license, but this checkout does not yet contain a `LICENSE` file. Copyright information and the full license text need to be added before a formal public release.
+Original project code is available under the [PolyForm Noncommercial License 1.0.0](LICENSE) for the purposes permitted by that license. Commercial uses outside those purposes require separate permission from the maintainers.
+
+Third-party components retain their respective licenses. This update does not revoke rights already granted under earlier licenses.
